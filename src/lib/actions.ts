@@ -15,13 +15,23 @@ function slugify(name: string): string {
     .replace(/(^-|-$)+/g, "");
 }
 
+/**
+ * Meta access tokens and phone number IDs are always plain ASCII. Stripping
+ * anything else defends against a stray character from a bad copy/paste
+ * silently corrupting the value — which otherwise only surfaces later as a
+ * cryptic "ByteString" crash when the token is used in an HTTP header.
+ */
+function sanitizeAsciiToken(value: string): string {
+  return value.replace(/[^\x21-\x7E]/g, "");
+}
+
 export async function createBusiness(formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
   const name = String(formData.get("name") ?? "").trim();
-  const wabaPhoneNumberId = String(formData.get("wabaPhoneNumberId") ?? "").trim();
-  const wabaAccessToken = String(formData.get("wabaAccessToken") ?? "").trim();
+  const wabaPhoneNumberId = sanitizeAsciiToken(String(formData.get("wabaPhoneNumberId") ?? ""));
+  const wabaAccessToken = sanitizeAsciiToken(String(formData.get("wabaAccessToken") ?? ""));
   const systemPrompt = String(formData.get("systemPrompt") ?? "").trim();
 
   if (!name || !wabaPhoneNumberId || !wabaAccessToken || !systemPrompt) {

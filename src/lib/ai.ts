@@ -1,6 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// .trim() guards against a stray leading/trailing character sneaking into
+// the env var from a copy/paste — an invalid key otherwise surfaces as an
+// opaque "ByteString" crash deep in the HTTP client instead of a clear error.
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() });
 
 export type AgentHistoryMessage = { role: "user" | "assistant"; content: string };
 
