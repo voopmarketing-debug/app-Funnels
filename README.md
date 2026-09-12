@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# App Funnels — Agentes de IA para WhatsApp
 
-## Getting Started
+Plataforma multi-tenant: cada negocio cliente tiene su propio agente de IA
+(Claude) respondiendo por su número de WhatsApp (Meta Cloud API oficial).
 
-First, run the development server:
+Ver [`PROJECT_STATE.md`](./PROJECT_STATE.md) para arquitectura, modelo de
+datos y decisiones técnicas.
+
+## Requisitos
+
+- Node 20+
+- PostgreSQL
+
+## Setup local
 
 ```bash
+npm install
+cp .env.example .env   # completa DATABASE_URL, AUTH_SECRET, TOKEN_ENCRYPTION_KEY, etc.
+npx prisma migrate dev
+SEED_ADMIN_EMAIL=tu@email.com SEED_ADMIN_PASSWORD=algo-seguro npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run dev` — servidor de desarrollo
+- `npm run build` / `npm run start` — build y server de producción
+- `npm test` — tests unitarios (Vitest)
+- `npm run db:seed` — crea el usuario admin inicial
 
-## Learn More
+## Conectar un negocio a WhatsApp
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Crea la app de Meta y el WhatsApp Business Account (Cloud API oficial).
+2. Configura el webhook `https://tu-dominio.com/api/webhooks/whatsapp` con el
+   mismo valor de `WHATSAPP_VERIFY_TOKEN` de tu `.env`.
+3. En el dashboard, crea el negocio con su `Phone Number ID` y `Access Token`
+   de Meta, y escribe el prompt del agente.
