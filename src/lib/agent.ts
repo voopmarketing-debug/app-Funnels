@@ -59,20 +59,43 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     content: msg.content,
   }));
 
-  const reply = await generateAgentReply({
-    systemPrompt: business.agent.systemPrompt,
-    model: business.agent.model,
-    temperature: business.agent.temperature,
-    history,
-    userMessage: message.text,
-  });
+  let reply: string;
+  try {
+    reply = await generateAgentReply({
+      systemPrompt: business.agent.systemPrompt,
+      model: business.agent.model,
+      temperature: business.agent.temperature,
+      history,
+      userMessage: message.text,
+    });
+  } catch (err) {
+    console.error("[ANTHROPIC_CALL_FAILED]", err);
+    throw err;
+  }
 
-  const { messageId } = await sendWhatsAppTextMessage({
-    phoneNumberId: business.wabaPhoneNumberId!,
-    accessToken: decryptSecret(business.wabaAccessToken),
-    to: message.from,
-    text: reply,
-  });
+  const accessToken = decryptSecret(business.wabaAccessToken);
+  const badCharIndex = [...accessToken].findIndex((ch) => ch.charCodeAt(0) > 255);
+  console.log(
+    "[WHATSAPP_TOKEN_DIAGNOSTIC]",
+    JSON.stringify({
+      length: accessToken.length,
+      badCharIndex,
+      badCharCode: badCharIndex >= 0 ? accessToken.charCodeAt(badCharIndex) : null,
+    }),
+  );
+
+  let messageId: string;
+  try {
+    ({ messageId } = await sendWhatsAppTextMessage({
+      phoneNumberId: business.wabaPhoneNumberId!,
+      accessToken,
+      to: message.from,
+      text: reply,
+    }));
+  } catch (err) {
+    console.error("[WHATSAPP_SEND_FAILED]", err);
+    throw err;
+  }
 
   await prisma.message.create({
     data: {
