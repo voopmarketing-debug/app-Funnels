@@ -15,17 +15,17 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Negocios</h1>
+        <h1 className="text-xl font-bold">Negocios</h1>
         <Link
           href="/dashboard/businesses/new"
-          className="rounded-md bg-black px-3 py-2 text-sm text-white dark:bg-white dark:text-black"
+          className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
         >
           + Nuevo negocio
         </Link>
       </div>
 
       {memberships.length === 0 && (
-        <p className="text-black/60 dark:text-white/60">
+        <p className="text-ink-muted">
           Todavía no hay negocios. Crea el primero para conectar su WhatsApp.
         </p>
       )}
@@ -35,13 +35,16 @@ export default async function DashboardPage() {
           <li key={business.id}>
             <Link
               href={`/dashboard/businesses/${business.id}`}
-              className="block rounded-xl border border-black/10 p-4 hover:border-black/30 dark:border-white/10 dark:hover:border-white/30"
+              className="block rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong"
             >
               <p className="font-medium">{business.name}</p>
-              <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                Agente: {business.agent?.enabled ? "activo" : "inactivo"}
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${business.agent?.enabled ? "bg-accent" : "bg-ink-faint"}`}
+                />
+                Agente {business.agent?.enabled ? "activo" : "inactivo"}
               </p>
-              <p className="text-sm text-black/60 dark:text-white/60">
+              <p className="text-sm text-ink-muted">
                 {business._count.conversations} conversaciones
               </p>
             </Link>

@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 
 export default function LoginPage() {
   return (
@@ -39,15 +40,27 @@ function LoginForm() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center p-6">
+    <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
+      <div className="fl-grid-bg pointer-events-none absolute inset-0" />
+
       <form
         action={handleSubmit}
-        className="w-full max-w-sm space-y-4 rounded-xl border border-black/10 p-6 dark:border-white/10"
+        className="relative w-full max-w-sm space-y-6 rounded-xl border border-border bg-surface p-7"
       >
-        <h1 className="text-xl font-semibold">Iniciar sesión</h1>
+        <div className="flex items-center gap-3">
+          <FunnelsLogoMark className="h-7 w-7 flex-none" />
+          <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">
+            Funnels_Labs
+          </span>
+        </div>
 
         <div className="space-y-1">
-          <label htmlFor="email" className="text-sm font-medium">
+          <h1 className="text-xl font-bold">Iniciar sesión</h1>
+          <p className="text-sm text-ink-muted">Panel de agentes de WhatsApp</p>
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="email" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Email
           </label>
           <input
@@ -55,12 +68,12 @@ function LoginForm() {
             name="email"
             type="email"
             required
-            className="w-full rounded-md border border-black/10 px-3 py-2 dark:border-white/20"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="password" className="text-sm font-medium">
+          <label htmlFor="password" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Contraseña
           </label>
           <input
@@ -68,16 +81,16 @@ function LoginForm() {
             name="password"
             type="password"
             required
-            className="w-full rounded-md border border-black/10 px-3 py-2 dark:border-white/20"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-error">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-md bg-black px-3 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          className="w-full rounded-md bg-accent px-3 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>

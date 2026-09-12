@@ -3,7 +3,7 @@ import { createBusiness } from "@/lib/actions";
 export default function NewBusinessPage() {
   return (
     <div className="max-w-xl space-y-6">
-      <h1 className="text-xl font-semibold">Nuevo negocio</h1>
+      <h1 className="text-xl font-bold">Nuevo negocio</h1>
 
       <form action={createBusiness} className="space-y-4">
         <Field label="Nombre del negocio" name="name" placeholder="Pizzería El Sabor" required />
@@ -21,7 +21,7 @@ export default function NewBusinessPage() {
           required
         />
         <div className="space-y-1">
-          <label htmlFor="systemPrompt" className="text-sm font-medium">
+          <label htmlFor="systemPrompt" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Instrucciones del agente de IA
           </label>
           <textarea
@@ -30,13 +30,13 @@ export default function NewBusinessPage() {
             required
             rows={6}
             placeholder="Eres el asistente de WhatsApp de [negocio]. Responde de forma breve y amable, ayuda a los clientes a..."
-            className="w-full rounded-md border border-black/10 px-3 py-2 dark:border-white/20"
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
           />
         </div>
 
         <button
           type="submit"
-          className="rounded-md bg-black px-4 py-2 text-white dark:bg-white dark:text-black"
+          className="rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover"
         >
           Crear negocio
         </button>
@@ -55,7 +55,7 @@ function Field(props: {
   const { label, name, placeholder, type = "text", required } = props;
   return (
     <div className="space-y-1">
-      <label htmlFor={name} className="text-sm font-medium">
+      <label htmlFor={name} className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
         {label}
       </label>
       <input
@@ -64,7 +64,7 @@ function Field(props: {
         type={type}
         placeholder={placeholder}
         required={required}
-        className="w-full rounded-md border border-black/10 px-3 py-2 dark:border-white/20"
+        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
       />
     </div>
   );

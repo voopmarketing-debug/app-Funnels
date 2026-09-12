@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
+/*
+ * Funnels Labs brand tokens.
+ * Dark-only brand (no light variant defined in the brand book) — the app
+ * intentionally does not switch with the OS theme.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --surface: #161616;
+  --surface-2: #1e1e1e;
+  --border: #2a2a2a;
+  --border-strong: #3d3d3d;
+
+  --ink: #f5f5f0;
+  --ink-muted: #8a8a86;
+  --ink-faint: #5a5a56;
+
+  --accent: #b5ff2b;
+  --accent-hover: #8fd400;
+  --accent-ink: #0a0a0a;
+  --accent-secondary: #c9a9ff;
+  --error: #ff6b57;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-error: var(--error);
+
+  --font-sans: var(--font-montserrat);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  font-family: var(--font-montserrat), -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+.fl-mono {
+  font-family: var(--font-jetbrains-mono), "SFMono-Regular", Menlo, monospace;
+}
+
+.fl-grid-bg {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.4;
 }

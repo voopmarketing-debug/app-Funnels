@@ -24,10 +24,10 @@ export default async function ConversationPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-xl font-bold">
         {conversation.customerName ?? conversation.customerPhone}
       </h1>
-      <p className="text-sm text-black/60 dark:text-white/60">{conversation.customerPhone}</p>
+      <p className="fl-mono text-xs tracking-wide text-ink-muted">{conversation.customerPhone}</p>
 
       <div className="space-y-3">
         {conversation.messages.map((message) => (
@@ -35,8 +35,8 @@ export default async function ConversationPage({
             key={message.id}
             className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
               message.role === "AGENT"
-                ? "ml-auto bg-black text-white dark:bg-white dark:text-black"
-                : "bg-black/5 dark:bg-white/10"
+                ? "ml-auto bg-accent text-accent-ink"
+                : "border border-border bg-surface"
             }`}
           >
             <p>{message.content}</p>
