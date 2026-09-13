@@ -8,9 +8,9 @@ import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { requireBusinessMembership } from "@/lib/authz";
-import type { ConversationStage } from "@prisma/client";
 import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
+import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 
 function slugify(name: string): string {
   return name
@@ -82,6 +82,12 @@ export async function registerBusiness(
         slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
         industry,
         agent: { create: { systemPrompt: defaultSystemPrompt } },
+        pipelineStages: {
+          create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
+            name: stageName,
+            position,
+          })),
+        },
       },
     });
 
@@ -130,6 +136,12 @@ export async function createBusiness(formData: FormData): Promise<void> {
       industry,
       memberships: { create: { userId: session.user.id, role: "OWNER" } },
       agent: { create: { systemPrompt } },
+      pipelineStages: {
+        create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
+          name: stageName,
+          position,
+        })),
+      },
     },
   });
 
@@ -188,28 +200,129 @@ export async function updateAgent(businessId: string, formData: FormData): Promi
   revalidatePath(`/dashboard/businesses/${businessId}`);
 }
 
-const VALID_STAGES: ConversationStage[] = ["NUEVO", "EN_CONVERSACION", "INTERESADO", "GANADO", "PERDIDO"];
-
 export async function updateConversationStage(
   businessId: string,
   conversationId: string,
-  stage: string,
+  stageId: string,
 ): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
 
-  if (!VALID_STAGES.includes(stage as ConversationStage)) {
-    throw new Error("Invalid stage");
-  }
+  const stage = await prisma.pipelineStage.findFirst({ where: { id: stageId, businessId } });
+  if (!stage) throw new Error("Invalid stage");
 
   await prisma.conversation.update({
     where: { id: conversationId, businessId },
-    data: { stage: stage as ConversationStage },
+    data: { stageId },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+}
+
+export async function addPipelineStage(businessId: string, formData: FormData): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) throw new Error("name is required");
+
+  const last = await prisma.pipelineStage.findFirst({
+    where: { businessId },
+    orderBy: { position: "desc" },
+  });
+
+  await prisma.pipelineStage.create({
+    data: { businessId, name, position: (last?.position ?? -1) + 1 },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
+export async function renamePipelineStage(
+  businessId: string,
+  stageId: string,
+  name: string,
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("name is required");
+
+  await prisma.pipelineStage.update({
+    where: { id: stageId, businessId },
+    data: { name: trimmed },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
+export async function deletePipelineStage(businessId: string, stageId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const stages = await prisma.pipelineStage.findMany({
+    where: { businessId },
+    orderBy: { position: "asc" },
+  });
+
+  if (stages.length <= 1) {
+    throw new Error("A business must keep at least one pipeline stage");
+  }
+
+  const toDelete = stages.find((s) => s.id === stageId);
+  if (!toDelete) throw new Error("Invalid stage");
+
+  // Conversations sitting in the deleted stage move to the first remaining
+  // one instead of being blocked or silently orphaned.
+  const fallback = stages.find((s) => s.id !== stageId)!;
+
+  await prisma.$transaction([
+    prisma.conversation.updateMany({
+      where: { businessId, stageId },
+      data: { stageId: fallback.id },
+    }),
+    prisma.pipelineStage.delete({ where: { id: stageId } }),
+  ]);
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
+export async function movePipelineStage(
+  businessId: string,
+  stageId: string,
+  direction: "left" | "right",
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const stages = await prisma.pipelineStage.findMany({
+    where: { businessId },
+    orderBy: { position: "asc" },
+  });
+
+  const index = stages.findIndex((s) => s.id === stageId);
+  const swapWith = direction === "left" ? index - 1 : index + 1;
+  if (index === -1 || swapWith < 0 || swapWith >= stages.length) return;
+
+  const a = stages[index];
+  const b = stages[swapWith];
+
+  await prisma.$transaction([
+    // Bump `a` out of the way first so the (businessId, position) unique
+    // constraint doesn't collide with `b` while swapping.
+    prisma.pipelineStage.update({ where: { id: a.id }, data: { position: -1 } }),
+    prisma.pipelineStage.update({ where: { id: b.id }, data: { position: a.position } }),
+    prisma.pipelineStage.update({ where: { id: a.id }, data: { position: b.position } }),
+  ]);
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
 }
 
 export async function toggleAgentEnabled(businessId: string, enabled: boolean): Promise<void> {

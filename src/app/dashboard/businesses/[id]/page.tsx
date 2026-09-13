@@ -5,6 +5,7 @@ import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
 import { CrmBoard } from "./CrmBoard";
 import { AgentPowerButton } from "./AgentPowerButton";
+import { PipelineManager } from "./PipelineManager";
 
 export default async function BusinessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,11 +20,17 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   if (!membership) notFound();
   const { business } = membership;
 
-  const conversations = await prisma.conversation.findMany({
-    where: { businessId: id },
-    orderBy: { lastMessageAt: "desc" },
-    take: 50,
-  });
+  const [conversations, stages] = await Promise.all([
+    prisma.conversation.findMany({
+      where: { businessId: id },
+      orderBy: { lastMessageAt: "desc" },
+      take: 50,
+    }),
+    prisma.pipelineStage.findMany({
+      where: { businessId: id },
+      orderBy: { position: "asc" },
+    }),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -50,7 +57,12 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">CRM — Conversaciones por etapa</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold">CRM — Conversaciones por etapa</h2>
+        </div>
+
+        <PipelineManager businessId={id} stages={stages} />
+
         {conversations.length === 0 ? (
           <p className="text-sm text-ink-muted">
             Aún no hay conversaciones en WhatsApp para este negocio.
@@ -58,11 +70,12 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
         ) : (
           <CrmBoard
             businessId={id}
+            stages={stages}
             conversations={conversations.map((c) => ({
               id: c.id,
               customerName: c.customerName,
               customerPhone: c.customerPhone,
-              stage: c.stage,
+              stageId: c.stageId,
               lastMessageAt: c.lastMessageAt.toISOString(),
             }))}
           />

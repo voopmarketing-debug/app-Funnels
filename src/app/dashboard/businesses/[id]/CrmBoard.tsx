@@ -4,56 +4,60 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { updateConversationStage } from "@/lib/actions";
-import { STAGE_OPTIONS, STAGE_STYLES } from "@/lib/crmStages";
+import { stageStyle } from "@/lib/crmStages";
+
+export type CrmStage = { id: string; name: string; position: number };
 
 export type CrmConversation = {
   id: string;
   customerName: string | null;
   customerPhone: string;
-  stage: string;
+  stageId: string;
   lastMessageAt: string;
 };
 
 export function CrmBoard({
   businessId,
+  stages,
   conversations,
 }: {
   businessId: string;
+  stages: CrmStage[];
   conversations: CrmConversation[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
 
-  function moveToStage(conversationId: string, newStage: string) {
+  function moveToStage(conversationId: string, newStageId: string) {
     startTransition(async () => {
-      await updateConversationStage(businessId, conversationId, newStage);
+      await updateConversationStage(businessId, conversationId, newStageId);
       router.refresh();
     });
   }
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
-      {STAGE_OPTIONS.map((stageOption) => {
-        const items = conversations.filter((c) => c.stage === stageOption.value);
-        const style = STAGE_STYLES[stageOption.value];
-        const isDropTarget = dragOverStage === stageOption.value;
+      {stages.map((stage) => {
+        const items = conversations.filter((c) => c.stageId === stage.id);
+        const style = stageStyle(stage.position);
+        const isDropTarget = dragOverStageId === stage.id;
 
         return (
           <div
-            key={stageOption.value}
+            key={stage.id}
             onDragOver={(e) => {
               e.preventDefault();
-              setDragOverStage(stageOption.value);
+              setDragOverStageId(stage.id);
             }}
-            onDragLeave={() => setDragOverStage((prev) => (prev === stageOption.value ? null : prev))}
+            onDragLeave={() => setDragOverStageId((prev) => (prev === stage.id ? null : prev))}
             onDrop={(e) => {
               e.preventDefault();
               const conversationId = e.dataTransfer.getData("text/plain");
-              setDragOverStage(null);
+              setDragOverStageId(null);
               setDraggingId(null);
-              if (conversationId) moveToStage(conversationId, stageOption.value);
+              if (conversationId) moveToStage(conversationId, stage.id);
             }}
             className={`flex w-64 flex-none flex-col rounded-lg border bg-surface transition ${
               isDropTarget ? "border-accent bg-accent/5" : "border-border"
@@ -61,8 +65,8 @@ export function CrmBoard({
           >
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
               <span className={`h-2 w-2 rounded-full ${style.dot}`} />
-              <p className="fl-mono text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                {stageOption.label}
+              <p className="fl-mono truncate text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                {stage.name}
               </p>
               <span className="ml-auto text-xs text-ink-muted">{items.length}</span>
             </div>
@@ -79,7 +83,7 @@ export function CrmBoard({
                   }}
                   onDragEnd={() => {
                     setDraggingId(null);
-                    setDragOverStage(null);
+                    setDragOverStageId(null);
                   }}
                   className={`cursor-grab rounded-md border ${style.border} bg-background p-2 active:cursor-grabbing ${
                     draggingId === c.id ? "opacity-40" : ""
@@ -93,14 +97,14 @@ export function CrmBoard({
                     <p className="truncate text-xs text-ink-muted">{c.customerPhone}</p>
                   </Link>
                   <select
-                    value={c.stage}
+                    value={c.stageId}
                     disabled={isPending}
                     onChange={(e) => moveToStage(c.id, e.target.value)}
                     className="fl-mono mt-2 w-full rounded border border-border bg-surface px-1.5 py-1 text-[10px] uppercase tracking-wide text-ink-muted outline-none focus:border-accent"
                   >
-                    {STAGE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                    {stages.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.name}
                       </option>
                     ))}
                   </select>

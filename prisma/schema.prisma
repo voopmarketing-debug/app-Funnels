@@ -27,9 +27,10 @@ model Business {
   // (e.g. "clinica" vs "ecommerce" call for very different context).
   industry String @default("otro")
 
-  memberships   Membership[]
-  agent         AIAgent?
-  conversations Conversation[]
+  memberships    Membership[]
+  agent          AIAgent?
+  conversations  Conversation[]
+  pipelineStages PipelineStage[]
 }
 
 // Links a platform user to a business (a user can manage multiple businesses).
@@ -69,34 +70,43 @@ model AIAgent {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
-// Simple CRM pipeline stage for a conversation, so the business owner can see
-// at a glance where each customer stands — without needing a separate CRM.
-enum ConversationStage {
-  NUEVO
-  EN_CONVERSACION
-  INTERESADO
-  GANADO
-  PERDIDO
+// A CRM pipeline stage, owned by one business and fully customizable: each
+// business gets its own set of stages (seeded with 5 defaults on creation),
+// and can rename, add, delete, or reorder them independently of every other
+// business.
+model PipelineStage {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  position   Int
+  createdAt  DateTime @default(now())
+
+  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([businessId, position])
 }
 
 // One WhatsApp conversation thread with an end customer of a business.
 model Conversation {
-  id             String            @id @default(cuid())
+  id             String   @id @default(cuid())
   businessId     String
   customerPhone  String
   customerName   String?
-  stage          ConversationStage @default(NUEVO)
+  stageId        String
   // When true, the AI agent stays silent on new messages in this specific
   // conversation — for when the business owner wants to take over one chat
   // by hand without touching the agent for everyone else.
-  aiPaused       Boolean           @default(false)
-  lastMessageAt  DateTime          @default(now())
-  createdAt      DateTime          @default(now())
+  aiPaused       Boolean  @default(false)
+  lastMessageAt  DateTime @default(now())
+  createdAt      DateTime @default(now())
 
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stage    PipelineStage @relation(fields: [stageId], references: [id])
   messages Message[]
 
   @@unique([businessId, customerPhone])
+  @@index([stageId])
 }
 
 enum MessageRole {

@@ -25,7 +25,10 @@ export default async function ConversationPage({
   });
   if (!conversation) notFound();
 
-  const business = await prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } });
+  const [business, stages] = await Promise.all([
+    prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
+    prisma.pipelineStage.findMany({ where: { businessId: id }, orderBy: { position: "asc" } }),
+  ]);
 
   const customerInitial = (conversation.customerName?.trim()[0] ?? conversation.customerPhone.slice(-2)).toUpperCase();
   const businessInitial = business.name.trim()[0]?.toUpperCase() ?? "F";
@@ -39,7 +42,12 @@ export default async function ConversationPage({
           <p className="fl-mono text-xs tracking-wide text-ink-muted">{conversation.customerPhone}</p>
         </div>
         <AiPauseButton businessId={id} conversationId={conversationId} aiPaused={conversation.aiPaused} />
-        <StageSelector businessId={id} conversationId={conversationId} stage={conversation.stage} />
+        <StageSelector
+          businessId={id}
+          conversationId={conversationId}
+          stageId={conversation.stageId}
+          stages={stages}
+        />
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto bg-background px-4 py-4">

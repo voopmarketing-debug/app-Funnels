@@ -27,6 +27,17 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     return;
   }
 
+  // Only needed for a brand-new conversation — every business is seeded
+  // with its own pipeline on creation, so this should always find one.
+  const firstStage = await prisma.pipelineStage.findFirst({
+    where: { businessId: business.id },
+    orderBy: { position: "asc" },
+  });
+  if (!firstStage) {
+    console.warn(`Business ${business.id} has no pipeline stages configured`);
+    return;
+  }
+
   const conversation = await prisma.conversation.upsert({
     where: {
       businessId_customerPhone: { businessId: business.id, customerPhone: message.from },
@@ -36,6 +47,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       businessId: business.id,
       customerPhone: message.from,
       customerName: message.contactName,
+      stageId: firstStage.id,
     },
   });
 

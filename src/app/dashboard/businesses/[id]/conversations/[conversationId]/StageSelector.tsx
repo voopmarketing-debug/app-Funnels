@@ -3,36 +3,37 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateConversationStage } from "@/lib/actions";
-import { STAGE_OPTIONS } from "@/lib/crmStages";
 
 export function StageSelector({
   businessId,
   conversationId,
-  stage,
+  stageId,
+  stages,
 }: {
   businessId: string;
   conversationId: string;
-  stage: string;
+  stageId: string;
+  stages: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   return (
     <select
-      value={stage}
+      value={stageId}
       disabled={isPending}
       onChange={(e) => {
-        const newStage = e.target.value;
+        const newStageId = e.target.value;
         startTransition(async () => {
-          await updateConversationStage(businessId, conversationId, newStage);
+          await updateConversationStage(businessId, conversationId, newStageId);
           router.refresh();
         });
       }}
       className="fl-mono rounded-md border border-border bg-background px-2 py-1 text-[11px] uppercase tracking-wide text-ink-muted outline-none focus:border-accent"
     >
-      {STAGE_OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
+      {stages.map((opt) => (
+        <option key={opt.id} value={opt.id}>
+          {opt.name}
         </option>
       ))}
     </select>

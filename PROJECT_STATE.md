@@ -22,9 +22,19 @@ pública con planes de precio para vender el producto.
 
 `Business` (tenant, con `industry`) → `Membership` (usuario↔negocio) →
 `AIAgent` (1:1, `systemPrompt`/`tone`/`replyLength`/`enabled`) →
-`Conversation` (por número de cliente, con `stage` de CRM) → `Message`
-(con `sentByHuman` para distinguir un mensaje mandado por la IA de uno
-mandado a mano desde el dashboard).
+`Conversation` (por número de cliente) → `Message` (con `sentByHuman` para
+distinguir un mensaje mandado por la IA de uno mandado a mano desde el
+dashboard).
+
+`PipelineStage` es el CRM: cada `Business` tiene su propio set de etapas
+(`name` + `position`), sembrado con 5 por defecto al crear el negocio
+(Nuevo/En conversación/Interesado/Ganado/Perdido — ver
+`DEFAULT_PIPELINE_STAGE_NAMES` en `src/lib/crmStages.ts`), pero cada negocio
+puede agregar, renombrar, borrar o reordenar las suyas sin afectar a los
+demás (`PipelineManager.tsx` + acciones `addPipelineStage` /
+`renamePipelineStage` / `deletePipelineStage` / `movePipelineStage`).
+`Conversation.stageId` apunta a una fila de `PipelineStage` de ese mismo
+negocio — ya no es un enum fijo.
 
 El `wabaAccessToken` de cada negocio se guarda cifrado (AES-256-GCM,
 `src/lib/crypto.ts`) con `TOKEN_ENCRYPTION_KEY`.
