@@ -37,6 +37,8 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           systemPrompt={business.agent?.systemPrompt ?? ""}
           enabled={business.agent?.enabled ?? true}
           temperature={business.agent?.temperature ?? 0.7}
+          tone={business.agent?.tone ?? "cercano"}
+          replyLength={business.agent?.replyLength ?? "breve"}
         />
 
         <WabaCredentialsForm businessId={id} wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""} />

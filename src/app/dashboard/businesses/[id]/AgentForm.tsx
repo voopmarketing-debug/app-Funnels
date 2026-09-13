@@ -5,16 +5,33 @@ import { updateAgent } from "@/lib/actions";
 
 type SaveState = { saved: boolean };
 
+const TONE_OPTIONS = [
+  { value: "cercano", label: "Cercano y cálido" },
+  { value: "formal", label: "Formal y profesional" },
+  { value: "directo", label: "Directo y al grano" },
+  { value: "divertido", label: "Divertido y desenfadado" },
+];
+
+const LENGTH_OPTIONS = [
+  { value: "breve", label: "Breve (1-3 frases)" },
+  { value: "media", label: "Media (un párrafo corto)" },
+  { value: "detallada", label: "Detallada (cuando haga falta)" },
+];
+
 export function AgentForm({
   businessId,
   systemPrompt,
   enabled,
   temperature,
+  tone,
+  replyLength,
 }: {
   businessId: string;
   systemPrompt: string;
   enabled: boolean;
   temperature: number;
+  tone: string;
+  replyLength: string;
 }) {
   const [temperatureValue, setTemperatureValue] = useState(temperature);
   const [state, formAction, isPending] = useActionState<SaveState, FormData>(
@@ -39,6 +56,44 @@ export function AgentForm({
           required
           className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label htmlFor="tone" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Tono del agente
+          </label>
+          <select
+            id="tone"
+            name="tone"
+            defaultValue={tone}
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
+          >
+            {TONE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="replyLength" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Largo de las respuestas
+          </label>
+          <select
+            id="replyLength"
+            name="replyLength"
+            defaultValue={replyLength}
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
+          >
+            {LENGTH_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

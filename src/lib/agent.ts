@@ -63,6 +63,8 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   try {
     reply = await generateAgentReply({
       systemPrompt: business.agent.systemPrompt,
+      tone: business.agent.tone,
+      replyLength: business.agent.replyLength,
       model: business.agent.model,
       temperature: business.agent.temperature,
       history,

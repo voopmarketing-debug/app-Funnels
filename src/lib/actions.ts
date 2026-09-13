@@ -84,12 +84,14 @@ export async function updateAgent(businessId: string, formData: FormData): Promi
   const systemPrompt = String(formData.get("systemPrompt") ?? "").trim();
   const temperature = Number(formData.get("temperature") ?? 0.7);
   const enabled = formData.get("enabled") === "on";
+  const tone = String(formData.get("tone") ?? "cercano");
+  const replyLength = String(formData.get("replyLength") ?? "breve");
 
   if (!systemPrompt) throw new Error("systemPrompt is required");
 
   await prisma.aIAgent.update({
     where: { businessId },
-    data: { systemPrompt, temperature, enabled },
+    data: { systemPrompt, temperature, enabled, tone, replyLength },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}`);

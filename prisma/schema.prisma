@@ -59,6 +59,8 @@ model AIAgent {
   model        String   @default("claude-sonnet-5")
   temperature  Float    @default(0.7)
   enabled      Boolean  @default(true)
+  tone         String   @default("cercano")
+  replyLength  String   @default("breve")
   updatedAt    DateTime @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
