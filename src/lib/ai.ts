@@ -39,20 +39,50 @@ const INDUSTRY_LABELS: Record<string, string> = Object.fromEntries(
   INDUSTRY_OPTIONS.map((option) => [option.value, option.label]),
 );
 
-// Belt-and-suspenders: the system prompt tells Claude not to open with a
-// greeting past the first message, but prompt instructions are never a hard
-// guarantee. Strip one leading greeting phrase in code so this can't slip
-// through even if the model ignores the instruction.
+// Belt-and-suspenders: the system prompt tells Claude not to greet past the
+// first message, but prompt instructions are never a hard guarantee — in
+// testing it moved from opening with "Hola" to opening (and even
+// mid-sentence inserting) "Buenas noches" instead, e.g. "¡Perfecto, buenas
+// noches! Para armar...". So this strips the phrase wherever it appears in
+// the reply, not just at the very start.
 const LEADING_GREETING_PATTERN =
-  /^\s*(hola de nuevo|¡?hola|qu[ée] tal|buen[oa]s(?:\s+(?:d[ií]as|tardes|noches))?)\b[!,.\s]*[\p{Emoji_Presentation}\u{1F300}-\u{1FAFF}]*\s*/iu;
+  /^\s*(¡?hola de nuevo|¡?hola|¡?qu[ée] tal|¡?buen[oa]s(?:\s+(?:d[ií]as|tardes|noches))?)\b[!,.\s]*[\p{Emoji_Presentation}\u{1F300}-\u{1FAFF}]*\s*/iu;
 
-export function stripLeadingGreeting(text: string): string {
-  const stripped = text.replace(LEADING_GREETING_PATTERN, "").trimStart();
+// Only the day-qualified "buenas noches/tardes/días" form is stripped when
+// it's NOT at the very start — bare "buenas"/"buenos" is far too common as a
+// normal adjective ("buenas noticias", "muy buenos resultados") to safely
+// remove wherever it shows up in the sentence.
+const EMBEDDED_GREETING_PATTERN =
+  /(,\s*)?¡?\b(?:hola\s+de\s+nuevo|hola|qu[ée]\s+tal|buen[oa]s\s+(?:d[ií]as|tardes|noches))\b!?/giu;
+
+function cleanupPunctuation(text: string): string {
+  return text
+    .replace(/,\s*,/g, ",")
+    .replace(/,\s*!/g, "!")
+    .replace(/!\s*,/g, "!")
+    .replace(/¡\s*!/g, "")
+    .replace(/\.\s*\./g, ".")
+    .replace(/^[,!.\s]+/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    // A greeting removed from the middle of the sentence (e.g. ", buenas
+    // noches!") becomes a period, which needs the next word capitalized to
+    // read as a proper new sentence: "¡Perfecto. para armar" -> "... Para".
+    .replace(/\.\s+([a-záéíóúñ])/g, (_m, ch: string) => `. ${ch.toUpperCase()}`);
+}
+
+export function stripGreetings(text: string, isFirstMessage: boolean): string {
+  if (isFirstMessage) return text;
+
+  let cleaned = text.replace(LEADING_GREETING_PATTERN, "");
+  cleaned = cleaned.replace(EMBEDDED_GREETING_PATTERN, (_match, comma) => (comma ? "." : ""));
+  cleaned = cleanupPunctuation(cleaned);
+
   // Don't return an empty string if the whole reply was somehow just "Hola".
-  if (stripped.length === 0) return text;
+  if (cleaned.length === 0) return text;
   // Re-capitalize in case stripping the greeting left a lowercase start,
   // e.g. "Hola, contame..." -> "contame..." -> "Contame...".
-  return stripped[0].toUpperCase() + stripped.slice(1);
+  return cleaned[0].toUpperCase() + cleaned.slice(1);
 }
 
 // Telling Claude "check the history before asking" relies on it noticing
@@ -92,7 +122,7 @@ function buildSystemPrompt(
   const continuityInstruction = isFirstMessage
     ? "Este es el PRIMER mensaje de esta conversación (no hay historial previo) — puedes saludar y presentarte brevemente."
     : `Esta conversación YA ESTÁ EN CURSO — más abajo tienes la transcripción exacta de todo lo hablado, no es el primer contacto.
-- PROHIBIDO empezar tu respuesta con "Hola", "¡Hola!", "Hola de nuevo", "Qué tal" o cualquier variante de saludo — ni siquiera como muletilla de entusiasmo. Empieza directo con el contenido de tu respuesta.
+- PROHIBIDO usar "Hola", "¡Hola!", "Hola de nuevo", "Qué tal", "Buenos días/tardes/noches" o cualquier variante de saludo — ni al empezar ni en medio de la respuesta, ni siquiera como muletilla de entusiasmo ("¡Perfecto, buenas noches!"). Empieza directo con el contenido de tu respuesta.
 - NO te vuelvas a presentar como si fuera la primera vez que hablan.
 - Antes de pedir cualquier dato (nombre, negocio, qué necesita, etc.), revisa la transcripción de abajo. Si ya aparece ahí, úsalo directamente — NUNCA lo vuelvas a preguntar, así hayan pasado varios mensajes o haya cambiado el tema.
 - Si te falta un solo dato (por ejemplo ya sabes el negocio pero no el nombre de la persona), pregunta SOLO por ese dato faltante. Nunca reformules una pregunta de varias partes ("¿cómo te llamas y cómo se llama tu negocio?") si una de esas partes ya fue respondida antes.`;
@@ -142,5 +172,5 @@ export async function generateAgentReply(params: {
     throw new Error("Claude did not return a text response");
   }
 
-  return isFirstMessage ? textBlock.text : stripLeadingGreeting(textBlock.text);
+  return stripGreetings(textBlock.text, isFirstMessage);
 }
