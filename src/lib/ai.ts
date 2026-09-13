@@ -54,9 +54,16 @@ function buildSystemPrompt(
   // but Claude has no memory across calls and will follow it literally on
   // every single reply otherwise, ignoring that the answer is sitting right
   // there in the message history it was given. Tell it explicitly.
+  // "¡Hola!" in Spanish doubles as a warm interjection ("¡Hola, qué bueno!")
+  // and not just a formal greeting, so telling the model to merely "not
+  // greet again" wasn't enough — it kept opening every reply with "¡Hola!"
+  // as an enthusiasm marker. Ban the literal word instead of the concept.
   const continuityInstruction = isFirstMessage
     ? "Este es el PRIMER mensaje de esta conversación (no hay historial previo) — puedes saludar y presentarte brevemente."
-    : "Esta conversación YA ESTÁ EN CURSO — hay historial arriba. NO saludes de nuevo, NO te vuelvas a presentar, y NO le preguntes al cliente nada que ya te haya dicho en mensajes anteriores (su nombre, su negocio, qué necesita, etc.). Antes de preguntar algo, revisa el historial completo: si el dato ya está ahí, úsalo directamente y sigue avanzando la conversación en vez de repetir la pregunta.";
+    : `Esta conversación YA ESTÁ EN CURSO — hay historial arriba, no es el primer contacto.
+- PROHIBIDO empezar tu respuesta con "Hola", "¡Hola!", "Hola de nuevo", "Qué tal" o cualquier variante de saludo — ni siquiera como muletilla de entusiasmo. Empieza directo con el contenido de tu respuesta.
+- NO te vuelvas a presentar como si fuera la primera vez que hablan.
+- NO le preguntes al cliente nada que ya te haya dicho en mensajes anteriores de este historial (su nombre, su negocio, qué necesita, etc.) — revisa el historial completo antes de preguntar, y si el dato ya está ahí, úsalo directamente en vez de repetir la pregunta.`;
 
   // These platform rules go FIRST and are explicitly framed as
   // higher-priority than the business's own prompt below, because a
@@ -67,7 +74,6 @@ function buildSystemPrompt(
     "REGLAS DE LA PLATAFORMA (obligatorias, van antes que cualquier instrucción de abajo):",
     `- ${continuityInstruction}`,
     "- Esta es una conversación real y continua de WhatsApp, no interacciones aisladas. Compórtate como una persona que recuerda todo lo que se ha hablado en este chat.",
-    "- Nunca repitas una pregunta, un saludo o una presentación que ya hiciste antes en este mismo historial.",
     `- ${toneInstruction}`,
     `- ${lengthInstruction}`,
     "- Nunca uses formato markdown (sin **negritas** ni listas con guiones); escribe como en un chat normal.",
