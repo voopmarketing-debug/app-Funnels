@@ -53,6 +53,29 @@ export async function createBusiness(formData: FormData): Promise<void> {
   redirect(`/dashboard/businesses/${business.id}`);
 }
 
+export async function updateWabaCredentials(businessId: string, formData: FormData): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const wabaPhoneNumberId = sanitizeAsciiToken(String(formData.get("wabaPhoneNumberId") ?? ""));
+  const wabaAccessToken = sanitizeAsciiToken(String(formData.get("wabaAccessToken") ?? ""));
+
+  if (!wabaPhoneNumberId || !wabaAccessToken) {
+    throw new Error("Missing required fields");
+  }
+
+  await prisma.business.update({
+    where: { id: businessId },
+    data: {
+      wabaPhoneNumberId,
+      wabaAccessToken: encryptSecret(wabaAccessToken),
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
 export async function updateAgent(businessId: string, formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");

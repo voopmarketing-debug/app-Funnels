@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AgentForm } from "./AgentForm";
+import { WabaCredentialsForm } from "./WabaCredentialsForm";
 
 export default async function BusinessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,6 +38,8 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           enabled={business.agent?.enabled ?? true}
           temperature={business.agent?.temperature ?? 0.7}
         />
+
+        <WabaCredentialsForm businessId={id} wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""} />
       </section>
 
       <section className="space-y-4">
