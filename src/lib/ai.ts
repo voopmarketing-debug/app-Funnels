@@ -30,8 +30,8 @@ const LENGTH_INSTRUCTIONS: Record<string, string> = {
 };
 
 const MAX_TOKENS_BY_LENGTH: Record<string, number> = {
-  breve: 300,
-  media: 600,
+  breve: 400,
+  media: 700,
   detallada: 1024,
 };
 
@@ -55,10 +55,10 @@ const LEADING_GREETING_PATTERN =
 const EMBEDDED_GREETING_PATTERN =
   /(,\s*)?¡?\b(?:hola\s+de\s+nuevo|hola|qu[ée]\s+tal|buen[oa]s\s+(?:d[ií]as|tardes|noches))\b!?/giu;
 
-// The transcript recap (see buildHistoryRecap) includes the agent's own past
-// replies, so once it apologizes for a delay once, it tends to treat that as
-// its established voice and repeat it — a self-reinforcing loop the prompt
-// instruction alone didn't reliably break. Strip it deterministically too.
+// The transcript recap (see buildConversationState) includes the agent's own
+// past replies, so once it apologizes for a delay once, it tends to treat
+// that as its established voice and repeat it — a self-reinforcing loop the
+// prompt instruction alone didn't reliably break. Strip it deterministically.
 const DELAY_APOLOGY_PATTERN =
   /([,!]\s*)?¡?\b(?:perdona|disculpa|perdón)\s+(?:la\s+|por\s+la\s+|por\s+el\s+)?(?:demora|tardanza|espera)\b!?/giu;
 
@@ -98,18 +98,31 @@ export function stripGreetings(text: string, isFirstMessage: boolean): string {
   return cleaned[0].toUpperCase() + cleaned.slice(1);
 }
 
-// Telling Claude "check the history before asking" relies on it noticing
-// the fact buried in a growing list of separate message turns — and in
-// testing with a long, dense business prompt, it kept losing track anyway
-// (at one point flatly claiming "I don't have your name in this
-// conversation" with the name sitting two turns up). Rendering the same
-// history as an explicit plain-text transcript INSIDE the system prompt
-// gives it a second, high-priority copy of the facts to check against,
-// which is far more reliable than trusting turn-by-turn recall alone.
-function buildHistoryRecap(history: AgentHistoryMessage[]): string {
-  if (history.length === 0) return "";
+// Models attend well to the very start and the very end of a long system
+// prompt, and much less reliably to the middle — where a business's own
+// (often long) custom prompt sits. Putting the transcript + the single most
+// important rule (don't repeat what's already known) FIRST, ahead of
+// everything else including the business prompt, showed clearly better
+// compliance in testing than appending it at the end. This block is also
+// short and repeats itself explicitly rather than being buried under a
+// wall of other rules — LLMs follow a handful of sharp instructions more
+// reliably than many overlapping ones.
+function buildConversationState(history: AgentHistoryMessage[]): string {
+  if (history.length === 0) {
+    return "ESTADO DE LA CONVERSACIÓN: es el primer mensaje del cliente. No hay historial previo.";
+  }
+
   const lines = history.map((msg) => (msg.role === "user" ? `Cliente: ${msg.content}` : `Tú: ${msg.content}`));
-  return `\n\nTRANSCRIPCIÓN EXACTA DE ESTA CONVERSACIÓN HASTA AHORA:\n${lines.join("\n")}\n\nCualquier dato que el cliente ya haya dado en esa transcripción (nombre, negocio, necesidad, lo que sea) cuenta como ya sabido — nunca lo pidas de nuevo.`;
+
+  return [
+    "ESTADO DE LA CONVERSACIÓN — LEE ESTO ANTES QUE CUALQUIER OTRA COSA:",
+    "Ya llevan esta conversación (no es el primer contacto):",
+    "---",
+    lines.join("\n"),
+    "---",
+    "REGLA #1, LA MÁS IMPORTANTE DE TODAS: todo lo que el cliente ya escribió arriba (su nombre, su negocio, qué necesita, cualquier dato) YA LO SABES. Está prohibido volver a preguntarlo, sin importar cuántos mensajes hayan pasado o si el tema cambió. Si te falta un solo dato, pregunta SOLO por ese, una vez, y avanza — nunca repitas una pregunta de varias partes solo porque una parte sigue faltando.",
+    "No saludes de nuevo ni te vuelvas a presentar (nada de \"Hola\", \"Buenas noches\", \"Qué tal\" al empezar ni a mitad de frase). No te disculpes por el tiempo de respuesta ni menciones demoras, ni siquiera si ves que tú mismo lo hiciste antes en esta transcripción — fue un error, no lo repitas.",
+  ].join("\n");
 }
 
 function buildSystemPrompt(
@@ -123,39 +136,21 @@ function buildSystemPrompt(
   const lengthInstruction = LENGTH_INSTRUCTIONS[replyLength] ?? LENGTH_INSTRUCTIONS.breve;
   const industryLabel = INDUSTRY_LABELS[industry] ?? INDUSTRY_LABELS.otro;
   const isFirstMessage = history.length === 0;
-  // The prompt a client writes almost always includes "greet the customer"
-  // and "ask their name/business" — reasonable advice for the first message,
-  // but Claude has no memory across calls and will follow it literally on
-  // every single reply otherwise, ignoring that the answer is sitting right
-  // there in the message history it was given. Tell it explicitly.
-  // "¡Hola!" in Spanish doubles as a warm interjection ("¡Hola, qué bueno!")
-  // and not just a formal greeting, so telling the model to merely "not
-  // greet again" wasn't enough — it kept opening every reply with "¡Hola!"
-  // as an enthusiasm marker. Ban the literal word instead of the concept.
-  const continuityInstruction = isFirstMessage
-    ? "Este es el PRIMER mensaje de esta conversación (no hay historial previo) — puedes saludar y presentarte brevemente."
-    : `Esta conversación YA ESTÁ EN CURSO — más abajo tienes la transcripción exacta de todo lo hablado, no es el primer contacto.
-- PROHIBIDO usar "Hola", "¡Hola!", "Hola de nuevo", "Qué tal", "Buenos días/tardes/noches" o cualquier variante de saludo — ni al empezar ni en medio de la respuesta, ni siquiera como muletilla de entusiasmo ("¡Perfecto, buenas noches!"). Empieza directo con el contenido de tu respuesta.
-- NO te vuelvas a presentar como si fuera la primera vez que hablan.
-- Antes de pedir cualquier dato (nombre, negocio, qué necesita, etc.), revisa la transcripción de abajo. Si ya aparece ahí, úsalo directamente — NUNCA lo vuelvas a preguntar, así hayan pasado varios mensajes o haya cambiado el tema.
-- Si te falta un solo dato (por ejemplo ya sabes el negocio pero no el nombre de la persona), pregunta SOLO por ese dato faltante. Nunca reformules una pregunta de varias partes ("¿cómo te llamas y cómo se llama tu negocio?") si una de esas partes ya fue respondida antes.
-- PROHIBIDO disculparte por el tiempo de respuesta o mencionar demoras: nunca digas "perdona la demora", "disculpa la tardanza", "ya estoy aquí", "perdón por no responder antes" ni nada similar — no sabes cuánto tiempo pasó ni al cliente le importa; comportarte así suena robótico. Aunque en la transcripción de abajo veas que TÚ mismo usaste antes una disculpa de este tipo, no la repitas ni la seas fiel — fue un error, corrígelo ahora.
-- Actúa siempre como un vendedor/asesor comercial profesional: seguro de sí mismo, directo, cordial pero sin relleno ni disculpas innecesarias. Cada respuesta debe sonar a alguien que sabe lo que hace, no a un bot pidiendo perdón.`;
 
-  // These platform rules go FIRST and are explicitly framed as
-  // higher-priority than the business's own prompt below, because a
-  // business's custom instructions ("saluda siempre", "pregunta su nombre")
-  // are written assuming a single interaction, not a multi-turn chat, and
-  // will otherwise fight with — and sometimes win over — the rules here.
-  const platformRules = [
-    "REGLAS DE LA PLATAFORMA (obligatorias, van antes que cualquier instrucción de abajo):",
-    `- ${continuityInstruction}`,
-    `- ${toneInstruction}`,
-    `- ${lengthInstruction}`,
-    "- Nunca uses formato markdown (sin **negritas** ni listas con guiones); escribe como en un chat normal.",
-  ].join("\n");
+  const styleRules = [
+    "Eres un vendedor/asesor comercial profesional: seguro de sí mismo, directo, cordial, sin relleno.",
+    toneInstruction,
+    lengthInstruction,
+    "Sin formato markdown (sin **negritas** ni listas con guiones) — escribe como en un chat normal.",
+  ]
+    .map((rule) => `- ${rule}`)
+    .join("\n");
 
-  return `${platformRules}\n\nContexto del negocio:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nInstrucciones específicas de este negocio:\n${basePrompt}${buildHistoryRecap(history)}`;
+  const closingReminder = isFirstMessage
+    ? ""
+    : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en la transcripción de arriba, y no saludes ni te disculpes por demoras.";
+
+  return `${buildConversationState(history)}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${closingReminder}`;
 }
 
 export async function generateAgentReply(params: {
