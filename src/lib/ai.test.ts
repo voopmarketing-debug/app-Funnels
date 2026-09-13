@@ -37,9 +37,25 @@ describe("stripGreetings", () => {
     ).toBe("¡Perfecto. Para armar bien tu propuesta, contame cómo te llamás.");
   });
 
-  it("strips a greeting addressed with the customer's name right after it", () => {
-    expect(stripGreetings("¡Buenas noches, Juan Camilo! Disculpa la demora.", false)).toBe(
-      "Juan Camilo! Disculpa la demora.",
+  it("strips a greeting addressed with the customer's name, and the delay apology right after it", () => {
+    expect(stripGreetings("¡Buenas noches, Juan Camilo! Disculpa la demora.", false)).toBe("Juan Camilo!");
+  });
+
+  it("strips a leading delay apology", () => {
+    expect(
+      stripGreetings("Perdona la demora, ya quedó todo funcionando de nuestro lado.", false),
+    ).toBe("Ya quedó todo funcionando de nuestro lado.");
+  });
+
+  it("strips 'perdón por la demora' mid-sentence without leaving a stray period", () => {
+    expect(
+      stripGreetings("Perdón por la demora, parece que hubo un problema técnico ahí.", false),
+    ).toBe("Parece que hubo un problema técnico ahí.");
+  });
+
+  it("does not touch 'demora' used as a normal noun unrelated to an apology", () => {
+    expect(stripGreetings("Tenemos productos con gran demora en llegar por la aduana.", false)).toBe(
+      "Tenemos productos con gran demora en llegar por la aduana.",
     );
   });
 

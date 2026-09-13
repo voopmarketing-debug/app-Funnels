@@ -55,17 +55,29 @@ const LEADING_GREETING_PATTERN =
 const EMBEDDED_GREETING_PATTERN =
   /(,\s*)?¡?\b(?:hola\s+de\s+nuevo|hola|qu[ée]\s+tal|buen[oa]s\s+(?:d[ií]as|tardes|noches))\b!?/giu;
 
+// The transcript recap (see buildHistoryRecap) includes the agent's own past
+// replies, so once it apologizes for a delay once, it tends to treat that as
+// its established voice and repeat it — a self-reinforcing loop the prompt
+// instruction alone didn't reliably break. Strip it deterministically too.
+const DELAY_APOLOGY_PATTERN =
+  /([,!]\s*)?¡?\b(?:perdona|disculpa|perdón)\s+(?:la\s+|por\s+la\s+|por\s+el\s+)?(?:demora|tardanza|espera)\b!?/giu;
+
+function replacePrecededPunctuation(_match: string, punct: string | undefined): string {
+  if (!punct) return "";
+  return punct.trim() === "!" ? "!" : ".";
+}
+
 function cleanupPunctuation(text: string): string {
   return text
     .replace(/,\s*,/g, ",")
     .replace(/,\s*!/g, "!")
     .replace(/!\s*,/g, "!")
     .replace(/¡\s*!/g, "")
-    .replace(/\.\s*\./g, ".")
+    .replace(/([!.,])\s*\.(?=\s|$)/g, "$1")
     .replace(/^[,!.\s]+/, "")
     .replace(/\s{2,}/g, " ")
     .trim()
-    // A greeting removed from the middle of the sentence (e.g. ", buenas
+    // A phrase removed from the middle of the sentence (e.g. ", buenas
     // noches!") becomes a period, which needs the next word capitalized to
     // read as a proper new sentence: "¡Perfecto. para armar" -> "... Para".
     .replace(/\.\s+([a-záéíóúñ])/g, (_m, ch: string) => `. ${ch.toUpperCase()}`);
@@ -76,11 +88,12 @@ export function stripGreetings(text: string, isFirstMessage: boolean): string {
 
   let cleaned = text.replace(LEADING_GREETING_PATTERN, "");
   cleaned = cleaned.replace(EMBEDDED_GREETING_PATTERN, (_match, comma) => (comma ? "." : ""));
+  cleaned = cleaned.replace(DELAY_APOLOGY_PATTERN, replacePrecededPunctuation);
   cleaned = cleanupPunctuation(cleaned);
 
   // Don't return an empty string if the whole reply was somehow just "Hola".
   if (cleaned.length === 0) return text;
-  // Re-capitalize in case stripping the greeting left a lowercase start,
+  // Re-capitalize in case stripping left a lowercase start,
   // e.g. "Hola, contame..." -> "contame..." -> "Contame...".
   return cleaned[0].toUpperCase() + cleaned.slice(1);
 }
@@ -125,7 +138,9 @@ function buildSystemPrompt(
 - PROHIBIDO usar "Hola", "¡Hola!", "Hola de nuevo", "Qué tal", "Buenos días/tardes/noches" o cualquier variante de saludo — ni al empezar ni en medio de la respuesta, ni siquiera como muletilla de entusiasmo ("¡Perfecto, buenas noches!"). Empieza directo con el contenido de tu respuesta.
 - NO te vuelvas a presentar como si fuera la primera vez que hablan.
 - Antes de pedir cualquier dato (nombre, negocio, qué necesita, etc.), revisa la transcripción de abajo. Si ya aparece ahí, úsalo directamente — NUNCA lo vuelvas a preguntar, así hayan pasado varios mensajes o haya cambiado el tema.
-- Si te falta un solo dato (por ejemplo ya sabes el negocio pero no el nombre de la persona), pregunta SOLO por ese dato faltante. Nunca reformules una pregunta de varias partes ("¿cómo te llamas y cómo se llama tu negocio?") si una de esas partes ya fue respondida antes.`;
+- Si te falta un solo dato (por ejemplo ya sabes el negocio pero no el nombre de la persona), pregunta SOLO por ese dato faltante. Nunca reformules una pregunta de varias partes ("¿cómo te llamas y cómo se llama tu negocio?") si una de esas partes ya fue respondida antes.
+- PROHIBIDO disculparte por el tiempo de respuesta o mencionar demoras: nunca digas "perdona la demora", "disculpa la tardanza", "ya estoy aquí", "perdón por no responder antes" ni nada similar — no sabes cuánto tiempo pasó ni al cliente le importa; comportarte así suena robótico. Aunque en la transcripción de abajo veas que TÚ mismo usaste antes una disculpa de este tipo, no la repitas ni la seas fiel — fue un error, corrígelo ahora.
+- Actúa siempre como un vendedor/asesor comercial profesional: seguro de sí mismo, directo, cordial pero sin relleno ni disculpas innecesarias. Cada respuesta debe sonar a alguien que sabe lo que hace, no a un bot pidiendo perdón.`;
 
   // These platform rules go FIRST and are explicitly framed as
   // higher-priority than the business's own prompt below, because a
