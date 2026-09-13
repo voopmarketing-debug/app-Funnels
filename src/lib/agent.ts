@@ -59,15 +59,25 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     content: msg.content,
   }));
 
+  let reply: string;
   try {
-    const reply = await generateAgentReply({
+    reply = await generateAgentReply({
       systemPrompt: business.agent.systemPrompt,
       model: business.agent.model,
       temperature: business.agent.temperature,
       history,
       userMessage: message.text,
     });
+  } catch (err) {
+    // Surface the failure straight into the conversation thread in the
+    // dashboard — a plain, ASCII-only summary, since the raw error object
+    // has repeatedly broken the platform's own log viewer before we could
+    // read it there. Tagged so we know it happened during the Claude call.
+    await logInternalError(conversation.id, "IA", err);
+    throw err;
+  }
 
+  try {
     const { messageId } = await sendWhatsAppTextMessage({
       phoneNumberId: business.wabaPhoneNumberId!,
       accessToken: decryptSecret(business.wabaAccessToken),
@@ -84,19 +94,21 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       },
     });
   } catch (err) {
-    // Surface the failure straight into the conversation thread in the
-    // dashboard — a plain, ASCII-only summary, since the raw error object
-    // has repeatedly broken the platform's own log viewer before we could
-    // read it there.
-    const raw = err instanceof Error ? err.message : String(err);
-    const safeMessage = raw.replace(/[^\x20-\x7E]/g, "?").slice(0, 500);
-    await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: "AGENT",
-        content: `[ERROR INTERNO] ${safeMessage}`,
-      },
-    });
+    // Tagged so we know it happened during the WhatsApp send, not the
+    // Claude call above.
+    await logInternalError(conversation.id, "WHATSAPP", err);
     throw err;
   }
+}
+
+async function logInternalError(conversationId: string, tag: string, err: unknown): Promise<void> {
+  const raw = err instanceof Error ? err.message : String(err);
+  const safeMessage = raw.replace(/[^\x20-\x7E]/g, "?").slice(0, 500);
+  await prisma.message.create({
+    data: {
+      conversationId,
+      role: "AGENT",
+      content: `[ERROR INTERNO - ${tag}] ${safeMessage}`,
+    },
+  });
 }
