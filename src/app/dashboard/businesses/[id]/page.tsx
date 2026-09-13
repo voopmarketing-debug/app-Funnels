@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
+import { CrmBoard } from "./CrmBoard";
 
 export default async function BusinessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,13 +25,15 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   });
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
-      <section className="space-y-4">
+    <div className="space-y-8">
+      <div>
         <h1 className="text-xl font-bold">{business.name}</h1>
         <p className="fl-mono text-xs tracking-wide text-ink-muted">
           WhatsApp: {business.wabaPhoneNumberId}
         </p>
+      </div>
 
+      <div className="grid gap-8 lg:grid-cols-2">
         <AgentForm
           businessId={id}
           systemPrompt={business.agent?.systemPrompt ?? ""}
@@ -43,31 +45,26 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
         />
 
         <WabaCredentialsForm businessId={id} wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""} />
-      </section>
+      </div>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Conversaciones</h2>
-        {conversations.length === 0 && (
+        <h2 className="text-lg font-semibold">CRM — Conversaciones por etapa</h2>
+        {conversations.length === 0 ? (
           <p className="text-sm text-ink-muted">
             Aún no hay conversaciones en WhatsApp para este negocio.
           </p>
+        ) : (
+          <CrmBoard
+            businessId={id}
+            conversations={conversations.map((c) => ({
+              id: c.id,
+              customerName: c.customerName,
+              customerPhone: c.customerPhone,
+              stage: c.stage,
+              lastMessageAt: c.lastMessageAt.toISOString(),
+            }))}
+          />
         )}
-        <ul className="divide-y divide-border">
-          {conversations.map((conversation) => (
-            <li key={conversation.id}>
-              <Link
-                href={`/dashboard/businesses/${id}/conversations/${conversation.id}`}
-                className="block py-3 transition hover:opacity-70"
-              >
-                <p className="font-medium">{conversation.customerName ?? conversation.customerPhone}</p>
-                <p className="text-sm text-ink-muted">
-                  {conversation.customerPhone} · última actividad{" "}
-                  {conversation.lastMessageAt.toLocaleString()}
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ul>
       </section>
     </div>
   );

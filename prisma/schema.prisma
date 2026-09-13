@@ -70,14 +70,25 @@ model AIAgent {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
+// Simple CRM pipeline stage for a conversation, so the business owner can see
+// at a glance where each customer stands — without needing a separate CRM.
+enum ConversationStage {
+  NUEVO
+  EN_CONVERSACION
+  INTERESADO
+  GANADO
+  PERDIDO
+}
+
 // One WhatsApp conversation thread with an end customer of a business.
 model Conversation {
-  id             String   @id @default(cuid())
+  id             String            @id @default(cuid())
   businessId     String
   customerPhone  String
   customerName   String?
-  lastMessageAt  DateTime @default(now())
-  createdAt      DateTime @default(now())
+  stage          ConversationStage @default(NUEVO)
+  lastMessageAt  DateTime          @default(now())
+  createdAt      DateTime          @default(now())
 
   business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   messages Message[]

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { requireBusinessMembership } from "@/lib/authz";
+import type { ConversationStage } from "@prisma/client";
 
 function slugify(name: string): string {
   return name
@@ -165,6 +166,30 @@ export async function updateAgent(businessId: string, formData: FormData): Promi
   ]);
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
+const VALID_STAGES: ConversationStage[] = ["NUEVO", "EN_CONVERSACION", "INTERESADO", "GANADO", "PERDIDO"];
+
+export async function updateConversationStage(
+  businessId: string,
+  conversationId: string,
+  stage: string,
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  if (!VALID_STAGES.includes(stage as ConversationStage)) {
+    throw new Error("Invalid stage");
+  }
+
+  await prisma.conversation.update({
+    where: { id: conversationId, businessId },
+    data: { stage: stage as ConversationStage },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
 }
 
 export async function sendManualMessage(
