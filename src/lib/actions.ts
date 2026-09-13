@@ -61,25 +61,39 @@ export async function registerBusiness(
   const passwordHash = await bcrypt.hash(password, 10);
   const defaultSystemPrompt = `Eres el asistente de WhatsApp de ${name}. Responde de forma breve, cercana y amable. Resuelve las dudas del cliente y ayúdalo a avanzar (agendar, comprar, o lo que corresponda al negocio). Si no sabes algo, dilo con honestidad en vez de inventar información.`;
 
-  await prisma.user.create({
-    data: {
-      email,
-      passwordHash,
-      name,
-      memberships: {
-        create: {
-          role: "OWNER",
-          business: {
-            create: {
-              name,
-              slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
-              industry,
-              agent: { create: { systemPrompt: defaultSystemPrompt } },
-            },
-          },
-        },
+  // AGENCY_ADMIN_EMAIL (optional): if set to Funnels Labs' own account,
+  // every new client business also gets that account as an ADMIN member —
+  // so the agency sees every client from its own dashboard instead of
+  // needing a separate login (or a manual DB edit) per client.
+  const agencyAdminEmail = process.env.AGENCY_ADMIN_EMAIL?.trim().toLowerCase();
+
+  await prisma.$transaction(async (tx) => {
+    const business = await tx.business.create({
+      data: {
+        name,
+        slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
+        industry,
+        agent: { create: { systemPrompt: defaultSystemPrompt } },
       },
-    },
+    });
+
+    await tx.user.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+        memberships: { create: { role: "OWNER", businessId: business.id } },
+      },
+    });
+
+    if (agencyAdminEmail && agencyAdminEmail !== email) {
+      const admin = await tx.user.findUnique({ where: { email: agencyAdminEmail } });
+      if (admin) {
+        await tx.membership.create({
+          data: { userId: admin.id, businessId: business.id, role: "ADMIN" },
+        });
+      }
+    }
   });
 
   redirect("/login?registered=1");

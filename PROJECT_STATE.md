@@ -87,6 +87,11 @@ puede simplificar.
 `DATABASE_URL`, `AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY`, `META_APP_SECRET`,
 `WHATSAPP_VERIFY_TOKEN`, `ANTHROPIC_API_KEY`.
 
+Opcional: `AGENCY_ADMIN_EMAIL` — el correo de la cuenta de Funnels Labs. Si
+está configurada, cada negocio que se auto-registra en `/register` le da
+automáticamente una membresía ADMIN a esa cuenta, así que la agencia ve
+todos los clientes desde su propio `/dashboard` sin tocar la base de datos.
+
 ## Cómo levantar en local
 
 ```bash
