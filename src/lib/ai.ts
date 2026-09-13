@@ -49,15 +49,31 @@ function buildSystemPrompt(
   const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.cercano;
   const lengthInstruction = LENGTH_INSTRUCTIONS[replyLength] ?? LENGTH_INSTRUCTIONS.breve;
   const industryLabel = INDUSTRY_LABELS[industry] ?? INDUSTRY_LABELS.otro;
-  // The prompt a client writes almost always includes "greet the customer" —
-  // reasonable advice for the first message, but Claude has no memory across
-  // calls and will follow it literally on every single reply otherwise. Tell
-  // it explicitly whether this is a fresh conversation or an ongoing one.
+  // The prompt a client writes almost always includes "greet the customer"
+  // and "ask their name/business" — reasonable advice for the first message,
+  // but Claude has no memory across calls and will follow it literally on
+  // every single reply otherwise, ignoring that the answer is sitting right
+  // there in the message history it was given. Tell it explicitly.
   const continuityInstruction = isFirstMessage
-    ? "Este es el primer mensaje de esta conversación — puedes saludar brevemente."
-    : "Ya llevan una conversación en curso (mira el historial). NO vuelvas a saludar ni a presentarte — responde directo, como continuando un chat normal con alguien que ya conoces.";
+    ? "Este es el PRIMER mensaje de esta conversación (no hay historial previo) — puedes saludar y presentarte brevemente."
+    : "Esta conversación YA ESTÁ EN CURSO — hay historial arriba. NO saludes de nuevo, NO te vuelvas a presentar, y NO le preguntes al cliente nada que ya te haya dicho en mensajes anteriores (su nombre, su negocio, qué necesita, etc.). Antes de preguntar algo, revisa el historial completo: si el dato ya está ahí, úsalo directamente y sigue avanzando la conversación en vez de repetir la pregunta.";
 
-  return `${basePrompt}\n\nContexto del negocio:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nEstilo de respuesta:\n- ${toneInstruction}\n- ${lengthInstruction}\n- ${continuityInstruction}\n- Nunca uses formato markdown (sin **negritas** ni listas con guiones); escribe como en un chat normal.`;
+  // These platform rules go FIRST and are explicitly framed as
+  // higher-priority than the business's own prompt below, because a
+  // business's custom instructions ("saluda siempre", "pregunta su nombre")
+  // are written assuming a single interaction, not a multi-turn chat, and
+  // will otherwise fight with — and sometimes win over — the rules here.
+  const platformRules = [
+    "REGLAS DE LA PLATAFORMA (obligatorias, van antes que cualquier instrucción de abajo):",
+    `- ${continuityInstruction}`,
+    "- Esta es una conversación real y continua de WhatsApp, no interacciones aisladas. Compórtate como una persona que recuerda todo lo que se ha hablado en este chat.",
+    "- Nunca repitas una pregunta, un saludo o una presentación que ya hiciste antes en este mismo historial.",
+    `- ${toneInstruction}`,
+    `- ${lengthInstruction}`,
+    "- Nunca uses formato markdown (sin **negritas** ni listas con guiones); escribe como en un chat normal.",
+  ].join("\n");
+
+  return `${platformRules}\n\nContexto del negocio:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nInstrucciones específicas de este negocio:\n${basePrompt}`;
 }
 
 export async function generateAgentReply(params: {
