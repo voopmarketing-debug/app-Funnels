@@ -65,6 +65,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       systemPrompt: business.agent.systemPrompt,
       tone: business.agent.tone,
       replyLength: business.agent.replyLength,
+      industry: business.industry,
       model: business.agent.model,
       temperature: business.agent.temperature,
       history,

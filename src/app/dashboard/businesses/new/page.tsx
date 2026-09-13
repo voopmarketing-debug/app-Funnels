@@ -1,4 +1,5 @@
 import { createBusiness } from "@/lib/actions";
+import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
 export default function NewBusinessPage() {
   return (
@@ -20,6 +21,23 @@ export default function NewBusinessPage() {
           placeholder="EAAG..."
           required
         />
+        <div className="space-y-1">
+          <label htmlFor="industry" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Tipo de negocio
+          </label>
+          <select
+            id="industry"
+            name="industry"
+            defaultValue="otro"
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
+          >
+            {INDUSTRY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="space-y-1">
           <label htmlFor="systemPrompt" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Instrucciones del agente de IA

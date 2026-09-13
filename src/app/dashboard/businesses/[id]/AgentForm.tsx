@@ -2,21 +2,9 @@
 
 import { useActionState, useState } from "react";
 import { updateAgent } from "@/lib/actions";
+import { TONE_OPTIONS, LENGTH_OPTIONS, INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
 type SaveState = { saved: boolean };
-
-const TONE_OPTIONS = [
-  { value: "cercano", label: "Cercano y cálido" },
-  { value: "formal", label: "Formal y profesional" },
-  { value: "directo", label: "Directo y al grano" },
-  { value: "divertido", label: "Divertido y desenfadado" },
-];
-
-const LENGTH_OPTIONS = [
-  { value: "breve", label: "Breve (1-3 frases)" },
-  { value: "media", label: "Media (un párrafo corto)" },
-  { value: "detallada", label: "Detallada (cuando haga falta)" },
-];
 
 export function AgentForm({
   businessId,
@@ -25,6 +13,7 @@ export function AgentForm({
   temperature,
   tone,
   replyLength,
+  industry,
 }: {
   businessId: string;
   systemPrompt: string;
@@ -32,6 +21,7 @@ export function AgentForm({
   temperature: number;
   tone: string;
   replyLength: string;
+  industry: string;
 }) {
   const [temperatureValue, setTemperatureValue] = useState(temperature);
   const [state, formAction, isPending] = useActionState<SaveState, FormData>(
@@ -58,7 +48,25 @@ export function AgentForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="space-y-1">
+          <label htmlFor="industry" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Tipo de negocio
+          </label>
+          <select
+            id="industry"
+            name="industry"
+            defaultValue={industry}
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
+          >
+            {INDUSTRY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="space-y-1">
           <label htmlFor="tone" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Tono del agente

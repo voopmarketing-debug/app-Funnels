@@ -23,8 +23,14 @@ export function WabaCredentialsForm({
   return (
     <details className="rounded-md border border-border bg-surface p-4">
       <summary className="cursor-pointer fl-mono text-xs tracking-wide text-ink-muted uppercase">
-        Credenciales de WhatsApp (actualizar si el token venció)
+        Credenciales de WhatsApp
       </summary>
+
+      <p className="mt-3 text-sm text-ink-muted">
+        Esto es opcional — solo tienes que tocarlo si Meta te avisa que el token de WhatsApp venció
+        (los tokens de prueba duran ~24 horas). Si todo sigue funcionando, no necesitas abrir ni
+        llenar esto.
+      </p>
 
       <form action={formAction} className="mt-4 space-y-4">
         <div className="space-y-1">
@@ -42,14 +48,13 @@ export function WabaCredentialsForm({
 
         <div className="space-y-1">
           <label htmlFor="wabaAccessToken" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            Token de acceso nuevo
+            Token de acceso nuevo (déjalo vacío si no venció)
           </label>
           <input
             id="wabaAccessToken"
             name="wabaAccessToken"
             type="password"
-            placeholder="Pega aquí el token generado en Meta"
-            required
+            placeholder="Solo pega algo aquí si tienes un token nuevo"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
         </div>

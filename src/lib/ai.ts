@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
 // API keys are always plain ASCII. Stripping anything else defends against
 // a stray character sneaking in from a copy/paste of a masked/partial key
@@ -34,14 +35,20 @@ const MAX_TOKENS_BY_LENGTH: Record<string, number> = {
   detallada: 1024,
 };
 
+const INDUSTRY_LABELS: Record<string, string> = Object.fromEntries(
+  INDUSTRY_OPTIONS.map((option) => [option.value, option.label]),
+);
+
 function buildSystemPrompt(
   basePrompt: string,
   tone: string,
   replyLength: string,
+  industry: string,
   isFirstMessage: boolean,
 ): string {
   const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.cercano;
   const lengthInstruction = LENGTH_INSTRUCTIONS[replyLength] ?? LENGTH_INSTRUCTIONS.breve;
+  const industryLabel = INDUSTRY_LABELS[industry] ?? INDUSTRY_LABELS.otro;
   // The prompt a client writes almost always includes "greet the customer" —
   // reasonable advice for the first message, but Claude has no memory across
   // calls and will follow it literally on every single reply otherwise. Tell
@@ -50,13 +57,14 @@ function buildSystemPrompt(
     ? "Este es el primer mensaje de esta conversación — puedes saludar brevemente."
     : "Ya llevan una conversación en curso (mira el historial). NO vuelvas a saludar ni a presentarte — responde directo, como continuando un chat normal con alguien que ya conoces.";
 
-  return `${basePrompt}\n\nEstilo de respuesta:\n- ${toneInstruction}\n- ${lengthInstruction}\n- ${continuityInstruction}\n- Nunca uses formato markdown (sin **negritas** ni listas con guiones); escribe como en un chat normal.`;
+  return `${basePrompt}\n\nContexto del negocio:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nEstilo de respuesta:\n- ${toneInstruction}\n- ${lengthInstruction}\n- ${continuityInstruction}\n- Nunca uses formato markdown (sin **negritas** ni listas con guiones); escribe como en un chat normal.`;
 }
 
 export async function generateAgentReply(params: {
   systemPrompt: string;
   tone: string;
   replyLength: string;
+  industry: string;
   model: string;
   temperature: number;
   history: AgentHistoryMessage[];
@@ -71,6 +79,7 @@ export async function generateAgentReply(params: {
       params.systemPrompt,
       params.tone,
       params.replyLength,
+      params.industry,
       params.history.length === 0,
     ),
     messages: [...params.history, { role: "user", content: params.userMessage }],

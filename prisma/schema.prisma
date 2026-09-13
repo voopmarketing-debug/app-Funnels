@@ -23,6 +23,10 @@ model Business {
   wabaPhoneNumberId String? @unique
   wabaAccessToken   String? // AES-256-GCM encrypted, see lib/crypto.ts
 
+  // What kind of business this is, so the AI agent can tailor its answers
+  // (e.g. "clinica" vs "ecommerce" call for very different context).
+  industry String @default("otro")
+
   memberships   Membership[]
   agent         AIAgent?
   conversations Conversation[]
@@ -92,6 +96,7 @@ model Message {
   role           MessageRole
   content        String      @db.Text
   whatsappMsgId  String?
+  sentByHuman    Boolean     @default(false)
   createdAt      DateTime    @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
