@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
@@ -24,6 +25,63 @@ function slugify(name: string): string {
  */
 function sanitizeAsciiToken(value: string): string {
   return value.replace(/[^\x21-\x7E]/g, "");
+}
+
+export type RegisterState = { error: string | null };
+
+/**
+ * Public self-registration: a new client creates their own login and their
+ * first business in one step. WhatsApp credentials are deliberately not
+ * collected here — a brand-new client rarely has their Meta access token
+ * handy at signup time, so that gets filled in afterward from the business
+ * page (with Funnels Labs walking them through it on the onboarding call).
+ */
+export async function registerBusiness(
+  _prevState: RegisterState,
+  formData: FormData,
+): Promise<RegisterState> {
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const industry = String(formData.get("industry") ?? "otro");
+
+  if (!name || !email || !password) {
+    return { error: "Completa todos los campos" };
+  }
+  if (password.length < 8) {
+    return { error: "La contraseña debe tener al menos 8 caracteres" };
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return { error: "Ya existe una cuenta con ese correo" };
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const defaultSystemPrompt = `Eres el asistente de WhatsApp de ${name}. Responde de forma breve, cercana y amable. Resuelve las dudas del cliente y ayúdalo a avanzar (agendar, comprar, o lo que corresponda al negocio). Si no sabes algo, dilo con honestidad en vez de inventar información.`;
+
+  await prisma.user.create({
+    data: {
+      email,
+      passwordHash,
+      name,
+      memberships: {
+        create: {
+          role: "OWNER",
+          business: {
+            create: {
+              name,
+              slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
+              industry,
+              agent: { create: { systemPrompt: defaultSystemPrompt } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  redirect("/login?registered=1");
 }
 
 export async function createBusiness(formData: FormData): Promise<void> {

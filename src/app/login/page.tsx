@@ -2,6 +2,7 @@
 
 import { signIn } from "next-auth/react";
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 
@@ -59,6 +60,12 @@ function LoginForm() {
           <p className="text-sm text-ink-muted">Panel de agentes de WhatsApp</p>
         </div>
 
+        {searchParams.get("registered") === "1" && (
+          <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-accent">
+            Cuenta creada. Ya puedes iniciar sesión.
+          </p>
+        )}
+
         <div className="space-y-1">
           <label htmlFor="email" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Email
@@ -94,6 +101,13 @@ function LoginForm() {
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>
+
+        <p className="text-center text-sm text-ink-muted">
+          ¿Eres cliente nuevo?{" "}
+          <Link href="/register" className="text-accent hover:underline">
+            Crea tu cuenta
+          </Link>
+        </p>
       </form>
     </main>
   );
