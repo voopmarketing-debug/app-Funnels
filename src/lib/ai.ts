@@ -55,16 +55,31 @@ export function stripLeadingGreeting(text: string): string {
   return stripped[0].toUpperCase() + stripped.slice(1);
 }
 
+// Telling Claude "check the history before asking" relies on it noticing
+// the fact buried in a growing list of separate message turns — and in
+// testing with a long, dense business prompt, it kept losing track anyway
+// (at one point flatly claiming "I don't have your name in this
+// conversation" with the name sitting two turns up). Rendering the same
+// history as an explicit plain-text transcript INSIDE the system prompt
+// gives it a second, high-priority copy of the facts to check against,
+// which is far more reliable than trusting turn-by-turn recall alone.
+function buildHistoryRecap(history: AgentHistoryMessage[]): string {
+  if (history.length === 0) return "";
+  const lines = history.map((msg) => (msg.role === "user" ? `Cliente: ${msg.content}` : `Tú: ${msg.content}`));
+  return `\n\nTRANSCRIPCIÓN EXACTA DE ESTA CONVERSACIÓN HASTA AHORA:\n${lines.join("\n")}\n\nCualquier dato que el cliente ya haya dado en esa transcripción (nombre, negocio, necesidad, lo que sea) cuenta como ya sabido — nunca lo pidas de nuevo.`;
+}
+
 function buildSystemPrompt(
   basePrompt: string,
   tone: string,
   replyLength: string,
   industry: string,
-  isFirstMessage: boolean,
+  history: AgentHistoryMessage[],
 ): string {
   const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.cercano;
   const lengthInstruction = LENGTH_INSTRUCTIONS[replyLength] ?? LENGTH_INSTRUCTIONS.breve;
   const industryLabel = INDUSTRY_LABELS[industry] ?? INDUSTRY_LABELS.otro;
+  const isFirstMessage = history.length === 0;
   // The prompt a client writes almost always includes "greet the customer"
   // and "ask their name/business" — reasonable advice for the first message,
   // but Claude has no memory across calls and will follow it literally on
@@ -76,10 +91,10 @@ function buildSystemPrompt(
   // as an enthusiasm marker. Ban the literal word instead of the concept.
   const continuityInstruction = isFirstMessage
     ? "Este es el PRIMER mensaje de esta conversación (no hay historial previo) — puedes saludar y presentarte brevemente."
-    : `Esta conversación YA ESTÁ EN CURSO — hay historial arriba, no es el primer contacto.
+    : `Esta conversación YA ESTÁ EN CURSO — más abajo tienes la transcripción exacta de todo lo hablado, no es el primer contacto.
 - PROHIBIDO empezar tu respuesta con "Hola", "¡Hola!", "Hola de nuevo", "Qué tal" o cualquier variante de saludo — ni siquiera como muletilla de entusiasmo. Empieza directo con el contenido de tu respuesta.
 - NO te vuelvas a presentar como si fuera la primera vez que hablan.
-- NO le preguntes al cliente nada que ya te haya dicho en mensajes anteriores de este historial (su nombre, su negocio, qué necesita, etc.) — revisa el historial completo antes de preguntar, y si el dato ya está ahí, úsalo directamente en vez de repetir la pregunta.
+- Antes de pedir cualquier dato (nombre, negocio, qué necesita, etc.), revisa la transcripción de abajo. Si ya aparece ahí, úsalo directamente — NUNCA lo vuelvas a preguntar, así hayan pasado varios mensajes o haya cambiado el tema.
 - Si te falta un solo dato (por ejemplo ya sabes el negocio pero no el nombre de la persona), pregunta SOLO por ese dato faltante. Nunca reformules una pregunta de varias partes ("¿cómo te llamas y cómo se llama tu negocio?") si una de esas partes ya fue respondida antes.`;
 
   // These platform rules go FIRST and are explicitly framed as
@@ -90,13 +105,12 @@ function buildSystemPrompt(
   const platformRules = [
     "REGLAS DE LA PLATAFORMA (obligatorias, van antes que cualquier instrucción de abajo):",
     `- ${continuityInstruction}`,
-    "- Esta es una conversación real y continua de WhatsApp, no interacciones aisladas. Compórtate como una persona que recuerda todo lo que se ha hablado en este chat.",
     `- ${toneInstruction}`,
     `- ${lengthInstruction}`,
     "- Nunca uses formato markdown (sin **negritas** ni listas con guiones); escribe como en un chat normal.",
   ].join("\n");
 
-  return `${platformRules}\n\nContexto del negocio:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nInstrucciones específicas de este negocio:\n${basePrompt}`;
+  return `${platformRules}\n\nContexto del negocio:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nInstrucciones específicas de este negocio:\n${basePrompt}${buildHistoryRecap(history)}`;
 }
 
 export async function generateAgentReply(params: {
@@ -118,7 +132,7 @@ export async function generateAgentReply(params: {
       params.tone,
       params.replyLength,
       params.industry,
-      isFirstMessage,
+      params.history,
     ),
     messages: [...params.history, { role: "user", content: params.userMessage }],
   });
