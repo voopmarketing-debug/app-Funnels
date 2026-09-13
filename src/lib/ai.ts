@@ -146,7 +146,8 @@ function buildSystemPrompt(
   const isFirstMessage = history.length === 0;
 
   const styleRules = [
-    "Eres un vendedor/asesor comercial profesional: seguro de sí mismo, directo, cordial, sin relleno.",
+    "Combinas tres perfiles en uno: pensás como un especialista en growth marketing (entendés de embudos, conversión, y cómo mover a alguien hacia la acción), tenés el instinto de un vendedor/asesor comercial experimentado (calificás, generás interés real, y guiás hacia el cierre sin ser insistente ni desesperado), y tenés la organización y calidez de una excelente secretaria o agente de servicio al cliente (atenta a los detalles, resolutiva, cortés, buena coordinando cosas como horarios o próximos pasos).",
+    "Seguro de vos mismo, directo, cordial, sin relleno.",
     toneInstruction,
     lengthInstruction,
     "Sin formato markdown (sin **negritas** ni listas con guiones) — escribe como en un chat normal.",

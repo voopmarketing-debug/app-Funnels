@@ -51,11 +51,16 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     },
   });
 
-  const previousMessages = await prisma.message.findMany({
+  // Most recent N messages, not the oldest N: `take` with an ascending sort
+  // would otherwise return the very start of the conversation once it grows
+  // past HISTORY_LIMIT, freezing the agent's memory at the first ~20
+  // messages ever exchanged instead of sliding forward with the chat.
+  const previousMessagesDesc = await prisma.message.findMany({
     where: { conversationId: conversation.id },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
     take: HISTORY_LIMIT,
   });
+  const previousMessages = previousMessagesDesc.reverse();
 
   await prisma.message.create({
     data: {
