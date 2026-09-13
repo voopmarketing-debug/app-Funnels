@@ -59,50 +59,44 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     content: msg.content,
   }));
 
-  let reply: string;
   try {
-    reply = await generateAgentReply({
+    const reply = await generateAgentReply({
       systemPrompt: business.agent.systemPrompt,
       model: business.agent.model,
       temperature: business.agent.temperature,
       history,
       userMessage: message.text,
     });
-  } catch (err) {
-    console.error("[ANTHROPIC_CALL_FAILED]", err);
-    throw err;
-  }
 
-  const accessToken = decryptSecret(business.wabaAccessToken);
-  const badCharIndex = [...accessToken].findIndex((ch) => ch.charCodeAt(0) > 255);
-  console.log(
-    "[WHATSAPP_TOKEN_DIAGNOSTIC]",
-    JSON.stringify({
-      length: accessToken.length,
-      badCharIndex,
-      badCharCode: badCharIndex >= 0 ? accessToken.charCodeAt(badCharIndex) : null,
-    }),
-  );
-
-  let messageId: string;
-  try {
-    ({ messageId } = await sendWhatsAppTextMessage({
+    const { messageId } = await sendWhatsAppTextMessage({
       phoneNumberId: business.wabaPhoneNumberId!,
-      accessToken,
+      accessToken: decryptSecret(business.wabaAccessToken),
       to: message.from,
       text: reply,
-    }));
+    });
+
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "AGENT",
+        content: reply,
+        whatsappMsgId: messageId,
+      },
+    });
   } catch (err) {
-    console.error("[WHATSAPP_SEND_FAILED]", err);
+    // Surface the failure straight into the conversation thread in the
+    // dashboard — a plain, ASCII-only summary, since the raw error object
+    // has repeatedly broken the platform's own log viewer before we could
+    // read it there.
+    const raw = err instanceof Error ? err.message : String(err);
+    const safeMessage = raw.replace(/[^\x20-\x7E]/g, "?").slice(0, 500);
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "AGENT",
+        content: `[ERROR INTERNO] ${safeMessage}`,
+      },
+    });
     throw err;
   }
-
-  await prisma.message.create({
-    data: {
-      conversationId: conversation.id,
-      role: "AGENT",
-      content: reply,
-      whatsappMsgId: messageId,
-    },
-  });
 }
