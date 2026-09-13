@@ -125,6 +125,14 @@ function buildConversationState(history: AgentHistoryMessage[]): string {
   ].join("\n");
 }
 
+const COMPREHENSION_RULES = [
+  "La gente escribe rápido: con errores de tipeo, abreviado, en desorden, con jerga local o de forma indirecta. Interpreta la intención real detrás de sus palabras — no te quedes en la lectura literal si algo no tiene sentido así.",
+  "Antes de responder, identifica exactamente qué te está diciendo o pidiendo el cliente EN ESE MENSAJE puntual, y en qué punto de la conversación están (mira el estado de arriba).",
+  "Responde siempre con algo concreto y específico a lo que el cliente realmente dijo (un dato, un problema, una duda puntual) — nunca con una respuesta genérica que serviría para cualquier conversación con cualquier persona.",
+]
+  .map((rule) => `- ${rule}`)
+  .join("\n");
+
 function buildSystemPrompt(
   basePrompt: string,
   tone: string,
@@ -150,7 +158,7 @@ function buildSystemPrompt(
     ? ""
     : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en la transcripción de arriba, y no saludes ni te disculpes por demoras.";
 
-  return `${buildConversationState(history)}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${closingReminder}`;
+  return `${buildConversationState(history)}\n\nCÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${closingReminder}`;
 }
 
 export async function generateAgentReply(params: {
