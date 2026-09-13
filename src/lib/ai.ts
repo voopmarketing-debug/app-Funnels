@@ -39,6 +39,22 @@ const INDUSTRY_LABELS: Record<string, string> = Object.fromEntries(
   INDUSTRY_OPTIONS.map((option) => [option.value, option.label]),
 );
 
+// Belt-and-suspenders: the system prompt tells Claude not to open with a
+// greeting past the first message, but prompt instructions are never a hard
+// guarantee. Strip one leading greeting phrase in code so this can't slip
+// through even if the model ignores the instruction.
+const LEADING_GREETING_PATTERN =
+  /^\s*(hola de nuevo|¡?hola|qu[ée] tal|buen[oa]s(?:\s+(?:d[ií]as|tardes|noches))?)\b[!,.\s]*[\p{Emoji_Presentation}\u{1F300}-\u{1FAFF}]*\s*/iu;
+
+export function stripLeadingGreeting(text: string): string {
+  const stripped = text.replace(LEADING_GREETING_PATTERN, "").trimStart();
+  // Don't return an empty string if the whole reply was somehow just "Hola".
+  if (stripped.length === 0) return text;
+  // Re-capitalize in case stripping the greeting left a lowercase start,
+  // e.g. "Hola, contame..." -> "contame..." -> "Contame...".
+  return stripped[0].toUpperCase() + stripped.slice(1);
+}
+
 function buildSystemPrompt(
   basePrompt: string,
   tone: string,
@@ -63,7 +79,8 @@ function buildSystemPrompt(
     : `Esta conversación YA ESTÁ EN CURSO — hay historial arriba, no es el primer contacto.
 - PROHIBIDO empezar tu respuesta con "Hola", "¡Hola!", "Hola de nuevo", "Qué tal" o cualquier variante de saludo — ni siquiera como muletilla de entusiasmo. Empieza directo con el contenido de tu respuesta.
 - NO te vuelvas a presentar como si fuera la primera vez que hablan.
-- NO le preguntes al cliente nada que ya te haya dicho en mensajes anteriores de este historial (su nombre, su negocio, qué necesita, etc.) — revisa el historial completo antes de preguntar, y si el dato ya está ahí, úsalo directamente en vez de repetir la pregunta.`;
+- NO le preguntes al cliente nada que ya te haya dicho en mensajes anteriores de este historial (su nombre, su negocio, qué necesita, etc.) — revisa el historial completo antes de preguntar, y si el dato ya está ahí, úsalo directamente en vez de repetir la pregunta.
+- Si te falta un solo dato (por ejemplo ya sabes el negocio pero no el nombre de la persona), pregunta SOLO por ese dato faltante. Nunca reformules una pregunta de varias partes ("¿cómo te llamas y cómo se llama tu negocio?") si una de esas partes ya fue respondida antes.`;
 
   // These platform rules go FIRST and are explicitly framed as
   // higher-priority than the business's own prompt below, because a
@@ -91,6 +108,8 @@ export async function generateAgentReply(params: {
   history: AgentHistoryMessage[];
   userMessage: string;
 }): Promise<string> {
+  const isFirstMessage = params.history.length === 0;
+
   const response = await anthropic.messages.create({
     model: params.model,
     max_tokens: MAX_TOKENS_BY_LENGTH[params.replyLength] ?? 300,
@@ -99,7 +118,7 @@ export async function generateAgentReply(params: {
       params.tone,
       params.replyLength,
       params.industry,
-      params.history.length === 0,
+      isFirstMessage,
     ),
     messages: [...params.history, { role: "user", content: params.userMessage }],
   });
@@ -109,5 +128,5 @@ export async function generateAgentReply(params: {
     throw new Error("Claude did not return a text response");
   }
 
-  return textBlock.text;
+  return isFirstMessage ? textBlock.text : stripLeadingGreeting(textBlock.text);
 }
