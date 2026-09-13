@@ -66,12 +66,9 @@ export async function generateAgentReply(params: {
   replyLength: string;
   industry: string;
   model: string;
-  temperature: number;
   history: AgentHistoryMessage[];
   userMessage: string;
 }): Promise<string> {
-  // `temperature` is deprecated/rejected on this model — omit it rather than
-  // fail every single request with a 400.
   const response = await anthropic.messages.create({
     model: params.model,
     max_tokens: MAX_TOKENS_BY_LENGTH[params.replyLength] ?? 300,

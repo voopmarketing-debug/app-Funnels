@@ -61,7 +61,6 @@ model AIAgent {
   businessId   String   @unique
   systemPrompt String   @db.Text
   model        String   @default("claude-sonnet-5")
-  temperature  Float    @default(0.7)
   enabled      Boolean  @default(true)
   tone         String   @default("cercano")
   replyLength  String   @default("breve")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { updateAgent } from "@/lib/actions";
 import { TONE_OPTIONS, LENGTH_OPTIONS, INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
@@ -9,19 +9,16 @@ type SaveState = { saved: boolean };
 export function AgentForm({
   businessId,
   systemPrompt,
-  temperature,
   tone,
   replyLength,
   industry,
 }: {
   businessId: string;
   systemPrompt: string;
-  temperature: number;
   tone: string;
   replyLength: string;
   industry: string;
 }) {
-  const [temperatureValue, setTemperatureValue] = useState(temperature);
   const [state, formAction, isPending] = useActionState<SaveState, FormData>(
     async (_prevState, formData) => {
       await updateAgent(businessId, formData);
@@ -100,23 +97,6 @@ export function AgentForm({
             ))}
           </select>
         </div>
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="temperature" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Temperatura ({temperatureValue})
-        </label>
-        <input
-          id="temperature"
-          name="temperature"
-          type="range"
-          min="0"
-          max="1"
-          step="0.1"
-          value={temperatureValue}
-          onChange={(e) => setTemperatureValue(Number(e.target.value))}
-          className="w-full accent-[var(--accent)]"
-        />
       </div>
 
       <div className="flex items-center gap-3">

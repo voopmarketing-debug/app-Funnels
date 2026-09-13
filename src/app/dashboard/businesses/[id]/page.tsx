@@ -41,7 +41,6 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
         <AgentForm
           businessId={id}
           systemPrompt={business.agent?.systemPrompt ?? ""}
-          temperature={business.agent?.temperature ?? 0.7}
           tone={business.agent?.tone ?? "cercano"}
           replyLength={business.agent?.replyLength ?? "breve"}
           industry={business.industry}

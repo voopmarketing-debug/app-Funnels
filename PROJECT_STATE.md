@@ -21,7 +21,7 @@ pública con planes de precio para vender el producto.
 ## Modelo de datos (`prisma/schema.prisma`)
 
 `Business` (tenant, con `industry`) → `Membership` (usuario↔negocio) →
-`AIAgent` (1:1, `systemPrompt`/`tone`/`replyLength`/`temperature`/`enabled`) →
+`AIAgent` (1:1, `systemPrompt`/`tone`/`replyLength`/`enabled`) →
 `Conversation` (por número de cliente, con `stage` de CRM) → `Message`
 (con `sentByHuman` para distinguir un mensaje mandado por la IA de uno
 mandado a mano desde el dashboard).
@@ -53,7 +53,10 @@ El `wabaAccessToken` de cada negocio se guarda cifrado (AES-256-GCM,
 ## Bugs reales ya resueltos (para no repetirlos)
 
 - **`temperature` es rechazado por el modelo `claude-sonnet-5`** (error 400)
-  — se dejó de enviar ese parámetro en `anthropic.messages.create()`.
+  — se dejó de enviar ese parámetro en `anthropic.messages.create()`. El
+  campo (y el slider en el dashboard) se eliminaron por completo más
+  adelante: quedó ahí sin hacer nada y confundía al cliente. No reintroducir
+  un control de "temperatura" salvo que el modelo lo vuelva a soportar.
 - **`ByteString` crash en cada mensaje entrante**: causado por
   `ANTHROPIC_API_KEY` con un carácter fuera de ASCII imprimible (p. ej. un
   "•" de una vista enmascarada de la clave), que terminaba metido en el

@@ -74,7 +74,6 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       replyLength: business.agent.replyLength,
       industry: business.industry,
       model: business.agent.model,
-      temperature: business.agent.temperature,
       history,
       userMessage: message.text,
     });

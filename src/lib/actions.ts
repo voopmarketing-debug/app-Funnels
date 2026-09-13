@@ -146,7 +146,6 @@ export async function updateAgent(businessId: string, formData: FormData): Promi
   await requireBusinessMembership(session.user.id, businessId);
 
   const systemPrompt = String(formData.get("systemPrompt") ?? "").trim();
-  const temperature = Number(formData.get("temperature") ?? 0.7);
   const tone = String(formData.get("tone") ?? "cercano");
   const replyLength = String(formData.get("replyLength") ?? "breve");
   const industry = String(formData.get("industry") ?? "otro");
@@ -156,7 +155,7 @@ export async function updateAgent(businessId: string, formData: FormData): Promi
   await prisma.$transaction([
     prisma.aIAgent.update({
       where: { businessId },
-      data: { systemPrompt, temperature, tone, replyLength },
+      data: { systemPrompt, tone, replyLength },
     }),
     prisma.business.update({
       where: { id: businessId },
