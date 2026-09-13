@@ -59,6 +59,22 @@ El `wabaAccessToken` de cada negocio se guarda cifrado (AES-256-GCM,
    escribir manualmente en ella — todo protegido por `Membership`
    (`src/lib/authz.ts` — todo lector/escritor de un negocio específico debe
    pasar por `requireBusinessMembership`).
+5. Cada negocio tiene su propia página de KPIs en
+   `/dashboard/businesses/[id]/analytics` (link "Ver KPIs" desde la página del
+   negocio). `src/lib/analytics.ts` calcula, con consultas a Prisma sobre los
+   últimos 30 días: volumen de conversaciones nuevas por día, mensajes por día
+   desglosados en Cliente/IA/Humano, tasa de automatización IA (mensajes de
+   agente sin `sentByHuman` sobre el total), tasa de error IA (mensajes
+   `[ERROR INTERNO ...]` sobre el total de intentos de respuesta), tiempo de
+   respuesta promedio/mediana (desde el primer mensaje de una racha del
+   cliente hasta la siguiente respuesta real, no de error), conversaciones
+   "esperando respuesta" (la última entrada del hilo es del cliente) y
+   distribución de conversaciones por etapa del pipeline (todo el histórico,
+   no solo 30 días). Los gráficos (`analytics/*Chart.tsx`) son SVG a mano
+   siguiendo el skill de dataviz del proyecto — sin librería externa —, con
+   tooltip al pasar el mouse; la paleta de color se validó con
+   `validate_palette.js` del skill contra la superficie oscura de la marca
+   (`#161616`) antes de usarse.
 
 ## Bugs reales ya resueltos (para no repetirlos)
 
@@ -147,6 +163,9 @@ npm run dev
 
 ## Pendiente / siguiente paso
 
+- El rango de fechas de la página de KPIs es fijo (últimos 30 días); si se
+  necesita comparar periodos o un rango custom, agregar un selector de fecha
+  (el skill de dataviz ya documenta cómo debe verse ese control).
 - Encolar el procesamiento del webhook (hoy es inline; a mayor volumen
   conviene una cola) para no bloquear la respuesta rápida que exige Meta.
 - Multiimagen/multimedia en WhatsApp (hoy solo texto).

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -41,7 +42,15 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
             WhatsApp: {business.wabaPhoneNumberId}
           </p>
         </div>
-        <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/dashboard/businesses/${id}/analytics`}
+            className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+          >
+            Ver KPIs
+          </Link>
+          <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
