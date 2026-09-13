@@ -1,5 +1,6 @@
 import { createBusiness } from "@/lib/actions";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
+import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
 
 export default function NewBusinessPage() {
   return (
@@ -42,13 +43,18 @@ export default function NewBusinessPage() {
           <label htmlFor="systemPrompt" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Instrucciones del agente de IA
           </label>
+          <p className="text-xs text-ink-muted">
+            Ya está pre-llenado con una plantilla — reemplaza cada{" "}
+            <span className="fl-mono text-ink">[texto entre corchetes]</span> con la info real del
+            negocio (o bórralo si no aplica) antes de crear el negocio.
+          </p>
           <textarea
             id="systemPrompt"
             name="systemPrompt"
             required
-            rows={6}
-            placeholder="Eres el asistente de WhatsApp de [negocio]. Responde de forma breve y amable, ayuda a los clientes a..."
-            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
+            rows={16}
+            defaultValue={AGENT_PROMPT_TEMPLATE}
+            className="fl-mono w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-accent"
           />
         </div>
 

@@ -9,6 +9,8 @@ import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { requireBusinessMembership } from "@/lib/authz";
 import type { ConversationStage } from "@prisma/client";
+import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
+import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
 function slugify(name: string): string {
   return name
@@ -59,7 +61,13 @@ export async function registerBusiness(
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const defaultSystemPrompt = `Eres el asistente de WhatsApp de ${name}. Responde de forma breve, cercana y amable. Resuelve las dudas del cliente y ayúdalo a avanzar (agendar, comprar, o lo que corresponda al negocio). Si no sabes algo, dilo con honestidad en vez de inventar información.`;
+  const industryLabel = INDUSTRY_OPTIONS.find((option) => option.value === industry)?.label ?? "negocio";
+  // Pre-fill the name and industry we already know; the rest of the
+  // template's [placeholders] stay for the client to fill in later from
+  // their business page (same template used in "+ Nuevo negocio").
+  const defaultSystemPrompt = AGENT_PROMPT_TEMPLATE
+    .replace(/\[NOMBRE DEL NEGOCIO\]/g, name)
+    .replace("[TIPO DE NEGOCIO: ej. clínica dental, tienda de ropa, estudio de coaching, restaurante]", industryLabel);
 
   // AGENCY_ADMIN_EMAIL (optional): if set to Funnels Labs' own account,
   // every new client business also gets that account as an ADMIN member —
