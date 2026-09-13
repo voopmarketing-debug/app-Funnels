@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
 import { CrmBoard } from "./CrmBoard";
+import { AgentPowerButton } from "./AgentPowerButton";
 
 export default async function BusinessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,18 +27,20 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-xl font-bold">{business.name}</h1>
-        <p className="fl-mono text-xs tracking-wide text-ink-muted">
-          WhatsApp: {business.wabaPhoneNumberId}
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold">{business.name}</h1>
+          <p className="fl-mono text-xs tracking-wide text-ink-muted">
+            WhatsApp: {business.wabaPhoneNumberId}
+          </p>
+        </div>
+        <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
         <AgentForm
           businessId={id}
           systemPrompt={business.agent?.systemPrompt ?? ""}
-          enabled={business.agent?.enabled ?? true}
           temperature={business.agent?.temperature ?? 0.7}
           tone={business.agent?.tone ?? "cercano"}
           replyLength={business.agent?.replyLength ?? "breve"}

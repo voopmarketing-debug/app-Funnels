@@ -54,6 +54,13 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     },
   });
 
+  if (conversation.aiPaused) {
+    // A human already took over this specific conversation — the message is
+    // saved above so it shows up in the dashboard, but the AI stays quiet
+    // instead of talking over them.
+    return;
+  }
+
   const history: AgentHistoryMessage[] = previousMessages.map((msg) => ({
     role: msg.role === "CUSTOMER" ? "user" : "assistant",
     content: msg.content,

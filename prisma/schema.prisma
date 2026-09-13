@@ -87,6 +87,10 @@ model Conversation {
   customerPhone  String
   customerName   String?
   stage          ConversationStage @default(NUEVO)
+  // When true, the AI agent stays silent on new messages in this specific
+  // conversation — for when the business owner wants to take over one chat
+  // by hand without touching the agent for everyone else.
+  aiPaused       Boolean           @default(false)
   lastMessageAt  DateTime          @default(now())
   createdAt      DateTime          @default(now())
 

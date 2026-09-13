@@ -9,7 +9,6 @@ type SaveState = { saved: boolean };
 export function AgentForm({
   businessId,
   systemPrompt,
-  enabled,
   temperature,
   tone,
   replyLength,
@@ -17,7 +16,6 @@ export function AgentForm({
 }: {
   businessId: string;
   systemPrompt: string;
-  enabled: boolean;
   temperature: number;
   tone: string;
   replyLength: string;
@@ -102,19 +100,6 @@ export function AgentForm({
             ))}
           </select>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <input
-          id="enabled"
-          name="enabled"
-          type="checkbox"
-          defaultChecked={enabled}
-          className="accent-[var(--accent)]"
-        />
-        <label htmlFor="enabled" className="text-sm">
-          Agente activo
-        </label>
       </div>
 
       <div className="space-y-1">

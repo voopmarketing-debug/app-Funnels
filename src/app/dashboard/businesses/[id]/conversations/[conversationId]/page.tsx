@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ManualMessageForm } from "./ManualMessageForm";
 import { StageSelector } from "./StageSelector";
+import { AiPauseButton } from "./AiPauseButton";
 
 export default async function ConversationPage({
   params,
@@ -37,6 +38,7 @@ export default async function ConversationPage({
           <h1 className="text-lg font-bold">{conversation.customerName ?? conversation.customerPhone}</h1>
           <p className="fl-mono text-xs tracking-wide text-ink-muted">{conversation.customerPhone}</p>
         </div>
+        <AiPauseButton businessId={id} conversationId={conversationId} aiPaused={conversation.aiPaused} />
         <StageSelector businessId={id} conversationId={conversationId} stage={conversation.stage} />
       </div>
 

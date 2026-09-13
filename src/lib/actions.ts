@@ -147,7 +147,6 @@ export async function updateAgent(businessId: string, formData: FormData): Promi
 
   const systemPrompt = String(formData.get("systemPrompt") ?? "").trim();
   const temperature = Number(formData.get("temperature") ?? 0.7);
-  const enabled = formData.get("enabled") === "on";
   const tone = String(formData.get("tone") ?? "cercano");
   const replyLength = String(formData.get("replyLength") ?? "breve");
   const industry = String(formData.get("industry") ?? "otro");
@@ -157,7 +156,7 @@ export async function updateAgent(businessId: string, formData: FormData): Promi
   await prisma.$transaction([
     prisma.aIAgent.update({
       where: { businessId },
-      data: { systemPrompt, temperature, enabled, tone, replyLength },
+      data: { systemPrompt, temperature, tone, replyLength },
     }),
     prisma.business.update({
       where: { id: businessId },
@@ -186,6 +185,34 @@ export async function updateConversationStage(
   await prisma.conversation.update({
     where: { id: conversationId, businessId },
     data: { stage: stage as ConversationStage },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+}
+
+export async function toggleAgentEnabled(businessId: string, enabled: boolean): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  await prisma.aIAgent.update({ where: { businessId }, data: { enabled } });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
+export async function toggleConversationAiPaused(
+  businessId: string,
+  conversationId: string,
+  aiPaused: boolean,
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  await prisma.conversation.update({
+    where: { id: conversationId, businessId },
+    data: { aiPaused },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
