@@ -13,11 +13,16 @@ export function StatTile({
   value,
   sublabel,
   status,
+  description,
 }: {
   label: string;
   value: string;
   sublabel?: string;
   status?: "good" | "warning" | "critical" | "neutral";
+  /** Fixed, plain-language explanation of what this number measures — shown
+   * every time, not just contextually, so a non-technical business owner
+   * always knows what they're looking at without having to ask. */
+  description: string;
 }) {
   const statusStyle = status ? STATUS_STYLES[status] : null;
 
@@ -34,6 +39,7 @@ export function StatTile({
         )}
         {sublabel && <span className="text-ink-faint">{sublabel}</span>}
       </div>
+      <p className="mt-2 border-t border-border pt-2 text-xs leading-snug text-ink-faint">{description}</p>
     </div>
   );
 }

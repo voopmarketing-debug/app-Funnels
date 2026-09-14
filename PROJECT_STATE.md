@@ -74,7 +74,20 @@ El `wabaAccessToken` de cada negocio se guarda cifrado (AES-256-GCM,
    siguiendo el skill de dataviz del proyecto — sin librería externa —, con
    tooltip al pasar el mouse; la paleta de color se validó con
    `validate_palette.js` del skill contra la superficie oscura de la marca
-   (`#161616`) antes de usarse.
+   (`#161616`) antes de usarse. Cada KPI y cada gráfico tiene una descripción
+   fija en lenguaje simple (pensada para el dueño del negocio, no técnica).
+6. La misma página de KPIs incluye **"Diagnóstico de ventas (IA)"**
+   (`SalesDiagnosisPanel.tsx` + `src/lib/diagnosis.ts` + acción
+   `generateSalesDiagnosis` en `actions.ts`): un botón que manda hasta 20
+   conversaciones reales recientes (sin mensajes `[ERROR INTERNO]`) a
+   **Claude Opus 5** con salida estructurada (`messages.parse` + Zod, ver
+   `@anthropic-ai/sdk/helpers/zod`) y devuelve resumen, puntuación 1-10,
+   fortalezas, debilidades y recomendaciones concretas para vender más — se
+   genera bajo demanda (no automático) y el último reporte se guarda en
+   `AIAgent.diagnosisReport`/`diagnosisGeneratedAt`. Si el negocio tiene menos
+   de 3 conversaciones o 12 mensajes útiles, no se llama a la API y se avisa
+   que faltan datos. Usa Opus (no el `claude-sonnet-5` de las respuestas de
+   WhatsApp) porque es una llamada puntual y poco frecuente, no por mensaje.
 
 ## Bugs reales ya resueltos (para no repetirlos)
 

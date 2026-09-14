@@ -7,6 +7,8 @@ import { StatTile } from "./StatTile";
 import { ConversationsTrendChart } from "./ConversationsTrendChart";
 import { MessagesStackedChart } from "./MessagesStackedChart";
 import { StageDistributionChart } from "./StageDistributionChart";
+import { SalesDiagnosisPanel } from "./SalesDiagnosisPanel";
+import type { SalesDiagnosis } from "@/lib/diagnosis";
 
 type Status = "good" | "warning" | "critical" | "neutral";
 
@@ -54,13 +56,21 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
 
   const membership = await prisma.membership.findUnique({
     where: { userId_businessId: { userId: session.user.id, businessId: id } },
-    include: { business: true },
+    include: { business: { include: { agent: true } } },
   });
 
   if (!membership) notFound();
   const { business } = membership;
 
   const analytics = await getBusinessAnalytics(id);
+
+  const diagnosis =
+    business.agent?.diagnosisReport && business.agent.diagnosisGeneratedAt
+      ? {
+          diagnosis: business.agent.diagnosisReport as unknown as SalesDiagnosis,
+          generatedAt: business.agent.diagnosisGeneratedAt.toISOString(),
+        }
+      : null;
 
   return (
     <div className="space-y-8">
@@ -75,54 +85,78 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <StatTile label="Conversaciones totales" value={String(analytics.totalConversations)} sublabel={`+${analytics.newConversations} en 30 días`} />
-        <StatTile label="Mensajes (30 días)" value={String(analytics.totalMessages)} />
+        <StatTile
+          label="Conversaciones totales"
+          value={String(analytics.totalConversations)}
+          sublabel={`+${analytics.newConversations} en 30 días`}
+          description="Cuántas personas distintas te han escrito por WhatsApp en total, desde siempre."
+        />
+        <StatTile
+          label="Mensajes (30 días)"
+          value={String(analytics.totalMessages)}
+          description="Cuántos mensajes se intercambiaron en el último mes — los que mandaron tus clientes y los que respondiste tú (IA o humano)."
+        />
         <StatTile
           label="Automatización IA"
           value={formatPercent(analytics.automationRate)}
           sublabel="de respuestas sin humano"
           status={automationStatus(analytics.automationRate)}
+          description="De cada 100 respuestas enviadas, cuántas las contestó la IA sola, sin que nadie de tu equipo interviniera a mano."
         />
         <StatTile
           label="Tiempo de respuesta"
           value={formatMinutes(analytics.responseTime.avgMinutes)}
           sublabel={analytics.responseTime.sampleSize > 0 ? `${analytics.responseTime.sampleSize} muestras` : undefined}
           status={responseTimeStatus(analytics.responseTime.avgMinutes)}
+          description="En promedio, cuánto tarda en llegar una respuesta después de que un cliente escribe. Entre menos, mejor experiencia para el cliente."
         />
         <StatTile
           label="Tasa de error IA"
           value={formatPercent(analytics.errorRate)}
           sublabel="fallas técnicas del agente"
           status={errorStatus(analytics.errorRate)}
+          description="De cada 100 intentos de respuesta, cuántos fallaron por un error técnico (no por una mala respuesta). Si ves un número alto, avísanos — no es cosa tuya."
         />
         <StatTile
           label="Esperando respuesta"
           value={String(analytics.awaitingReply)}
           sublabel="conversaciones sin contestar"
           status={awaitingReplyStatus(analytics.awaitingReply)}
+          description="Conversaciones donde el cliente escribió último y todavía nadie —ni la IA ni una persona— le ha contestado."
         />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-surface p-4">
-          <h2 className="mb-4 text-sm font-semibold text-ink">Conversaciones nuevas por día</h2>
+          <h2 className="text-sm font-semibold text-ink">Conversaciones nuevas por día</h2>
+          <p className="mb-4 mt-1 text-xs text-ink-faint">
+            Cuántos clientes nuevos empezaron a escribirte cada día — te muestra si tu flujo de leads está creciendo o parado.
+          </p>
           <ConversationsTrendChart data={analytics.conversationsTrend} />
         </div>
 
         <div className="rounded-xl border border-border bg-surface p-4">
-          <h2 className="mb-4 text-sm font-semibold text-ink">Mensajes por día, por tipo</h2>
+          <h2 className="text-sm font-semibold text-ink">Mensajes por día, por tipo</h2>
+          <p className="mb-4 mt-1 text-xs text-ink-faint">
+            Quién contestó cada mensaje: el cliente, tu IA, o una persona de tu equipo a mano.
+          </p>
           <MessagesStackedChart data={analytics.messagesTrend} />
         </div>
       </section>
 
       <section className="rounded-xl border border-border bg-surface p-4">
-        <h2 className="mb-4 text-sm font-semibold text-ink">Conversaciones por etapa del pipeline</h2>
+        <h2 className="text-sm font-semibold text-ink">Conversaciones por etapa del pipeline</h2>
+        <p className="mb-4 mt-1 text-xs text-ink-faint">
+          Cuántas conversaciones tienes hoy en cada etapa de tu embudo de ventas — te dice dónde se te están quedando los leads.
+        </p>
         {analytics.stageDistribution.length === 0 ? (
           <p className="text-sm text-ink-muted">Este negocio todavía no tiene etapas configuradas.</p>
         ) : (
           <StageDistributionChart stages={analytics.stageDistribution} />
         )}
       </section>
+
+      <SalesDiagnosisPanel businessId={id} initialDiagnosis={diagnosis} />
     </div>
   );
 }

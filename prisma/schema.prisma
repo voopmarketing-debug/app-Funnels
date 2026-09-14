@@ -67,6 +67,12 @@ model AIAgent {
   replyLength  String   @default("breve")
   updatedAt    DateTime @updatedAt
 
+  // Latest AI-generated sales coaching report (see src/lib/diagnosis.ts) —
+  // regenerated on demand from a button in the dashboard, not on a schedule.
+  // Nullable: no report exists until the business owner generates one.
+  diagnosisReport      Json?
+  diagnosisGeneratedAt DateTime?
+
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 

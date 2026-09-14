@@ -11,6 +11,7 @@ import { requireBusinessMembership } from "@/lib/authz";
 import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
+import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
 
 function slugify(name: string): string {
   return name
@@ -392,4 +393,37 @@ export async function sendManualMessage(
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+}
+
+export type SalesDiagnosisResult =
+  | { status: "insufficient_data" }
+  | { status: "ok"; diagnosis: SalesDiagnosis; generatedAt: string }
+  | { status: "error"; message: string };
+
+export async function generateSalesDiagnosis(businessId: string): Promise<SalesDiagnosisResult> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  let result;
+  try {
+    result = await runSalesDiagnosis(businessId);
+  } catch {
+    // Claude/API failures land here — surfaced as a plain message in the UI
+    // rather than crashing the whole analytics page.
+    return { status: "error", message: "No se pudo generar el diagnóstico. Intenta de nuevo en un momento." };
+  }
+
+  if (result.status === "insufficient_data") {
+    return { status: "insufficient_data" };
+  }
+
+  const generatedAt = new Date();
+  await prisma.aIAgent.update({
+    where: { businessId },
+    data: { diagnosisReport: result.diagnosis, diagnosisGeneratedAt: generatedAt },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/analytics`);
+  return { status: "ok", diagnosis: result.diagnosis, generatedAt: generatedAt.toISOString() };
 }
