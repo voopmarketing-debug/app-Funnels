@@ -27,10 +27,22 @@ model Business {
   // (e.g. "clinica" vs "ecommerce" call for very different context).
   industry String @default("otro")
 
+  // Determines the monthly active-contacts limit shown on the dashboard
+  // (see src/lib/plans.ts). Assigned by the agency after a sales call — not
+  // self-service, no billing integration wired to it yet, so this is purely
+  // informational: reaching the cap never blocks the agent from replying.
+  planTier PlanTier @default(STARTER)
+
   memberships    Membership[]
   agent          AIAgent?
   conversations  Conversation[]
   pipelineStages PipelineStage[]
+}
+
+enum PlanTier {
+  STARTER
+  PRO
+  SCALE
 }
 
 // Links a platform user to a business (a user can manage multiple businesses).

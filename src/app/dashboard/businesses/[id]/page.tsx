@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessAnalytics } from "@/lib/analytics";
+import { getBusinessAnalytics, getActiveContactsThisMonth } from "@/lib/analytics";
+import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
 import { ContactsView } from "./ContactsView";
 import { AgentPowerButton } from "./AgentPowerButton";
 import { PipelineManager } from "./PipelineManager";
+import { PlanUsageCard } from "./PlanUsageCard";
 
 function formatPercent(value: number | null): string {
   return value === null ? "—" : `${Math.round(value)}%`;
@@ -32,7 +34,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   if (!membership) notFound();
   const { business } = membership;
 
-  const [conversations, stages, analytics] = await Promise.all([
+  const [conversations, stages, analytics, activeContacts] = await Promise.all([
     prisma.conversation.findMany({
       where: { businessId: id },
       orderBy: { lastMessageAt: "desc" },
@@ -43,7 +45,12 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
       orderBy: { position: "asc" },
     }),
     getBusinessAnalytics(id),
+    getActiveContactsThisMonth(id),
   ]);
+
+  const planLimit = PLAN_LIMITS[business.planTier];
+  const planStatus = planUsageStatus(activeContacts, planLimit);
+  const canEditPlan = membership.role === "ADMIN";
 
   return (
     <div className="space-y-8">
@@ -64,6 +71,15 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
         </div>
       </div>
+
+      <PlanUsageCard
+        businessId={id}
+        planTier={business.planTier}
+        used={activeContacts}
+        limit={planLimit}
+        status={planStatus}
+        canEditPlan={canEditPlan}
+      />
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-border bg-surface p-4">

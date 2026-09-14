@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getActiveContactsThisMonth } from "@/lib/analytics";
+import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
+
+const PLAN_BADGE_STYLES: Record<"warning" | "critical", { bg: string; text: string; label: string }> = {
+  warning: { bg: "#fab21926", text: "#fab219", label: "Cerca del límite del plan" },
+  critical: { bg: "#d03b3b26", text: "#d03b3b", label: "Superó el límite del plan" },
+};
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -11,6 +18,15 @@ export default async function DashboardPage() {
     include: { business: { include: { agent: true, _count: { select: { conversations: true } } } } },
     orderBy: { createdAt: "desc" },
   });
+
+  // Only the agency (ADMIN) needs the over-limit heads-up here — an OWNER
+  // already sees their own plan usage on the business page. Skip the extra
+  // queries for businesses where it won't be shown.
+  const adminBusinessIds = memberships.filter((m) => m.role === "ADMIN").map((m) => m.business.id);
+  const activeContactsEntries = await Promise.all(
+    adminBusinessIds.map(async (businessId) => [businessId, await getActiveContactsThisMonth(businessId)] as const),
+  );
+  const activeContactsByBusiness = new Map(activeContactsEntries);
 
   return (
     <div className="space-y-6">
@@ -31,25 +47,43 @@ export default async function DashboardPage() {
       )}
 
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {memberships.map(({ business }) => (
-          <li key={business.id}>
-            <Link
-              href={`/dashboard/businesses/${business.id}`}
-              className="block rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong"
-            >
-              <p className="font-medium">{business.name}</p>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${business.agent?.enabled ? "bg-accent" : "bg-ink-faint"}`}
-                />
-                Agente {business.agent?.enabled ? "activo" : "inactivo"}
-              </p>
-              <p className="text-sm text-ink-muted">
-                {business._count.conversations} conversaciones
-              </p>
-            </Link>
-          </li>
-        ))}
+        {memberships.map(({ business, role }) => {
+          const used = activeContactsByBusiness.get(business.id);
+          const status = role === "ADMIN" && used !== undefined
+            ? planUsageStatus(used, PLAN_LIMITS[business.planTier])
+            : null;
+          const badge = status === "warning" || status === "critical" ? PLAN_BADGE_STYLES[status] : null;
+
+          return (
+            <li key={business.id}>
+              <Link
+                href={`/dashboard/businesses/${business.id}`}
+                className="block rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium">{business.name}</p>
+                  {badge && (
+                    <span
+                      className="fl-mono flex-none rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ backgroundColor: badge.bg, color: badge.text }}
+                    >
+                      {badge.label}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${business.agent?.enabled ? "bg-accent" : "bg-ink-faint"}`}
+                  />
+                  Agente {business.agent?.enabled ? "activo" : "inactivo"}
+                </p>
+                <p className="text-sm text-ink-muted">
+                  {business._count.conversations} conversaciones
+                </p>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

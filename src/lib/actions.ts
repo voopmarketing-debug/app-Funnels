@@ -12,6 +12,8 @@ import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
+import { PLAN_TIERS } from "@/lib/plans";
+import type { PlanTier } from "@prisma/client";
 
 function slugify(name: string): string {
   return name
@@ -426,4 +428,27 @@ export async function generateSalesDiagnosis(businessId: string): Promise<SalesD
 
   revalidatePath(`/dashboard/businesses/${businessId}/analytics`);
   return { status: "ok", diagnosis: result.diagnosis, generatedAt: generatedAt.toISOString() };
+}
+
+// Plan tier is a billing decision, assigned by the agency after a sales call
+// — the client (Role.OWNER) can see their usage against it but never change
+// it themselves, so this checks the membership role directly rather than
+// just requireBusinessMembership.
+export async function updateBusinessPlan(businessId: string, planTier: PlanTier): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const membership = await prisma.membership.findUnique({
+    where: { userId_businessId: { userId: session.user.id, businessId } },
+  });
+  if (!membership || membership.role !== "ADMIN") {
+    throw new Error("Only the agency can change a business's plan");
+  }
+  if (!PLAN_TIERS.includes(planTier)) {
+    throw new Error("Invalid plan tier");
+  }
+
+  await prisma.business.update({ where: { id: businessId }, data: { planTier } });
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath("/dashboard");
 }

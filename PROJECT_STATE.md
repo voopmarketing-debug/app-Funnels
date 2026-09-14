@@ -156,8 +156,11 @@ npm run dev
   gerente de cuenta dedicado.
 - Posicionamiento high-ticket, vendido por llamada/aplicación, no self-service
   a bajo costo (ver el plan de lanzamiento para la lógica completa de precio).
-  Los límites de contactos son informativos en la landing — todavía no hay
-  enforcement técnico que bloquee al superar el límite del plan.
+  Los límites de contactos ya se rastrean técnicamente (ver
+  "Plan de negocio y límite de contactos" abajo), pero superar el límite
+  todavía no bloquea al agente de responder — es solo una señal visual para
+  que la agencia haga seguimiento comercial (upsell), a propósito, porque
+  aún no hay cobro/billing automatizado con el que emparejar un bloqueo duro.
 - Segmentos objetivo: clientes actuales de Funnels Labs (upsell), clínicas,
   coaches/consultores, ecommerce.
 - Márgen: el costo real por negocio activo (Claude + WhatsApp Cloud API +
@@ -168,6 +171,30 @@ npm run dev
   banda, (c) el volumen de conversaciones de WhatsApp supere la ventana de
   servicio gratuita de Meta (24h por conversación iniciada por el cliente).
 
+## Plan de negocio y límite de contactos
+
+`Business.planTier` (`STARTER` / `PRO` / `SCALE`, enum de Prisma) guarda el
+plan de cada negocio. `src/lib/plans.ts` define `PLAN_LIMITS` (espejo de los
+límites de la landing: 500 / 2,000 / ilimitado) y `planUsageStatus()`, que
+clasifica el uso en `good` / `warning` (≥80%) / `critical` (≥100%) /
+`unlimited`. "Contacto activo" se calcula igual que en la landing:
+`getActiveContactsThisMonth()` en `src/lib/analytics.ts` cuenta clientes
+distintos que escribieron al menos un mensaje en lo que va del mes calendario
+(UTC).
+
+- En la página de cada negocio (`/dashboard/businesses/[id]`), `PlanUsageCard`
+  muestra el plan actual, una barra de progreso con el color de severidad de
+  la app (`#0ca30c`/`#fab219`/`#d03b3b`) y "usados / límite" en contactos.
+  Solo la agencia (rol `ADMIN`) ve el `<select>` para cambiar de plan — se
+  guarda con la server action `updateBusinessPlan`, que rechaza el cambio si
+  quien lo pide no es `ADMIN`.
+- En la lista de negocios de la agencia (`/dashboard`), cada tarjeta muestra
+  una etiqueta ("Cerca del límite del plan" / "Superó el límite del plan")
+  cuando ese negocio está en `warning` o `critical` — así Juan puede ver de
+  un vistazo a quién contactar para un upsell, sin entrar a cada negocio.
+- Sigue siendo solo informativo: no bloquea el envío/recepción de mensajes de
+  WhatsApp al superar el límite (ver nota en la sección de precios arriba).
+
 ## Validado manualmente (Playwright, build de producción)
 
 - Login / logout, registro público (`/register`), guard de `/dashboard`
@@ -176,7 +203,16 @@ npm run dev
   self-service crea negocio sin credenciales de WhatsApp (se agregan
   después desde el dashboard).
 - Editar prompt/tono/largo/rubro/temperatura/enabled del agente.
-- Actualizar credenciales de WhatsApp sin perder el token si se deja vacío.
+- Actualizar credenciales de WhatsApp sin perder el token si se deja vacío;
+  el panel ahora queda abierto por defecto y deja explícito que el Phone
+  Number ID y el token los entrega Meta (con la ruta exacta en WhatsApp
+  Manager / Meta for Developers para encontrarlos), y que actualizar el
+  token cuando Meta avisa que venció no es opcional.
+- Barra de uso de plan (`PlanUsageCard`) en la página de negocio: probado
+  como agencia (ve y puede cambiar el plan) y como dueño del negocio (ve la
+  barra sin poder editar el plan); etiqueta de "límite superado" probada en
+  la lista `/dashboard` de la agencia con un negocio sembrado por encima del
+  límite Starter (520/500 contactos).
 - Tablero CRM: mover una conversación de etapa vía `<select>`, se refleja
   al instante (`router.refresh()`).
 - Enviar un mensaje manual desde el dashboard (marca `sentByHuman`, sale

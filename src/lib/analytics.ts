@@ -170,3 +170,21 @@ export async function getBusinessAnalytics(businessId: string): Promise<Business
     stageDistribution: stages.map((s) => ({ name: s.name, position: s.position, count: s._count.conversations })),
   };
 }
+
+// "Contacto activo" for plan-limit purposes (see src/lib/plans.ts): a
+// distinct customer who wrote at least once this calendar month — matches
+// the definition on the public pricing page, not just newly created
+// conversations, so a returning customer from an older conversation counts
+// too.
+export async function getActiveContactsThisMonth(businessId: string): Promise<number> {
+  const now = new Date();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+  const rows = await prisma.message.findMany({
+    where: { conversation: { businessId }, role: "CUSTOMER", createdAt: { gte: startOfMonth } },
+    select: { conversationId: true },
+    distinct: ["conversationId"],
+  });
+
+  return rows.length;
+}
