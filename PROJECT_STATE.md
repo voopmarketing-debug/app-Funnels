@@ -126,10 +126,25 @@ puede simplificar.
 `DATABASE_URL`, `AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY`, `META_APP_SECRET`,
 `WHATSAPP_VERIFY_TOKEN`, `ANTHROPIC_API_KEY`.
 
-Opcional: `AGENCY_ADMIN_EMAIL` — el correo de la cuenta de Funnels Labs. Si
-está configurada, cada negocio que se auto-registra en `/register` le da
-automáticamente una membresía ADMIN a esa cuenta, así que la agencia ve
-todos los clientes desde su propio `/dashboard` sin tocar la base de datos.
+Opcional: `AGENCY_ADMIN_EMAIL` — el correo de la cuenta de Funnels Labs (debe
+coincidir exacto, sin importar mayúsculas, con el correo que usa esa cuenta
+para iniciar sesión en la plataforma). Si está configurada, cada negocio que
+se auto-registra en `/register` le da automáticamente una membresía ADMIN a
+esa cuenta, así que la agencia ve todos los clientes desde su propio
+`/dashboard` sin tocar la base de datos.
+
+Esa asignación automática solo ocurre en el momento exacto del registro, y
+solo si la cuenta de la agencia ya existía en ese momento — así que un
+negocio creado antes de configurar la variable (o antes de que existiera la
+cuenta de la agencia) se queda sin esa membresía. Para no depender de tener
+el orden perfecto, `/dashboard/page.tsx` corre un "backfill" en cada carga:
+si quien inició sesión es la cuenta de `AGENCY_ADMIN_EMAIL`, se asegura de
+tener membresía ADMIN en absolutamente todos los negocios que existan en ese
+momento (usa `createMany` con `skipDuplicates`, así que es barato y no
+duplica nada). En la práctica esto significa: configura la variable con el
+correo correcto de la agencia y, la próxima vez que esa cuenta entre a
+`/dashboard`, va a ver todos los negocios — incluidos los que ya existían
+antes de configurar la variable.
 
 Opcional: `SUPPORT_WHATSAPP_NUMBER` — número de WhatsApp de la agencia (solo
 dígitos, con código de país) para el botón "Soporte" que ve cada cliente en

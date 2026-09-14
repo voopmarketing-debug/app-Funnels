@@ -9,9 +9,31 @@ const PLAN_BADGE_STYLES: Record<"warning" | "critical", { bg: string; text: stri
   critical: { bg: "#d03b3b26", text: "#d03b3b", label: "Superó el límite del plan" },
 };
 
+// registerBusiness() only grants the agency an ADMIN membership on a client
+// business at the exact moment that business registers, and only if the
+// agency's own account already existed by then — so it can miss businesses
+// created before AGENCY_ADMIN_EMAIL was configured, or before the agency
+// account existed. This runs on every /dashboard load for that one account
+// and adopts any business it's missing, so "see every client" always holds
+// without needing a one-off DB fix.
+async function backfillAgencyAdminMemberships(userId: string, userEmail: string | null | undefined) {
+  const agencyAdminEmail = process.env.AGENCY_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!agencyAdminEmail || userEmail?.trim().toLowerCase() !== agencyAdminEmail) return;
+
+  const businesses = await prisma.business.findMany({ select: { id: true } });
+  if (businesses.length === 0) return;
+
+  await prisma.membership.createMany({
+    data: businesses.map((b) => ({ userId, businessId: b.id, role: "ADMIN" as const })),
+    skipDuplicates: true,
+  });
+}
+
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) return null;
+
+  await backfillAgencyAdminMemberships(session.user.id, session.user.email);
 
   const memberships = await prisma.membership.findMany({
     where: { userId: session.user.id },
