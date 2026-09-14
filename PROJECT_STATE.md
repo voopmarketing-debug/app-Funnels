@@ -131,6 +131,11 @@ está configurada, cada negocio que se auto-registra en `/register` le da
 automáticamente una membresía ADMIN a esa cuenta, así que la agencia ve
 todos los clientes desde su propio `/dashboard` sin tocar la base de datos.
 
+Opcional: `SUPPORT_WHATSAPP_NUMBER` — número de WhatsApp de la agencia (solo
+dígitos, con código de país) para el botón "Soporte" que ve cada cliente en
+el header del dashboard. Sin configurar, el botón cae a un `mailto:` en vez
+de mostrar un número falso.
+
 ## Cómo levantar en local
 
 ```bash
@@ -142,10 +147,17 @@ npm run dev
 
 ## Negocio: precios y segmentos (recomendación, vive también en la landing `/`)
 
-- **Starter**: $49/mes + $97 implementación única — 1 número, ~500
-  conversaciones/mes.
-- **Pro**: $99/mes + $97 implementación única — conversaciones ilimitadas,
-  ajuste de prompt mensual incluido, soporte prioritario.
+- **Starter**: $297/mes + $997 implementación única — 1 número, hasta 500
+  contactos activos/mes.
+- **Pro**: $497/mes + $1,497 implementación única — hasta 2,000 contactos
+  activos/mes, dashboard de KPIs + diagnóstico de ventas con IA, ajuste de
+  prompt mensual incluido, soporte prioritario.
+- **Scale**: a medida — contactos ilimitados, varios números de WhatsApp,
+  gerente de cuenta dedicado.
+- Posicionamiento high-ticket, vendido por llamada/aplicación, no self-service
+  a bajo costo (ver el plan de lanzamiento para la lógica completa de precio).
+  Los límites de contactos son informativos en la landing — todavía no hay
+  enforcement técnico que bloquee al superar el límite del plan.
 - Segmentos objetivo: clientes actuales de Funnels Labs (upsell), clínicas,
   coaches/consultores, ecommerce.
 - Márgen: el costo real por negocio activo (Claude + WhatsApp Cloud API +

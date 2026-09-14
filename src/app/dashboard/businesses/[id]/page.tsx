@@ -2,11 +2,22 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getBusinessAnalytics } from "@/lib/analytics";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
-import { CrmBoard } from "./CrmBoard";
+import { ContactsView } from "./ContactsView";
 import { AgentPowerButton } from "./AgentPowerButton";
 import { PipelineManager } from "./PipelineManager";
+
+function formatPercent(value: number | null): string {
+  return value === null ? "—" : `${Math.round(value)}%`;
+}
+
+function formatMinutes(value: number | null): string {
+  if (value === null) return "—";
+  if (value < 1) return "<1 min";
+  return value < 10 ? `${value.toFixed(1)} min` : `${Math.round(value)} min`;
+}
 
 export default async function BusinessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -21,7 +32,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   if (!membership) notFound();
   const { business } = membership;
 
-  const [conversations, stages] = await Promise.all([
+  const [conversations, stages, analytics] = await Promise.all([
     prisma.conversation.findMany({
       where: { businessId: id },
       orderBy: { lastMessageAt: "desc" },
@@ -31,6 +42,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
       where: { businessId: id },
       orderBy: { position: "asc" },
     }),
+    getBusinessAnalytics(id),
   ]);
 
   return (
@@ -53,6 +65,25 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs text-ink-muted">Contactos totales</p>
+          <p className="mt-1 text-2xl font-bold text-ink">{analytics.totalConversations}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs text-ink-muted">Tiempo de respuesta</p>
+          <p className="mt-1 text-2xl font-bold text-ink">{formatMinutes(analytics.responseTime.avgMinutes)}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs text-ink-muted">Automatización IA</p>
+          <p className="mt-1 text-2xl font-bold text-ink">{formatPercent(analytics.automationRate)}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs text-ink-muted">Esperando respuesta</p>
+          <p className="mt-1 text-2xl font-bold text-ink">{analytics.awaitingReply}</p>
+        </div>
+      </section>
+
       <div className="grid gap-8 lg:grid-cols-2">
         <AgentForm
           businessId={id}
@@ -67,7 +98,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
 
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">CRM — Conversaciones por etapa</h2>
+          <h2 className="text-lg font-semibold">Contactos y CRM</h2>
         </div>
 
         <PipelineManager businessId={id} stages={stages} />
@@ -77,7 +108,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
             Aún no hay conversaciones en WhatsApp para este negocio.
           </p>
         ) : (
-          <CrmBoard
+          <ContactsView
             businessId={id}
             stages={stages}
             conversations={conversations.map((c) => ({

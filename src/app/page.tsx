@@ -22,6 +22,33 @@ const SEGMENTS = [
   },
 ];
 
+const PLANS = [
+  {
+    name: "Starter",
+    price: "$297",
+    setup: "+ $997 implementación única",
+    contacts: "Hasta 500 contactos activos/mes",
+    features: ["1 número de WhatsApp", "Agente con memoria completa de la conversación", "CRM personalizable por etapas", "Soporte por WhatsApp"],
+    highlight: false,
+  },
+  {
+    name: "Pro",
+    price: "$497",
+    setup: "+ $1,497 implementación única",
+    contacts: "Hasta 2,000 contactos activos/mes",
+    features: ["1 número de WhatsApp", "Dashboard de KPIs + diagnóstico de ventas con IA", "Ajuste de prompt mensual incluido", "Soporte prioritario por WhatsApp"],
+    highlight: true,
+  },
+  {
+    name: "Scale",
+    price: "A medida",
+    setup: "Hablemos de tu caso",
+    contacts: "Contactos ilimitados",
+    features: ["Varios números de WhatsApp", "Todo lo del plan Pro", "Onboarding asistido paso a paso", "Gerente de cuenta dedicado"],
+    highlight: false,
+  },
+];
+
 const STEPS = [
   { n: "1", title: "Crea tu cuenta", text: "Te registras con el nombre de tu negocio y tu correo." },
   { n: "2", title: "Conectamos tu WhatsApp", text: "En una llamada de 30-45 min, con la API oficial de Meta." },
@@ -120,53 +147,54 @@ export default async function Home() {
         <h2 className="text-center text-2xl font-bold">Planes</h2>
         <p className="mx-auto mt-2 max-w-xl text-center text-sm text-ink-muted">
           Incluyen implementación (conexión de tu WhatsApp, configuración del agente y prueba en
-          vivo) más mantenimiento mensual. Precios de referencia en USD.
+          vivo) más mantenimiento mensual. Un contacto activo es cada cliente distinto que te
+          escribe en el mes. Precios de referencia en USD.
         </p>
 
-        <div className="mx-auto mt-8 grid max-w-3xl gap-6 sm:grid-cols-2">
-          <div className="rounded-xl border border-border bg-surface p-6">
-            <p className="fl-mono text-xs uppercase tracking-wide text-ink-muted">Starter</p>
-            <p className="mt-2 text-3xl font-bold">$49<span className="text-base font-normal text-ink-muted">/mes</span></p>
-            <p className="mt-1 text-sm text-ink-muted">+ $97 implementación única</p>
-            <ul className="mt-5 space-y-2 text-sm text-ink-muted">
-              <li>1 número de WhatsApp</li>
-              <li>Hasta ~500 conversaciones/mes</li>
-              <li>Tono y prompt configurables</li>
-              <li>Soporte por email</li>
-            </ul>
-            <Link
-              href="/register"
-              className="mt-6 block rounded-md border border-border px-4 py-2 text-center font-semibold text-ink transition hover:border-border-strong"
+        <div className="mx-auto mt-8 grid max-w-5xl gap-6 sm:grid-cols-3">
+          {PLANS.map((plan) => (
+            <div
+              key={plan.name}
+              className={`rounded-xl p-6 ${
+                plan.highlight ? "border-2 border-accent bg-surface" : "border border-border bg-surface"
+              }`}
             >
-              Empezar
-            </Link>
-          </div>
-
-          <div className="rounded-xl border-2 border-accent bg-surface p-6">
-            <p className="fl-mono text-xs uppercase tracking-wide text-accent">Pro</p>
-            <p className="mt-2 text-3xl font-bold">$99<span className="text-base font-normal text-ink-muted">/mes</span></p>
-            <p className="mt-1 text-sm text-ink-muted">+ $97 implementación única</p>
-            <ul className="mt-5 space-y-2 text-sm text-ink-muted">
-              <li>1 número de WhatsApp</li>
-              <li>Conversaciones ilimitadas</li>
-              <li>Ajuste de prompt mensual incluido</li>
-              <li>Soporte prioritario</li>
-            </ul>
-            <Link
-              href="/register"
-              className="mt-6 block rounded-md bg-accent px-4 py-2 text-center font-semibold text-accent-ink transition hover:bg-accent-hover"
-            >
-              Empezar
-            </Link>
-          </div>
+              <p className={`fl-mono text-xs uppercase tracking-wide ${plan.highlight ? "text-accent" : "text-ink-muted"}`}>
+                {plan.name}
+              </p>
+              <p className="mt-2 text-3xl font-bold">
+                {plan.price}
+                {plan.name !== "Scale" && <span className="text-base font-normal text-ink-muted">/mes</span>}
+              </p>
+              <p className="mt-1 text-sm text-ink-muted">{plan.setup}</p>
+              <p className="mt-4 rounded-md bg-background px-3 py-2 text-sm font-medium text-ink">
+                {plan.contacts}
+              </p>
+              <ul className="mt-5 space-y-2 text-sm text-ink-muted">
+                {plan.features.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+              <Link
+                href={plan.name === "Scale" ? "mailto:voopmarketing@gmail.com" : "/register"}
+                className={`mt-6 block rounded-md px-4 py-2 text-center font-semibold transition ${
+                  plan.highlight
+                    ? "bg-accent text-accent-ink hover:bg-accent-hover"
+                    : "border border-border text-ink hover:border-border-strong"
+                }`}
+              >
+                {plan.name === "Scale" ? "Hablemos" : "Empezar"}
+              </Link>
+            </div>
+          ))}
         </div>
 
         <p className="mt-6 text-center text-sm text-ink-muted">
-          ¿Varios negocios o sucursales?{" "}
+          ¿Superas los contactos de tu plan?{" "}
           <a href="mailto:voopmarketing@gmail.com" className="text-accent hover:underline">
             Escríbenos
           </a>{" "}
-          para un plan a la medida.
+          y lo ajustamos sin cortar tu servicio.
         </p>
       </section>
 
