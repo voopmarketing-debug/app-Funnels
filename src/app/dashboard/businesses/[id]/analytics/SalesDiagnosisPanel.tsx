@@ -101,12 +101,10 @@ export function SalesDiagnosisPanel({
       )}
 
       {current && (
-        <details
-          open={expanded}
-          onToggle={(e) => setExpanded(e.currentTarget.open)}
-          className="group mt-4 border-t border-border pt-4"
-        >
-          <summary className="flex cursor-pointer list-none items-center gap-4 [&::-webkit-details-marker]:hidden">
+        <details open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)} className="group mt-4">
+          <summary
+            className="flex cursor-pointer list-none items-center gap-4 rounded-lg border border-border-strong bg-surface-2 px-4 py-3 transition hover:border-accent hover:bg-[#232323] [&::-webkit-details-marker]:hidden"
+          >
             <ScoreMeter score={current.diagnosis.puntuacion} />
             <div className="min-w-0 flex-1">
               <p className="fl-mono text-[11px] tracking-wide text-ink-faint">
@@ -114,10 +112,22 @@ export function SalesDiagnosisPanel({
               </p>
               <p className="truncate text-sm text-ink-muted">{current.diagnosis.resumen}</p>
             </div>
-            <span className="flex-none text-xs text-ink-faint transition-transform group-open:rotate-180">▾</span>
+            <span className="flex flex-none items-center gap-1.5 text-sm font-semibold text-accent">
+              <span className="hidden group-open:inline">Ocultar</span>
+              <span className="group-open:hidden">Ver diagnóstico completo</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                className="flex-none transition-transform duration-200 group-open:rotate-180"
+              >
+                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
           </summary>
 
-          <div className="mt-5 space-y-5">
+          <div className="mt-5 space-y-5 border-t border-border pt-5">
             <p className="text-sm text-ink">{current.diagnosis.resumen}</p>
 
             <div className="grid gap-4 sm:grid-cols-2">
