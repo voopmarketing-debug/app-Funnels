@@ -126,6 +126,21 @@ puede simplificar.
 `DATABASE_URL`, `AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY`, `META_APP_SECRET`,
 `WHATSAPP_VERIFY_TOKEN`, `ANTHROPIC_API_KEY`.
 
+Opcional pero recomendado con Neon: `DIRECT_URL` — la conexión directa (sin
+pooler) que usa `prisma migrate deploy` durante el build. Explicación: las
+migraciones toman un advisory lock de postgres que necesita una sesión
+estable, y el connection string pooled de Neon (pgbouncer en modo
+transacción) no la garantiza — cada statement puede caer en una conexión de
+backend distinta, así que el lock nunca se resuelve como se espera y el
+deploy falla con `Error P1002: Timed out trying to acquire a postgres
+advisory lock` aunque la base de datos sí responda. `prisma.config.ts` ya
+usa `DIRECT_URL` si existe (con `DATABASE_URL` como respaldo si no está
+configurada), así que basta con agregar la variable en Vercel. Para
+conseguir ese string en Neon: dashboard del proyecto > Connection Details >
+apagar el toggle "Pooled connection", copiar esa conexión y ponerla como
+`DIRECT_URL` en Vercel (Production y Preview). `DATABASE_URL` se queda igual
+(pooled) — la app en producción la sigue usando tal cual.
+
 Opcional: `AGENCY_ADMIN_EMAIL` — el correo de la cuenta de Funnels Labs (debe
 coincidir exacto, sin importar mayúsculas, con el correo que usa esa cuenta
 para iniciar sesión en la plataforma). Si está configurada, cada negocio que
