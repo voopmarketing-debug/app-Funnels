@@ -12,14 +12,24 @@ function formatDate(iso: string): string {
   );
 }
 
-function ScoreBadge({ score }: { score: number }) {
-  const color = score >= 8 ? "#0ca30c" : score >= 5 ? "#fab219" : "#d03b3b";
+// Meter: fill carries severity, track is a lighter step of the same hue so
+// the state reads across the whole bar even before you look at the number.
+function severityColors(score: number): { fill: string; track: string } {
+  if (score >= 8) return { fill: "#0ca30c", track: "rgba(12,163,12,0.16)" };
+  if (score >= 5) return { fill: "#fab219", track: "rgba(250,178,25,0.16)" };
+  return { fill: "#d03b3b", track: "rgba(208,59,59,0.16)" };
+}
+
+function ScoreMeter({ score }: { score: number }) {
+  const { fill, track } = severityColors(score);
   return (
-    <div className="flex flex-none flex-col items-center justify-center rounded-lg border border-border px-4 py-2">
-      <span className="text-2xl font-bold" style={{ color }}>
-        {score}
+    <div className="flex flex-none flex-col items-center gap-1.5">
+      <div className="h-2 w-24 overflow-hidden rounded-full" style={{ backgroundColor: track }}>
+        <div className="h-full rounded-full" style={{ width: `${(score / 10) * 100}%`, backgroundColor: fill }} />
+      </div>
+      <span className="fl-mono text-[11px] font-semibold" style={{ color: fill }}>
+        {score} / 10
       </span>
-      <span className="fl-mono text-[10px] tracking-wide text-ink-faint">/ 10</span>
     </div>
   );
 }
@@ -34,6 +44,10 @@ export function SalesDiagnosisPanel({
   const [isPending, startTransition] = useTransition();
   const [current, setCurrent] = useState<InitialDiagnosis>(initialDiagnosis);
   const [notice, setNotice] = useState<string | null>(null);
+  // Collapsed by default so a returning visit doesn't add a wall of text to
+  // an already-long page — but pops open right after a fresh generation, so
+  // the thing you just asked for is the thing you see.
+  const [expanded, setExpanded] = useState(false);
 
   function handleGenerate() {
     setNotice(null);
@@ -41,8 +55,11 @@ export function SalesDiagnosisPanel({
       const result: SalesDiagnosisResult = await generateSalesDiagnosis(businessId);
       if (result.status === "ok") {
         setCurrent({ diagnosis: result.diagnosis, generatedAt: result.generatedAt });
+        setExpanded(true);
       } else if (result.status === "insufficient_data") {
-        setNotice("Todavía no hay suficientes conversaciones reales para un diagnóstico útil. Necesitas al menos unas cuantas conversaciones con varios mensajes cada una.");
+        setNotice(
+          "Todavía no hay suficientes conversaciones reales para un diagnóstico útil. Necesitas al menos unas cuantas conversaciones con varios mensajes cada una.",
+        );
       } else {
         setNotice(result.message);
       }
@@ -59,14 +76,18 @@ export function SalesDiagnosisPanel({
             cierre para vender más — no es una opinión genérica, está basado en lo que de verdad pasó.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={isPending}
-          className="flex-none rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
-        >
-          {isPending ? "Analizando..." : current ? "Actualizar diagnóstico" : "Generar diagnóstico"}
-        </button>
+        <div className="flex flex-none flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={isPending}
+            className="flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+          >
+            {isPending && <span className="h-2 w-2 animate-pulse rounded-full bg-accent-ink" />}
+            {isPending ? "Analizando..." : current ? "Actualizar diagnóstico" : "Generar diagnóstico"}
+          </button>
+          {isPending && <p className="text-[11px] text-ink-faint">Puede tardar hasta 30 segundos — está leyendo tus conversaciones a fondo.</p>}
+        </div>
       </div>
 
       {notice && (
@@ -80,62 +101,72 @@ export function SalesDiagnosisPanel({
       )}
 
       {current && (
-        <div className="mt-4 space-y-5">
-          <p className="fl-mono text-[11px] tracking-wide text-ink-faint">
-            Generado el {formatDate(current.generatedAt)}
-          </p>
+        <details
+          open={expanded}
+          onToggle={(e) => setExpanded(e.currentTarget.open)}
+          className="group mt-4 border-t border-border pt-4"
+        >
+          <summary className="flex cursor-pointer list-none items-center gap-4 [&::-webkit-details-marker]:hidden">
+            <ScoreMeter score={current.diagnosis.puntuacion} />
+            <div className="min-w-0 flex-1">
+              <p className="fl-mono text-[11px] tracking-wide text-ink-faint">
+                Generado el {formatDate(current.generatedAt)}
+              </p>
+              <p className="truncate text-sm text-ink-muted">{current.diagnosis.resumen}</p>
+            </div>
+            <span className="flex-none text-xs text-ink-faint transition-transform group-open:rotate-180">▾</span>
+          </summary>
 
-          <div className="flex items-start gap-4">
-            <ScoreBadge score={current.diagnosis.puntuacion} />
+          <div className="mt-5 space-y-5">
             <p className="text-sm text-ink">{current.diagnosis.resumen}</p>
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide" style={{ color: "#8fd400" }}>
+                  Fortalezas
+                </h3>
+                <ul className="space-y-2">
+                  {current.diagnosis.fortalezas.map((item, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-ink-muted">
+                      <span className="mt-0.5 flex-none" style={{ color: "#b5ff2b" }}>
+                        +
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide text-error">Debilidades</h3>
+                <ul className="space-y-2">
+                  {current.diagnosis.debilidades.map((item, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-ink-muted">
+                      <span className="mt-0.5 flex-none text-error">−</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
             <div>
-              <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide text-accent-dim" style={{ color: "#8fd400" }}>
-                Fortalezas
+              <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide text-ink-muted">
+                Recomendaciones para vender más
               </h3>
-              <ul className="space-y-2">
-                {current.diagnosis.fortalezas.map((item, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-ink-muted">
-                    <span className="mt-0.5 flex-none text-accent" style={{ color: "#b5ff2b" }}>
-                      +
+              <ol className="space-y-2">
+                {current.diagnosis.recomendaciones.map((item, i) => (
+                  <li key={i} className="flex gap-2.5 text-sm text-ink">
+                    <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">
+                      {i + 1}
                     </span>
                     {item}
                   </li>
                 ))}
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide text-error">Debilidades</h3>
-              <ul className="space-y-2">
-                {current.diagnosis.debilidades.map((item, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-ink-muted">
-                    <span className="mt-0.5 flex-none text-error">−</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
+              </ol>
             </div>
           </div>
-
-          <div>
-            <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide text-ink-muted">
-              Recomendaciones para vender más
-            </h3>
-            <ol className="space-y-2">
-              {current.diagnosis.recomendaciones.map((item, i) => (
-                <li key={i} className="flex gap-2.5 text-sm text-ink">
-                  <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">
-                    {i + 1}
-                  </span>
-                  {item}
-                </li>
-              ))}
-            </ol>
-          </div>
-        </div>
+        </details>
       )}
     </section>
   );
