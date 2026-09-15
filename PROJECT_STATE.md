@@ -167,31 +167,53 @@ click-to-chat de la agencia (`https://wa.me/message/F2RWC3YUI7EYM1`) — es un
 valor fijo en el código, no una variable de entorno, así que para cambiarlo
 hay que editar ese archivo.
 
-Opcional: `REGISTRATION_SHEET_WEBHOOK_URL` — para que cada registro nuevo en
-`/register` (nombre, correo, teléfono, negocio, industria, fecha) caiga como
-una fila en un Google Sheet, y así la agencia pueda armar audiencias de
-remarketing (subir correos/teléfonos a Meta/Google Ads, campañas de
-seguimiento, y más adelante contactarlos por su WhatsApp para cosas como la
-app) sin tocar la base de datos. `src/lib/remarketingSheet.ts` hace un POST
-best-effort a esta URL en `registerBusiness()` — si falla o la variable no
-está configurada, el registro del cliente sigue funcionando normal (nunca se
-bloquea por esto). El teléfono también queda guardado en `User.phone`
-(campo obligatorio en el formulario de registro) por si se necesita desde
-código más adelante, no solo en el Sheet.
+`GOOGLE_APPS_SCRIPT_WEBHOOK_URL` — una sola variable que conecta dos cosas
+a un único Google Apps Script Web App:
+
+1. Cada registro nuevo en `/register` (nombre, correo, teléfono, negocio,
+   industria, fecha) cae como fila en un Google Sheet, para que la agencia
+   arme audiencias de remarketing (subir correos/teléfonos a Meta/Google
+   Ads, campañas de seguimiento) sin tocar la base de datos
+   (`src/lib/remarketingSheet.ts`).
+2. El correo de "recuperar contraseña" (`/forgot-password`) se envía desde
+   ahí también (`src/lib/email.ts`).
+
+Ambos hacen un POST best-effort a esta URL — si falla o la variable no está
+configurada, nunca bloquean lo que el usuario está haciendo (el registro
+sigue funcionando, y el formulario de recuperar contraseña sigue mostrando
+su mensaje genérico de éxito, solo que no sale nada real).
+
+**Por qué Apps Script y no Gmail SMTP con una "Contraseña de aplicación":**
+se intentó primero con SMTP + App Password, pero Google bloquea la creación
+de App Passwords en muchas cuentas personales sin avisar por qué ("la
+opción de configuración que buscas no está disponible para tu cuenta"), sin
+importar que la verificación en dos pasos esté bien activada — es una
+restricción del lado de Google, no algo que dependa de esta app. Apps
+Script evita el problema por completo: envía correo autorizado por OAuth
+(el mismo consentimiento que ya diste al implementar el script), no por
+contraseña, así que funciona sin importar esa restricción.
 
 El Sheet ya existe: **Funnels Labs — Registros para Remarketing**, creado en
 el Google Drive de `voopmarketing@gmail.com`
 (https://docs.google.com/spreadsheets/d/1lnE-PFpV0ip20dnez0kmz3fYCO9RvTXG3dq9CNjTCNU/edit),
 con la fila de encabezado (`Fecha de registro, Nombre, Correo, Teléfono,
-Negocio, Industria`) ya puesta. Falta conectarlo — eso requiere un paso manual
-en Google (Claude no tiene forma de desplegar un Apps Script por API):
+Negocio, Industria`) ya puesta. Falta conectar el script — eso requiere un
+paso manual en Google (Claude no tiene forma de desplegar un Apps Script por
+API):
 
 1. Abre ese Sheet → menú **Extensiones → Apps Script**.
 2. Borra el contenido de `Code.gs` y pega esto:
    ```js
    function doPost(e) {
-     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
      var data = JSON.parse(e.postData.contents);
+
+     if (data.type === "email") {
+       MailApp.sendEmail({ to: data.to, subject: data.subject, htmlBody: data.html });
+       return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+         .setMimeType(ContentService.MimeType.JSON);
+     }
+
+     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
      sheet.appendRow([
        new Date(),
        data.nombre || "",
@@ -207,27 +229,19 @@ en Google (Claude no tiene forma de desplegar un Apps Script por API):
 3. Guarda (ícono de disquete) → botón **Implementar → Nueva implementación**.
 4. Tipo: **Aplicación web**. "Ejecutar como": **Yo (voopmarketing@gmail.com)**.
    "Quién tiene acceso": **Cualquier usuario**. Clic en **Implementar** y
-   autoriza los permisos que pida Google (es tu propio script, es seguro).
+   autoriza los permisos que pida Google (es tu propio script, es seguro —
+   esta vez te va a pedir permiso también para enviar correo, dale que sí).
 5. Copia la **URL de la aplicación web** que te muestra al final (empieza
    con `https://script.google.com/macros/s/.../exec`).
-6. Pégala como `REGISTRATION_SHEET_WEBHOOK_URL` en Vercel (Production) y haz
+6. Pégala como `GOOGLE_APPS_SCRIPT_WEBHOOK_URL` en Vercel (Production) y haz
    Redeploy. Desde ese momento, cada `/register` nuevo agrega una fila al
-   Sheet automáticamente.
+   Sheet, y "recuperar contraseña" manda el correo real.
 
-Requerido para que funcione "recuperar contraseña" (`/forgot-password`):
-`GMAIL_USER` y `GMAIL_APP_PASSWORD` — sin esto, el formulario sigue
-funcionando (no revela si el correo existe) pero el correo real nunca sale,
-solo queda un `console.error` en los logs de Vercel. Usa el Gmail de la
-agencia (`voopmarketing@gmail.com`), no un servicio nuevo:
-
-1. Activa la verificación en dos pasos en esa cuenta de Google, si no la
-   tiene (Cuenta de Google > Seguridad > Verificación en dos pasos).
-2. Ve a **myaccount.google.com/apppasswords**, crea una "Contraseña de
-   aplicación" nueva (cualquier nombre, ej. "Funnels Labs").
-3. Copia la contraseña de 16 caracteres que te da (no es tu contraseña
-   normal de Gmail — es una exclusiva para esto).
-4. En Vercel: `GMAIL_USER=voopmarketing@gmail.com` y
-   `GMAIL_APP_PASSWORD=` esa contraseña de 16 caracteres. Redeploy.
+Si ya habías implementado una versión anterior de este script (solo con la
+parte del Sheet, sin el `if (data.type === "email")`): edítalo con el código
+de arriba y en **Implementar → Administrar implementaciones** → ícono de
+lápiz sobre la implementación existente → **Nueva versión** → Implementar.
+Así la URL no cambia y no hay que tocar la variable en Vercel de nuevo.
 
 ## Cómo levantar en local
 
@@ -295,7 +309,7 @@ distintos que escribieron al menos un mensaje en lo que va del mes calendario
 → si el correo existe, genera un token aleatorio, guarda solo su hash SHA-256
 en `User.resetTokenHash` (nunca el token real) con `resetTokenExpiresAt` a 1
 hora, y manda un correo con el link `/reset-password?token=...` vía
-`src/lib/email.ts` (Gmail + Nodemailer, ver la variable `GMAIL_APP_PASSWORD`
+`src/lib/email.ts` (vía el Google Apps Script, ver `GOOGLE_APPS_SCRIPT_WEBHOOK_URL`
 arriba). La respuesta del formulario es siempre la misma exista o no el
 correo, para no revelar qué correos están registrados. `/reset-password`
 (server action `resetPassword`) valida el hash del token contra la base y

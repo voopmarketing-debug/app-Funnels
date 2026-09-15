@@ -1,10 +1,10 @@
 // Best-effort sync of new client registrations to a Google Sheet, so the
 // agency can build remarketing audiences (email lists for ads, follow-up
-// campaigns) without needing DB access. Wired via a Google Apps Script Web
-// App (doPost) instead of the Sheets API, so no service-account credentials
-// need to live in this app — just a webhook URL. See PROJECT_STATE.md for
-// the Apps Script snippet and setup steps.
-const WEBHOOK_URL = process.env.REGISTRATION_SHEET_WEBHOOK_URL;
+// campaigns) without needing DB access. Wired via the same Google Apps
+// Script Web App used for password-reset emails (src/lib/email.ts) — no
+// service-account credentials or App Passwords needed, just one webhook
+// URL. See PROJECT_STATE.md for the Apps Script snippet and setup steps.
+const WEBHOOK_URL = process.env.GOOGLE_APPS_SCRIPT_WEBHOOK_URL;
 const TIMEOUT_MS = 5000;
 
 export async function logRegistrationForRemarketing(data: {
@@ -22,7 +22,7 @@ export async function logRegistrationForRemarketing(data: {
     await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ type: "registration", ...data }),
       signal: controller.signal,
     });
     clearTimeout(timeout);
