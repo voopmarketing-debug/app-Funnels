@@ -9,14 +9,20 @@ export function AccountForm({
   phone,
   city,
   country,
-  socialMedia,
+  facebook,
+  instagram,
+  tiktok,
+  linkedin,
 }: {
   email: string;
   name: string;
   phone: string;
   city: string;
   country: string;
-  socialMedia: string;
+  facebook: string;
+  instagram: string;
+  tiktok: string;
+  linkedin: string;
 }) {
   const [state, formAction, isPending] = useActionState<UpdateProfileState, FormData>(
     updateOwnProfile,
@@ -85,17 +91,61 @@ export function AccountForm({
         </div>
       </div>
 
-      <div className="space-y-1">
-        <label htmlFor="socialMedia" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Redes sociales
-        </label>
-        <input
-          id="socialMedia"
-          name="socialMedia"
-          defaultValue={socialMedia}
-          placeholder="Instagram @negocio, Facebook /negocio"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
+      <div className="space-y-3">
+        <p className="fl-mono text-xs tracking-wide text-ink-muted uppercase">Redes sociales</p>
+
+        <div className="space-y-1">
+          <label htmlFor="instagram" className="text-xs text-ink-muted">
+            Instagram
+          </label>
+          <input
+            id="instagram"
+            name="instagram"
+            defaultValue={instagram}
+            placeholder="@negocio"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="facebook" className="text-xs text-ink-muted">
+            Facebook
+          </label>
+          <input
+            id="facebook"
+            name="facebook"
+            defaultValue={facebook}
+            placeholder="facebook.com/negocio"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="tiktok" className="text-xs text-ink-muted">
+            TikTok
+          </label>
+          <input
+            id="tiktok"
+            name="tiktok"
+            defaultValue={tiktok}
+            placeholder="@negocio"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="linkedin" className="text-xs text-ink-muted">
+            LinkedIn
+          </label>
+          <input
+            id="linkedin"
+            name="linkedin"
+            defaultValue={linkedin}
+            placeholder="linkedin.com/company/negocio"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+
         <p className="text-xs text-ink-muted">
           Ciudad, país y redes le dan contexto a tu agente de IA — así puede responder si un cliente
           pregunta dónde están o si tienen Instagram, sin que tengas que escribirlo tú en el prompt.

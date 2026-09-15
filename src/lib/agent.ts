@@ -31,7 +31,11 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   // in "Mi perfil" — fed into the prompt automatically, see buildSystemPrompt.
   const ownerMembership = await prisma.membership.findFirst({
     where: { businessId: business.id, role: "OWNER" },
-    include: { user: { select: { phone: true, city: true, country: true, socialMedia: true } } },
+    include: {
+      user: {
+        select: { phone: true, city: true, country: true, facebook: true, instagram: true, tiktok: true, linkedin: true },
+      },
+    },
   });
 
   // Only needed for a brand-new conversation — every business is seeded

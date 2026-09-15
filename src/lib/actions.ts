@@ -583,7 +583,10 @@ export async function updateOwnProfile(
   const phone = sanitizePhone(String(formData.get("phone") ?? ""));
   const city = String(formData.get("city") ?? "").trim();
   const country = String(formData.get("country") ?? "").trim();
-  const socialMedia = String(formData.get("socialMedia") ?? "").trim();
+  const facebook = String(formData.get("facebook") ?? "").trim();
+  const instagram = String(formData.get("instagram") ?? "").trim();
+  const tiktok = String(formData.get("tiktok") ?? "").trim();
+  const linkedin = String(formData.get("linkedin") ?? "").trim();
 
   await prisma.user.update({
     where: { id: session.user.id },
@@ -592,7 +595,10 @@ export async function updateOwnProfile(
       phone: phone || null,
       city: city || null,
       country: country || null,
-      socialMedia: socialMedia || null,
+      facebook: facebook || null,
+      instagram: instagram || null,
+      tiktok: tiktok || null,
+      linkedin: linkedin || null,
     },
   });
   revalidatePath("/dashboard/account");

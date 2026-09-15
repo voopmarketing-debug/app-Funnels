@@ -125,7 +125,10 @@ export type OwnerContext = {
   phone?: string | null;
   city?: string | null;
   country?: string | null;
-  socialMedia?: string | null;
+  facebook?: string | null;
+  instagram?: string | null;
+  tiktok?: string | null;
+  linkedin?: string | null;
 };
 
 // Background facts the client set once in "Mi perfil" (never typed into
@@ -133,10 +136,20 @@ export type OwnerContext = {
 // are included, so an account with nothing set adds no noise here.
 function buildOwnerContextBlock(owner?: OwnerContext): string {
   if (!owner) return "";
+
+  const socials = [
+    owner.instagram ? `Instagram ${owner.instagram}` : null,
+    owner.facebook ? `Facebook ${owner.facebook}` : null,
+    owner.tiktok ? `TikTok ${owner.tiktok}` : null,
+    owner.linkedin ? `LinkedIn ${owner.linkedin}` : null,
+  ]
+    .filter((s): s is string => s !== null)
+    .join(", ");
+
   const lines = [
     owner.city && owner.country ? `- Ubicación: ${owner.city}, ${owner.country}` : owner.city ? `- Ciudad: ${owner.city}` : owner.country ? `- País: ${owner.country}` : null,
     owner.phone ? `- Teléfono/WhatsApp de contacto: ${owner.phone}` : null,
-    owner.socialMedia ? `- Redes sociales: ${owner.socialMedia}` : null,
+    socials ? `- Redes sociales: ${socials}` : null,
   ].filter((line): line is string => line !== null);
 
   if (lines.length === 0) return "";

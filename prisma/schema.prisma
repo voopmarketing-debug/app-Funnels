@@ -60,7 +60,10 @@ model User {
   // business this account owns.
   city         String?
   country      String?
-  socialMedia  String?
+  facebook     String?
+  instagram    String?
+  tiktok       String?
+  linkedin     String?
   passwordHash String
   name         String?
   createdAt    DateTime     @default(now())

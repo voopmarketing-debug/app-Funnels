@@ -18,7 +18,10 @@ export default async function AccountPage() {
         phone={user.phone ?? ""}
         city={user.city ?? ""}
         country={user.country ?? ""}
-        socialMedia={user.socialMedia ?? ""}
+        facebook={user.facebook ?? ""}
+        instagram={user.instagram ?? ""}
+        tiktok={user.tiktok ?? ""}
+        linkedin={user.linkedin ?? ""}
       />
     </div>
   );
