@@ -49,6 +49,10 @@ enum PlanTier {
 model User {
   id           String       @id @default(cuid())
   email        String       @unique
+  // Contact/WhatsApp number for the agency to reach this person directly —
+  // separate from wabaPhoneNumberId on Business, which is the Meta WhatsApp
+  // Business API config for their bot, not a way to contact them.
+  phone        String?
   passwordHash String
   name         String?
   createdAt    DateTime     @default(now())

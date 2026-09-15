@@ -161,25 +161,30 @@ correo correcto de la agencia y, la próxima vez que esa cuenta entre a
 `/dashboard`, va a ver todos los negocios — incluidos los que ya existían
 antes de configurar la variable.
 
-Opcional: `SUPPORT_WHATSAPP_NUMBER` — número de WhatsApp de la agencia (solo
-dígitos, con código de país) para el botón "Soporte" que ve cada cliente en
-el header del dashboard. Sin configurar, el botón cae a un `mailto:` en vez
-de mostrar un número falso.
+El botón "Soporte" que ve cada cliente en el header del dashboard
+(`src/app/dashboard/layout.tsx`) apunta directo al link de WhatsApp
+click-to-chat de la agencia (`https://wa.me/message/F2RWC3YUI7EYM1`) — es un
+valor fijo en el código, no una variable de entorno, así que para cambiarlo
+hay que editar ese archivo.
 
 Opcional: `REGISTRATION_SHEET_WEBHOOK_URL` — para que cada registro nuevo en
-`/register` (nombre, correo, negocio, industria, fecha) caiga como una fila
-en un Google Sheet, y así la agencia pueda armar audiencias de remarketing
-(subir correos a Meta/Google Ads, campañas de seguimiento) sin tocar la base
-de datos. `src/lib/remarketingSheet.ts` hace un POST best-effort a esta URL
-en `registerBusiness()` — si falla o la variable no está configurada, el
-registro del cliente sigue funcionando normal (nunca se bloquea por esto).
+`/register` (nombre, correo, teléfono, negocio, industria, fecha) caiga como
+una fila en un Google Sheet, y así la agencia pueda armar audiencias de
+remarketing (subir correos/teléfonos a Meta/Google Ads, campañas de
+seguimiento, y más adelante contactarlos por su WhatsApp para cosas como la
+app) sin tocar la base de datos. `src/lib/remarketingSheet.ts` hace un POST
+best-effort a esta URL en `registerBusiness()` — si falla o la variable no
+está configurada, el registro del cliente sigue funcionando normal (nunca se
+bloquea por esto). El teléfono también queda guardado en `User.phone`
+(campo obligatorio en el formulario de registro) por si se necesita desde
+código más adelante, no solo en el Sheet.
 
 El Sheet ya existe: **Funnels Labs — Registros para Remarketing**, creado en
 el Google Drive de `voopmarketing@gmail.com`
-(https://docs.google.com/spreadsheets/d/1LI_uMqyv5yEzexZ0TBRyc9LHxAyriQXvZmZjPdbMtdc/edit),
-con la fila de encabezado (`Fecha de registro, Nombre, Correo, Negocio,
-Industria`) ya puesta. Falta conectarlo — eso requiere un paso manual en Google
-(Claude no tiene forma de desplegar un Apps Script por API):
+(https://docs.google.com/spreadsheets/d/1lnE-PFpV0ip20dnez0kmz3fYCO9RvTXG3dq9CNjTCNU/edit),
+con la fila de encabezado (`Fecha de registro, Nombre, Correo, Teléfono,
+Negocio, Industria`) ya puesta. Falta conectarlo — eso requiere un paso manual
+en Google (Claude no tiene forma de desplegar un Apps Script por API):
 
 1. Abre ese Sheet → menú **Extensiones → Apps Script**.
 2. Borra el contenido de `Code.gs` y pega esto:
@@ -191,6 +196,7 @@ Industria`) ya puesta. Falta conectarlo — eso requiere un paso manual en Googl
        new Date(),
        data.nombre || "",
        data.correo || "",
+       data.telefono || "",
        data.negocio || "",
        data.industria || "",
      ]);

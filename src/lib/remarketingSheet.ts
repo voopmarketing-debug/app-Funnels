@@ -10,6 +10,7 @@ const TIMEOUT_MS = 5000;
 export async function logRegistrationForRemarketing(data: {
   nombre: string;
   correo: string;
+  telefono: string;
   negocio: string;
   industria: string;
 }): Promise<void> {

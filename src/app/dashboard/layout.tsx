@@ -2,21 +2,9 @@ import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 
-// Support channel shown to every client in the dashboard header. Prefers a
-// real WhatsApp number (set SUPPORT_WHATSAPP_NUMBER in Vercel — digits only,
-// with country code, e.g. 573001234567) so clients reach the agency
-// instantly; falls back to email rather than shipping a fabricated number.
-function getSupportLink(): { href: string; label: string } {
-  const rawNumber = process.env.SUPPORT_WHATSAPP_NUMBER;
-  const digits = rawNumber?.replace(/[^\d]/g, "");
-  if (digits) {
-    return {
-      href: `https://wa.me/${digits}?text=${encodeURIComponent("Hola, necesito ayuda con mi cuenta de Funnels Labs")}`,
-      label: "Soporte",
-    };
-  }
-  return { href: "mailto:voopmarketing@gmail.com", label: "Soporte" };
-}
+// Support channel shown to every client in the dashboard header — the
+// agency's own WhatsApp click-to-chat link.
+const SUPPORT_LINK = { href: "https://wa.me/message/F2RWC3YUI7EYM1", label: "Soporte" };
 
 function WhatsAppIcon() {
   return (
@@ -35,7 +23,7 @@ function WhatsAppIcon() {
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  const support = getSupportLink();
+  const support = SUPPORT_LINK;
 
   return (
     <div className="flex min-h-full flex-col">

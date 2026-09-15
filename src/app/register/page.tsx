@@ -77,6 +77,21 @@ export default function RegisterPage() {
         </div>
 
         <div className="space-y-1">
+          <label htmlFor="phone" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            WhatsApp / teléfono de contacto
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            required
+            placeholder="+57 300 123 4567"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+          <p className="text-xs text-ink-muted">Para contactarte sobre tu cuenta y la conexión de tu WhatsApp.</p>
+        </div>
+
+        <div className="space-y-1">
           <label htmlFor="password" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Contraseña
           </label>

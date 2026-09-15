@@ -34,6 +34,14 @@ function sanitizeAsciiToken(value: string): string {
   return value.replace(/[^\x21-\x7E]/g, "");
 }
 
+/** Keeps a leading "+" and digits only, so the number stays usable for a wa.me link later. */
+function sanitizePhone(value: string): string {
+  const trimmed = value.trim();
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
+  return hasPlus ? `+${digits}` : digits;
+}
+
 export type RegisterState = { error: string | null };
 
 /**
@@ -49,10 +57,11 @@ export async function registerBusiness(
 ): Promise<RegisterState> {
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = sanitizePhone(String(formData.get("phone") ?? ""));
   const password = String(formData.get("password") ?? "");
   const industry = String(formData.get("industry") ?? "otro");
 
-  if (!name || !email || !password) {
+  if (!name || !email || !phone || !password) {
     return { error: "Completa todos los campos" };
   }
   if (password.length < 8) {
@@ -98,6 +107,7 @@ export async function registerBusiness(
     await tx.user.create({
       data: {
         email,
+        phone,
         passwordHash,
         name,
         memberships: { create: { role: "OWNER", businessId: business.id } },
@@ -117,6 +127,7 @@ export async function registerBusiness(
   await logRegistrationForRemarketing({
     nombre: name,
     correo: email,
+    telefono: phone,
     negocio: name,
     industria: industryLabel,
   });
