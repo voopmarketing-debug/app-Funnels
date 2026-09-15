@@ -166,6 +166,48 @@ dígitos, con código de país) para el botón "Soporte" que ve cada cliente en
 el header del dashboard. Sin configurar, el botón cae a un `mailto:` en vez
 de mostrar un número falso.
 
+Opcional: `REGISTRATION_SHEET_WEBHOOK_URL` — para que cada registro nuevo en
+`/register` (nombre, correo, negocio, industria, fecha) caiga como una fila
+en un Google Sheet, y así la agencia pueda armar audiencias de remarketing
+(subir correos a Meta/Google Ads, campañas de seguimiento) sin tocar la base
+de datos. `src/lib/remarketingSheet.ts` hace un POST best-effort a esta URL
+en `registerBusiness()` — si falla o la variable no está configurada, el
+registro del cliente sigue funcionando normal (nunca se bloquea por esto).
+
+El Sheet ya existe: **Funnels Labs — Registros para Remarketing**, creado en
+el Google Drive de `voopmarketing@gmail.com`
+(https://docs.google.com/spreadsheets/d/1LI_uMqyv5yEzexZ0TBRyc9LHxAyriQXvZmZjPdbMtdc/edit),
+con la fila de encabezado (`Fecha de registro, Nombre, Correo, Negocio,
+Industria`) ya puesta. Falta conectarlo — eso requiere un paso manual en Google
+(Claude no tiene forma de desplegar un Apps Script por API):
+
+1. Abre ese Sheet → menú **Extensiones → Apps Script**.
+2. Borra el contenido de `Code.gs` y pega esto:
+   ```js
+   function doPost(e) {
+     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+     var data = JSON.parse(e.postData.contents);
+     sheet.appendRow([
+       new Date(),
+       data.nombre || "",
+       data.correo || "",
+       data.negocio || "",
+       data.industria || "",
+     ]);
+     return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+       .setMimeType(ContentService.MimeType.JSON);
+   }
+   ```
+3. Guarda (ícono de disquete) → botón **Implementar → Nueva implementación**.
+4. Tipo: **Aplicación web**. "Ejecutar como": **Yo (voopmarketing@gmail.com)**.
+   "Quién tiene acceso": **Cualquier usuario**. Clic en **Implementar** y
+   autoriza los permisos que pida Google (es tu propio script, es seguro).
+5. Copia la **URL de la aplicación web** que te muestra al final (empieza
+   con `https://script.google.com/macros/s/.../exec`).
+6. Pégala como `REGISTRATION_SHEET_WEBHOOK_URL` en Vercel (Production) y haz
+   Redeploy. Desde ese momento, cada `/register` nuevo agrega una fila al
+   Sheet automáticamente.
+
 ## Cómo levantar en local
 
 ```bash

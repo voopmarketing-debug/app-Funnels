@@ -13,6 +13,7 @@ import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
 import { PLAN_TIERS } from "@/lib/plans";
+import { logRegistrationForRemarketing } from "@/lib/remarketingSheet";
 import type { PlanTier } from "@prisma/client";
 
 function slugify(name: string): string {
@@ -111,6 +112,13 @@ export async function registerBusiness(
         });
       }
     }
+  });
+
+  await logRegistrationForRemarketing({
+    nombre: name,
+    correo: email,
+    negocio: name,
+    industria: industryLabel,
   });
 
   redirect("/login?registered=1");
