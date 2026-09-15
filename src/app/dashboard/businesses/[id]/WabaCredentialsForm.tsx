@@ -21,12 +21,22 @@ export function WabaCredentialsForm({
   );
 
   return (
-    <details open className="rounded-md border-2 border-[#fab219]/50 bg-surface p-4">
-      <summary className="flex cursor-pointer items-center gap-2 fl-mono text-xs tracking-wide text-ink uppercase">
+    <details
+      open
+      className="group self-start rounded-md border-2 border-[#fab219]/50 bg-surface p-4"
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2 fl-mono text-xs tracking-wide text-ink uppercase [&::-webkit-details-marker]:hidden">
         <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[#fab219] text-[11px] font-bold text-black">
           !
         </span>
-        Credenciales de WhatsApp — paso obligatorio
+        <span className="flex-1">Credenciales de WhatsApp — paso obligatorio</span>
+        <svg
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-4 w-4 flex-none text-[#fab219] transition-transform group-open:rotate-180"
+        >
+          <path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </summary>
 
       <p className="mt-3 text-sm text-ink">
