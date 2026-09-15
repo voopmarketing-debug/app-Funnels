@@ -1,7 +1,9 @@
 "use server";
 
+import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -14,7 +16,10 @@ import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
 import { PLAN_TIERS } from "@/lib/plans";
 import { logRegistrationForRemarketing } from "@/lib/remarketingSheet";
+import { sendEmail } from "@/lib/email";
 import type { PlanTier } from "@prisma/client";
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function slugify(name: string): string {
   return name
@@ -489,4 +494,94 @@ export async function updateBusinessName(businessId: string, name: string): Prom
   await prisma.business.update({ where: { id: businessId }, data: { name: trimmed } });
   revalidatePath(`/dashboard/businesses/${businessId}`);
   revalidatePath("/dashboard");
+}
+
+export type ForgotPasswordState = { submitted: boolean };
+
+/**
+ * Always returns { submitted: true } whether or not the email is
+ * registered — revealing that would let anyone probe for which emails
+ * have an account.
+ */
+export async function requestPasswordReset(
+  _prevState: ForgotPasswordState,
+  formData: FormData,
+): Promise<ForgotPasswordState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+
+  if (email) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { resetTokenHash, resetTokenExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
+      });
+
+      const host = (await headers()).get("host");
+      const resetUrl = `https://${host}/reset-password?token=${rawToken}`;
+
+      await sendEmail({
+        to: email,
+        subject: "Restablece tu contraseña — Funnels Labs",
+        html: `
+          <p>Recibimos una solicitud para restablecer tu contraseña en Funnels Labs.</p>
+          <p><a href="${resetUrl}">Haz clic aquí para elegir una nueva contraseña</a></p>
+          <p>Este enlace vence en 1 hora. Si tú no pediste esto, ignora este correo — tu contraseña sigue igual.</p>
+        `,
+      });
+    }
+  }
+
+  return { submitted: true };
+}
+
+export type ResetPasswordState = { error: string | null };
+
+export async function resetPassword(
+  _prevState: ResetPasswordState,
+  formData: FormData,
+): Promise<ResetPasswordState> {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+
+  if (!token) return { error: "Enlace inválido. Solicita uno nuevo." };
+  if (password.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres" };
+
+  const resetTokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await prisma.user.findFirst({
+    where: { resetTokenHash, resetTokenExpiresAt: { gt: new Date() } },
+  });
+
+  if (!user) {
+    return { error: "El enlace venció o ya se usó. Solicita uno nuevo." };
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+  });
+
+  redirect("/login?reset=1");
+}
+
+export type UpdateProfileState = { error: string | null; saved: boolean };
+
+export async function updateOwnProfile(
+  _prevState: UpdateProfileState,
+  formData: FormData,
+): Promise<UpdateProfileState> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "El nombre no puede estar vacío", saved: false };
+
+  await prisma.user.update({ where: { id: session.user.id }, data: { name } });
+  revalidatePath("/dashboard/account");
+  revalidatePath("/dashboard");
+  return { error: null, saved: true };
 }

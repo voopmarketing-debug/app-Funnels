@@ -214,6 +214,21 @@ en Google (Claude no tiene forma de desplegar un Apps Script por API):
    Redeploy. Desde ese momento, cada `/register` nuevo agrega una fila al
    Sheet automáticamente.
 
+Requerido para que funcione "recuperar contraseña" (`/forgot-password`):
+`GMAIL_USER` y `GMAIL_APP_PASSWORD` — sin esto, el formulario sigue
+funcionando (no revela si el correo existe) pero el correo real nunca sale,
+solo queda un `console.error` en los logs de Vercel. Usa el Gmail de la
+agencia (`voopmarketing@gmail.com`), no un servicio nuevo:
+
+1. Activa la verificación en dos pasos en esa cuenta de Google, si no la
+   tiene (Cuenta de Google > Seguridad > Verificación en dos pasos).
+2. Ve a **myaccount.google.com/apppasswords**, crea una "Contraseña de
+   aplicación" nueva (cualquier nombre, ej. "Funnels Labs").
+3. Copia la contraseña de 16 caracteres que te da (no es tu contraseña
+   normal de Gmail — es una exclusiva para esto).
+4. En Vercel: `GMAIL_USER=voopmarketing@gmail.com` y
+   `GMAIL_APP_PASSWORD=` esa contraseña de 16 caracteres. Redeploy.
+
 ## Cómo levantar en local
 
 ```bash
@@ -272,6 +287,40 @@ distintos que escribieron al menos un mensaje en lo que va del mes calendario
   un vistazo a quién contactar para un upsell, sin entrar a cada negocio.
 - Sigue siendo solo informativo: no bloquea el envío/recepción de mensajes de
   WhatsApp al superar el límite (ver nota en la sección de precios arriba).
+
+## Recuperar contraseña, perfil propio y módulo de Clientes
+
+**Recuperar contraseña**: `/login` tiene un link "¿Olvidaste tu contraseña?"
+→ `/forgot-password` (pide el correo, server action `requestPasswordReset`)
+→ si el correo existe, genera un token aleatorio, guarda solo su hash SHA-256
+en `User.resetTokenHash` (nunca el token real) con `resetTokenExpiresAt` a 1
+hora, y manda un correo con el link `/reset-password?token=...` vía
+`src/lib/email.ts` (Gmail + Nodemailer, ver la variable `GMAIL_APP_PASSWORD`
+arriba). La respuesta del formulario es siempre la misma exista o no el
+correo, para no revelar qué correos están registrados. `/reset-password`
+(server action `resetPassword`) valida el hash del token contra la base y
+que no haya vencido, actualiza `passwordHash` y borra el token (de un solo
+uso).
+
+**Mi perfil** (`/dashboard/account`, cualquier usuario autenticado): formulario
+simple para cambiar el `name` propio (server action `updateOwnProfile`). El
+correo se muestra pero no se puede editar ahí — es el identificador de login
+y, para la cuenta de la agencia, tiene que seguir coincidiendo con
+`AGENCY_ADMIN_EMAIL`. Se entra haciendo clic en el correo propio en el header
+del dashboard.
+
+**Módulo Clientes** (`/dashboard/clients`, solo visible y accesible para
+quien tenga alguna membresía `ADMIN` — la agencia): tabla con los datos
+personales que cada cliente puso al registrarse (nombre, correo, teléfono,
+negocio, plan, fecha de registro), con link directo a la página de cada
+negocio. Pensado para que Juan tenga a mano el correo/teléfono de cada
+cliente — para contactarlo, o para poder iniciar sesión con sus credenciales
+si necesita reproducir un problema desde la cuenta real del cliente (dado que
+la agencia ya tiene acceso completo a la configuración de cada negocio vía su
+membresía ADMIN, esto no requiere una función de "iniciar sesión como" —
+alcanza con entrar a `/dashboard/businesses/[id]` de ese negocio).
+Un cliente sin membresía ADMIN en ningún negocio recibe 404 si intenta
+entrar a esta URL directamente.
 
 ## Validado manualmente (Playwright, build de producción)
 

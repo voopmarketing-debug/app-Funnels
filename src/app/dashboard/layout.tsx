@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 
 // Support channel shown to every client in the dashboard header — the
@@ -25,15 +26,26 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await auth();
   const support = SUPPORT_LINK;
 
+  const isAgencyAdmin = session?.user?.id
+    ? (await prisma.membership.findFirst({ where: { userId: session.user.id, role: "ADMIN" }, select: { id: true } })) !== null
+    : false;
+
   return (
     <div className="flex min-h-full flex-col">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <FunnelsLogoMark className="h-6 w-6 flex-none" />
-          <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">
-            Funnels_Labs
-          </span>
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
+            <FunnelsLogoMark className="h-6 w-6 flex-none" />
+            <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">
+              Funnels_Labs
+            </span>
+          </Link>
+          {isAgencyAdmin && (
+            <Link href="/dashboard/clients" className="text-sm font-medium text-ink-muted transition hover:text-ink">
+              Clientes
+            </Link>
+          )}
+        </div>
         <div className="flex items-center gap-4 text-sm">
           <a
             href={support.href}
@@ -44,7 +56,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <WhatsAppIcon />
             {support.label}
           </a>
-          <span className="text-ink-muted">{session?.user?.email}</span>
+          <Link href="/dashboard/account" className="text-ink-muted transition hover:text-ink hover:underline">
+            {session?.user?.email}
+          </Link>
           <form
             action={async () => {
               "use server";

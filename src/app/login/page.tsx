@@ -66,6 +66,12 @@ function LoginForm() {
           </p>
         )}
 
+        {searchParams.get("reset") === "1" && (
+          <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-accent">
+            Contraseña actualizada. Ya puedes iniciar sesión con la nueva.
+          </p>
+        )}
+
         <div className="space-y-1">
           <label htmlFor="email" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
             Email
@@ -80,9 +86,14 @@ function LoginForm() {
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="password" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            Contraseña
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+              Contraseña
+            </label>
+            <Link href="/forgot-password" className="text-xs text-accent hover:underline">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
           <input
             id="password"
             name="password"

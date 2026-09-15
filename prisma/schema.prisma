@@ -57,6 +57,13 @@ model User {
   name         String?
   createdAt    DateTime     @default(now())
   memberships  Membership[]
+
+  // Password reset flow: resetTokenHash stores a SHA-256 hash of the token
+  // emailed to the user (never the raw token) so a DB read alone can't be
+  // used to reset a password; resetTokenExpiresAt bounds how long it's
+  // valid. Both cleared once used.
+  resetTokenHash      String?   @unique
+  resetTokenExpiresAt DateTime?
 }
 
 model Membership {
