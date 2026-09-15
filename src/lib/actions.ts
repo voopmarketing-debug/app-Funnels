@@ -471,3 +471,22 @@ export async function updateBusinessPlan(businessId: string, planTier: PlanTier)
   revalidatePath(`/dashboard/businesses/${businessId}`);
   revalidatePath("/dashboard");
 }
+
+export async function updateBusinessName(businessId: string, name: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const membership = await prisma.membership.findUnique({
+    where: { userId_businessId: { userId: session.user.id, businessId } },
+  });
+  if (!membership || membership.role !== "ADMIN") {
+    throw new Error("Only the agency can rename a business");
+  }
+
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("El nombre no puede estar vacío");
+
+  await prisma.business.update({ where: { id: businessId }, data: { name: trimmed } });
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath("/dashboard");
+}

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
+import { BusinessCardMenu } from "./BusinessCardMenu";
 
 const PLAN_BADGE_STYLES: Record<"warning" | "critical", { bg: string; text: string; label: string }> = {
   warning: { bg: "#fab21926", text: "#fab219", label: "Cerca del límite del plan" },
@@ -77,12 +78,12 @@ export default async function DashboardPage() {
           const badge = status === "warning" || status === "critical" ? PLAN_BADGE_STYLES[status] : null;
 
           return (
-            <li key={business.id}>
+            <li key={business.id} className="relative">
               <Link
                 href={`/dashboard/businesses/${business.id}`}
                 className="block rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong"
               >
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-2 pr-7">
                   <p className="font-medium">{business.name}</p>
                   {badge && (
                     <span
@@ -103,6 +104,7 @@ export default async function DashboardPage() {
                   {business._count.conversations} conversaciones
                 </p>
               </Link>
+              {role === "ADMIN" && <BusinessCardMenu businessId={business.id} currentName={business.name} />}
             </li>
           );
         })}
