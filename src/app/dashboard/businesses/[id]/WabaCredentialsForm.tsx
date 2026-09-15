@@ -62,6 +62,7 @@ export function WabaCredentialsForm({
             name="wabaPhoneNumberId"
             defaultValue={wabaPhoneNumberId}
             required
+            autoComplete="off"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
         </div>
@@ -82,8 +83,9 @@ export function WabaCredentialsForm({
           <input
             id="wabaAccessToken"
             name="wabaAccessToken"
-            type="password"
+            type="text"
             placeholder="Pega aquí el token nuevo que te dio Meta"
+            autoComplete="off"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
         </div>

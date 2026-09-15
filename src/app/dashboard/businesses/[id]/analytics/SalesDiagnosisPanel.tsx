@@ -20,6 +20,28 @@ function severityColors(score: number): { fill: string; track: string } {
   return { fill: "#d03b3b", track: "rgba(208,59,59,0.16)" };
 }
 
+// The model consistently quotes the exact customer/agent messages it's
+// using as evidence (e.g. 'Agendemos una llamada'). Bolding those quoted
+// spans in a brighter color turns a wall of same-toned text into something
+// scannable — the quotes ARE the concrete, important points; everything
+// else is connective narration.
+function HighlightedText({ text }: { text: string }) {
+  const parts = text.split(/('[^']+'|"[^"]+")/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^['"]/.test(part) ? (
+          <strong key={i} className="font-semibold text-ink">
+            {part}
+          </strong>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
 function ScoreMeter({ score }: { score: number }) {
   const { fill, track } = severityColors(score);
   return (
@@ -128,7 +150,9 @@ export function SalesDiagnosisPanel({
           </summary>
 
           <div className="mt-5 space-y-5 border-t border-border pt-5">
-            <p className="text-sm text-ink">{current.diagnosis.resumen}</p>
+            <p className="text-sm text-ink-muted">
+              <HighlightedText text={current.diagnosis.resumen} />
+            </p>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -141,7 +165,7 @@ export function SalesDiagnosisPanel({
                       <span className="mt-0.5 flex-none" style={{ color: "#b5ff2b" }}>
                         +
                       </span>
-                      {item}
+                      <HighlightedText text={item} />
                     </li>
                   ))}
                 </ul>
@@ -153,7 +177,7 @@ export function SalesDiagnosisPanel({
                   {current.diagnosis.debilidades.map((item, i) => (
                     <li key={i} className="flex gap-2 text-sm text-ink-muted">
                       <span className="mt-0.5 flex-none text-error">−</span>
-                      {item}
+                      <HighlightedText text={item} />
                     </li>
                   ))}
                 </ul>
@@ -166,11 +190,11 @@ export function SalesDiagnosisPanel({
               </h3>
               <ol className="space-y-2">
                 {current.diagnosis.recomendaciones.map((item, i) => (
-                  <li key={i} className="flex gap-2.5 text-sm text-ink">
+                  <li key={i} className="flex gap-2.5 text-sm text-ink-muted">
                     <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">
                       {i + 1}
                     </span>
-                    {item}
+                    <HighlightedText text={item} />
                   </li>
                 ))}
               </ol>

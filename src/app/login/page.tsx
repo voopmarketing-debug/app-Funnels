@@ -46,6 +46,7 @@ function LoginForm() {
 
       <form
         action={handleSubmit}
+        autoComplete="on"
         className="relative w-full max-w-sm space-y-6 rounded-xl border border-border bg-surface p-7"
       >
         <div className="flex items-center gap-3">
@@ -82,6 +83,7 @@ function LoginForm() {
             type="email"
             required
             placeholder="tu@correo.com"
+            autoComplete="username"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
           <p className="text-xs text-ink-muted">
@@ -104,6 +106,7 @@ function LoginForm() {
             name="password"
             type="password"
             required
+            autoComplete="current-password"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
           <p className="text-xs text-ink-muted">
