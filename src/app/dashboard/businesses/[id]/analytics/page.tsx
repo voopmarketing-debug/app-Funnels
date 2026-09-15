@@ -2,15 +2,31 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessAnalytics } from "@/lib/analytics";
+import { getBusinessAnalytics, isDateRangeKey, type DateRangeKey } from "@/lib/analytics";
 import { StatTile } from "./StatTile";
 import { ConversationsTrendChart } from "./ConversationsTrendChart";
 import { MessagesStackedChart } from "./MessagesStackedChart";
 import { StageDistributionChart } from "./StageDistributionChart";
 import { SalesDiagnosisPanel } from "./SalesDiagnosisPanel";
+import { DateRangeSelector } from "./DateRangeSelector";
 import type { SalesDiagnosis } from "@/lib/diagnosis";
 
 type Status = "good" | "warning" | "critical" | "neutral";
+
+// Short noun phrase per range, for composing sublabels like "+3 hoy" or
+// "Mensajes (7 días)" without special-casing every call site.
+const RANGE_NOUN_PHRASE: Record<DateRangeKey, string> = {
+  today: "hoy",
+  yesterday: "ayer",
+  "7d": "7 días",
+  "15d": "15 días",
+  "30d": "30 días",
+};
+
+function newConversationsSublabel(rangeKey: DateRangeKey, count: number): string {
+  if (rangeKey === "today" || rangeKey === "yesterday") return `+${count} ${RANGE_NOUN_PHRASE[rangeKey]}`;
+  return `+${count} en ${RANGE_NOUN_PHRASE[rangeKey]}`;
+}
 
 function formatPercent(value: number | null): string {
   return value === null ? "—" : `${Math.round(value)}%`;
@@ -49,8 +65,17 @@ function awaitingReplyStatus(count: number): Status {
   return "critical";
 }
 
-export default async function AnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AnalyticsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ range?: string }>;
+}) {
   const { id } = await params;
+  const { range } = await searchParams;
+  const rangeKey: DateRangeKey = range && isDateRangeKey(range) ? range : "30d";
+
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -62,7 +87,7 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
   if (!membership) notFound();
   const { business } = membership;
 
-  const analytics = await getBusinessAnalytics(id);
+  const analytics = await getBusinessAnalytics(id, rangeKey);
 
   const diagnosis =
     business.agent?.diagnosisReport && business.agent.diagnosisGeneratedAt
@@ -80,7 +105,7 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
         </Link>
         <div className="mt-1 flex items-baseline justify-between gap-4">
           <h1 className="text-xl font-bold">KPIs y analítica</h1>
-          <span className="fl-mono text-xs tracking-wide text-ink-muted">Últimos 30 días</span>
+          <DateRangeSelector value={rangeKey} />
         </div>
       </div>
 
@@ -88,13 +113,13 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ id: 
         <StatTile
           label="Conversaciones totales"
           value={String(analytics.totalConversations)}
-          sublabel={`+${analytics.newConversations} en 30 días`}
+          sublabel={newConversationsSublabel(rangeKey, analytics.newConversations)}
           description="Cuántas personas distintas te han escrito por WhatsApp en total, desde siempre."
         />
         <StatTile
-          label="Mensajes (30 días)"
+          label={`Mensajes (${RANGE_NOUN_PHRASE[rangeKey]})`}
           value={String(analytics.totalMessages)}
-          description="Cuántos mensajes se intercambiaron en el último mes — los que mandaron tus clientes y los que respondiste tú (IA o humano)."
+          description="Cuántos mensajes se intercambiaron en el período seleccionado — los que mandaron tus clientes y los que respondiste tú (IA o humano)."
         />
         <StatTile
           label="Automatización IA"

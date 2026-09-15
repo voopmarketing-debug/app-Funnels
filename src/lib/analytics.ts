@@ -1,9 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { type DateRangeKey } from "@/lib/dateRanges";
 
-// How many days of daily-bucketed history the trend charts cover. Kept short
-// on purpose — this is a per-business operational dashboard (like Chatwoot's
-// or Intercom's "last 30 days" view), not a long-term BI report.
-const TREND_DAYS = 30;
+export { DATE_RANGE_OPTIONS, isDateRangeKey, type DateRangeKey } from "@/lib/dateRanges";
 
 // Errors are persisted as normal AGENT messages (see logInternalError in
 // lib/agent.ts) so they show up in the conversation thread — but they must
@@ -34,31 +32,68 @@ function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function buildDayRange(days: number): string[] {
+function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+// "today"/"yesterday" are fixed calendar-day windows; "Nd" options are a
+// rolling window of N calendar days ending today (inclusive) — same
+// convention the dashboard used before this was configurable.
+function resolveDateRange(key: DateRangeKey, now: Date): { since: Date; until: Date } {
+  const startOfToday = startOfUtcDay(now);
+
+  if (key === "today") return { since: startOfToday, until: now };
+
+  if (key === "yesterday") {
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setUTCDate(startOfYesterday.getUTCDate() - 1);
+    return { since: startOfYesterday, until: startOfToday };
+  }
+
+  const days = key === "7d" ? 7 : key === "15d" ? 15 : 30;
+  const since = new Date(startOfToday);
+  since.setUTCDate(since.getUTCDate() - (days - 1));
+  return { since, until: now };
+}
+
+function buildDayKeys(key: DateRangeKey, now: Date): string[] {
+  const startOfToday = startOfUtcDay(now);
+
+  if (key === "today") return [dayKey(startOfToday)];
+
+  if (key === "yesterday") {
+    const yesterday = new Date(startOfToday);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    return [dayKey(yesterday)];
+  }
+
+  const days = key === "7d" ? 7 : key === "15d" ? 15 : 30;
   const keys: string[] = [];
-  const now = new Date();
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+    const d = new Date(startOfToday);
+    d.setUTCDate(d.getUTCDate() - i);
     keys.push(dayKey(d));
   }
   return keys;
 }
 
-export async function getBusinessAnalytics(businessId: string): Promise<BusinessAnalytics> {
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - (TREND_DAYS - 1));
-  since.setUTCHours(0, 0, 0, 0);
+export async function getBusinessAnalytics(
+  businessId: string,
+  rangeKey: DateRangeKey = "30d",
+): Promise<BusinessAnalytics> {
+  const now = new Date();
+  const { since, until } = resolveDateRange(rangeKey, now);
 
   const [totalConversations, newConversations, recentConversations, recentMessages, stages, conversationsForActivity] =
     await Promise.all([
       prisma.conversation.count({ where: { businessId } }),
-      prisma.conversation.count({ where: { businessId, createdAt: { gte: since } } }),
+      prisma.conversation.count({ where: { businessId, createdAt: { gte: since, lt: until } } }),
       prisma.conversation.findMany({
-        where: { businessId, createdAt: { gte: since } },
+        where: { businessId, createdAt: { gte: since, lt: until } },
         select: { createdAt: true },
       }),
       prisma.message.findMany({
-        where: { conversation: { businessId }, createdAt: { gte: since } },
+        where: { conversation: { businessId }, createdAt: { gte: since, lt: until } },
         select: { createdAt: true, role: true, sentByHuman: true, content: true, conversationId: true },
         orderBy: { createdAt: "asc" },
       }),
@@ -78,7 +113,7 @@ export async function getBusinessAnalytics(businessId: string): Promise<Business
       }),
     ]);
 
-  const dayKeys = buildDayRange(TREND_DAYS);
+  const dayKeys = buildDayKeys(rangeKey, now);
 
   const conversationsByDay = new Map(dayKeys.map((k) => [k, 0]));
   for (const c of recentConversations) {
@@ -144,13 +179,13 @@ export async function getBusinessAnalytics(businessId: string): Promise<Business
   const automationRate = iaCount + humanoCount === 0 ? null : (iaCount / (iaCount + humanoCount)) * 100;
   const errorRate = totalAgentEvents === 0 ? null : (errorCount / totalAgentEvents) * 100;
 
-  const now = Date.now();
+  const nowMs = now.getTime();
   const dayMs = 24 * 60 * 60 * 1000;
   let awaitingReply = 0;
   let activeLast24h = 0;
   for (const c of conversationsForActivity) {
     if (c.messages[0]?.role === "CUSTOMER") awaitingReply += 1;
-    if (now - c.lastMessageAt.getTime() < dayMs) activeLast24h += 1;
+    if (nowMs - c.lastMessageAt.getTime() < dayMs) activeLast24h += 1;
   }
 
   return {
