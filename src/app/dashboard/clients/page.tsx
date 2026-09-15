@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LABELS } from "@/lib/plans";
+import { ResetPasswordButton } from "./ResetPasswordButton";
 
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "short", year: "numeric" }).format(date);
@@ -49,6 +50,7 @@ export default async function ClientsPage() {
                 <th className="px-4 py-3 font-medium">Negocio</th>
                 <th className="px-4 py-3 font-medium">Plan</th>
                 <th className="px-4 py-3 font-medium">Registrado</th>
+                <th className="px-4 py-3 font-medium">Contraseña</th>
               </tr>
             </thead>
             <tbody>
@@ -64,6 +66,9 @@ export default async function ClientsPage() {
                   </td>
                   <td className="px-4 py-3 text-ink-muted">{PLAN_LABELS[business.planTier]}</td>
                   <td className="px-4 py-3 text-ink-muted">{formatDate(createdAt)}</td>
+                  <td className="px-4 py-3">
+                    <ResetPasswordButton userId={user.id} />
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -585,3 +585,40 @@ export async function updateOwnProfile(
   revalidatePath("/dashboard");
   return { error: null, saved: true };
 }
+
+/**
+ * Lets the agency set a new password for a client directly — a reliable
+ * fallback to "forgot password" when email delivery is unavailable (e.g.
+ * GOOGLE_APPS_SCRIPT_WEBHOOK_URL not configured yet, or the client just
+ * can't find the email). Returns the new plaintext password once, for the
+ * agency to hand to the client directly (WhatsApp, phone); it is never
+ * stored anywhere except as a bcrypt hash.
+ */
+export async function adminResetUserPassword(targetUserId: string): Promise<{ password: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const targetOwnerBusinessIds = (
+    await prisma.membership.findMany({
+      where: { userId: targetUserId, role: "OWNER" },
+      select: { businessId: true },
+    })
+  ).map((m) => m.businessId);
+
+  const callerIsAdmin = await prisma.membership.findFirst({
+    where: { userId: session.user.id, role: "ADMIN", businessId: { in: targetOwnerBusinessIds } },
+  });
+  if (!callerIsAdmin) {
+    throw new Error("Only the agency can reset a client's password");
+  }
+
+  const newPassword = crypto.randomBytes(6).toString("base64url");
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+
+  await prisma.user.update({
+    where: { id: targetUserId },
+    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+  });
+
+  return { password: newPassword };
+}
