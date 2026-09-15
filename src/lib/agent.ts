@@ -27,6 +27,13 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     return;
   }
 
+  // Background context (city/country/social media/phone) the owner set once
+  // in "Mi perfil" — fed into the prompt automatically, see buildSystemPrompt.
+  const ownerMembership = await prisma.membership.findFirst({
+    where: { businessId: business.id, role: "OWNER" },
+    include: { user: { select: { phone: true, city: true, country: true, socialMedia: true } } },
+  });
+
   // Only needed for a brand-new conversation — every business is seeded
   // with its own pipeline on creation, so this should always find one.
   const firstStage = await prisma.pipelineStage.findFirst({
@@ -93,6 +100,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       model: business.agent.model,
       history,
       userMessage: message.text,
+      owner: ownerMembership?.user,
     });
   } catch (err) {
     // Surface the failure straight into the conversation thread in the

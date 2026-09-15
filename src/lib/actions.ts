@@ -580,7 +580,21 @@ export async function updateOwnProfile(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "El nombre no puede estar vacío", saved: false };
 
-  await prisma.user.update({ where: { id: session.user.id }, data: { name } });
+  const phone = sanitizePhone(String(formData.get("phone") ?? ""));
+  const city = String(formData.get("city") ?? "").trim();
+  const country = String(formData.get("country") ?? "").trim();
+  const socialMedia = String(formData.get("socialMedia") ?? "").trim();
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: {
+      name,
+      phone: phone || null,
+      city: city || null,
+      country: country || null,
+      socialMedia: socialMedia || null,
+    },
+  });
   revalidatePath("/dashboard/account");
   revalidatePath("/dashboard");
   return { error: null, saved: true };

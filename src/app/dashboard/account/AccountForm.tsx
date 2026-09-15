@@ -3,7 +3,21 @@
 import { useActionState } from "react";
 import { updateOwnProfile, type UpdateProfileState } from "@/lib/actions";
 
-export function AccountForm({ email, name }: { email: string; name: string }) {
+export function AccountForm({
+  email,
+  name,
+  phone,
+  city,
+  country,
+  socialMedia,
+}: {
+  email: string;
+  name: string;
+  phone: string;
+  city: string;
+  country: string;
+  socialMedia: string;
+}) {
   const [state, formAction, isPending] = useActionState<UpdateProfileState, FormData>(
     updateOwnProfile,
     { error: null, saved: false },
@@ -28,6 +42,64 @@ export function AccountForm({ email, name }: { email: string; name: string }) {
           required
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
         />
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="phone" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+          Teléfono / WhatsApp
+        </label>
+        <input
+          id="phone"
+          name="phone"
+          type="tel"
+          defaultValue={phone}
+          placeholder="+57 300 123 4567"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label htmlFor="city" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Ciudad
+          </label>
+          <input
+            id="city"
+            name="city"
+            defaultValue={city}
+            placeholder="Bogotá"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="country" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            País
+          </label>
+          <input
+            id="country"
+            name="country"
+            defaultValue={country}
+            placeholder="Colombia"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="socialMedia" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+          Redes sociales
+        </label>
+        <input
+          id="socialMedia"
+          name="socialMedia"
+          defaultValue={socialMedia}
+          placeholder="Instagram @negocio, Facebook /negocio"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+        />
+        <p className="text-xs text-ink-muted">
+          Ciudad, país y redes le dan contexto a tu agente de IA — así puede responder si un cliente
+          pregunta dónde están o si tienen Instagram, sin que tengas que escribirlo tú en el prompt.
+        </p>
       </div>
 
       {state.error && <p className="text-sm text-error">{state.error}</p>}

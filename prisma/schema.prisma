@@ -53,6 +53,14 @@ model User {
   // separate from wabaPhoneNumberId on Business, which is the Meta WhatsApp
   // Business API config for their bot, not a way to contact them.
   phone        String?
+  // Fed into the AI agent's system prompt as background context (see
+  // buildSystemPrompt in src/lib/ai.ts) so the bot can answer "¿dónde
+  // están?" or share a social media handle without the client having to
+  // type it into their own editable prompt — set once here, used by every
+  // business this account owns.
+  city         String?
+  country      String?
+  socialMedia  String?
   passwordHash String
   name         String?
   createdAt    DateTime     @default(now())

@@ -121,12 +121,35 @@ const COMPREHENSION_RULES = [
   .map((rule) => `- ${rule}`)
   .join("\n");
 
+export type OwnerContext = {
+  phone?: string | null;
+  city?: string | null;
+  country?: string | null;
+  socialMedia?: string | null;
+};
+
+// Background facts the client set once in "Mi perfil" (never typed into
+// their own editable prompt) — only the lines that are actually filled in
+// are included, so an account with nothing set adds no noise here.
+function buildOwnerContextBlock(owner?: OwnerContext): string {
+  if (!owner) return "";
+  const lines = [
+    owner.city && owner.country ? `- Ubicación: ${owner.city}, ${owner.country}` : owner.city ? `- Ciudad: ${owner.city}` : owner.country ? `- País: ${owner.country}` : null,
+    owner.phone ? `- Teléfono/WhatsApp de contacto: ${owner.phone}` : null,
+    owner.socialMedia ? `- Redes sociales: ${owner.socialMedia}` : null,
+  ].filter((line): line is string => line !== null);
+
+  if (lines.length === 0) return "";
+  return `\n\nDATOS DE REFERENCIA DEL NEGOCIO (usa esto solo si el cliente pregunta algo relacionado, como ubicación o redes — no lo menciones por iniciativa propia):\n${lines.join("\n")}`;
+}
+
 function buildSystemPrompt(
   basePrompt: string,
   tone: string,
   replyLength: string,
   industry: string,
   history: AgentHistoryMessage[],
+  owner?: OwnerContext,
 ): string {
   const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.cercano;
   const lengthInstruction = LENGTH_INSTRUCTIONS[replyLength] ?? LENGTH_INSTRUCTIONS.breve;
@@ -147,7 +170,7 @@ function buildSystemPrompt(
     ? ""
     : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en la transcripción de arriba, y no saludes ni te disculpes por demoras — pero mantené la calidez, no te vuelvas seco por evitar el saludo.";
 
-  return `${buildConversationState(history)}\n\nCÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${closingReminder}`;
+  return `${buildConversationState(history)}\n\nCÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.${buildOwnerContextBlock(owner)}\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${closingReminder}`;
 }
 
 export async function generateAgentReply(params: {
@@ -158,6 +181,7 @@ export async function generateAgentReply(params: {
   model: string;
   history: AgentHistoryMessage[];
   userMessage: string;
+  owner?: OwnerContext;
 }): Promise<string> {
   const isFirstMessage = params.history.length === 0;
 
@@ -170,6 +194,7 @@ export async function generateAgentReply(params: {
       params.replyLength,
       params.industry,
       params.history,
+      params.owner,
     ),
     messages: [...params.history, { role: "user", content: params.userMessage }],
   });

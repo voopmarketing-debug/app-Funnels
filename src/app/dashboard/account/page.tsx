@@ -12,7 +12,14 @@ export default async function AccountPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-bold">Mi perfil</h1>
-      <AccountForm email={user.email} name={user.name ?? ""} />
+      <AccountForm
+        email={user.email}
+        name={user.name ?? ""}
+        phone={user.phone ?? ""}
+        city={user.city ?? ""}
+        country={user.country ?? ""}
+        socialMedia={user.socialMedia ?? ""}
+      />
     </div>
   );
 }
