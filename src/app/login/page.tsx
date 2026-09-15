@@ -86,10 +86,6 @@ function LoginForm() {
             autoComplete="username"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
-          <p className="text-xs text-ink-muted">
-            El correo con el que creaste tu cuenta en Funnels Labs — no tu número de WhatsApp ni
-            el Phone Number ID.
-          </p>
         </div>
 
         <div className="space-y-1">
@@ -109,9 +105,6 @@ function LoginForm() {
             autoComplete="current-password"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
-          <p className="text-xs text-ink-muted">
-            La contraseña que elegiste al crear tu cuenta — no el token de acceso que te dio Meta.
-          </p>
         </div>
 
         {error && <p className="text-sm text-error">{error}</p>}
