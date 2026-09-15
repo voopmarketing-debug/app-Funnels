@@ -22,30 +22,44 @@ const SEGMENTS = [
   },
 ];
 
+const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+
 const PLANS = [
   {
     name: "Starter",
-    price: "$297",
-    setup: "+ $997 implementación única",
+    badge: "Oferta de lanzamiento",
+    price: "$150",
+    priceSuffix: "USD todo el trimestre",
+    strikePrice: "$450",
+    billingNote:
+      "El plan normal es $150 USD/mes. Por el lanzamiento del software te lo dejamos en $150 USD por los 3 meses completos — pago único, sin mensualidades en ese periodo. Se cobra automático cada trimestre (vía Hotmart).",
     contacts: "Hasta 500 contactos activos/mes",
     features: ["1 número de WhatsApp", "Agente con memoria completa de la conversación", "CRM personalizable por etapas", "Soporte por WhatsApp"],
     highlight: false,
+    ctaLabel: "Empezar",
+    ctaHref: "/register",
   },
   {
     name: "Pro",
-    price: "$497",
-    setup: "+ $1,497 implementación única",
+    price: "$300",
+    priceSuffix: "USD cada 3 meses",
+    billingNote: "Cobro automático trimestral (vía Hotmart) — mínimo 3 meses.",
     contacts: "Hasta 2,000 contactos activos/mes",
     features: ["1 número de WhatsApp", "Dashboard de KPIs + diagnóstico de ventas con IA", "Ajuste de prompt mensual incluido", "Soporte prioritario por WhatsApp"],
     highlight: true,
+    ctaLabel: "Empezar",
+    ctaHref: "/register",
   },
   {
-    name: "Scale",
-    price: "A medida",
-    setup: "Hablemos de tu caso",
+    name: "Consultoría",
+    price: "Llave en mano",
+    priceSuffix: "",
+    billingNote: "Agenda una llamada y nosotros implementamos todo por ti, de principio a fin.",
     contacts: "Contactos ilimitados",
-    features: ["Varios números de WhatsApp", "Todo lo del plan Pro", "Onboarding asistido paso a paso", "Gerente de cuenta dedicado"],
+    features: ["Varios números de WhatsApp", "Todo lo del plan Pro", "Lo implementamos nosotros, de punta a punta", "Gerente de cuenta dedicado"],
     highlight: false,
+    ctaLabel: "Agenda una llamada",
+    ctaHref: SUPPORT_WHATSAPP_LINK,
   },
 ];
 
@@ -146,27 +160,38 @@ export default async function Home() {
       <section id="precios" className="relative mx-auto max-w-5xl px-6 py-16">
         <h2 className="text-center text-2xl font-bold">Planes</h2>
         <p className="mx-auto mt-2 max-w-xl text-center text-sm text-ink-muted">
-          Incluyen implementación (conexión de tu WhatsApp, configuración del agente y prueba en
-          vivo) más mantenimiento mensual. Un contacto activo es cada cliente distinto que te
-          escribe en el mes. Precios de referencia en USD.
+          Pago trimestral (cada 3 meses), débito automático — sin sorpresas mes a mes. Un contacto
+          activo es cada cliente distinto que te escribe en el mes. Precios de referencia en USD.
         </p>
 
         <div className="mx-auto mt-8 grid max-w-5xl gap-6 sm:grid-cols-3">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
-              className={`rounded-xl p-6 ${
+              className={`flex flex-col rounded-xl p-6 ${
                 plan.highlight ? "border-2 border-accent bg-surface" : "border border-border bg-surface"
               }`}
             >
-              <p className={`fl-mono text-xs uppercase tracking-wide ${plan.highlight ? "text-accent" : "text-ink-muted"}`}>
-                {plan.name}
-              </p>
-              <p className="mt-2 text-3xl font-bold">
-                {plan.price}
-                {plan.name !== "Scale" && <span className="text-base font-normal text-ink-muted">/mes</span>}
-              </p>
-              <p className="mt-1 text-sm text-ink-muted">{plan.setup}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className={`fl-mono text-xs uppercase tracking-wide ${plan.highlight ? "text-accent" : "text-ink-muted"}`}>
+                  {plan.name}
+                </p>
+                {plan.badge && (
+                  <span className="fl-mono rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-ink">
+                    {plan.badge}
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-baseline gap-2">
+                <p className="text-3xl font-bold">{plan.price}</p>
+                {plan.strikePrice && (
+                  <span className="text-base text-ink-faint line-through">{plan.strikePrice}</span>
+                )}
+              </div>
+              {plan.priceSuffix && <p className="text-sm text-ink-muted">{plan.priceSuffix}</p>}
+              <p className="mt-1 text-xs text-ink-muted">{plan.billingNote}</p>
+
               <p className="mt-4 rounded-md bg-background px-3 py-2 text-sm font-medium text-ink">
                 {plan.contacts}
               </p>
@@ -176,14 +201,16 @@ export default async function Home() {
                 ))}
               </ul>
               <Link
-                href={plan.name === "Scale" ? "mailto:voopmarketing@gmail.com" : "/register"}
+                href={plan.ctaHref}
+                target={plan.ctaHref.startsWith("http") ? "_blank" : undefined}
+                rel={plan.ctaHref.startsWith("http") ? "noopener noreferrer" : undefined}
                 className={`mt-6 block rounded-md px-4 py-2 text-center font-semibold transition ${
                   plan.highlight
                     ? "bg-accent text-accent-ink hover:bg-accent-hover"
                     : "border border-border text-ink hover:border-border-strong"
                 }`}
               >
-                {plan.name === "Scale" ? "Hablemos" : "Empezar"}
+                {plan.ctaLabel}
               </Link>
             </div>
           ))}

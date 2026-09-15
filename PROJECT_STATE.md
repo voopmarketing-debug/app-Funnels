@@ -254,13 +254,21 @@ npm run dev
 
 ## Negocio: precios y segmentos (recomendación, vive también en la landing `/`)
 
-- **Starter**: $297/mes + $997 implementación única — 1 número, hasta 500
-  contactos activos/mes.
-- **Pro**: $497/mes + $1,497 implementación única — hasta 2,000 contactos
+- **Starter**: $150 USD/mes de precio normal, pero con **oferta de
+  lanzamiento**: $150 USD por el trimestre completo (pago único, cubre 3
+  meses) — 1 número, hasta 500 contactos activos/mes.
+- **Pro**: $300 USD cada 3 meses (mínimo 3 meses) — hasta 2,000 contactos
   activos/mes, dashboard de KPIs + diagnóstico de ventas con IA, ajuste de
   prompt mensual incluido, soporte prioritario.
-- **Scale**: a medida — contactos ilimitados, varios números de WhatsApp,
-  gerente de cuenta dedicado.
+- **Consultoría** (antes "Scale" en la landing, sigue siendo internamente el
+  tier `SCALE` en `PlanTier`): llave en mano — el cliente agenda una llamada
+  y la agencia implementa todo. Sin precio fijo en la landing; contactos
+  ilimitados.
+- Cobro pensado como suscripción trimestral vía Hotmart (débito automático
+  cada 3 meses, no mensual) — el botón de Starter/Pro en la landing sigue
+  yendo a `/register` por ahora; falta reemplazarlo por el link real de
+  Hotmart cuando Juan lo tenga listo. El botón de Consultoría va directo al
+  WhatsApp de soporte (`https://wa.me/message/F2RWC3YUI7EYM1`).
 - Posicionamiento high-ticket, vendido por llamada/aplicación, no self-service
   a bajo costo (ver el plan de lanzamiento para la lógica completa de precio).
   Los límites de contactos ya se rastrean técnicamente (ver
