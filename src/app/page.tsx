@@ -38,23 +38,7 @@ const PLANS = [
       "1 línea de WhatsApp (un negocio)",
       "Agente con memoria completa de la conversación",
       "CRM personalizable por etapas",
-      "Soporte de lunes a viernes por WhatsApp con un agente especializado",
-      "Sesión de onboarding y acompañamiento",
-    ],
-    highlight: false,
-    ctaLabel: "Empezar",
-    ctaHref: "/register",
-  },
-  {
-    name: "Pro",
-    price: "$300",
-    priceSuffix: "USD cada 3 meses",
-    billingNote: "Cobro automático trimestral (vía Hotmart) — mínimo 3 meses.",
-    contacts: "Hasta 1,200 contactos activos/mes",
-    features: [
-      "Hasta 3 líneas de WhatsApp en total",
       "Dashboard de KPIs + diagnóstico de ventas con IA",
-      "Ajuste de prompt mensual incluido",
       "Soporte de lunes a viernes por WhatsApp con un agente especializado",
       "Sesión de onboarding y acompañamiento",
     ],
@@ -67,10 +51,10 @@ const PLANS = [
     price: "Llave en mano",
     priceSuffix: "",
     billingNote: "Agenda una llamada y nosotros implementamos todo por ti, de principio a fin.",
-    contacts: "Contactos ilimitados",
+    contacts: "Contactos y líneas de WhatsApp a la medida de tu volumen",
     features: [
-      "Líneas de WhatsApp personalizadas, sin límite fijo",
-      "Todo lo del plan Pro",
+      "Todo lo del plan Starter, sin límite de contactos ni de líneas",
+      "Desarrollo a medida: lo que tu negocio necesite, hecho para ti",
       "Lo implementamos nosotros, de punta a punta",
       "Gerente de cuenta dedicado + soporte por WhatsApp",
     ],
@@ -181,7 +165,7 @@ export default async function Home() {
           activo es cada cliente distinto que te escribe en el mes. Precios de referencia en USD.
         </p>
 
-        <div className="mx-auto mt-8 grid max-w-5xl gap-6 sm:grid-cols-3">
+        <div className="mx-auto mt-8 grid max-w-3xl gap-6 sm:grid-cols-2">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
