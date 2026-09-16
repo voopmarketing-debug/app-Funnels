@@ -27,7 +27,7 @@ export function StatTile({
   const statusStyle = status ? STATUS_STYLES[status] : null;
 
   return (
-    <div className="fl-card p-4">
+    <div className="fl-card min-w-0 p-4">
       <p className="text-sm text-ink-muted">{label}</p>
       <p className="mt-1.5 text-3xl font-semibold text-ink">{value}</p>
       <div className="mt-1.5 flex items-center gap-1.5 text-xs">

@@ -105,7 +105,7 @@ export default async function AnalyticsPage({
       : null;
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-8">
       <div>
         <Link href={`/dashboard/businesses/${id}`} className="text-sm text-ink-muted underline hover:text-ink">
           ← {business.name}
@@ -123,7 +123,7 @@ export default async function AnalyticsPage({
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <section className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatTile
           label="Conversaciones totales"
           value={String(analytics.totalConversations)}
@@ -166,7 +166,7 @@ export default async function AnalyticsPage({
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="fl-card p-4">
+        <div className="fl-card min-w-0 p-4">
           <h2 className="text-sm font-semibold text-ink">Conversaciones nuevas por día</h2>
           <p className="mb-4 mt-1 text-xs text-ink-faint">
             Cuántos clientes nuevos empezaron a escribirte cada día — te muestra si tu flujo de leads está creciendo o parado.
@@ -174,7 +174,7 @@ export default async function AnalyticsPage({
           <ConversationsTrendChart data={analytics.conversationsTrend} />
         </div>
 
-        <div className="fl-card p-4">
+        <div className="fl-card min-w-0 p-4">
           <h2 className="text-sm font-semibold text-ink">Mensajes por día, por tipo</h2>
           <p className="mb-4 mt-1 text-xs text-ink-faint">
             Quién contestó cada mensaje: el cliente, tu IA, o una persona de tu equipo a mano.
@@ -183,7 +183,7 @@ export default async function AnalyticsPage({
         </div>
       </section>
 
-      <section className="fl-card p-4">
+      <section className="fl-card min-w-0 p-4">
         <h2 className="text-sm font-semibold text-ink">Conversaciones por etapa del pipeline</h2>
         <p className="mb-4 mt-1 text-xs text-ink-faint">
           Cuántas conversaciones tienes hoy en cada etapa de tu embudo de ventas — te dice dónde se te están quedando los leads.
