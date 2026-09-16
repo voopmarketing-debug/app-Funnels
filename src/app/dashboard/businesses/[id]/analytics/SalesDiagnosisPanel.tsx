@@ -89,7 +89,7 @@ export function SalesDiagnosisPanel({
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-4">
+    <section className="fl-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-ink">Diagnóstico de ventas (IA)</h2>

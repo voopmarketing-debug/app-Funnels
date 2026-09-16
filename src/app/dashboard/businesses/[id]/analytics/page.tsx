@@ -152,7 +152,7 @@ export default async function AnalyticsPage({
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="fl-card p-4">
           <h2 className="text-sm font-semibold text-ink">Conversaciones nuevas por día</h2>
           <p className="mb-4 mt-1 text-xs text-ink-faint">
             Cuántos clientes nuevos empezaron a escribirte cada día — te muestra si tu flujo de leads está creciendo o parado.
@@ -160,7 +160,7 @@ export default async function AnalyticsPage({
           <ConversationsTrendChart data={analytics.conversationsTrend} />
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="fl-card p-4">
           <h2 className="text-sm font-semibold text-ink">Mensajes por día, por tipo</h2>
           <p className="mb-4 mt-1 text-xs text-ink-faint">
             Quién contestó cada mensaje: el cliente, tu IA, o una persona de tu equipo a mano.
@@ -169,7 +169,7 @@ export default async function AnalyticsPage({
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-surface p-4">
+      <section className="fl-card p-4">
         <h2 className="text-sm font-semibold text-ink">Conversaciones por etapa del pipeline</h2>
         <p className="mb-4 mt-1 text-xs text-ink-faint">
           Cuántas conversaciones tienes hoy en cada etapa de tu embudo de ventas — te dice dónde se te están quedando los leads.

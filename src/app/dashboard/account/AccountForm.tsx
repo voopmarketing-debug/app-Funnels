@@ -30,7 +30,7 @@ export function AccountForm({
   );
 
   return (
-    <form action={formAction} className="max-w-sm space-y-4 rounded-xl border border-border bg-surface p-5">
+    <form action={formAction} className="fl-card max-w-sm space-y-4 p-5">
       <div className="space-y-1">
         <label className="fl-mono text-xs tracking-wide text-ink-muted uppercase">Email</label>
         <p className="rounded-md border border-border bg-background px-3 py-2 text-ink-muted">{email}</p>

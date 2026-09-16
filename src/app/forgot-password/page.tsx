@@ -13,9 +13,10 @@ export default function ForgotPasswordPage() {
 
   return (
     <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
+      <div className="fl-ambient-bg" />
       <div className="fl-grid-bg pointer-events-none absolute inset-0" />
 
-      <div className="relative w-full max-w-sm space-y-6 rounded-xl border border-border bg-surface p-7">
+      <div className="relative w-full max-w-sm space-y-6 fl-card-hero p-7">
         <div className="flex items-center gap-3">
           <FunnelsLogoMark className="h-7 w-7 flex-none" />
           <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">

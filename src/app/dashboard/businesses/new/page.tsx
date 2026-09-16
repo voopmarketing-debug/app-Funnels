@@ -6,7 +6,7 @@ export default function NewBusinessPage() {
     <div className="max-w-xl space-y-6">
       <h1 className="text-xl font-bold">Nuevo negocio</h1>
 
-      <form action={createBusiness} className="space-y-4">
+      <form action={createBusiness} className="fl-card space-y-4 p-5">
         <Field label="Nombre del negocio" name="name" placeholder="Pizzería El Sabor" required />
         <Field
           label="Phone Number ID (Meta Cloud API)"

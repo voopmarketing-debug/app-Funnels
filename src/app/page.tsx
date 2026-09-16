@@ -132,7 +132,7 @@ export default async function Home() {
         </h2>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {SEGMENTS.map((s) => (
-            <div key={s.title} className="rounded-xl border border-border bg-surface p-5">
+            <div key={s.title} className="fl-card p-5">
               <p className="font-semibold">{s.title}</p>
               <p className="mt-2 text-sm text-ink-muted">{s.text}</p>
             </div>
@@ -168,9 +168,7 @@ export default async function Home() {
           {PLANS.map((plan) => (
             <div
               key={plan.name}
-              className={`flex flex-col rounded-xl p-6 ${
-                plan.highlight ? "border-2 border-accent bg-surface" : "border border-border bg-surface"
-              }`}
+              className={`fl-card flex flex-col p-6 ${plan.highlight ? "border-2 border-accent" : ""}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <p className={`fl-mono text-xs uppercase tracking-wide ${plan.highlight ? "text-accent" : "text-ink-muted"}`}>

@@ -82,32 +82,34 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
       />
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="fl-card p-4">
           <p className="text-xs text-ink-muted">Contactos totales</p>
           <p className="mt-1 text-2xl font-bold text-ink">{analytics.totalConversations}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="fl-card p-4">
           <p className="text-xs text-ink-muted">Tiempo de respuesta</p>
           <p className="mt-1 text-2xl font-bold text-ink">{formatMinutes(analytics.responseTime.avgMinutes)}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="fl-card p-4">
           <p className="text-xs text-ink-muted">Automatización IA</p>
           <p className="mt-1 text-2xl font-bold text-ink">{formatPercent(analytics.automationRate)}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="fl-card p-4">
           <p className="text-xs text-ink-muted">Esperando respuesta</p>
           <p className="mt-1 text-2xl font-bold text-ink">{analytics.awaitingReply}</p>
         </div>
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <AgentForm
-          businessId={id}
-          systemPrompt={business.agent?.systemPrompt ?? ""}
-          tone={business.agent?.tone ?? "cercano"}
-          replyLength={business.agent?.replyLength ?? "breve"}
-          industry={business.industry}
-        />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="fl-card p-4">
+          <AgentForm
+            businessId={id}
+            systemPrompt={business.agent?.systemPrompt ?? ""}
+            tone={business.agent?.tone ?? "cercano"}
+            replyLength={business.agent?.replyLength ?? "breve"}
+            industry={business.industry}
+          />
+        </div>
 
         <WabaCredentialsForm businessId={id} wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""} />
       </div>

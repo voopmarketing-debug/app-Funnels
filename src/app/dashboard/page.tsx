@@ -57,7 +57,7 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-bold">Negocios</h1>
         <Link
           href="/dashboard/businesses/new"
-          className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
+          className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
         >
           + Nuevo negocio
         </Link>
@@ -81,7 +81,7 @@ export default async function DashboardPage() {
             <li key={business.id} className="relative">
               <Link
                 href={`/dashboard/businesses/${business.id}`}
-                className="block rounded-xl border border-border bg-surface p-4 transition hover:border-border-strong"
+                className="fl-card fl-card-hover fl-card-interactive block p-4"
               >
                 <div className="flex items-start justify-between gap-2 pr-7">
                   <p className="font-medium">{business.name}</p>
@@ -96,7 +96,7 @@ export default async function DashboardPage() {
                 </div>
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
                   <span
-                    className={`h-1.5 w-1.5 rounded-full ${business.agent?.enabled ? "bg-accent" : "bg-ink-faint"}`}
+                    className={`h-1.5 w-1.5 rounded-full ${business.agent?.enabled ? "bg-accent shadow-[0_0_8px_rgba(181,255,43,0.8)]" : "bg-ink-faint"}`}
                   />
                   Agente {business.agent?.enabled ? "activo" : "inactivo"}
                 </p>

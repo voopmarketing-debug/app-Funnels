@@ -42,12 +42,13 @@ function LoginForm() {
 
   return (
     <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
+      <div className="fl-ambient-bg" />
       <div className="fl-grid-bg pointer-events-none absolute inset-0" />
 
       <form
         action={handleSubmit}
         autoComplete="on"
-        className="relative w-full max-w-sm space-y-6 rounded-xl border border-border bg-surface p-7"
+        className="fl-card-hero relative w-full max-w-sm space-y-6 p-7"
       >
         <div className="flex items-center gap-3">
           <FunnelsLogoMark className="h-7 w-7 flex-none" />

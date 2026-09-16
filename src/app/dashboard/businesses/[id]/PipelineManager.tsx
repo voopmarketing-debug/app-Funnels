@@ -48,7 +48,7 @@ export function PipelineManager({
   }, [isAddPending, addState.addedCount]);
 
   return (
-    <details className="rounded-md border border-border bg-surface p-4">
+    <details className="fl-card p-4">
       <summary className="cursor-pointer fl-mono text-xs tracking-wide text-ink-muted uppercase">
         Editar etapas del CRM
       </summary>

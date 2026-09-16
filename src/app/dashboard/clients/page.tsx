@@ -40,7 +40,7 @@ export default async function ClientsPage() {
       {owners.length === 0 ? (
         <p className="text-sm text-ink-muted">Todavía no hay clientes registrados.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="fl-card overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-surface text-xs uppercase tracking-wide text-ink-muted">

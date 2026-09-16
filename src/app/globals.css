@@ -21,6 +21,9 @@
   --accent-ink: #0a0a0a;
   --accent-secondary: #c9a9ff;
   --error: #ff6b57;
+
+  --glow-accent: 181, 255, 43;
+  --glow-secondary: 201, 169, 255;
 }
 
 @theme inline {
@@ -60,4 +63,89 @@ body {
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
   background-size: 40px 40px;
   opacity: 0.4;
+}
+
+/*
+ * Shared "glow card" visual language for the dashboard: a dark surface with
+ * a faint two-tone ambient gradient (brand lime + brand purple) baked into
+ * the background, instead of a flat fill. Kept subtle so body text stays
+ * fully readable — this is atmosphere, not a hero graphic.
+ *
+ * Wrapped in @layer components so Tailwind utility classes (which live in
+ * the utilities layer) can still win on overlapping properties — e.g. a
+ * `border-2 border-accent` utility overriding fl-card's default border —
+ * instead of losing to this unlayered CSS under cascade-layer rules.
+ */
+@layer components {
+  .fl-card {
+    position: relative;
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+    background:
+      radial-gradient(120% 140% at 100% 0%, rgba(var(--glow-accent), 0.07), transparent 55%),
+      radial-gradient(120% 140% at 0% 100%, rgba(var(--glow-secondary), 0.05), transparent 55%),
+      var(--surface);
+    transition: border-color 0.15s ease;
+  }
+
+  .fl-card-hover:hover {
+    border-color: var(--border-strong);
+  }
+
+  .fl-card-interactive {
+    cursor: pointer;
+  }
+
+  .fl-card-interactive:hover {
+    border-color: rgba(var(--glow-accent), 0.5);
+    box-shadow: 0 0 0 1px rgba(var(--glow-accent), 0.12), 0 12px 32px -16px rgba(var(--glow-accent), 0.25);
+  }
+
+  /* A brighter variant for the single "hero" card on a page (greeting, plan
+   * usage) — same idea, stronger glow. */
+  .fl-card-hero {
+    position: relative;
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+    background:
+      radial-gradient(130% 160% at 100% 0%, rgba(var(--glow-accent), 0.14), transparent 60%),
+      radial-gradient(130% 160% at 0% 100%, rgba(var(--glow-secondary), 0.1), transparent 60%),
+      var(--surface);
+  }
+
+  /* Fixed ambient glow behind the whole dashboard shell — two soft color
+   * blobs pinned to the viewport corners, brand-colored, very low opacity so
+   * they read as atmosphere rather than decoration competing with content. */
+  .fl-ambient-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(60rem 40rem at 15% -10%, rgba(var(--glow-accent), 0.08), transparent 60%),
+      radial-gradient(50rem 40rem at 110% 30%, rgba(var(--glow-secondary), 0.07), transparent 60%),
+      var(--background);
+  }
+
+  .fl-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.75rem;
+    color: var(--ink-muted);
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .fl-nav-icon:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .fl-nav-icon[data-active="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    box-shadow: 0 8px 20px -8px rgba(var(--glow-accent), 0.7);
+  }
 }

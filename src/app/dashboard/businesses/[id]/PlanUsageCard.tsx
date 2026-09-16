@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateBusinessPlan } from "@/lib/actions";
 import { PLAN_TIERS, PLAN_LABELS, type PlanUsageStatus } from "@/lib/plans";
 import type { PlanTier } from "@prisma/client";
+import { RingStat } from "@/components/RingStat";
 
 const STATUS_STYLES: Record<PlanUsageStatus, { bar: string; label: string; text: string }> = {
   good: { bar: "#0ca30c", label: "Bien", text: "#0ca30c" },
@@ -44,42 +45,40 @@ export function PlanUsageCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <p className="text-sm font-semibold text-ink">Plan {PLAN_LABELS[planTier]}</p>
-          {status !== "unlimited" && (
-            <span className="flex items-center gap-1.5 text-xs" style={{ color: style.text }}>
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.bar }} />
-              {style.label}
-            </span>
+    <div className="fl-card-hero flex flex-wrap items-center gap-5 p-4">
+      <RingStat percent={pct} gradientId={`plan-usage-${businessId}`} gradientFrom={style.bar} gradientTo={style.bar}>
+        <span className="fl-mono text-sm font-semibold text-ink">{limit === null ? "∞" : `${Math.round(pct)}%`}</span>
+      </RingStat>
+
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-semibold text-ink">Plan {PLAN_LABELS[planTier]}</p>
+            {status !== "unlimited" && (
+              <span className="flex items-center gap-1.5 text-xs" style={{ color: style.text }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.bar }} />
+                {style.label}
+              </span>
+            )}
+          </div>
+
+          {canEditPlan && (
+            <select
+              value={pendingPlan ?? planTier}
+              disabled={isPending}
+              onChange={(e) => handlePlanChange(e.target.value as PlanTier)}
+              className="fl-mono rounded-md border border-border bg-background px-2 py-1 text-xs uppercase tracking-wide text-ink-muted outline-none focus:border-accent"
+            >
+              {PLAN_TIERS.map((tier) => (
+                <option key={tier} value={tier}>
+                  {PLAN_LABELS[tier]}
+                </option>
+              ))}
+            </select>
           )}
         </div>
 
-        {canEditPlan && (
-          <select
-            value={pendingPlan ?? planTier}
-            disabled={isPending}
-            onChange={(e) => handlePlanChange(e.target.value as PlanTier)}
-            className="fl-mono rounded-md border border-border bg-background px-2 py-1 text-xs uppercase tracking-wide text-ink-muted outline-none focus:border-accent"
-          >
-            {PLAN_TIERS.map((tier) => (
-              <option key={tier} value={tier}>
-                {PLAN_LABELS[tier]}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      <div className="mt-3 flex items-center gap-3">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-background">
-          <div
-            className="h-full rounded-full transition-all"
-            style={{ width: `${pct}%`, backgroundColor: style.bar }}
-          />
-        </div>
-        <p className="fl-mono flex-none text-xs text-ink-muted">
+        <p className="fl-mono text-xs text-ink-muted">
           {used} / {limit === null ? "∞" : limit} contactos este mes
         </p>
       </div>
