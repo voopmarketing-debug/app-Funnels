@@ -17,10 +17,18 @@ try {
 // acquire a postgres advisory lock"), even though the DB is reachable.
 // Set DIRECT_URL to the provider's direct/unpooled connection string to fix
 // this (in Neon: dashboard > Connection Details > turn off "Pooled
-// connection"); DATABASE_URL can stay pooled for the running app. Falls
-// back to DATABASE_URL when DIRECT_URL isn't set, so this is a no-op for
-// setups (like local Postgres) that don't pool at all.
-const migrationDatabaseUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+// connection"). Also checks the env var names Vercel's own Neon/Postgres
+// storage integrations auto-inject for the unpooled connection
+// (POSTGRES_URL_NON_POOLING, DATABASE_URL_UNPOOLED) in case DIRECT_URL was
+// never set by hand but one of those already exists. DATABASE_URL can stay
+// pooled for the running app either way. Falls all the way back to
+// DATABASE_URL when none of these are set, so this is a no-op for setups
+// (like local Postgres) that don't pool at all.
+const migrationDatabaseUrl =
+  process.env.DIRECT_URL ??
+  process.env.POSTGRES_URL_NON_POOLING ??
+  process.env.DATABASE_URL_UNPOOLED ??
+  process.env.DATABASE_URL;
 if (!migrationDatabaseUrl) {
   throw new Error("Set DATABASE_URL (or DIRECT_URL) before running Prisma CLI commands.");
 }
