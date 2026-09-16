@@ -1,3 +1,4 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { anthropic } from "@/lib/anthropicClient";
 
@@ -156,6 +157,16 @@ function buildOwnerContextBlock(owner?: OwnerContext): string {
   return `\n\nDATOS DE REFERENCIA DEL NEGOCIO (usa esto solo si el cliente pregunta algo relacionado, como ubicación o redes — no lo menciones por iniciativa propia):\n${lines.join("\n")}`;
 }
 
+// Split in two blocks instead of one string so the STABLE part (style +
+// business context + the client's own prompt — identical for every message
+// of every conversation this business gets, until they edit their agent
+// settings) can carry a cache_control breakpoint, while the part that
+// changes on every single message (the conversation-so-far recap) sits
+// after it. Prompt caching only matches an exact byte-for-byte prefix, so
+// anything volatile placed BEFORE a cached block silently breaks caching for
+// everything that follows it — the recap can no longer come first like it
+// used to. The 1h TTL keeps this business's cache warm across its other
+// ongoing conversations too, not just consecutive replies in the same one.
 function buildSystemPrompt(
   basePrompt: string,
   tone: string,
@@ -163,7 +174,7 @@ function buildSystemPrompt(
   industry: string,
   history: AgentHistoryMessage[],
   owner?: OwnerContext,
-): string {
+): Anthropic.TextBlockParam[] {
   const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.cercano;
   const lengthInstruction = LENGTH_INSTRUCTIONS[replyLength] ?? LENGTH_INSTRUCTIONS.breve;
   const industryLabel = INDUSTRY_LABELS[industry] ?? INDUSTRY_LABELS.otro;
@@ -183,7 +194,13 @@ function buildSystemPrompt(
     ? ""
     : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en la transcripción de arriba, y no saludes ni te disculpes por demoras — pero mantené la calidez, no te vuelvas seco por evitar el saludo.";
 
-  return `${buildConversationState(history)}\n\nCÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.${buildOwnerContextBlock(owner)}\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${closingReminder}`;
+  const cacheableBlock = `CÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.${buildOwnerContextBlock(owner)}\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}`;
+  const dynamicBlock = `${buildConversationState(history)}${closingReminder}`;
+
+  return [
+    { type: "text", text: cacheableBlock, cache_control: { type: "ephemeral", ttl: "1h" } },
+    { type: "text", text: dynamicBlock },
+  ];
 }
 
 export async function generateAgentReply(params: {
