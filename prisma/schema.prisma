@@ -33,6 +33,15 @@ model Business {
   // informational: reaching the cap never blocks the agent from replying.
   planTier PlanTier @default(STARTER)
 
+  // Current paid-period window — set manually by the agency (ADMIN) from
+  // /dashboard/clients whenever they confirm a Hotmart payment, since
+  // there's no billing integration to derive this from. Both nullable:
+  // unset until the agency records the first payment. Purely informational,
+  // like planTier above — an expired subscriptionEndsAt never blocks the
+  // agent from replying, it's just a signal for the agency to follow up.
+  subscriptionStartedAt DateTime?
+  subscriptionEndsAt    DateTime?
+
   memberships    Membership[]
   agent          AIAgent?
   conversations  Conversation[]

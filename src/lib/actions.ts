@@ -478,6 +478,36 @@ export async function updateBusinessPlan(businessId: string, planTier: PlanTier)
   revalidatePath("/dashboard");
 }
 
+/**
+ * The agency records the current paid-period window manually (no billing
+ * integration) whenever they confirm a Hotmart payment — shown on
+ * /dashboard/clients so they can see at a glance who's active, who's about
+ * to renew, and who's overdue. Either date can be cleared by passing null.
+ */
+export async function updateBusinessSubscription(
+  businessId: string,
+  dates: { startedAt: string | null; endsAt: string | null },
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const membership = await prisma.membership.findUnique({
+    where: { userId_businessId: { userId: session.user.id, businessId } },
+  });
+  if (!membership || membership.role !== "ADMIN") {
+    throw new Error("Only the agency can update a business's subscription dates");
+  }
+
+  await prisma.business.update({
+    where: { id: businessId },
+    data: {
+      subscriptionStartedAt: dates.startedAt ? new Date(dates.startedAt) : null,
+      subscriptionEndsAt: dates.endsAt ? new Date(dates.endsAt) : null,
+    },
+  });
+  revalidatePath("/dashboard/clients");
+}
+
 export async function updateBusinessName(businessId: string, name: string): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");

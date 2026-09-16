@@ -4,9 +4,20 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LABELS } from "@/lib/plans";
 import { ResetPasswordButton } from "./ResetPasswordButton";
+import { SubscriptionDatesEditor } from "./SubscriptionDatesEditor";
+
+const EXPIRING_SOON_DAYS = 7;
 
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+}
+
+function subscriptionStatus(endsAt: Date | null): "active" | "expiring" | "expired" | "unset" {
+  if (!endsAt) return "unset";
+  const daysLeft = (endsAt.getTime() - Date.now()) / 86_400_000;
+  if (daysLeft < 0) return "expired";
+  if (daysLeft <= EXPIRING_SOON_DAYS) return "expiring";
+  return "active";
 }
 
 export default async function ClientsPage() {
@@ -49,6 +60,7 @@ export default async function ClientsPage() {
                 <th className="px-4 py-3 font-medium">Teléfono</th>
                 <th className="px-4 py-3 font-medium">Negocio</th>
                 <th className="px-4 py-3 font-medium">Plan</th>
+                <th className="px-4 py-3 font-medium">Membresía (inicio → vence)</th>
                 <th className="px-4 py-3 font-medium">Registrado</th>
                 <th className="px-4 py-3 font-medium">Contraseña</th>
               </tr>
@@ -65,6 +77,14 @@ export default async function ClientsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-ink-muted">{PLAN_LABELS[business.planTier]}</td>
+                  <td className="px-4 py-3">
+                    <SubscriptionDatesEditor
+                      businessId={business.id}
+                      startedAt={business.subscriptionStartedAt}
+                      endsAt={business.subscriptionEndsAt}
+                      status={subscriptionStatus(business.subscriptionEndsAt)}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-ink-muted">{formatDate(createdAt)}</td>
                   <td className="px-4 py-3">
                     <ResetPasswordButton userId={user.id} />

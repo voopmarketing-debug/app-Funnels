@@ -10,13 +10,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ? (await prisma.membership.findFirst({ where: { userId: session.user.id, role: "ADMIN" }, select: { id: true } })) !== null
     : false;
 
-  // KPIs and CRM are per-business pages, but the sidebar is global — for a
-  // client (who almost always has just one agent/negocio), link those two
-  // nav items straight to their first business instead of making them dig
-  // through "Agentes de IA" first. Hidden entirely if they don't own one.
-  const primaryOwnedBusiness = session?.user?.id
+  // KPIs and CRM are per-business pages, but the sidebar is global — link
+  // those two nav items straight to a first business (any the user has
+  // access to — their own if they're a client, or the first one they
+  // administer if they're the agency) instead of making them dig through
+  // "Agentes de IA" first. Hidden entirely if they have no business yet.
+  // Once there, AgentSwitcher lets them pick a different one — the agency
+  // isn't stuck looking at just this one.
+  const primaryBusiness = session?.user?.id
     ? await prisma.membership.findFirst({
-        where: { userId: session.user.id, role: "OWNER" },
+        where: { userId: session.user.id },
         orderBy: { createdAt: "asc" },
         select: { businessId: true },
       })
@@ -32,7 +35,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="fl-ambient-bg" />
       <DashboardSidebar
         isAgencyAdmin={isAgencyAdmin}
-        primaryBusinessId={primaryOwnedBusiness?.businessId ?? null}
+        primaryBusinessId={primaryBusiness?.businessId ?? null}
         onSignOut={handleSignOut}
       />
       <div className="flex min-h-screen flex-1 flex-col">
