@@ -50,7 +50,7 @@ const PLANS = [
     price: "$300",
     priceSuffix: "USD cada 3 meses",
     billingNote: "Cobro automático trimestral (vía Hotmart) — mínimo 3 meses.",
-    contacts: "Hasta 2,000 contactos activos/mes",
+    contacts: "Hasta 1,200 contactos activos/mes",
     features: [
       "Hasta 6 líneas de WhatsApp en total",
       "Dashboard de KPIs + diagnóstico de ventas con IA",

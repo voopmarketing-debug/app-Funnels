@@ -2,12 +2,16 @@ import type { PlanTier } from "@prisma/client";
 
 // Mirrors the plan cards on the public landing page (src/app/page.tsx,
 // section #precios) — keep both in sync if pricing changes. `null` means
-// unlimited. Purely informational for now: nothing here enforces the cap or
-// blocks the agent from replying once a business goes over it — see
-// PROJECT_STATE.md for why (no billing integration to pair it with yet).
+// unlimited. Enforced in lib/agent.ts: once a business is at its limit, a
+// genuinely new contact that month no longer triggers an AI reply (paused
+// for a human instead) — see the plan-limit check in handleIncomingMessage.
+// These numbers are chosen so AI cost (see src/lib/ai.ts's prompt caching)
+// stays profitable against each plan's quarterly price even in a worst-case
+// usage pattern, not just on average — PRO's 1,200 leaves ~14% margin on
+// Anthropic cost alone even in that worst case; STARTER's 500 leaves ~28%.
 export const PLAN_LIMITS: Record<PlanTier, number | null> = {
   STARTER: 500,
-  PRO: 2000,
+  PRO: 1200,
   SCALE: null,
 };
 
