@@ -35,7 +35,7 @@ const PLANS = [
       "El plan normal es $150 USD/mes. Por el lanzamiento del software te lo dejamos en $150 USD por los 3 meses completos — pago único, sin mensualidades en ese periodo. Se cobra automático cada trimestre (vía Hotmart).",
     contacts: "Hasta 400 contactos activos/mes",
     features: [
-      "Hasta 3 líneas de WhatsApp (una por negocio)",
+      "1 línea de WhatsApp (un negocio)",
       "Agente con memoria completa de la conversación",
       "CRM personalizable por etapas",
       "Soporte de lunes a viernes por WhatsApp con un agente especializado",
@@ -52,7 +52,7 @@ const PLANS = [
     billingNote: "Cobro automático trimestral (vía Hotmart) — mínimo 3 meses.",
     contacts: "Hasta 1,200 contactos activos/mes",
     features: [
-      "Hasta 6 líneas de WhatsApp en total",
+      "Hasta 3 líneas de WhatsApp en total",
       "Dashboard de KPIs + diagnóstico de ventas con IA",
       "Ajuste de prompt mensual incluido",
       "Soporte de lunes a viernes por WhatsApp con un agente especializado",

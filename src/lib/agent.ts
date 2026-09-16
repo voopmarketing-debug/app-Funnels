@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { sendWhatsAppTextMessage, type WhatsAppInboundMessage } from "@/lib/whatsapp";
 import { generateAgentReply, type AgentHistoryMessage } from "@/lib/ai";
-import { getActiveContactsThisMonth } from "@/lib/analytics";
+import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS } from "@/lib/plans";
 
 const HISTORY_LIMIT = 20;
@@ -75,13 +75,18 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   });
   const previousMessages = previousMessagesDesc.reverse();
 
-  // Every AI reply costs real money (see lib/ai.ts), so a business that's
+  // Every AI reply costs real money (see lib/ai.ts), so an account that's
   // already at its plan's monthly active-contacts cap shouldn't get billed
   // for yet another one. Checked BEFORE saving this message so an already-
   // active contact this month (someone mid-conversation) is never affected —
   // only a genuinely NEW contact arriving after the cap is reached gets
   // paused, which matches what "Hasta N contactos activos/mes" promises on
   // the pricing page.
+  //
+  // Pooled across every line (business) the account owns, not just this one
+  // — one subscription can cover multiple WhatsApp lines (see LINE_LIMITS),
+  // so the cap has to be account-wide or a multi-line account could reach
+  // several times the intended contact volume for one plan's price.
   const planLimit = PLAN_LIMITS[business.planTier];
   let overPlanLimit = false;
   if (planLimit !== null) {
@@ -91,7 +96,9 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       select: { id: true },
     });
     if (!alreadyActiveThisMonth) {
-      const activeContacts = await getActiveContactsThisMonth(business.id);
+      const activeContacts = ownerMembership
+        ? await getAccountActiveContactsThisMonth(ownerMembership.userId)
+        : await getActiveContactsThisMonth(business.id);
       if (activeContacts >= planLimit) overPlanLimit = true;
     }
   }

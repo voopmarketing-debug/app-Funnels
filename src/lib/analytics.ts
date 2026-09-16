@@ -235,3 +235,30 @@ export async function getActiveContactsThisMonth(businessId: string): Promise<nu
 
   return rows.length;
 }
+
+// Same "contacto activo" definition as getActiveContactsThisMonth, but
+// pooled across every business (WhatsApp line) this account owns — an
+// account's plan is one subscription covering up to LINE_LIMITS lines, so
+// "hasta N contactos activos/mes" means N total for the account, not N per
+// line. Used for plan-limit enforcement in lib/agent.ts; without this, a
+// Starter account running its full 3 lines could reach 3× the intended
+// contact volume for the price of one.
+export async function getAccountActiveContactsThisMonth(userId: string): Promise<number> {
+  const now = new Date();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+  const ownedBusinesses = await prisma.membership.findMany({
+    where: { userId, role: "OWNER" },
+    select: { businessId: true },
+  });
+  const businessIds = ownedBusinesses.map((m) => m.businessId);
+  if (businessIds.length === 0) return 0;
+
+  const rows = await prisma.message.findMany({
+    where: { conversation: { businessId: { in: businessIds } }, role: "CUSTOMER", createdAt: { gte: startOfMonth } },
+    select: { conversationId: true },
+    distinct: ["conversationId"],
+  });
+
+  return rows.length;
+}

@@ -26,10 +26,14 @@ export const PLAN_LABELS: Record<PlanTier, string> = {
 // getAccountLineStatus in lib/lineLimits.ts + createBusiness in actions.ts),
 // unlike PLAN_LIMITS above: it's fully under our control, no billing
 // integration needed to gate it. `null` means no cap (the "Consultoría" /
-// llave en mano tier).
+// llave en mano tier). Starter = one business, matching its "una por
+// negocio" positioning; Pro = up to 3, for a small multi-location or
+// multi-brand client. PLAN_LIMITS above is pooled per account (not per
+// line — see getAccountActiveContactsThisMonth), so more lines no longer
+// multiplies AI cost exposure the way it did before that fix.
 export const LINE_LIMITS: Record<PlanTier, number | null> = {
-  STARTER: 3,
-  PRO: 6,
+  STARTER: 1,
+  PRO: 3,
   SCALE: null,
 };
 
