@@ -1,6 +1,5 @@
 import { createBusiness } from "@/lib/actions";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
-import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
 
 export default function NewBusinessPage() {
   return (
@@ -44,16 +43,14 @@ export default function NewBusinessPage() {
             Instrucciones del agente de IA
           </label>
           <p className="text-xs text-ink-muted">
-            Ya está pre-llenado con una plantilla — reemplaza cada{" "}
-            <span className="fl-mono text-ink">[texto entre corchetes]</span> con la info real del
-            negocio (o bórralo si no aplica) antes de crear el negocio.
+            Pega aquí el prompt ya completado con la info real del negocio.
           </p>
           <textarea
             id="systemPrompt"
             name="systemPrompt"
             required
             rows={16}
-            defaultValue={AGENT_PROMPT_TEMPLATE}
+            placeholder="Pega aquí las instrucciones del agente para este negocio..."
             className="fl-mono w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-ink outline-none focus:border-accent"
           />
         </div>

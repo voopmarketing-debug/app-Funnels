@@ -10,7 +10,6 @@ import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { requireBusinessMembership } from "@/lib/authz";
-import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
@@ -80,12 +79,6 @@ export async function registerBusiness(
 
   const passwordHash = await bcrypt.hash(password, 10);
   const industryLabel = INDUSTRY_OPTIONS.find((option) => option.value === industry)?.label ?? "negocio";
-  // Pre-fill the name and industry we already know; the rest of the
-  // template's [placeholders] stay for the client to fill in later from
-  // their business page (same template used in "+ Nuevo negocio").
-  const defaultSystemPrompt = AGENT_PROMPT_TEMPLATE
-    .replace(/\[NOMBRE DEL NEGOCIO\]/g, name)
-    .replace("[TIPO DE NEGOCIO: ej. clínica dental, tienda de ropa, estudio de coaching, restaurante]", industryLabel);
 
   // AGENCY_ADMIN_EMAIL (optional): if set to Funnels Labs' own account,
   // every new client business also gets that account as an ADMIN member —
@@ -99,7 +92,7 @@ export async function registerBusiness(
         name,
         slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
         industry,
-        agent: { create: { systemPrompt: defaultSystemPrompt } },
+        agent: { create: { systemPrompt: "" } },
         pipelineStages: {
           create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
             name: stageName,

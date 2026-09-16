@@ -37,6 +37,7 @@ export function AgentForm({
           id="systemPrompt"
           name="systemPrompt"
           defaultValue={systemPrompt}
+          placeholder="Pega aquí las instrucciones de tu negocio para el agente..."
           rows={8}
           required
           className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
