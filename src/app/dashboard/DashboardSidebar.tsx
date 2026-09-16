@@ -94,7 +94,7 @@ export function DashboardSidebar({
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href));
 
   return (
-    <aside className="flex w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5">
+    <aside className="flex min-h-screen w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5">
       <Link href="/dashboard" className="mb-4 flex items-center gap-2.5 px-4">
         <FunnelsLogoMark className="h-6 w-6 flex-none" />
         <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">Funnels_Labs</span>
@@ -141,7 +141,7 @@ export function DashboardSidebar({
         </Link>
       </nav>
 
-      <div className="flex flex-col gap-1 px-3">
+      <div className="flex flex-col gap-1 border-t border-border px-3 pt-3">
         <ThemeToggle className="fl-nav-item" showLabel />
         <a href={SUPPORT_LINK} target="_blank" rel="noopener noreferrer" className="fl-nav-item">
           <WhatsAppIcon />

@@ -28,14 +28,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex min-h-full">
+    <div className="flex min-h-screen">
       <div className="fl-ambient-bg" />
       <DashboardSidebar
         isAgencyAdmin={isAgencyAdmin}
         primaryBusinessId={primaryOwnedBusiness?.businessId ?? null}
         onSignOut={handleSignOut}
       />
-      <div className="flex min-h-full flex-1 flex-col">
+      <div className="flex min-h-screen flex-1 flex-col">
         <header className="flex items-center justify-end border-b border-border px-6 py-3">
           <Link href="/dashboard/account" className="fl-mono text-xs tracking-wide text-ink-muted transition hover:text-ink">
             {session?.user?.email}
