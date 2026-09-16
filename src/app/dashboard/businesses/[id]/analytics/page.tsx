@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessAnalytics, isDateRangeKey, type DateRangeKey } from "@/lib/analytics";
 import { StatTile } from "./StatTile";
-import { ChatIcon, MessageIcon, BoltIcon, ClockIcon, AlertIcon, HourglassIcon, LayersIcon } from "./StatIcons";
+import { ChatIcon, MessageIcon, BoltIcon, ClockIcon, AlertIcon, HourglassIcon, LayersIcon, CostIcon } from "./StatIcons";
 import { ConversationsTrendChart } from "./ConversationsTrendChart";
 import { MessagesStackedChart } from "./MessagesStackedChart";
 import { StageDistributionChart } from "./StageDistributionChart";
@@ -65,6 +65,15 @@ function awaitingReplyStatus(count: number): Status {
   if (count === 0) return "good";
   if (count <= 3) return "warning";
   return "critical";
+}
+
+// Real spend, not the plan-tier estimate elsewhere in the app — see
+// realAiCostUsd in lib/analytics.ts. "—" (not "$0.00") when there's no
+// usage data yet for this range, so an empty range never reads as free.
+function formatCostUsd(value: number | null): string {
+  if (value === null) return "—";
+  if (value < 0.01 && value > 0) return "<$0.01";
+  return `$${value.toFixed(2)}`;
 }
 
 const SECTION_ICON_GLOW: Record<"accent" | "blue" | "secondary", string> = {
@@ -209,6 +218,14 @@ export default async function AnalyticsPage({
           description="Conversaciones donde el cliente escribió último y todavía nadie —ni la IA ni una persona— le ha contestado."
           tone="blue"
           icon={<HourglassIcon />}
+        />
+        <StatTile
+          label={`Costo real de IA (${RANGE_NOUN_PHRASE[rangeKey]})`}
+          value={formatCostUsd(analytics.realAiCostUsd)}
+          sublabel="gasto real en Anthropic"
+          description="Lo que de verdad costó en la API de Anthropic responder estas conversaciones — no un estimado, el gasto medido mensaje por mensaje."
+          tone="secondary"
+          icon={<CostIcon />}
         />
       </section>
 

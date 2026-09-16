@@ -203,6 +203,13 @@ function buildSystemPrompt(
   ];
 }
 
+export type AgentReplyUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+};
+
 export async function generateAgentReply(params: {
   systemPrompt: string;
   tone: string;
@@ -212,7 +219,7 @@ export async function generateAgentReply(params: {
   history: AgentHistoryMessage[];
   userMessage: string;
   owner?: OwnerContext;
-}): Promise<string> {
+}): Promise<{ text: string; usage: AgentReplyUsage }> {
   const isFirstMessage = params.history.length === 0;
 
   const response = await anthropic.messages.create({
@@ -243,5 +250,13 @@ export async function generateAgentReply(params: {
     throw new Error("Claude did not return a text response");
   }
 
-  return stripGreetings(textBlock.text, isFirstMessage);
+  return {
+    text: stripGreetings(textBlock.text, isFirstMessage),
+    usage: {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+    },
+  };
 }

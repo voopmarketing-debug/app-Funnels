@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { type DateRangeKey } from "@/lib/dateRanges";
+import { estimateCostUsd } from "@/lib/aiCost";
 
 export { DATE_RANGE_OPTIONS, isDateRangeKey, type DateRangeKey } from "@/lib/dateRanges";
 
@@ -30,6 +31,10 @@ export type BusinessAnalytics = {
   automationRate: number | null;
   errorRate: number | null;
   responseTime: ResponseTimeStats;
+  // Real spend from stored token usage (see aiCost.ts) — null when no
+  // message in this range has usage data yet (e.g. before this tracking
+  // shipped, or a range with zero AI replies), never zero-by-omission.
+  realAiCostUsd: number | null;
   awaitingReply: number;
   activeLast24h: number;
   conversationsTrend: DailyPoint[];
@@ -103,7 +108,18 @@ export async function getBusinessAnalytics(
       }),
       prisma.message.findMany({
         where: { conversation: { businessId }, createdAt: { gte: since, lt: until } },
-        select: { createdAt: true, role: true, sentByHuman: true, content: true, conversationId: true },
+        select: {
+          createdAt: true,
+          role: true,
+          sentByHuman: true,
+          content: true,
+          conversationId: true,
+          model: true,
+          inputTokens: true,
+          outputTokens: true,
+          cacheCreationInputTokens: true,
+          cacheReadInputTokens: true,
+        },
         orderBy: { createdAt: "asc" },
       }),
       prisma.pipelineStage.findMany({
@@ -135,8 +151,16 @@ export async function getBusinessAnalytics(
   let iaCount = 0;
   let humanoCount = 0;
   let errorCount = 0;
+  let realAiCostUsd = 0;
+  let hasCostData = false;
 
   for (const m of recentMessages) {
+    const cost = estimateCostUsd(m);
+    if (cost !== null) {
+      realAiCostUsd += cost;
+      hasCostData = true;
+    }
+
     const systemNotice = isSystemNotice(m.role, m.content);
     const bucket = messagesByDay.get(dayKey(m.createdAt));
     if (bucket) {
@@ -207,6 +231,7 @@ export async function getBusinessAnalytics(
     automationRate,
     errorRate,
     responseTime: { avgMinutes, medianMinutes, sampleSize: responseSamplesMs.length },
+    realAiCostUsd: hasCostData ? realAiCostUsd : null,
     awaitingReply,
     activeLast24h,
     conversationsTrend: dayKeys.map((date) => ({ date, value: conversationsByDay.get(date) ?? 0 })),

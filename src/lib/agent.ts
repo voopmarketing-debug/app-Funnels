@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { sendWhatsAppTextMessage, type WhatsAppInboundMessage } from "@/lib/whatsapp";
-import { generateAgentReply, type AgentHistoryMessage } from "@/lib/ai";
+import { generateAgentReply, type AgentHistoryMessage, type AgentReplyUsage } from "@/lib/ai";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS } from "@/lib/plans";
 
@@ -134,8 +134,9 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   }));
 
   let reply: string;
+  let usage: AgentReplyUsage;
   try {
-    reply = await generateAgentReply({
+    const result = await generateAgentReply({
       systemPrompt: business.agent.systemPrompt,
       tone: business.agent.tone,
       replyLength: business.agent.replyLength,
@@ -145,6 +146,8 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       userMessage: message.text,
       owner: ownerMembership?.user,
     });
+    reply = result.text;
+    usage = result.usage;
   } catch (err) {
     // Surface the failure straight into the conversation thread in the
     // dashboard — a plain, ASCII-only summary, since the raw error object
@@ -168,6 +171,11 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
         role: "AGENT",
         content: reply,
         whatsappMsgId: messageId,
+        model: business.agent.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheCreationInputTokens: usage.cacheCreationInputTokens,
+        cacheReadInputTokens: usage.cacheReadInputTokens,
       },
     });
   } catch (err) {
