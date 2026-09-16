@@ -218,6 +218,15 @@ export async function generateAgentReply(params: {
   const response = await anthropic.messages.create({
     model: params.model,
     max_tokens: MAX_TOKENS_BY_LENGTH[params.replyLength] ?? 300,
+    // Writing one short WhatsApp reply from an already-specified business
+    // prompt doesn't need deep reasoning — Sonnet 5 runs adaptive thinking by
+    // default even with no explicit `thinking` param, which silently bills
+    // extra output tokens for a task that doesn't benefit from it (chat-
+    // shaped workloads see ~30-50% lower cost at low effort with no
+    // measurable accuracy loss, per Anthropic's published cost-optimization
+    // benchmarks). Left untouched on the sales-diagnosis call in
+    // diagnosis.ts, which genuinely reasons over several transcripts.
+    output_config: { effort: "low" },
     system: buildSystemPrompt(
       params.systemPrompt,
       params.tone,
