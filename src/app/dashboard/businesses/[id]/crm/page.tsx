@@ -7,6 +7,7 @@ import { CrmBoard } from "../CrmBoard";
 import { ContactsTable } from "../ContactsTable";
 import { CrmTabs } from "./CrmTabs";
 import { ConversationSplitView } from "./ConversationSplitView";
+import { AgentSwitcher } from "../AgentSwitcher";
 
 export default async function CrmPage({
   params,
@@ -27,13 +28,18 @@ export default async function CrmPage({
   });
   if (!membership) notFound();
 
-  const [business, stages, conversations] = await Promise.all([
+  const [business, stages, conversations, accessibleBusinesses] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
     prisma.pipelineStage.findMany({ where: { businessId: id }, orderBy: { position: "asc" } }),
     prisma.conversation.findMany({
       where: { businessId: id },
       orderBy: { lastMessageAt: "desc" },
       take: 50,
+    }),
+    prisma.membership.findMany({
+      where: { userId: session.user.id },
+      include: { business: { select: { id: true, name: true } } },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -68,7 +74,10 @@ export default async function CrmPage({
         <Link href={`/dashboard/businesses/${id}`} className="text-sm text-ink-muted underline hover:text-ink">
           ← {business.name}
         </Link>
-        <h1 className="mt-1 text-xl font-bold">CRM</h1>
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-4">
+          <h1 className="text-xl font-bold">CRM</h1>
+          <AgentSwitcher businesses={accessibleBusinesses.map((m) => m.business)} currentId={id} section="crm" />
+        </div>
       </div>
 
       <PipelineManager businessId={id} stages={stages} />

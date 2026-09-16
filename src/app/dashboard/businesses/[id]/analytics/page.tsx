@@ -9,6 +9,7 @@ import { MessagesStackedChart } from "./MessagesStackedChart";
 import { StageDistributionChart } from "./StageDistributionChart";
 import { SalesDiagnosisPanel } from "./SalesDiagnosisPanel";
 import { DateRangeSelector } from "./DateRangeSelector";
+import { AgentSwitcher } from "../AgentSwitcher";
 import type { SalesDiagnosis } from "@/lib/diagnosis";
 
 type Status = "good" | "warning" | "critical" | "neutral";
@@ -87,6 +88,12 @@ export default async function AnalyticsPage({
   if (!membership) notFound();
   const { business } = membership;
 
+  const accessibleBusinesses = await prisma.membership.findMany({
+    where: { userId: session.user.id },
+    include: { business: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
   const analytics = await getBusinessAnalytics(id, rangeKey);
 
   const diagnosis =
@@ -103,9 +110,16 @@ export default async function AnalyticsPage({
         <Link href={`/dashboard/businesses/${id}`} className="text-sm text-ink-muted underline hover:text-ink">
           ← {business.name}
         </Link>
-        <div className="mt-1 flex items-baseline justify-between gap-4">
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-4">
           <h1 className="text-xl font-bold">KPIs y analítica</h1>
-          <DateRangeSelector value={rangeKey} />
+          <div className="flex flex-wrap items-center gap-3">
+            <AgentSwitcher
+              businesses={accessibleBusinesses.map((m) => m.business)}
+              currentId={id}
+              section="analytics"
+            />
+            <DateRangeSelector value={rangeKey} />
+          </div>
         </div>
       </div>
 

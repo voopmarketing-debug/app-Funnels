@@ -25,6 +25,25 @@ function UsersIcon() {
   );
 }
 
+function ChartIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <path d="M4 20V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 20h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 20v-6M13 20v-9M18 20v-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CrmIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M9 4.5v15M15 4.5v15" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
 function UserIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
@@ -63,9 +82,11 @@ const SUPPORT_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
 
 export function DashboardSidebar({
   isAgencyAdmin,
+  primaryBusinessId,
   onSignOut,
 }: {
   isAgencyAdmin: boolean;
+  primaryBusinessId: string | null;
   onSignOut: () => Promise<void>;
 }) {
   const pathname = usePathname();
@@ -88,6 +109,26 @@ export function DashboardSidebar({
           <HomeIcon />
           Agentes de IA
         </Link>
+        {primaryBusinessId && (
+          <Link
+            href={`/dashboard/businesses/${primaryBusinessId}/analytics`}
+            className="fl-nav-item"
+            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/analytics`)}
+          >
+            <ChartIcon />
+            KPIs
+          </Link>
+        )}
+        {primaryBusinessId && (
+          <Link
+            href={`/dashboard/businesses/${primaryBusinessId}/crm`}
+            className="fl-nav-item"
+            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/crm`)}
+          >
+            <CrmIcon />
+            CRM
+          </Link>
+        )}
         {isAgencyAdmin && (
           <Link href="/dashboard/clients" className="fl-nav-item" data-active={isActive("/dashboard/clients")}>
             <UsersIcon />
