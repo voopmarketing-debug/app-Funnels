@@ -497,6 +497,24 @@ export async function updateBusinessName(businessId: string, name: string): Prom
   revalidatePath("/dashboard");
 }
 
+/**
+ * Permanently deletes a business — its agent, conversations, messages and
+ * CRM stages cascade with it (see the onDelete: Cascade relations in
+ * schema.prisma). Either the client (OWNER) or the agency (ADMIN) on this
+ * specific business can do it: this is what lets a client free up a line
+ * on their plan by dropping one agent before creating another (see
+ * getAccountLineStatus in lib/lineLimits.ts).
+ */
+export async function deleteBusiness(businessId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  await requireBusinessMembership(session.user.id, businessId);
+
+  await prisma.business.delete({ where: { id: businessId } });
+  revalidatePath("/dashboard");
+}
+
 export type ForgotPasswordState = { submitted: boolean };
 
 /**

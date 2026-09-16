@@ -6,6 +6,8 @@ import { requestPasswordReset, type ForgotPasswordState } from "@/lib/actions";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+
 export default function ForgotPasswordPage() {
   const [state, formAction, isPending] = useActionState<ForgotPasswordState, FormData>(
     requestPasswordReset,
@@ -63,11 +65,24 @@ export default function ForgotPasswordPage() {
           </form>
         )}
 
-        <p className="text-center text-sm text-ink-muted">
-          <Link href="/login" className="text-accent hover:underline">
-            Volver a iniciar sesión
-          </Link>
-        </p>
+        <div className="space-y-1 text-center text-sm text-ink-muted">
+          <p>
+            <Link href="/login" className="text-accent hover:underline">
+              Volver a iniciar sesión
+            </Link>
+          </p>
+          <p>
+            ¿Necesitas ayuda?{" "}
+            <a
+              href={SUPPORT_WHATSAPP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:underline"
+            >
+              Escríbenos por WhatsApp
+            </a>
+          </p>
+        </div>
       </div>
     </main>
   );

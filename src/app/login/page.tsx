@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+
 export default function LoginPage() {
   return (
     <Suspense>
@@ -92,14 +94,9 @@ function LoginForm() {
         </div>
 
         <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <label htmlFor="password" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-              Contraseña
-            </label>
-            <Link href="/forgot-password" className="text-xs text-accent hover:underline">
-              ¿Olvidaste tu contraseña?
-            </Link>
-          </div>
+          <label htmlFor="password" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Contraseña
+          </label>
           <input
             id="password"
             name="password"
@@ -125,6 +122,18 @@ function LoginForm() {
           <Link href="/register" className="text-accent hover:underline">
             Crea tu cuenta
           </Link>
+        </p>
+
+        <p className="text-center text-sm text-ink-muted">
+          ¿Necesitas ayuda?{" "}
+          <a
+            href={SUPPORT_WHATSAPP_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline"
+          >
+            Escríbenos por WhatsApp
+          </a>
         </p>
       </form>
     </main>

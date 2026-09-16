@@ -2,6 +2,8 @@ import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 
+const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+
 export default async function ResetPasswordPage({
   searchParams,
 }: {
@@ -28,6 +30,18 @@ export default async function ResetPasswordPage({
         </div>
 
         <ResetPasswordForm token={token ?? ""} />
+
+        <p className="text-center text-sm text-ink-muted">
+          ¿Necesitas ayuda?{" "}
+          <a
+            href={SUPPORT_WHATSAPP_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline"
+          >
+            Escríbenos por WhatsApp
+          </a>
+        </p>
       </div>
     </main>
   );

@@ -108,7 +108,7 @@ export default async function DashboardPage() {
                   {business._count.conversations} conversaciones
                 </p>
               </Link>
-              {role === "ADMIN" && <BusinessCardMenu businessId={business.id} currentName={business.name} />}
+              <BusinessCardMenu businessId={business.id} currentName={business.name} canRename={role === "ADMIN"} />
             </li>
           );
         })}

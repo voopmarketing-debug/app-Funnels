@@ -7,6 +7,8 @@ import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState<RegisterState, FormData>(
     registerBusiness,
@@ -124,6 +126,18 @@ export default function RegisterPage() {
           <Link href="/login" className="text-accent hover:underline">
             Inicia sesión
           </Link>
+        </p>
+
+        <p className="text-center text-sm text-ink-muted">
+          ¿Necesitas ayuda?{" "}
+          <a
+            href={SUPPORT_WHATSAPP_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent hover:underline"
+          >
+            Escríbenos por WhatsApp
+          </a>
         </p>
       </form>
     </main>
