@@ -185,4 +185,31 @@ dialog::backdrop {
     color: var(--accent-ink);
     box-shadow: 0 8px 20px -8px rgba(var(--glow-accent), 0.7);
   }
+
+  /* Labeled sidebar row (icon + visible text) — the wider counterpart to
+   * fl-nav-icon, used in DashboardSidebar so section names are always
+   * readable, not just on hover/title. */
+  .fl-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.6rem;
+    color: var(--ink-muted);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .fl-nav-item:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .fl-nav-item[data-active="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    box-shadow: 0 8px 20px -8px rgba(var(--glow-accent), 0.7);
+  }
 }

@@ -6,9 +6,7 @@ import { getBusinessAnalytics, getActiveContactsThisMonth } from "@/lib/analytic
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
-import { ContactsView } from "./ContactsView";
 import { AgentPowerButton } from "./AgentPowerButton";
-import { PipelineManager } from "./PipelineManager";
 import { PlanUsageCard } from "./PlanUsageCard";
 
 function formatPercent(value: number | null): string {
@@ -34,16 +32,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   if (!membership) notFound();
   const { business } = membership;
 
-  const [conversations, stages, analytics, activeContacts] = await Promise.all([
-    prisma.conversation.findMany({
-      where: { businessId: id },
-      orderBy: { lastMessageAt: "desc" },
-      take: 50,
-    }),
-    prisma.pipelineStage.findMany({
-      where: { businessId: id },
-      orderBy: { position: "asc" },
-    }),
+  const [analytics, activeContacts] = await Promise.all([
     getBusinessAnalytics(id),
     getActiveContactsThisMonth(id),
   ]);
@@ -62,6 +51,12 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            href={`/dashboard/businesses/${id}/crm`}
+            className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+          >
+            Ver CRM
+          </Link>
           <Link
             href={`/dashboard/businesses/${id}/analytics`}
             className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
@@ -113,32 +108,6 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
 
         <WabaCredentialsForm businessId={id} wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""} />
       </div>
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">Contactos y CRM</h2>
-        </div>
-
-        <PipelineManager businessId={id} stages={stages} />
-
-        {conversations.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            Aún no hay conversaciones en WhatsApp para este negocio.
-          </p>
-        ) : (
-          <ContactsView
-            businessId={id}
-            stages={stages}
-            conversations={conversations.map((c) => ({
-              id: c.id,
-              customerName: c.customerName,
-              customerPhone: c.customerPhone,
-              stageId: c.stageId,
-              lastMessageAt: c.lastMessageAt.toISOString(),
-            }))}
-          />
-        )}
-      </section>
     </div>
   );
 }

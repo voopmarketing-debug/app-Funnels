@@ -30,7 +30,7 @@ export function NewBusinessButton({
   if (!atLimit) {
     return (
       <Link href="/dashboard/businesses/new" className={BUTTON_CLASS}>
-        + Nuevo negocio
+        + Nuevo agente de IA
       </Link>
     );
   }
@@ -38,7 +38,7 @@ export function NewBusinessButton({
   return (
     <>
       <button type="button" onClick={() => dialogRef.current?.showModal()} className={BUTTON_CLASS}>
-        + Nuevo negocio
+        + Nuevo agente de IA
       </button>
 
       <dialog ref={dialogRef} className="fl-card-hero w-full max-w-sm p-0">

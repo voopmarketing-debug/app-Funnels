@@ -58,7 +58,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Negocios</h1>
+        <h1 className="text-xl font-bold">Agentes de IA</h1>
         <NewBusinessButton
           atLimit={lineStatus.atLimit}
           limit={lineStatus.limit}
@@ -69,7 +69,7 @@ export default async function DashboardPage() {
 
       {memberships.length === 0 && (
         <p className="text-ink-muted">
-          Todavía no hay negocios. Crea el primero para conectar su WhatsApp.
+          Todavía no hay agentes de IA. Crea el primero para conectar su WhatsApp.
         </p>
       )}
 

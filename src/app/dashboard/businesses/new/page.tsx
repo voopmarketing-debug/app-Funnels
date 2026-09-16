@@ -39,7 +39,7 @@ export default async function NewBusinessPage() {
               href="/dashboard"
               className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink transition hover:border-accent"
             >
-              Volver a negocios
+              Volver a agentes de IA
             </Link>
           </div>
         </div>
@@ -49,7 +49,7 @@ export default async function NewBusinessPage() {
 
   return (
     <div className="max-w-xl space-y-6">
-      <h1 className="text-xl font-bold">Nuevo negocio</h1>
+      <h1 className="text-xl font-bold">Nuevo agente de IA</h1>
 
       <form action={createBusiness} className="fl-card space-y-4 p-5">
         <Field label="Nombre del negocio" name="name" placeholder="Pizzería El Sabor" required />
@@ -104,7 +104,7 @@ export default async function NewBusinessPage() {
           type="submit"
           className="rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover"
         >
-          Crear negocio
+          Crear agente de IA
         </button>
       </form>
     </div>

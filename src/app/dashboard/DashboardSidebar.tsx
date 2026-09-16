@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 function HomeIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
       <path d="M4 11.5 12 4l8 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -16,7 +16,7 @@ function HomeIcon() {
 
 function UsersIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
       <circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth="2" />
       <path d="M3.5 19.5c0-3.2 2.5-5.5 5.5-5.5s5.5 2.3 5.5 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       <path d="M15.5 5.3c1.4.3 2.5 1.5 2.5 3s-1.1 2.7-2.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -27,7 +27,7 @@ function UsersIcon() {
 
 function UserIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
       <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="2" />
       <path d="M4.5 19.5c0-4.1 3.4-6.5 7.5-6.5s7.5 2.4 7.5 6.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
@@ -36,7 +36,7 @@ function UserIcon() {
 
 function WhatsAppIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="flex-none">
       <path
         d="M17 14.5c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.48-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.5-.17 0-.37-.02-.57-.02-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.87 1.22 3.07.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.19 1.87.12.57-.09 1.75-.71 2-1.4.25-.69.25-1.28.17-1.4-.07-.12-.27-.2-.57-.35Z"
         fill="currentColor"
@@ -51,7 +51,7 @@ function WhatsAppIcon() {
 
 function LogoutIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
       <path d="M9 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M15 16l4-4-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M19 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -73,40 +73,43 @@ export function DashboardSidebar({
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href));
 
   return (
-    <aside className="fl-mono flex w-[4.5rem] flex-none flex-col items-center gap-2 border-r border-border bg-surface py-5">
-      <Link href="/dashboard" className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl" aria-label="Inicio">
-        <FunnelsLogoMark className="h-7 w-7" />
+    <aside className="flex w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5">
+      <Link href="/dashboard" className="mb-4 flex items-center gap-2.5 px-4">
+        <FunnelsLogoMark className="h-6 w-6 flex-none" />
+        <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">Funnels_Labs</span>
       </Link>
 
-      <nav className="flex flex-1 flex-col items-center gap-2">
-        <Link href="/dashboard" className="fl-nav-icon" data-active={isActive("/dashboard") && !isActive("/dashboard/clients") && !isActive("/dashboard/account")} aria-label="Negocios" title="Negocios">
+      <nav className="flex flex-1 flex-col gap-1 px-3">
+        <Link
+          href="/dashboard"
+          className="fl-nav-item"
+          data-active={isActive("/dashboard") && !isActive("/dashboard/clients") && !isActive("/dashboard/account")}
+        >
           <HomeIcon />
+          Agentes de IA
         </Link>
         {isAgencyAdmin && (
-          <Link href="/dashboard/clients" className="fl-nav-icon" data-active={isActive("/dashboard/clients")} aria-label="Clientes" title="Clientes">
+          <Link href="/dashboard/clients" className="fl-nav-item" data-active={isActive("/dashboard/clients")}>
             <UsersIcon />
+            Clientes
           </Link>
         )}
-        <Link href="/dashboard/account" className="fl-nav-icon" data-active={isActive("/dashboard/account")} aria-label="Mi perfil" title="Mi perfil">
+        <Link href="/dashboard/account" className="fl-nav-item" data-active={isActive("/dashboard/account")}>
           <UserIcon />
+          Mi perfil
         </Link>
       </nav>
 
-      <div className="flex flex-col items-center gap-2">
-        <ThemeToggle />
-        <a
-          href={SUPPORT_LINK}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fl-nav-icon"
-          aria-label="Soporte por WhatsApp"
-          title="Soporte por WhatsApp"
-        >
+      <div className="flex flex-col gap-1 px-3">
+        <ThemeToggle className="fl-nav-item" showLabel />
+        <a href={SUPPORT_LINK} target="_blank" rel="noopener noreferrer" className="fl-nav-item">
           <WhatsAppIcon />
+          Soporte
         </a>
         <form action={onSignOut}>
-          <button type="submit" className="fl-nav-icon" aria-label="Salir" title="Salir">
+          <button type="submit" className="fl-nav-item">
             <LogoutIcon />
+            Salir
           </button>
         </form>
       </div>

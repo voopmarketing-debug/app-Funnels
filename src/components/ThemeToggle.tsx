@@ -44,7 +44,13 @@ function MoonIcon() {
 // business owner can switch from the dashboard (or any auth screen) if they
 // prefer a light workspace. Persisted in localStorage; see the inline
 // beforeInteractive script in layout.tsx for the flash-free initial paint.
-export function ThemeToggle({ className = "fl-nav-icon" }: { className?: string }) {
+export function ThemeToggle({
+  className = "fl-nav-icon",
+  showLabel = false,
+}: {
+  className?: string;
+  showLabel?: boolean;
+}) {
   const [theme, setTheme] = useState<Theme | null>(null);
 
   useEffect(() => {
@@ -63,6 +69,7 @@ export function ThemeToggle({ className = "fl-nav-icon" }: { className?: string 
   }
 
   const current = theme ?? "dark";
+  const label = current === "light" ? "Modo oscuro" : "Modo claro";
 
   return (
     <button
@@ -73,6 +80,7 @@ export function ThemeToggle({ className = "fl-nav-icon" }: { className?: string 
       title={current === "light" ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
     >
       {current === "light" ? <MoonIcon /> : <SunIcon />}
+      {showLabel && <span>{label}</span>}
     </button>
   );
 }
