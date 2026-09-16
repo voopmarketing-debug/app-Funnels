@@ -3,7 +3,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
+import { getAccountLineStatus } from "@/lib/lineLimits";
 import { BusinessCardMenu } from "./BusinessCardMenu";
+import { NewBusinessButton } from "./NewBusinessButton";
 
 const PLAN_BADGE_STYLES: Record<"warning" | "critical", { bg: string; text: string; label: string }> = {
   warning: { bg: "#fab21926", text: "#fab219", label: "Cerca del límite del plan" },
@@ -36,6 +38,8 @@ export default async function DashboardPage() {
 
   await backfillAgencyAdminMemberships(session.user.id, session.user.email);
 
+  const lineStatus = await getAccountLineStatus(session.user.id);
+
   const memberships = await prisma.membership.findMany({
     where: { userId: session.user.id },
     include: { business: { include: { agent: true, _count: { select: { conversations: true } } } } },
@@ -55,12 +59,12 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Negocios</h1>
-        <Link
-          href="/dashboard/businesses/new"
-          className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
-        >
-          + Nuevo negocio
-        </Link>
+        <NewBusinessButton
+          atLimit={lineStatus.atLimit}
+          limit={lineStatus.limit}
+          count={lineStatus.count}
+          planTier={lineStatus.planTier}
+        />
       </div>
 
       {memberships.length === 0 && (

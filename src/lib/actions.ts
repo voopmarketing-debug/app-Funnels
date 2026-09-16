@@ -13,7 +13,8 @@ import { requireBusinessMembership } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
-import { PLAN_TIERS } from "@/lib/plans";
+import { PLAN_TIERS, PLAN_LABELS } from "@/lib/plans";
+import { getAccountLineStatus } from "@/lib/lineLimits";
 import { logRegistrationForRemarketing } from "@/lib/remarketingSheet";
 import { sendEmail } from "@/lib/email";
 import type { PlanTier } from "@prisma/client";
@@ -145,6 +146,13 @@ export async function createBusiness(formData: FormData): Promise<void> {
 
   if (!name || !wabaPhoneNumberId || !wabaAccessToken || !systemPrompt) {
     throw new Error("Missing required fields");
+  }
+
+  const lineStatus = await getAccountLineStatus(session.user.id);
+  if (lineStatus.atLimit) {
+    throw new Error(
+      `Alcanzaste el límite de líneas de WhatsApp de tu plan ${PLAN_LABELS[lineStatus.planTier]} (${lineStatus.limit}). Actualiza de plan o contáctanos para agregar más.`,
+    );
   }
 
   const business = await prisma.business.create({

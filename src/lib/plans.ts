@@ -17,6 +17,18 @@ export const PLAN_LABELS: Record<PlanTier, string> = {
   SCALE: "Scale",
 };
 
+// How many separate WhatsApp lines (each its own Business record, with its
+// own agent) an account can run under each plan — this one IS enforced (see
+// getAccountLineStatus in lib/lineLimits.ts + createBusiness in actions.ts),
+// unlike PLAN_LIMITS above: it's fully under our control, no billing
+// integration needed to gate it. `null` means no cap (the "Consultoría" /
+// llave en mano tier).
+export const LINE_LIMITS: Record<PlanTier, number | null> = {
+  STARTER: 3,
+  PRO: 6,
+  SCALE: null,
+};
+
 export const PLAN_TIERS: PlanTier[] = ["STARTER", "PRO", "SCALE"];
 
 export type PlanUsageStatus = "good" | "warning" | "critical" | "unlimited";
