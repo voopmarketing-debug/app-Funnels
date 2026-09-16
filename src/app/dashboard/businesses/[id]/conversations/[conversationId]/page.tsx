@@ -34,7 +34,7 @@ export default async function ConversationPage({
   const businessInitial = business.name.trim()[0]?.toUpperCase() ?? "F";
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-2xl flex-col overflow-hidden rounded-lg border border-border">
+    <div className="fl-card mx-auto flex h-[calc(100vh-8rem)] max-w-2xl flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
         <Avatar initial={customerInitial} variant="customer" />
         <div className="flex-1">
