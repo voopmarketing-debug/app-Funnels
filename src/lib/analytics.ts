@@ -3,11 +3,20 @@ import { type DateRangeKey } from "@/lib/dateRanges";
 
 export { DATE_RANGE_OPTIONS, isDateRangeKey, type DateRangeKey } from "@/lib/dateRanges";
 
-// Errors are persisted as normal AGENT messages (see logInternalError in
-// lib/agent.ts) so they show up in the conversation thread — but they must
-// never be counted as a real AI reply for automation rate, response time, or
-// the message-volume charts, or those numbers would be wrong.
+// Errors and plan-limit pauses are persisted as normal AGENT messages (see
+// logInternalError and logPlanLimitNotice in lib/agent.ts) so they show up
+// in the conversation thread — but neither is a real AI reply, so both must
+// stay out of automation rate, response time, and the message-volume
+// charts, or those numbers would be wrong. Only the error prefix counts
+// toward "Tasa de error IA" — a plan-limit pause isn't a technical failure,
+// it's an intentional cost guardrail, and would mislabel the KPI if counted
+// there too.
 const ERROR_PREFIX = "[ERROR INTERNO";
+const PLAN_LIMIT_PREFIX = "[LÍMITE DE PLAN";
+
+function isSystemNotice(role: string, content: string): boolean {
+  return role === "AGENT" && (content.startsWith(ERROR_PREFIX) || content.startsWith(PLAN_LIMIT_PREFIX));
+}
 
 export type DailyPoint = { date: string; value: number };
 export type DailyMessagePoint = { date: string; cliente: number; ia: number; humano: number };
@@ -128,19 +137,22 @@ export async function getBusinessAnalytics(
   let errorCount = 0;
 
   for (const m of recentMessages) {
-    const isError = m.role === "AGENT" && m.content.startsWith(ERROR_PREFIX);
+    const systemNotice = isSystemNotice(m.role, m.content);
     const bucket = messagesByDay.get(dayKey(m.createdAt));
     if (bucket) {
       if (m.role === "CUSTOMER") bucket.cliente += 1;
-      else if (!isError) {
+      else if (!systemNotice) {
         if (m.sentByHuman) bucket.humano += 1;
         else bucket.ia += 1;
       }
     }
 
     if (m.role === "AGENT") {
-      if (isError) errorCount += 1;
-      else if (m.sentByHuman) humanoCount += 1;
+      if (m.content.startsWith(ERROR_PREFIX)) errorCount += 1;
+      else if (systemNotice) {
+        // Plan-limit pause: not an error, not a real reply — excluded from
+        // every count on purpose (see isSystemNotice above).
+      } else if (m.sentByHuman) humanoCount += 1;
       else iaCount += 1;
     }
 
@@ -156,10 +168,10 @@ export async function getBusinessAnalytics(
   for (const list of byConversation.values()) {
     let pendingSince: Date | null = null;
     for (const m of list) {
-      const isError = m.role === "AGENT" && m.content.startsWith(ERROR_PREFIX);
+      const systemNotice = isSystemNotice(m.role, m.content);
       if (m.role === "CUSTOMER") {
         if (!pendingSince) pendingSince = m.createdAt;
-      } else if (!isError && pendingSince) {
+      } else if (!systemNotice && pendingSince) {
         responseSamplesMs.push(m.createdAt.getTime() - pendingSince.getTime());
         pendingSince = null;
       }

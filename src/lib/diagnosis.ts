@@ -5,6 +5,7 @@ import { anthropic } from "@/lib/anthropicClient";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
 const ERROR_PREFIX = "[ERROR INTERNO";
+const PLAN_LIMIT_PREFIX = "[LÍMITE DE PLAN";
 
 // Below this, a report would be guessing from too little real signal —
 // better to say so than to hand back generic-sounding advice dressed up as
@@ -78,7 +79,9 @@ async function buildDiagnosisInput(businessId: string): Promise<DiagnosisInput |
   const usableConversations = conversations
     .map((c) => ({
       stageName: c.stage.name,
-      messages: c.messages.filter((m) => !(m.role === "AGENT" && m.content.startsWith(ERROR_PREFIX))),
+      messages: c.messages.filter(
+        (m) => !(m.role === "AGENT" && (m.content.startsWith(ERROR_PREFIX) || m.content.startsWith(PLAN_LIMIT_PREFIX))),
+      ),
     }))
     .filter((c) => c.messages.length > 0);
 

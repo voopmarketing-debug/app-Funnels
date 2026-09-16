@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { sendWhatsAppTextMessage, type WhatsAppInboundMessage } from "@/lib/whatsapp";
 import { generateAgentReply, type AgentHistoryMessage } from "@/lib/ai";
+import { getActiveContactsThisMonth } from "@/lib/analytics";
+import { PLAN_LIMITS } from "@/lib/plans";
 
 const HISTORY_LIMIT = 20;
 
@@ -73,6 +75,27 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   });
   const previousMessages = previousMessagesDesc.reverse();
 
+  // Every AI reply costs real money (see lib/ai.ts), so a business that's
+  // already at its plan's monthly active-contacts cap shouldn't get billed
+  // for yet another one. Checked BEFORE saving this message so an already-
+  // active contact this month (someone mid-conversation) is never affected —
+  // only a genuinely NEW contact arriving after the cap is reached gets
+  // paused, which matches what "Hasta N contactos activos/mes" promises on
+  // the pricing page.
+  const planLimit = PLAN_LIMITS[business.planTier];
+  let overPlanLimit = false;
+  if (planLimit !== null) {
+    const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+    const alreadyActiveThisMonth = await prisma.message.findFirst({
+      where: { conversationId: conversation.id, role: "CUSTOMER", createdAt: { gte: startOfMonth } },
+      select: { id: true },
+    });
+    if (!alreadyActiveThisMonth) {
+      const activeContacts = await getActiveContactsThisMonth(business.id);
+      if (activeContacts >= planLimit) overPlanLimit = true;
+    }
+  }
+
   await prisma.message.create({
     data: {
       conversationId: conversation.id,
@@ -86,6 +109,15 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     // A human already took over this specific conversation — the message is
     // saved above so it shows up in the dashboard, but the AI stays quiet
     // instead of talking over them.
+    return;
+  }
+
+  if (overPlanLimit) {
+    // Saved above so it's visible in the dashboard, but no AI call — pause
+    // this conversation for a human to pick up (or the plan to be upgraded)
+    // instead of quietly going over the plan's cost ceiling.
+    await logPlanLimitNotice(conversation.id, planLimit!);
+    await prisma.conversation.update({ where: { id: conversation.id }, data: { aiPaused: true } });
     return;
   }
 
@@ -137,6 +169,16 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     await logInternalError(conversation.id, "WHATSAPP", err);
     throw err;
   }
+}
+
+async function logPlanLimitNotice(conversationId: string, planLimit: number): Promise<void> {
+  await prisma.message.create({
+    data: {
+      conversationId,
+      role: "AGENT",
+      content: `[LÍMITE DE PLAN] Este negocio alcanzó su límite de ${planLimit} contactos activos este mes. La IA se pausó automáticamente en esta conversación para evitar sobrecostos — respondan manualmente o actualicen de plan para reactivarla (botón de IA en la conversación).`,
+    },
+  });
 }
 
 async function logInternalError(conversationId: string, tag: string, err: unknown): Promise<void> {
