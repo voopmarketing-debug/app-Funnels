@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function HomeIcon() {
   return (
@@ -92,6 +93,7 @@ export function DashboardSidebar({
       </nav>
 
       <div className="flex flex-col items-center gap-2">
+        <ThemeToggle />
         <a
           href={SUPPORT_LINK}
           target="_blank"

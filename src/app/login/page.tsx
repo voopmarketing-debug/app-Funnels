@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function LoginPage() {
   return (
@@ -44,6 +45,7 @@ function LoginForm() {
     <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
       <div className="fl-ambient-bg" />
       <div className="fl-grid-bg pointer-events-none absolute inset-0" />
+      <ThemeToggle className="fl-nav-icon absolute right-4 top-4 z-10" />
 
       <form
         action={handleSubmit}

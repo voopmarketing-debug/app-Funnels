@@ -256,14 +256,17 @@ npm run dev
 
 - **Starter**: $150 USD/mes de precio normal, pero con **oferta de
   lanzamiento**: $150 USD por el trimestre completo (pago único, cubre 3
-  meses) — 1 número, hasta 500 contactos activos/mes.
-- **Pro**: $300 USD cada 3 meses (mínimo 3 meses) — hasta 2,000 contactos
-  activos/mes, dashboard de KPIs + diagnóstico de ventas con IA, ajuste de
-  prompt mensual incluido, soporte prioritario.
+  meses) — hasta 3 líneas de WhatsApp (una por negocio), hasta 500 contactos
+  activos/mes, soporte de lunes a viernes por WhatsApp con agente
+  especializado, sesión de onboarding y acompañamiento.
+- **Pro**: $300 USD cada 3 meses (mínimo 3 meses) — hasta 6 líneas de
+  WhatsApp en total, hasta 2,000 contactos activos/mes, dashboard de KPIs +
+  diagnóstico de ventas con IA, ajuste de prompt mensual incluido, mismo
+  soporte de lunes a viernes + onboarding y acompañamiento.
 - **Consultoría** (antes "Scale" en la landing, sigue siendo internamente el
   tier `SCALE` en `PlanTier`): llave en mano — el cliente agenda una llamada
-  y la agencia implementa todo. Sin precio fijo en la landing; contactos
-  ilimitados.
+  y la agencia implementa todo. Sin precio fijo en la landing; líneas de
+  WhatsApp personalizadas (sin límite fijo) y contactos ilimitados.
 - Cobro pensado como suscripción trimestral vía Hotmart (débito automático
   cada 3 meses, no mensual) — el botón de Starter/Pro en la landing sigue
   yendo a `/register` por ahora; falta reemplazarlo por el link real de
@@ -309,6 +312,57 @@ distintos que escribieron al menos un mensaje en lo que va del mes calendario
   un vistazo a quién contactar para un upsell, sin entrar a cada negocio.
 - Sigue siendo solo informativo: no bloquea el envío/recepción de mensajes de
   WhatsApp al superar el límite (ver nota en la sección de precios arriba).
+
+## Límite de líneas de WhatsApp por plan (sí se hace cumplir)
+
+A diferencia del límite de contactos (arriba, solo informativo), el número de
+**líneas de WhatsApp** — cada una es un `Business` distinto, con su propio
+`wabaPhoneNumberId` y agente — sí se bloquea, porque está totalmente bajo
+nuestro control (no depende de billing): `LINE_LIMITS` en `src/lib/plans.ts`
+(`STARTER: 3`, `PRO: 6`, `SCALE: null` = sin límite).
+
+- `getAccountLineStatus(userId)` en `src/lib/lineLimits.ts` cuenta cuántos
+  negocios tiene como `OWNER` la cuenta, y toma el plan más permisivo entre
+  esos negocios (en la práctica todos deberían compartir el mismo plan, es
+  una sola suscripción).
+- La acción `createBusiness` (en `src/lib/actions.ts`) rechaza la creación si
+  la cuenta ya está en el límite (defensa en profundidad).
+- En `/dashboard`, el botón "+ Nuevo negocio" (`NewBusinessButton.tsx`) es un
+  link normal mientras haya cupo; al llegar al límite se convierte en un
+  botón que abre un **pop-up** (`<dialog>` nativo) explicando el límite del
+  plan, con un botón a WhatsApp de soporte para actualizar de plan.
+- Si alguien llega de todas formas a `/dashboard/businesses/new` con el
+  límite alcanzado (link directo, etc.), la página muestra la misma tarjeta
+  de "límite alcanzado" en vez del formulario.
+
+## Identidad visual y tema claro/oscuro
+
+Todo el dashboard (y login/registro/recuperar contraseña/landing) comparte un
+lenguaje visual de "tarjetas con resplandor" en `src/app/globals.css`
+(`fl-card`, `fl-card-hero`, `fl-ambient-bg`, `fl-nav-icon`, todo dentro de
+`@layer components` para que las utilidades de Tailwind puedan
+sobreescribirlo cuando haga falta, ej. el borde del plan Pro destacado en
+precios). La barra lateral de íconos vive en `DashboardSidebar.tsx`.
+
+El cliente puede cambiar entre **oscuro** (el default de marca) y **claro**
+con el ícono de sol/luna (`src/components/ThemeToggle.tsx`) — en la barra
+lateral del dashboard y en las pantallas de login/registro/recuperar
+contraseña. La preferencia se guarda en `localStorage` (`fl-theme`) y se
+aplica vía `[data-theme="light"]` en `<html>`; un script `beforeInteractive`
+en `layout.tsx` la aplica antes del primer render para evitar parpadeo (con
+`suppressHydrationWarning` en `<html>` porque el server no puede saber de
+antemano la preferencia guardada en el navegador). Los tokens de color viven
+como variables CSS en `globals.css` — el tema claro re-balancea el verde/
+morado de marca (más oscuros, para que sigan siendo legibles como texto
+sobre blanco) en vez de reusar los tonos neón del oscuro.
+
+Los gráficos SVG de KPIs (`ConversationsTrendChart`, `MessagesStackedChart`,
+`StageDistributionChart`) leen sus colores de grilla/ejes/texto desde esas
+mismas variables (vía `style={{ stroke: "var(--...)" }}`, no atributos
+directos) para que se vean bien en ambos temas — solo el color de marca
+(línea de tendencia, barras de etapas) se mantiene fijo y vívido a propósito
+en los dos temas, igual que los colores semánticos de estado
+(bien/atención/crítico), que son una escala fija reservada, no decorativa.
 
 ## Recuperar contraseña, perfil propio y módulo de Clientes
 

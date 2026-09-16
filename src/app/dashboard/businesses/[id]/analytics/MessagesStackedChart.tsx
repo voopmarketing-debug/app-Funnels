@@ -7,7 +7,6 @@ const WIDTH = 640;
 const HEIGHT = 240;
 const PADDING = { top: 16, right: 12, bottom: 28, left: 32 };
 const GAP = 2; // surface-color gap between stacked segments, per dataviz mark spec
-const SURFACE = "#161616";
 
 // Validated (dataviz skill validator, --pairs all, dark mode, this app's
 // surface #161616): worst all-pairs CVD ΔE 9.4, normal-vision ΔE 20.9 — all pass.
@@ -85,8 +84,8 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
           const y = baselineY - tick * scale;
           return (
             <g key={tick}>
-              <line x1={PADDING.left} x2={WIDTH - PADDING.right} y1={y} y2={y} stroke="#2a2a2a" strokeWidth={1} />
-              <text x={PADDING.left - 8} y={y + 3} textAnchor="end" fontSize={10} fill="#8a8a86">
+              <line x1={PADDING.left} x2={WIDTH - PADDING.right} y1={y} y2={y} style={{ stroke: "var(--border)" }} strokeWidth={1} />
+              <text x={PADDING.left - 8} y={y + 3} textAnchor="end" fontSize={10} style={{ fill: "var(--ink-muted)" }}>
                 {tick}
               </text>
             </g>
@@ -120,7 +119,7 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
                 ) : null,
               )}
               {i % labelEvery === 0 && (
-                <text x={x + barWidth / 2} y={HEIGHT - 8} textAnchor="middle" fontSize={10} fill="#8a8a86">
+                <text x={x + barWidth / 2} y={HEIGHT - 8} textAnchor="middle" fontSize={10} style={{ fill: "var(--ink-muted)" }}>
                   {formatDayLabel(d.date)}
                 </text>
               )}
@@ -134,7 +133,7 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
             x2={hoveredX}
             y1={PADDING.top}
             y2={baselineY}
-            stroke="#3d3d3d"
+            style={{ stroke: "var(--border-strong)" }}
             strokeWidth={1}
             strokeDasharray="3 3"
           />
@@ -144,7 +143,7 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
       {hovered && (
         <div
           className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-md border border-border-strong bg-surface-2 px-2.5 py-1.5 text-xs shadow-lg"
-          style={{ left: `${(hoveredX / WIDTH) * 100}%`, backgroundColor: SURFACE }}
+          style={{ left: `${(hoveredX / WIDTH) * 100}%` }}
         >
           <p className="mb-1 font-medium text-ink-muted">{formatDayLabel(hovered.date)}</p>
           {SERIES.map((s) => (

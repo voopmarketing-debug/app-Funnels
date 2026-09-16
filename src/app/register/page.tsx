@@ -5,6 +5,7 @@ import Link from "next/link";
 import { registerBusiness, type RegisterState } from "@/lib/actions";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState<RegisterState, FormData>(
@@ -16,6 +17,7 @@ export default function RegisterPage() {
     <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
       <div className="fl-ambient-bg" />
       <div className="fl-grid-bg pointer-events-none absolute inset-0" />
+      <ThemeToggle className="fl-nav-icon absolute right-4 top-4 z-10" />
 
       <form
         action={formAction}

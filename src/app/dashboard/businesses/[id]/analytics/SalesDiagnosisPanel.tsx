@@ -125,7 +125,7 @@ export function SalesDiagnosisPanel({
       {current && (
         <details open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)} className="group mt-4">
           <summary
-            className="flex cursor-pointer list-none items-center gap-4 rounded-lg border border-border-strong bg-surface-2 px-4 py-3 transition hover:border-accent hover:bg-[#232323] [&::-webkit-details-marker]:hidden"
+            className="flex cursor-pointer list-none items-center gap-4 rounded-lg border border-border-strong bg-surface-2 px-4 py-3 transition hover:border-accent hover:bg-border [&::-webkit-details-marker]:hidden"
           >
             <ScoreMeter score={current.diagnosis.puntuacion} />
             <div className="min-w-0 flex-1">
@@ -156,13 +156,13 @@ export function SalesDiagnosisPanel({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide" style={{ color: "#8fd400" }}>
+                <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent-hover)" }}>
                   Fortalezas
                 </h3>
                 <ul className="space-y-2">
                   {current.diagnosis.fortalezas.map((item, i) => (
                     <li key={i} className="flex gap-2 text-sm text-ink-muted">
-                      <span className="mt-0.5 flex-none" style={{ color: "#b5ff2b" }}>
+                      <span className="mt-0.5 flex-none" style={{ color: "var(--accent)" }}>
                         +
                       </span>
                       <span>

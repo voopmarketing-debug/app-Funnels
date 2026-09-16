@@ -2,10 +2,15 @@
 
 /*
  * Funnels Labs brand tokens.
- * Dark-only brand (no light variant defined in the brand book) — the app
- * intentionally does not switch with the OS theme.
+ * Dark is the default brand look, but the client can switch to a light
+ * variant from the theme toggle (see ThemeToggle.tsx) — persisted in
+ * localStorage as `fl-theme` and applied via [data-theme] on <html>,
+ * set as early as possible (see the inline script in layout.tsx) to avoid
+ * a flash of the wrong theme on load.
  */
 :root {
+  color-scheme: dark;
+
   --background: #0a0a0a;
   --surface: #161616;
   --surface-2: #1e1e1e;
@@ -24,6 +29,34 @@
 
   --glow-accent: 181, 255, 43;
   --glow-secondary: 201, 169, 255;
+}
+
+/* Light variant — same brand hues, re-balanced for a white surface: the
+ * accent green/purple are deepened so they stay legible as text (the
+ * neon dark-mode shades fail contrast on white), while accent-ink flips
+ * to white since it's the text color placed on top of an accent-filled
+ * button/badge. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --background: #f6f6f2;
+  --surface: #ffffff;
+  --surface-2: #f0f0eb;
+  --border: #e2e2db;
+  --border-strong: #cbcbc2;
+
+  --ink: #16160f;
+  --ink-muted: #63635a;
+  --ink-faint: #919186;
+
+  --accent: #5c8a00;
+  --accent-hover: #4a7000;
+  --accent-ink: #ffffff;
+  --accent-secondary: #7c3aed;
+  --error: #c8402e;
+
+  --glow-accent: 92, 138, 0;
+  --glow-secondary: 124, 58, 237;
 }
 
 @theme inline {
@@ -55,6 +88,10 @@ body {
 
 .fl-mono {
   font-family: var(--font-jetbrains-mono), "SFMono-Regular", Menlo, monospace;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .fl-grid-bg {

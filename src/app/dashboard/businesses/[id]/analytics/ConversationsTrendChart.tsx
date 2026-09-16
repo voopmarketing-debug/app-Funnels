@@ -6,8 +6,7 @@ import type { DailyPoint } from "@/lib/analytics";
 const WIDTH = 640;
 const HEIGHT = 220;
 const PADDING = { top: 16, right: 12, bottom: 28, left: 32 };
-const LINE_COLOR = "#b5ff2b"; // brand accent — this is the one chart where it's a single series, so it earns full brightness.
-const SURFACE = "#161616";
+const LINE_COLOR = "#b5ff2b"; // brand accent — this is the one chart where it's a single series, so it earns full brightness regardless of theme.
 
 function niceMax(value: number): number {
   if (value <= 5) return 5;
@@ -71,8 +70,8 @@ export function ConversationsTrendChart({ data }: { data: DailyPoint[] }) {
           const y = PADDING.top + plotHeight - (tick / maxValue) * plotHeight;
           return (
             <g key={tick}>
-              <line x1={PADDING.left} x2={WIDTH - PADDING.right} y1={y} y2={y} stroke="#2a2a2a" strokeWidth={1} />
-              <text x={PADDING.left - 8} y={y + 3} textAnchor="end" fontSize={10} fill="#8a8a86">
+              <line x1={PADDING.left} x2={WIDTH - PADDING.right} y1={y} y2={y} style={{ stroke: "var(--border)" }} strokeWidth={1} />
+              <text x={PADDING.left - 8} y={y + 3} textAnchor="end" fontSize={10} style={{ fill: "var(--ink-muted)" }}>
                 {tick}
               </text>
             </g>
@@ -81,7 +80,7 @@ export function ConversationsTrendChart({ data }: { data: DailyPoint[] }) {
 
         {points.map((p, i) =>
           i % labelEvery === 0 ? (
-            <text key={p.date} x={p.x} y={HEIGHT - 8} textAnchor="middle" fontSize={10} fill="#8a8a86">
+            <text key={p.date} x={p.x} y={HEIGHT - 8} textAnchor="middle" fontSize={10} style={{ fill: "var(--ink-muted)" }}>
               {formatDayLabel(p.date)}
             </text>
           ) : null,
@@ -97,10 +96,10 @@ export function ConversationsTrendChart({ data }: { data: DailyPoint[] }) {
               x2={hovered.x}
               y1={PADDING.top}
               y2={PADDING.top + plotHeight}
-              stroke="#3d3d3d"
+              style={{ stroke: "var(--border-strong)" }}
               strokeWidth={1}
             />
-            <circle cx={hovered.x} cy={hovered.y} r={4} fill={LINE_COLOR} stroke={SURFACE} strokeWidth={2} />
+            <circle cx={hovered.x} cy={hovered.y} r={4} fill={LINE_COLOR} style={{ stroke: "var(--surface)" }} strokeWidth={2} />
           </>
         )}
       </svg>

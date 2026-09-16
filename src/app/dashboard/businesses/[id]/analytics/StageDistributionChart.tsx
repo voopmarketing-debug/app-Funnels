@@ -7,7 +7,6 @@ const WIDTH = 640;
 const ROW_HEIGHT = 40;
 const BAR_HEIGHT = 20;
 const PADDING = { top: 8, right: 56, bottom: 8, left: 12 };
-const SURFACE = "#161616";
 
 // Ordinal encoding, not categorical: these bars are the SAME hue (brand
 // accent) at increasing lightness steps by pipeline position — the color
@@ -47,16 +46,16 @@ export function StageDistributionChart({ stages }: { stages: StagePoint[] }) {
               style={{ cursor: "default" }}
             >
               <rect x={PADDING.left} y={y - 2} width={plotWidth + PADDING.right} height={BAR_HEIGHT + 4} fill="transparent" />
-              <text x={PADDING.left} y={y - 6} fontSize={11} fill="#8a8a86">
+              <text x={PADDING.left} y={y - 6} fontSize={11} style={{ fill: "var(--ink-muted)" }}>
                 {stage.name}
               </text>
               <path
                 d={rightRoundedRectPath(PADDING.left, y, Math.max(2, w), BAR_HEIGHT, 4)}
                 fill={`rgba(${ACCENT_HUE}, ${opacity})`}
-                stroke={isHovered ? "#f5f5f0" : "none"}
+                style={{ stroke: isHovered ? "var(--ink)" : "none" }}
                 strokeWidth={isHovered ? 1 : 0}
               />
-              <text x={PADDING.left + Math.max(2, w) + 8} y={y + BAR_HEIGHT / 2 + 4} fontSize={12} fontWeight={600} fill="#f5f5f0">
+              <text x={PADDING.left + Math.max(2, w) + 8} y={y + BAR_HEIGHT / 2 + 4} fontSize={12} fontWeight={600} style={{ fill: "var(--ink)" }}>
                 {stage.count}
               </text>
             </g>
@@ -66,8 +65,8 @@ export function StageDistributionChart({ stages }: { stages: StagePoint[] }) {
 
       {hoverId !== null && (
         <div
-          className="pointer-events-none absolute right-2 rounded-md border border-border-strong px-2.5 py-1.5 text-xs shadow-lg"
-          style={{ top: hoverId * ROW_HEIGHT, backgroundColor: SURFACE }}
+          className="pointer-events-none absolute right-2 rounded-md border border-border-strong bg-surface-2 px-2.5 py-1.5 text-xs shadow-lg"
+          style={{ top: hoverId * ROW_HEIGHT }}
         >
           <p className="font-semibold text-ink">{stages[hoverId].count} conversaciones</p>
           <p className="text-ink-muted">{stages[hoverId].name}</p>
