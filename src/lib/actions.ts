@@ -655,6 +655,50 @@ export async function updateOwnProfile(
   return { error: null, saved: true };
 }
 
+export type ChangePasswordState = { error: string | null; saved: boolean };
+
+/**
+ * Self-service password change from "Mi perfil" — the natural follow-up
+ * once a client has logged in with a password the agency relayed manually
+ * (see adminResetUserPassword below): they can pick their own from here
+ * instead of staying on the one the agency generated for them. Requires
+ * the current password, unlike the agency's reset, since this runs from an
+ * already-authenticated session and should not let a hijacked session lock
+ * the real owner out silently.
+ */
+export async function changeOwnPassword(
+  _prevState: ChangePasswordState,
+  formData: FormData,
+): Promise<ChangePasswordState> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  if (newPassword.length < 8) {
+    return { error: "La nueva contraseña debe tener al menos 8 caracteres", saved: false };
+  }
+  if (newPassword !== confirmPassword) {
+    return { error: "Las contraseñas no coinciden", saved: false };
+  }
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id } });
+  const currentMatches = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!currentMatches) {
+    return { error: "La contraseña actual no es correcta", saved: false };
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+  });
+
+  return { error: null, saved: true };
+}
+
 /**
  * Lets the agency set a new password for a client directly — a reliable
  * fallback to "forgot password" when email delivery is unavailable (e.g.

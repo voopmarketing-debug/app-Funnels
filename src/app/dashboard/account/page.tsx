@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AccountForm } from "./AccountForm";
+import { ChangePasswordForm } from "./ChangePasswordForm";
 
 export default async function AccountPage() {
   const session = await auth();
@@ -23,6 +24,7 @@ export default async function AccountPage() {
         tiktok={user.tiktok ?? ""}
         linkedin={user.linkedin ?? ""}
       />
+      <ChangePasswordForm />
     </div>
   );
 }
