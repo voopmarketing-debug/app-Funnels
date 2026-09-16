@@ -33,7 +33,7 @@ const PLANS = [
     strikePrice: "$450",
     billingNote:
       "El plan normal es $150 USD/mes. Por el lanzamiento del software te lo dejamos en $150 USD por los 3 meses completos — pago único, sin mensualidades en ese periodo. Se cobra automático cada trimestre (vía Hotmart).",
-    contacts: "Hasta 500 contactos activos/mes",
+    contacts: "Hasta 400 contactos activos/mes",
     features: [
       "Hasta 3 líneas de WhatsApp (una por negocio)",
       "Agente con memoria completa de la conversación",

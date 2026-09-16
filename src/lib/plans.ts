@@ -8,9 +8,9 @@ import type { PlanTier } from "@prisma/client";
 // These numbers are chosen so AI cost (see src/lib/ai.ts's prompt caching)
 // stays profitable against each plan's quarterly price even in a worst-case
 // usage pattern, not just on average — PRO's 1,200 leaves ~14% margin on
-// Anthropic cost alone even in that worst case; STARTER's 500 leaves ~28%.
+// Anthropic cost alone even in that worst case; STARTER's 400 leaves ~43%.
 export const PLAN_LIMITS: Record<PlanTier, number | null> = {
-  STARTER: 500,
+  STARTER: 400,
   PRO: 1200,
   SCALE: null,
 };
