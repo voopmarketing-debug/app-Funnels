@@ -1,0 +1,97 @@
+function IconBase({ children }: { children: React.ReactNode }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="flex-none">
+      {children}
+    </svg>
+  );
+}
+
+export function ChatIcon() {
+  return (
+    <IconBase>
+      <path
+        d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8A2.5 2.5 0 0 1 17.5 16H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5v-8Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </IconBase>
+  );
+}
+
+export function MessageIcon() {
+  return (
+    <IconBase>
+      <path d="M8 10h8M8 14h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.5v-3.5H6.5A2.5 2.5 0 0 1 4 13.5v-7Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </IconBase>
+  );
+}
+
+export function BoltIcon() {
+  return (
+    <IconBase>
+      <path
+        d="M13 3 5 13.5h5.5L11 21l8-11h-5.5L13 3Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </IconBase>
+  );
+}
+
+export function ClockIcon() {
+  return (
+    <IconBase>
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
+      <path d="M12 8v4.5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
+export function AlertIcon() {
+  return (
+    <IconBase>
+      <path
+        d="M12 4 3 20h18L12 4Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path d="M12 10.5v3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="17" r="0.9" fill="currentColor" />
+    </IconBase>
+  );
+}
+
+export function LayersIcon() {
+  return (
+    <IconBase>
+      <path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="m4 12 8 4.5 8-4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m4 16.5 8 4.5 8-4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
+export function HourglassIcon() {
+  return (
+    <IconBase>
+      <path
+        d="M6 3.5h12M6 20.5h12M7 3.5v3.4c0 1.3.6 2.5 1.6 3.3l2.4 1.8 2.4-1.8c1-.8 1.6-2 1.6-3.3V3.5M7 20.5v-3.4c0-1.3.6-2.5 1.6-3.3l2.4-1.8 2.4 1.8c1 .8 1.6 2 1.6 3.3v3.4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </IconBase>
+  );
+}

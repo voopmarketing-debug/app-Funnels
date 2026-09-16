@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessAnalytics, isDateRangeKey, type DateRangeKey } from "@/lib/analytics";
 import { StatTile } from "./StatTile";
+import { ChatIcon, MessageIcon, BoltIcon, ClockIcon, AlertIcon, HourglassIcon, LayersIcon } from "./StatIcons";
 import { ConversationsTrendChart } from "./ConversationsTrendChart";
 import { MessagesStackedChart } from "./MessagesStackedChart";
 import { StageDistributionChart } from "./StageDistributionChart";
@@ -64,6 +65,40 @@ function awaitingReplyStatus(count: number): Status {
   if (count === 0) return "good";
   if (count <= 3) return "warning";
   return "critical";
+}
+
+const SECTION_ICON_GLOW: Record<"accent" | "blue" | "secondary", string> = {
+  accent: "--glow-accent",
+  blue: "--glow-blue",
+  secondary: "--glow-secondary",
+};
+
+function SectionHeading({
+  icon,
+  tone,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  tone: "accent" | "blue" | "secondary";
+  title: string;
+  description: string;
+}) {
+  const glowVar = SECTION_ICON_GLOW[tone];
+  return (
+    <div className="mb-4 flex items-start gap-3">
+      <span
+        className="flex h-8 w-8 flex-none items-center justify-center rounded-xl"
+        style={{ backgroundColor: `rgba(var(${glowVar}), 0.16)`, color: `rgba(var(${glowVar}), 1)` }}
+      >
+        {icon}
+      </span>
+      <div>
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        <p className="mt-0.5 text-xs text-ink-faint">{description}</p>
+      </div>
+    </div>
+  );
 }
 
 export default async function AnalyticsPage({
@@ -129,11 +164,15 @@ export default async function AnalyticsPage({
           value={String(analytics.totalConversations)}
           sublabel={newConversationsSublabel(rangeKey, analytics.newConversations)}
           description="Cuántas personas distintas te han escrito por WhatsApp en total, desde siempre."
+          tone="accent"
+          icon={<ChatIcon />}
         />
         <StatTile
           label={`Mensajes (${RANGE_NOUN_PHRASE[rangeKey]})`}
           value={String(analytics.totalMessages)}
           description="Cuántos mensajes se intercambiaron en el período seleccionado — los que mandaron tus clientes y los que respondiste tú (IA o humano)."
+          tone="blue"
+          icon={<MessageIcon />}
         />
         <StatTile
           label="Automatización IA"
@@ -141,6 +180,8 @@ export default async function AnalyticsPage({
           sublabel="de respuestas sin humano"
           status={automationStatus(analytics.automationRate)}
           description="De cada 100 respuestas enviadas, cuántas las contestó la IA sola, sin que nadie de tu equipo interviniera a mano."
+          tone="secondary"
+          icon={<BoltIcon />}
         />
         <StatTile
           label="Tiempo de respuesta"
@@ -148,6 +189,8 @@ export default async function AnalyticsPage({
           sublabel={analytics.responseTime.sampleSize > 0 ? `${analytics.responseTime.sampleSize} muestras` : undefined}
           status={responseTimeStatus(analytics.responseTime.avgMinutes)}
           description="En promedio, cuánto tarda en llegar una respuesta después de que un cliente escribe. Entre menos, mejor experiencia para el cliente."
+          tone="amber"
+          icon={<ClockIcon />}
         />
         <StatTile
           label="Tasa de error IA"
@@ -155,6 +198,8 @@ export default async function AnalyticsPage({
           sublabel="fallas técnicas del agente"
           status={errorStatus(analytics.errorRate)}
           description="De cada 100 intentos de respuesta, cuántos fallaron por un error técnico (no por una mala respuesta). Si ves un número alto, avísanos — no es cosa tuya."
+          tone="accent"
+          icon={<AlertIcon />}
         />
         <StatTile
           label="Esperando respuesta"
@@ -162,32 +207,40 @@ export default async function AnalyticsPage({
           sublabel="conversaciones sin contestar"
           status={awaitingReplyStatus(analytics.awaitingReply)}
           description="Conversaciones donde el cliente escribió último y todavía nadie —ni la IA ni una persona— le ha contestado."
+          tone="blue"
+          icon={<HourglassIcon />}
         />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="fl-card min-w-0 p-4">
-          <h2 className="text-sm font-semibold text-ink">Conversaciones nuevas por día</h2>
-          <p className="mb-4 mt-1 text-xs text-ink-faint">
-            Cuántos clientes nuevos empezaron a escribirte cada día — te muestra si tu flujo de leads está creciendo o parado.
-          </p>
+          <SectionHeading
+            icon={<ChatIcon />}
+            tone="accent"
+            title="Conversaciones nuevas por día"
+            description="Cuántos clientes nuevos empezaron a escribirte cada día — te muestra si tu flujo de leads está creciendo o parado."
+          />
           <ConversationsTrendChart data={analytics.conversationsTrend} />
         </div>
 
         <div className="fl-card min-w-0 p-4">
-          <h2 className="text-sm font-semibold text-ink">Mensajes por día, por tipo</h2>
-          <p className="mb-4 mt-1 text-xs text-ink-faint">
-            Quién contestó cada mensaje: el cliente, tu IA, o una persona de tu equipo a mano.
-          </p>
+          <SectionHeading
+            icon={<MessageIcon />}
+            tone="blue"
+            title="Mensajes por día, por tipo"
+            description="Quién contestó cada mensaje: el cliente, tu IA, o una persona de tu equipo a mano."
+          />
           <MessagesStackedChart data={analytics.messagesTrend} />
         </div>
       </section>
 
       <section className="fl-card min-w-0 p-4">
-        <h2 className="text-sm font-semibold text-ink">Conversaciones por etapa del pipeline</h2>
-        <p className="mb-4 mt-1 text-xs text-ink-faint">
-          Cuántas conversaciones tienes hoy en cada etapa de tu embudo de ventas — te dice dónde se te están quedando los leads.
-        </p>
+        <SectionHeading
+          icon={<LayersIcon />}
+          tone="secondary"
+          title="Conversaciones por etapa del pipeline"
+          description="Cuántas conversaciones tienes hoy en cada etapa de tu embudo de ventas — te dice dónde se te están quedando los leads."
+        />
         {analytics.stageDistribution.length === 0 ? (
           <p className="text-sm text-ink-muted">Este negocio todavía no tiene etapas configuradas.</p>
         ) : (

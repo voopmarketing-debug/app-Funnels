@@ -29,6 +29,8 @@
 
   --glow-accent: 181, 255, 43;
   --glow-secondary: 201, 169, 255;
+  --glow-amber: 250, 178, 25;
+  --glow-blue: 57, 135, 229;
 }
 
 /* Light variant — same brand hues, re-balanced for a white surface: the
@@ -57,6 +59,8 @@
 
   --glow-accent: 92, 138, 0;
   --glow-secondary: 124, 58, 237;
+  --glow-amber: 179, 111, 0;
+  --glow-blue: 26, 96, 194;
 }
 
 @theme inline {
