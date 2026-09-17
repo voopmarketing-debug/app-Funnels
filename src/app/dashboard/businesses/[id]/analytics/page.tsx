@@ -219,14 +219,16 @@ export default async function AnalyticsPage({
           tone="blue"
           icon={<HourglassIcon />}
         />
-        <StatTile
-          label={`Costo real de IA (${RANGE_NOUN_PHRASE[rangeKey]})`}
-          value={formatCostUsd(analytics.realAiCostUsd)}
-          sublabel="gasto real en Anthropic"
-          description="Lo que de verdad costó en la API de Anthropic responder estas conversaciones — no un estimado, el gasto medido mensaje por mensaje."
-          tone="secondary"
-          icon={<CostIcon />}
-        />
+        {membership.role === "ADMIN" && (
+          <StatTile
+            label={`Costo real de IA (${RANGE_NOUN_PHRASE[rangeKey]})`}
+            value={formatCostUsd(analytics.realAiCostUsd)}
+            sublabel="gasto real en Anthropic"
+            description="Lo que de verdad costó en la API de Anthropic responder estas conversaciones — visible solo para la agencia, para medir rentabilidad."
+            tone="secondary"
+            icon={<CostIcon />}
+          />
+        )}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
