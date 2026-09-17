@@ -609,10 +609,14 @@ export async function updateBusinessName(businessId: string, name: string): Prom
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId_businessId: { userId: session.user.id, businessId } },
+  // Agency-wide privilege, not tied to the caller's role on THIS business —
+  // an agency admin can rename any agent, including one where they're only
+  // the OWNER (e.g. their own internal/demo business).
+  const isAgencyAdmin = await prisma.membership.findFirst({
+    where: { userId: session.user.id, role: "ADMIN" },
+    select: { id: true },
   });
-  if (!membership || membership.role !== "ADMIN") {
+  if (!isAgencyAdmin) {
     throw new Error("Only the agency can rename a business");
   }
 
