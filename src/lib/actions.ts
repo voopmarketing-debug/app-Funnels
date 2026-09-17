@@ -134,6 +134,103 @@ export async function registerBusiness(
   redirect("/login?registered=1");
 }
 
+export type CreateClientState = {
+  error: string | null;
+  success: { password: string; businessId: string; businessName: string } | null;
+};
+
+/**
+ * Agency-only: creates a brand-new client account + their first business in
+ * one step, for when the agency itself onboards a client (a sales call, a
+ * favor, a migration) instead of the client self-registering. Deliberately
+ * has NO line-limit check — unlike createBusiness below, this always makes
+ * a fresh client account (never the caller's own), so there is nothing of
+ * the caller's to cap, and a brand-new client always starts at zero anyway.
+ * The password is generated the same way as adminResetUserPassword: shown
+ * once here so the agency can hand it to the client directly.
+ */
+export async function createClientAccount(
+  _prevState: CreateClientState,
+  formData: FormData,
+): Promise<CreateClientState> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const isAgencyAdmin = await prisma.membership.findFirst({
+    where: { userId: session.user.id, role: "ADMIN" },
+    select: { id: true },
+  });
+  if (!isAgencyAdmin) throw new Error("Solo la agencia puede crear cuentas de clientes");
+
+  const businessName = String(formData.get("businessName") ?? "").trim();
+  const clientName = String(formData.get("clientName") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = sanitizePhone(String(formData.get("phone") ?? ""));
+  const industry = String(formData.get("industry") ?? "otro");
+
+  if (!businessName || !clientName || !email || !phone) {
+    return { error: "Completa todos los campos", success: null };
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    return { error: "Ya existe una cuenta con ese correo", success: null };
+  }
+
+  const newPassword = crypto.randomBytes(6).toString("base64url");
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+
+  // Same auto-grant as registerBusiness, so the agency's shared inbox also
+  // sees this client even if a different admin account created it.
+  const agencyAdminEmail = process.env.AGENCY_ADMIN_EMAIL?.trim().toLowerCase();
+  const callerEmail = session.user.email?.trim().toLowerCase();
+
+  const businessId = await prisma.$transaction(async (tx) => {
+    const business = await tx.business.create({
+      data: {
+        name: businessName,
+        slug: `${slugify(businessName)}-${Math.random().toString(36).slice(2, 7)}`,
+        industry,
+        agent: { create: { systemPrompt: "" } },
+        pipelineStages: {
+          create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
+            name: stageName,
+            position,
+          })),
+        },
+      },
+    });
+
+    await tx.user.create({
+      data: {
+        email,
+        phone,
+        passwordHash,
+        name: clientName,
+        memberships: { create: { role: "OWNER", businessId: business.id } },
+      },
+    });
+
+    await tx.membership.create({
+      data: { userId: session.user.id, businessId: business.id, role: "ADMIN" },
+    });
+
+    if (agencyAdminEmail && agencyAdminEmail !== callerEmail) {
+      const admin = await tx.user.findUnique({ where: { email: agencyAdminEmail } });
+      if (admin) {
+        await tx.membership.create({
+          data: { userId: admin.id, businessId: business.id, role: "ADMIN" },
+        });
+      }
+    }
+
+    return business.id;
+  });
+
+  revalidatePath("/dashboard/clients");
+  return { error: null, success: { password: newPassword, businessId, businessName } };
+}
+
 export async function createBusiness(formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");

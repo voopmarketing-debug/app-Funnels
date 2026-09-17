@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { PLAN_LABELS } from "@/lib/plans";
 import { ResetPasswordButton } from "./ResetPasswordButton";
 import { SubscriptionDatesEditor } from "./SubscriptionDatesEditor";
+import { CreateClientForm } from "./CreateClientForm";
 
 const EXPIRING_SOON_DAYS = 7;
 
@@ -40,12 +41,15 @@ export default async function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold">Clientes</h1>
-        <p className="text-sm text-ink-muted">
-          Datos personales que cada cliente registró al crear su cuenta — úsalos para contactarlo o
-          para entrar a probar su cuenta con sus credenciales si lo necesita.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold">Clientes</h1>
+          <p className="text-sm text-ink-muted">
+            Datos personales que cada cliente registró al crear su cuenta — úsalos para contactarlo o
+            para entrar a probar su cuenta con sus credenciales si lo necesita.
+          </p>
+        </div>
+        <CreateClientForm />
       </div>
 
       {owners.length === 0 ? (
