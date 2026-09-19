@@ -1162,3 +1162,31 @@ export async function generateBusinessWebsite(businessId: string): Promise<void>
 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
 }
+
+/**
+ * Records the custom domain a client wants pointed at their site. There's
+ * no automated DNS/Vercel-domain wiring here — this just saves the request
+ * so the agency can connect it manually (same DNS process used for
+ * agente.funnelslabs.app) and confirm with the client once it's live.
+ */
+export async function updateWebsiteCustomDomain(businessId: string, formData: FormData): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const customDomain = String(formData.get("customDomain") ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+
+  const website = await prisma.website.findUnique({ where: { businessId } });
+  if (!website) throw new Error("Genera primero el sitio web de este negocio");
+
+  await prisma.website.update({
+    where: { businessId },
+    data: { customDomain: customDomain || null },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website`);
+}

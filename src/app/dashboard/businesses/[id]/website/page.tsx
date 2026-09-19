@@ -26,15 +26,19 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
         </Link>
         <h1 className="mt-1 text-xl font-bold">Sitio web</h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-          Claude arma una página completa para este negocio, adaptada a su rubro, con el WhatsApp del negocio como
-          botón principal — todo lo que llega por ahí cae directo en el CRM de arriba.
+          Creamos con IA una página completa para este negocio, adaptada a su rubro, con el WhatsApp del negocio
+          como botón principal — todo lo que llega por ahí cae directo en el CRM de arriba.
         </p>
       </div>
 
       <WebsiteManager
         businessId={id}
         hasWabaCredentials={!!membership.business.wabaPhoneNumberId}
-        website={website ? { slug: website.slug, generatedAt: website.generatedAt } : null}
+        website={
+          website
+            ? { slug: website.slug, generatedAt: website.generatedAt, customDomain: website.customDomain }
+            : null
+        }
         publicUrlBase={`https://${appHost}/sitio`}
       />
     </div>

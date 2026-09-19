@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { generateBusinessWebsite } from "@/lib/actions";
+import { generateBusinessWebsite, updateWebsiteCustomDomain } from "@/lib/actions";
 
 export function WebsiteManager({
   businessId,
@@ -12,7 +12,7 @@ export function WebsiteManager({
 }: {
   businessId: string;
   hasWabaCredentials: boolean;
-  website: { slug: string; generatedAt: Date } | null;
+  website: { slug: string; generatedAt: Date; customDomain: string | null } | null;
   publicUrlBase: string;
 }) {
   const router = useRouter();
@@ -62,41 +62,41 @@ export function WebsiteManager({
 
         {error && <p className="text-sm text-error">{error}</p>}
 
-        {website && publicUrl && (
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-              <code className="fl-mono flex-1 text-sm text-accent">{publicUrl}</code>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(publicUrl);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                }}
-                className="text-xs font-medium text-ink-muted hover:text-ink"
-              >
-                {copied ? "✓ Copiado" : "Copiar"}
-              </button>
-              <a
-                href={publicUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs font-medium text-accent hover:underline"
-              >
-                Ver sitio ↗
-              </a>
-            </div>
-            <p className="text-xs text-ink-muted">
-              ¿Quieres un dominio propio o un subdominio (como negocio.funnelslabs.app) en vez de este link? Es un
-              paso manual de DNS — pídenoslo y lo conectamos igual que hicimos con agente.funnelslabs.app.
-            </p>
-          </div>
-        )}
-
         {!website && hasWabaCredentials && !isPending && (
           <p className="text-sm text-ink-muted">Todavía no se ha generado un sitio para este negocio.</p>
         )}
       </div>
+
+      {website && publicUrl && (
+        <div className="fl-card space-y-2 p-5">
+          <h2 className="text-sm font-semibold text-ink">Link de tu sitio en Funnels Labs</h2>
+          <p className="text-xs text-ink-muted">Ya está activo — cualquiera puede entrar a este link ahora mismo.</p>
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
+            <code className="fl-mono flex-1 text-sm text-accent">{publicUrl}</code>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(publicUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="text-xs font-medium text-ink-muted hover:text-ink"
+            >
+              {copied ? "✓ Copiado" : "Copiar"}
+            </button>
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-accent hover:underline"
+            >
+              Ver sitio ↗
+            </a>
+          </div>
+        </div>
+      )}
+
+      {website && <CustomDomainForm businessId={businessId} customDomain={website.customDomain} />}
 
       {website && publicUrl && (
         <div className="fl-card overflow-hidden p-0">
@@ -105,6 +105,53 @@ export function WebsiteManager({
           </div>
           <iframe src={publicUrl} className="h-[600px] w-full" title="Vista previa del sitio" />
         </div>
+      )}
+    </div>
+  );
+}
+
+type DomainState = { saved: boolean };
+
+function CustomDomainForm({ businessId, customDomain }: { businessId: string; customDomain: string | null }) {
+  const [state, formAction, isPending] = useActionState<DomainState, FormData>(async (_prev, formData) => {
+    await updateWebsiteCustomDomain(businessId, formData);
+    return { saved: true };
+  }, { saved: false });
+
+  return (
+    <div className="fl-card space-y-3 p-5">
+      <div>
+        <h2 className="text-sm font-semibold text-ink">Dominio propio (opcional)</h2>
+        <p className="mt-1 text-xs text-ink-muted">
+          ¿Quieres que el sitio se vea en tu propio dominio (como minegocio.com) en vez del link de Funnels Labs? O
+          si prefieres un subdominio dedicado (como minegocio.funnelslabs.app), pídelo igual aquí. Escríbelo abajo —
+          es un paso de DNS que conectamos nosotros manualmente y te avisamos por WhatsApp cuando quede activo,
+          igual que hicimos con agente.funnelslabs.app.
+        </p>
+      </div>
+
+      <form action={formAction} className="flex flex-wrap items-center gap-2">
+        <input
+          name="customDomain"
+          defaultValue={customDomain ?? ""}
+          placeholder="minegocio.com"
+          className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+        />
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink transition hover:border-accent disabled:opacity-50"
+        >
+          {isPending ? "Guardando..." : "Solicitar"}
+        </button>
+        {state.saved && !isPending && <span className="fl-mono text-xs text-accent">✓ Guardado</span>}
+      </form>
+
+      {customDomain && (
+        <p className="text-xs text-ink-muted">
+          Dominio solicitado: <span className="fl-mono text-ink">{customDomain}</span> — en revisión, te avisamos
+          cuando quede conectado.
+        </p>
       )}
     </div>
   );
