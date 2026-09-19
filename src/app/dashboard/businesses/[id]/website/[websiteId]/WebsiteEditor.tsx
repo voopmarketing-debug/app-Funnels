@@ -5,12 +5,6 @@ import { useRouter } from "next/navigation";
 import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage, applyWebsitePrompt } from "@/lib/actions";
 import { FONT_OPTIONS, type WebsiteContent } from "@/lib/websiteContent";
 
-const LABEL_NAMES: Record<string, string> = {
-  header: "Botón de WhatsApp (arriba)",
-  hero: "Botón principal",
-  contact: "Botón de contacto (abajo)",
-};
-
 export function WebsiteEditor({
   businessId,
   websiteId,
@@ -26,7 +20,7 @@ export function WebsiteEditor({
   customDomain: string | null;
   generatedAt: Date;
   publicUrl: string;
-  stats: { totalViews: number; totalClicks: number; clicksByLabel: Record<string, number> };
+  stats: { totalViews: number; clicksWhatsapp: number; clicksAgenda: number };
 }) {
   const router = useRouter();
   const [content, setContent] = useState<WebsiteContent>(initialContent);
@@ -345,31 +339,24 @@ export function WebsiteEditor({
       <div className="space-y-2 lg:sticky lg:top-4 lg:self-start">
         <div className="fl-card space-y-3 p-4">
           <h2 className="text-sm font-semibold text-ink">Métricas del sitio</h2>
+          <div className="rounded-md border border-border bg-background p-3">
+            <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Visitas</p>
+            <p className="text-2xl font-bold text-ink">{stats.totalViews}</p>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-md border border-border bg-background p-3">
-              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Visitas</p>
-              <p className="text-2xl font-bold text-ink">{stats.totalViews}</p>
+              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a WhatsApp</p>
+              <p className="text-2xl font-bold text-accent">{stats.clicksWhatsapp}</p>
             </div>
             <div className="rounded-md border border-border bg-background p-3">
-              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics</p>
-              <p className="text-2xl font-bold text-accent">{stats.totalClicks}</p>
+              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a agenda/link</p>
+              <p className="text-2xl font-bold text-[rgb(var(--glow-secondary))]">{stats.clicksAgenda}</p>
             </div>
           </div>
-          {stats.totalViews > 0 && (
-            <p className="text-xs text-ink-muted">
-              {Math.round((stats.totalClicks / stats.totalViews) * 100)}% de quienes entran hacen clic en un botón.
-            </p>
-          )}
-          {Object.keys(stats.clicksByLabel).length > 0 && (
-            <div className="space-y-1 border-t border-border pt-2">
-              {Object.entries(stats.clicksByLabel).map(([label, count]) => (
-                <div key={label} className="flex items-center justify-between text-xs">
-                  <span className="text-ink-muted">{LABEL_NAMES[label] ?? label}</span>
-                  <span className="fl-mono font-semibold text-ink">{count}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <p className="text-[11px] text-ink-faint">
+            Van por separado a propósito: "WhatsApp" es cuando el botón usa el número del negocio; "Agenda/link" es
+            cuando esta página tiene un link externo configurado (ver campo "Link del botón" arriba).
+          </p>
         </div>
 
         <div className="fl-card space-y-2 p-4">

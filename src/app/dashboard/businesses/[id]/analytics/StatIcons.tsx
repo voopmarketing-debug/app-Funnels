@@ -114,6 +114,33 @@ export function CursorClickIcon() {
   );
 }
 
+export function WhatsAppSmallIcon() {
+  return (
+    <IconBase>
+      <path
+        d="M12 3.5a8.5 8.5 0 0 0-7.3 12.8L3.5 20.5l4.3-1.1A8.5 8.5 0 1 0 12 3.5Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.7 8.3c.2-.4.4-.4.6-.4h.5c.15 0 .35 0 .5.4.2.5.6 1.5.65 1.6.05.15.1.3 0 .45-.1.2-.15.3-.3.45-.15.15-.3.3-.15.55.4.7 1.6 2 2.6 2.3.2.05.35 0 .5-.15.15-.15.5-.6.65-.8.15-.2.3-.15.5-.1.2.1 1.3.6 1.5.7.2.1.35.15.4.25.05.15.05.7-.2 1.3-.25.6-1.3 1.1-1.8 1.15-.45.05-.9.1-2.9-.6-2.5-.9-4.1-3.4-4.2-3.6-.1-.2-.9-1.2-.9-2.3 0-1.1.55-1.6.75-1.85Z"
+        fill="currentColor"
+      />
+    </IconBase>
+  );
+}
+
+export function CalendarLinkIcon() {
+  return (
+    <IconBase>
+      <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M4 9.5h16M8 3v3.5M16 3v3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M9 14.5l2.5 2.5L15.5 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
 export function CostIcon() {
   return (
     <IconBase>

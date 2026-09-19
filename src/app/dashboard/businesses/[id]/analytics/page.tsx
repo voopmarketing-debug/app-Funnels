@@ -14,7 +14,8 @@ import {
   LayersIcon,
   CostIcon,
   GlobeIcon,
-  CursorClickIcon,
+  WhatsAppSmallIcon,
+  CalendarLinkIcon,
 } from "./StatIcons";
 import { ConversationsTrendChart } from "./ConversationsTrendChart";
 import { MessagesStackedChart } from "./MessagesStackedChart";
@@ -238,16 +239,18 @@ export default async function AnalyticsPage({
           icon={<GlobeIcon />}
         />
         <StatTile
-          label={`Clics en el sitio web (${RANGE_NOUN_PHRASE[rangeKey]})`}
-          value={String(analytics.websiteClicks)}
-          sublabel={
-            analytics.websiteViews > 0
-              ? `${Math.round((analytics.websiteClicks / analytics.websiteViews) * 100)}% de las visitas`
-              : undefined
-          }
-          description="Cuántas veces alguien le dio clic a un botón (WhatsApp, agenda, etc.) en alguna página web de este negocio."
+          label={`Clics a WhatsApp (${RANGE_NOUN_PHRASE[rangeKey]})`}
+          value={String(analytics.websiteClicksWhatsapp)}
+          description="Cuántas veces alguien le dio clic a un botón que lleva al WhatsApp del negocio, en alguna página web."
           tone="accent"
-          icon={<CursorClickIcon />}
+          icon={<WhatsAppSmallIcon />}
+        />
+        <StatTile
+          label={`Clics a agenda / link externo (${RANGE_NOUN_PHRASE[rangeKey]})`}
+          value={String(analytics.websiteClicksAgenda)}
+          description="Cuántas veces alguien le dio clic a un botón que lleva a un link externo (como tu agenda), en páginas configuradas para eso."
+          tone="secondary"
+          icon={<CalendarLinkIcon />}
         />
         {membership.role === "ADMIN" && (
           <StatTile

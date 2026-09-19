@@ -37,10 +37,11 @@ export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname === "/ir") {
     const label = request.nextUrl.searchParams.get("label") ?? "unknown";
     const content = WebsiteContentSchema.parse(website.content);
+    const destination = content.hero.ctaUrl ? "agenda" : "whatsapp";
     const target = content.hero.ctaUrl || `https://wa.me/${website.whatsappNumber.replace(/[^0-9]/g, "")}`;
 
     try {
-      await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "cta_click", label } });
+      await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "cta_click", label, destination } });
     } catch (err) {
       console.error("Failed to log website click event:", err);
     }

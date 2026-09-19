@@ -284,8 +284,14 @@ model WebsiteEvent {
   id        String   @id @default(cuid())
   websiteId String
   type      String // "view" | "cta_click"
-  label     String? // which CTA, e.g. "hero" | "header" | "contact" — null for "view"
-  createdAt DateTime @default(now())
+  label     String? // which button, e.g. "hero" | "header" | "contact" — null for "view"
+  // Where a cta_click actually sent the visitor — "whatsapp" or "agenda"
+  // (any external ctaUrl override) — kept separate from `label` since the
+  // client asked for these never to be combined into one "clicks" number.
+  // Captured at click time from that page's content, not derived later, so
+  // it stays correct even if the page's link setting changes afterward.
+  destination String?
+  createdAt   DateTime @default(now())
 
   website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 

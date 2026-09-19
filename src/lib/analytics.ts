@@ -43,8 +43,11 @@ export type BusinessAnalytics = {
   // Visits and CTA-button clicks across every Website page this business
   // has generated (see WebsiteEvent, logged from app/sitio/[slug]/route.ts,
   // its /ir click redirect, and proxy.ts for connected custom domains).
+  // Clicks are split by where the button actually sent the visitor — kept
+  // as two separate numbers on purpose, never combined into one "clicks".
   websiteViews: number;
-  websiteClicks: number;
+  websiteClicksWhatsapp: number;
+  websiteClicksAgenda: number;
 };
 
 function dayKey(date: Date): string {
@@ -111,7 +114,8 @@ export async function getBusinessAnalytics(
     stages,
     conversationsForActivity,
     websiteViews,
-    websiteClicks,
+    websiteClicksWhatsapp,
+    websiteClicksAgenda,
   ] = await Promise.all([
     prisma.conversation.count({ where: { businessId } }),
     prisma.conversation.count({ where: { businessId, createdAt: { gte: since, lt: until } } }),
@@ -153,7 +157,10 @@ export async function getBusinessAnalytics(
       where: { type: "view", createdAt: { gte: since, lt: until }, website: { businessId } },
     }),
     prisma.websiteEvent.count({
-      where: { type: "cta_click", createdAt: { gte: since, lt: until }, website: { businessId } },
+      where: { type: "cta_click", destination: "whatsapp", createdAt: { gte: since, lt: until }, website: { businessId } },
+    }),
+    prisma.websiteEvent.count({
+      where: { type: "cta_click", destination: "agenda", createdAt: { gte: since, lt: until }, website: { businessId } },
     }),
   ]);
 
@@ -260,7 +267,8 @@ export async function getBusinessAnalytics(
     })),
     stageDistribution: stages.map((s) => ({ name: s.name, position: s.position, count: s._count.conversations })),
     websiteViews,
-    websiteClicks,
+    websiteClicksWhatsapp,
+    websiteClicksAgenda,
   };
 }
 
