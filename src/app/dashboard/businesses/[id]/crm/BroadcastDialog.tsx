@@ -8,12 +8,16 @@ const INITIAL_STATE: DialogState = { error: null, result: null };
 
 // Entry point for mass-messaging: opens a dialog to pick a pipeline stage
 // (or all of it) and compose one message sent to every matching contact.
+type BroadcastTemplate = { id: string; name: string; bodyText: string };
+
 export function BroadcastDialog({
   businessId,
   stages,
+  templates,
 }: {
   businessId: string;
   stages: { id: string; name: string }[];
+  templates: BroadcastTemplate[];
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [formKey, setFormKey] = useState(0);
@@ -36,6 +40,7 @@ export function BroadcastDialog({
           key={formKey}
           businessId={businessId}
           stages={stages}
+          templates={templates}
           onClose={() => dialogRef.current?.close()}
         />
       </dialog>
@@ -46,12 +51,16 @@ export function BroadcastDialog({
 function BroadcastDialogContent({
   businessId,
   stages,
+  templates,
   onClose,
 }: {
   businessId: string;
   stages: { id: string; name: string }[];
+  templates: BroadcastTemplate[];
   onClose: () => void;
 }) {
+  const [mode, setMode] = useState<"free" | "template">("free");
+  const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id);
   const [state, formAction, isPending] = useActionState<DialogState, FormData>(async (_prev, formData) => {
     try {
       const result = await sendBroadcast(businessId, formData);
@@ -121,18 +130,77 @@ function BroadcastDialogContent({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="message" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Mensaje
-        </label>
-        <textarea
-          id="message"
-          name="message"
-          required
-          rows={4}
-          placeholder="Escribe el mensaje que van a recibir..."
-          className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
+        <span className="fl-mono text-xs tracking-wide text-ink-muted uppercase">Tipo de envío</span>
+        <div className="flex gap-1 rounded-md border border-border bg-background p-1">
+          <button
+            type="button"
+            onClick={() => setMode("free")}
+            className={`flex-1 rounded px-2 py-1.5 text-xs font-semibold transition ${
+              mode === "free" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            Mensaje libre
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("template")}
+            className={`flex-1 rounded px-2 py-1.5 text-xs font-semibold transition ${
+              mode === "template" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            Plantilla aprobada
+          </button>
+        </div>
+        <p className="text-[11px] text-ink-faint">
+          {mode === "free"
+            ? "Solo les llega a quienes te escribieron en las últimas 24 horas."
+            : "Le llega a todos, incluso contactos fríos — pero el texto es fijo, no se puede editar aquí."}
+        </p>
       </div>
+
+      {mode === "free" ? (
+        <div className="space-y-1">
+          <label htmlFor="message" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Mensaje
+          </label>
+          <textarea
+            id="message"
+            name="message"
+            required
+            rows={4}
+            placeholder="Escribe el mensaje que van a recibir..."
+            className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+      ) : templates.length === 0 ? (
+        <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-ink-muted">
+          Todavía no tienes plantillas aprobadas por Meta. Créalas y espera su aprobación en{" "}
+          <span className="fl-mono text-ink">Plantillas</span> (en la página del negocio).
+        </p>
+      ) : (
+        <div className="space-y-1">
+          <label htmlFor="templateId" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Plantilla
+          </label>
+          <select
+            id="templateId"
+            name="templateId"
+            required
+            defaultValue={templates[0].id}
+            onChange={(e) => setSelectedTemplateId(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          >
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <p className="rounded-md border border-border bg-background px-3 py-2 text-xs text-ink-muted">
+            {templates.find((t) => t.id === selectedTemplateId)?.bodyText ?? templates[0].bodyText}
+          </p>
+        </div>
+      )}
 
       {state.error && <p className="text-sm text-error">{state.error}</p>}
 

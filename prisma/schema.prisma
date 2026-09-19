@@ -22,6 +22,11 @@ model Business {
   // Meta Cloud API connection for this business's WhatsApp number.
   wabaPhoneNumberId String? @unique
   wabaAccessToken   String? // AES-256-GCM encrypted, see lib/crypto.ts
+  // WhatsApp Business Account id — a different id than wabaPhoneNumberId,
+  // needed only for message-template management (Meta scopes templates to
+  // the WABA, not the phone number). Not secret, so not encrypted, same as
+  // wabaPhoneNumberId.
+  wabaId String?
 
   // What kind of business this is, so the AI agent can tailor its answers
   // (e.g. "clinica" vs "ecommerce" call for very different context).
@@ -47,6 +52,7 @@ model Business {
   conversations  Conversation[]
   pipelineStages PipelineStage[]
   broadcasts     Broadcast[]
+  messageTemplates MessageTemplate[]
 }
 
 enum PlanTier {
@@ -215,6 +221,36 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
+}
+
+enum TemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// A WhatsApp message template, submitted to Meta for approval so it can be
+// sent to a customer outside the normal 24h free-form messaging window
+// (required for broadcasts to contacts who haven't written in recently).
+// Meta owns the actual approval — this row mirrors their status, refreshed
+// on demand (no template-status webhook wired up).
+model MessageTemplate {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String // Meta's template name: lowercase, underscores only
+  language   String // e.g. "es", "es_CO", "en_US"
+  category   String // "MARKETING" | "UTILITY"
+  bodyText   String   @db.Text
+
+  status           TemplateStatus @default(PENDING)
+  metaTemplateId   String? // id Meta assigns once created
+  rejectionReason  String?        @db.Text
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, name, language])
 }
 
 // One mass-send of a single message to every conversation in a business

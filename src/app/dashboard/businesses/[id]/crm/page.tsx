@@ -29,7 +29,7 @@ export default async function CrmPage({
   });
   if (!membership) notFound();
 
-  const [business, stages, conversations, accessibleBusinesses] = await Promise.all([
+  const [business, stages, conversations, accessibleBusinesses, approvedTemplates] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
     prisma.pipelineStage.findMany({ where: { businessId: id }, orderBy: { position: "asc" } }),
     prisma.conversation.findMany({
@@ -41,6 +41,11 @@ export default async function CrmPage({
       where: { userId: session.user.id },
       include: { business: { select: { id: true, name: true } } },
       orderBy: { createdAt: "asc" },
+    }),
+    prisma.messageTemplate.findMany({
+      where: { businessId: id, status: "APPROVED" },
+      select: { id: true, name: true, bodyText: true },
+      orderBy: { name: "asc" },
     }),
   ]);
 
@@ -90,7 +95,7 @@ export default async function CrmPage({
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CrmTabs activeTab={tab} />
-          <BroadcastDialog businessId={id} stages={stages} />
+          <BroadcastDialog businessId={id} stages={stages} templates={approvedTemplates} />
         </div>
 
         {tab === "board" && <CrmBoard businessId={id} stages={stages} conversations={conversationSummaries} />}

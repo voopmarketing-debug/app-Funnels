@@ -8,9 +8,11 @@ type SaveState = { saved: boolean };
 export function WabaCredentialsForm({
   businessId,
   wabaPhoneNumberId,
+  wabaId,
 }: {
   businessId: string;
   wabaPhoneNumberId: string;
+  wabaId: string;
 }) {
   const [state, formAction, isPending] = useActionState<SaveState, FormData>(
     async (_prevState, formData) => {
@@ -85,6 +87,26 @@ export function WabaCredentialsForm({
             name="wabaAccessToken"
             type="text"
             placeholder="Pega aquí el token nuevo que te dio Meta"
+            autoComplete="off"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="wabaId" className="fl-mono text-xs tracking-wide text-ink uppercase">
+            3. WABA ID (solo si vas a usar plantillas de difusión)
+          </label>
+          <p className="text-xs text-ink-muted">
+            Es el ID de tu cuenta de WhatsApp Business (distinto al Phone Number ID de arriba) — solo hace falta
+            para crear <strong>plantillas de mensajes</strong> (ver sección Plantillas), no para el agente normal.
+            Lo encuentras en{" "}
+            <span className="fl-mono text-ink">business.facebook.com → WhatsApp Manager → Configuración de la API</span>{" "}
+            (ahí dice &quot;ID de la cuenta de WhatsApp Business&quot;).
+          </p>
+          <input
+            id="wabaId"
+            name="wabaId"
+            defaultValue={wabaId}
             autoComplete="off"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />

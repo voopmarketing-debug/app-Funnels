@@ -8,7 +8,13 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
-import { sendWhatsAppTextMessage, sendWhatsAppMediaMessage } from "@/lib/whatsapp";
+import {
+  sendWhatsAppTextMessage,
+  sendWhatsAppMediaMessage,
+  sendWhatsAppTemplateMessage,
+  createWhatsAppTemplate,
+  fetchWhatsAppTemplateStatus,
+} from "@/lib/whatsapp";
 import { resolveMediaType, uploadAttachment, MAX_ATTACHMENT_BYTES, maxMbFor } from "@/lib/attachments";
 import { requireBusinessMembership } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
@@ -282,6 +288,7 @@ export async function updateWabaCredentials(businessId: string, formData: FormDa
 
   const wabaPhoneNumberId = sanitizeAsciiToken(String(formData.get("wabaPhoneNumberId") ?? ""));
   const wabaAccessToken = sanitizeAsciiToken(String(formData.get("wabaAccessToken") ?? ""));
+  const wabaId = sanitizeAsciiToken(String(formData.get("wabaId") ?? ""));
 
   if (!wabaPhoneNumberId) {
     throw new Error("Missing required fields");
@@ -289,15 +296,99 @@ export async function updateWabaCredentials(businessId: string, formData: FormDa
 
   // The token field is optional here: it only needs to be filled in when the
   // previous one expired. An empty submission just keeps the stored token.
+  // wabaId is optional too — only needed to create WhatsApp message
+  // templates (see /templates), not for regular sending/receiving.
   await prisma.business.update({
     where: { id: businessId },
     data: {
       wabaPhoneNumberId,
       ...(wabaAccessToken ? { wabaAccessToken: encryptSecret(wabaAccessToken) } : {}),
+      ...(wabaId ? { wabaId } : {}),
     },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
+const TEMPLATE_CATEGORIES = new Set(["MARKETING", "UTILITY"]);
+
+/** Submits a new WhatsApp message template to Meta for approval — see lib/whatsapp.ts for the API call itself. */
+export async function createMessageTemplate(businessId: string, formData: FormData): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const name = String(formData.get("name") ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/(^_|_$)+/g, "");
+  const language = String(formData.get("language") ?? "es");
+  const categoryRaw = String(formData.get("category") ?? "MARKETING");
+  const category = TEMPLATE_CATEGORIES.has(categoryRaw) ? (categoryRaw as "MARKETING" | "UTILITY") : "MARKETING";
+  const bodyText = String(formData.get("bodyText") ?? "").trim();
+
+  if (!name || !bodyText) throw new Error("El nombre y el texto de la plantilla son obligatorios");
+
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+  if (!business.wabaAccessToken || !business.wabaId) {
+    throw new Error("Falta el WABA ID en las credenciales de WhatsApp de este negocio (ver sección de credenciales)");
+  }
+
+  const { id: metaTemplateId, status } = await createWhatsAppTemplate({
+    wabaId: business.wabaId,
+    accessToken: decryptSecret(business.wabaAccessToken),
+    name,
+    language,
+    category,
+    bodyText,
+  });
+
+  await prisma.messageTemplate.create({
+    data: {
+      businessId,
+      name,
+      language,
+      category,
+      bodyText,
+      metaTemplateId,
+      status: status === "APPROVED" ? "APPROVED" : status === "REJECTED" ? "REJECTED" : "PENDING",
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/templates`);
+}
+
+/** Re-checks a template's approval status with Meta — there's no status-update webhook wired up, so this is a manual refresh. */
+export async function refreshTemplateStatus(businessId: string, templateId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const [business, template] = await Promise.all([
+    prisma.business.findUniqueOrThrow({ where: { id: businessId } }),
+    prisma.messageTemplate.findFirstOrThrow({ where: { id: templateId, businessId } }),
+  ]);
+  if (!business.wabaAccessToken || !business.wabaId) {
+    throw new Error("Falta el WABA ID en las credenciales de WhatsApp de este negocio");
+  }
+
+  const result = await fetchWhatsAppTemplateStatus({
+    wabaId: business.wabaId,
+    accessToken: decryptSecret(business.wabaAccessToken),
+    name: template.name,
+  });
+  if (!result) return;
+
+  await prisma.messageTemplate.update({
+    where: { id: templateId },
+    data: {
+      status: result.status === "APPROVED" ? "APPROVED" : result.status === "REJECTED" ? "REJECTED" : "PENDING",
+      rejectionReason: result.rejectionReason,
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/templates`);
 }
 
 export async function updateAgent(businessId: string, formData: FormData): Promise<void> {
@@ -398,10 +489,9 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
 
-  const message = String(formData.get("message") ?? "").trim();
-  if (!message) throw new Error("message is required");
   const stageIdRaw = String(formData.get("stageId") ?? "");
   const stageId = stageIdRaw && stageIdRaw !== "all" ? stageIdRaw : null;
+  const templateId = String(formData.get("templateId") ?? "").trim() || null;
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
   if (!business.wabaAccessToken || !business.wabaPhoneNumberId) {
@@ -409,6 +499,24 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
   }
   const accessToken = decryptSecret(business.wabaAccessToken);
   const phoneNumberId = business.wabaPhoneNumberId;
+
+  // Two ways to send: a free-text message (only reaches contacts who wrote
+  // in the last 24h — Meta rejects the rest) or an approved template
+  // (works anytime, but its body is fixed — see /templates). Exactly one
+  // of these resolves per call.
+  let message: string;
+  let template: { name: string; language: string } | null = null;
+  if (templateId) {
+    const approvedTemplate = await prisma.messageTemplate.findFirst({
+      where: { id: templateId, businessId, status: "APPROVED" },
+    });
+    if (!approvedTemplate) throw new Error("Plantilla no encontrada o todavía no está aprobada");
+    message = approvedTemplate.bodyText;
+    template = { name: approvedTemplate.name, language: approvedTemplate.language };
+  } else {
+    message = String(formData.get("message") ?? "").trim();
+    if (!message) throw new Error("message is required");
+  }
 
   const conversations = await prisma.conversation.findMany({
     where: { businessId, ...(stageId ? { stageId } : {}) },
@@ -433,12 +541,15 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
     const batch = conversations.slice(i, i + BATCH_SIZE);
     const outcomes = await Promise.allSettled(
       batch.map(async (conv) => {
-        const { messageId } = await sendWhatsAppTextMessage({
-          phoneNumberId,
-          accessToken,
-          to: conv.customerPhone,
-          text: message,
-        });
+        const { messageId } = template
+          ? await sendWhatsAppTemplateMessage({
+              phoneNumberId,
+              accessToken,
+              to: conv.customerPhone,
+              templateName: template.name,
+              language: template.language,
+            })
+          : await sendWhatsAppTextMessage({ phoneNumberId, accessToken, to: conv.customerPhone, text: message });
         await prisma.message.create({
           data: { conversationId: conv.id, role: "AGENT", content: message, whatsappMsgId: messageId, sentByHuman: true },
         });

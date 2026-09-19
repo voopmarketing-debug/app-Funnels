@@ -115,6 +115,110 @@ export async function downloadWhatsAppMedia(params: { url: string; accessToken: 
   return Buffer.from(arrayBuffer);
 }
 
+export type TemplateCategory = "MARKETING" | "UTILITY";
+
+/**
+ * Submits a new message template to Meta for review. Templates are scoped
+ * to the WhatsApp Business Account (wabaId), not the phone number — this is
+ * a different id than wabaPhoneNumberId. Approval is entirely on Meta's
+ * side (usually minutes to a day); the returned status is almost always
+ * "PENDING" right after creation.
+ */
+export async function createWhatsAppTemplate(params: {
+  wabaId: string;
+  accessToken: string;
+  name: string;
+  language: string;
+  category: TemplateCategory;
+  bodyText: string;
+}): Promise<{ id: string; status: string }> {
+  const { wabaId, accessToken, name, language, category, bodyText } = params;
+
+  const response = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${wabaId}/message_templates`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name,
+      language,
+      category,
+      components: [{ type: "BODY", text: bodyText }],
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`WhatsApp API error (${response.status}): ${body}`);
+  }
+
+  const data = (await response.json()) as { id?: string; status?: string };
+  if (!data.id) throw new Error("WhatsApp API did not return a template id");
+
+  return { id: data.id, status: data.status ?? "PENDING" };
+}
+
+/** Looks up a template's current review status by name — no status-update webhook is wired up, so this is polled on demand. */
+export async function fetchWhatsAppTemplateStatus(params: {
+  wabaId: string;
+  accessToken: string;
+  name: string;
+}): Promise<{ status: string; rejectionReason: string | null } | null> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/message_templates`);
+  url.searchParams.set("name", params.name);
+
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${params.accessToken}` } });
+  if (!response.ok) return null;
+
+  const data = (await response.json()) as {
+    data?: { status?: string; rejected_reason?: string }[];
+  };
+  const entry = data.data?.[0];
+  if (!entry?.status) return null;
+
+  return { status: entry.status, rejectionReason: entry.rejected_reason ?? null };
+}
+
+/** Sends an approved template message — the only way to message a customer outside Meta's 24h free-form window. */
+export async function sendWhatsAppTemplateMessage(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  templateName: string;
+  language: string;
+}): Promise<{ messageId: string }> {
+  const { phoneNumberId, accessToken, to, templateName, language } = params;
+
+  const response = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: { name: templateName, language: { code: language } },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`WhatsApp API error (${response.status}): ${body}`);
+  }
+
+  const data = (await response.json()) as { messages?: { id: string }[] };
+  const messageId = data.messages?.[0]?.id;
+  if (!messageId) throw new Error("WhatsApp API did not return a message id");
+
+  return { messageId };
+}
+
 /**
  * Verifies the `X-Hub-Signature-256` header Meta sends on every webhook
  * delivery, proving the payload was not forged or tampered with in transit.

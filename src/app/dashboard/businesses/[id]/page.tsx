@@ -63,6 +63,12 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           >
             Ver KPIs
           </Link>
+          <Link
+            href={`/dashboard/businesses/${id}/templates`}
+            className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+          >
+            Plantillas
+          </Link>
           <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
         </div>
       </div>
@@ -106,7 +112,11 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           />
         </div>
 
-        <WabaCredentialsForm businessId={id} wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""} />
+        <WabaCredentialsForm
+          businessId={id}
+          wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""}
+          wabaId={business.wabaId ?? ""}
+        />
       </div>
     </div>
   );
