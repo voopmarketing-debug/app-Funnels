@@ -39,6 +39,21 @@ export async function sendWhatsAppTextMessage(params: {
   return { messageId };
 }
 
+/** Looks up the actual dialable WhatsApp number behind a phone_number_id — needed to build a wa.me link (the id itself isn't dialable). */
+export async function fetchWhatsAppDisplayNumber(params: {
+  phoneNumberId: string;
+  accessToken: string;
+}): Promise<string | null> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.phoneNumberId}`);
+  url.searchParams.set("fields", "display_phone_number");
+
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${params.accessToken}` } });
+  if (!response.ok) return null;
+
+  const data = (await response.json()) as { display_phone_number?: string };
+  return data.display_phone_number ?? null;
+}
+
 export type OutboundMediaType = "image" | "document" | "audio" | "video";
 
 /** Sends a media message by public link — Meta fetches the file itself, no upload-to-Meta step needed. */

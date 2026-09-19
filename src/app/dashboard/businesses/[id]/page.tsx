@@ -69,6 +69,12 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           >
             Plantillas
           </Link>
+          <Link
+            href={`/dashboard/businesses/${id}/website`}
+            className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+          >
+            Sitio web
+          </Link>
           <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
         </div>
       </div>

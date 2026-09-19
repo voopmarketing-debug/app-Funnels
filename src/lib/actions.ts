@@ -14,7 +14,9 @@ import {
   sendWhatsAppTemplateMessage,
   createWhatsAppTemplate,
   fetchWhatsAppTemplateStatus,
+  fetchWhatsAppDisplayNumber,
 } from "@/lib/whatsapp";
+import { generateWebsiteHtml } from "@/lib/websiteGenerator";
 import { resolveMediaType, uploadAttachment, MAX_ATTACHMENT_BYTES, maxMbFor } from "@/lib/attachments";
 import { requireBusinessMembership } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
@@ -1108,4 +1110,55 @@ export async function adminResetUserPassword(targetUserId: string): Promise<{ pa
   });
 
   return { password: newPassword };
+}
+
+/**
+ * Generates (or regenerates) this business's marketing site with Claude,
+ * tailored to its industry, and stores it for public serving at
+ * /sitio/[slug] (see app/sitio/[slug]/route.ts). Reuses the same WhatsApp
+ * credentials as the AI agent to look up the real, dialable number for the
+ * site's WhatsApp call-to-action — wabaPhoneNumberId itself isn't dialable.
+ */
+export async function generateBusinessWebsite(businessId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const [business, ownerMembership] = await Promise.all([
+    prisma.business.findUniqueOrThrow({ where: { id: businessId }, include: { agent: true } }),
+    prisma.membership.findFirst({
+      where: { businessId, role: "OWNER" },
+      include: { user: { select: { city: true, country: true, facebook: true, instagram: true, tiktok: true } } },
+    }),
+  ]);
+
+  if (!business.wabaAccessToken || !business.wabaPhoneNumberId) {
+    throw new Error("Conecta primero las credenciales de WhatsApp de este negocio (Phone Number ID y token)");
+  }
+
+  const accessToken = decryptSecret(business.wabaAccessToken);
+  const displayNumber = await fetchWhatsAppDisplayNumber({ phoneNumberId: business.wabaPhoneNumberId, accessToken });
+  if (!displayNumber) {
+    throw new Error("No se pudo obtener el número de WhatsApp desde Meta — revisa que el token siga vigente");
+  }
+
+  const html = await generateWebsiteHtml({
+    businessName: business.name,
+    industry: business.industry,
+    description: business.agent?.systemPrompt ?? "",
+    whatsappNumber: displayNumber,
+    city: ownerMembership?.user.city,
+    country: ownerMembership?.user.country,
+    instagram: ownerMembership?.user.instagram,
+    facebook: ownerMembership?.user.facebook,
+    tiktok: ownerMembership?.user.tiktok,
+  });
+
+  await prisma.website.upsert({
+    where: { businessId },
+    create: { businessId, slug: business.slug, html, model: "claude-sonnet-5" },
+    update: { html, model: "claude-sonnet-5" },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website`);
 }
