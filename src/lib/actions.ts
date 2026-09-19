@@ -8,7 +8,8 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
-import { sendWhatsAppTextMessage } from "@/lib/whatsapp";
+import { sendWhatsAppTextMessage, sendWhatsAppMediaMessage } from "@/lib/whatsapp";
+import { resolveMediaType, uploadAttachment, MAX_ATTACHMENT_BYTES, maxMbFor } from "@/lib/attachments";
 import { requireBusinessMembership } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
@@ -346,6 +347,127 @@ export async function updateConversationStage(
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
 }
 
+/** Updates the lead detail panel's freeform fields — each one is optional so a caller can patch just one. */
+export async function updateConversationDetails(
+  businessId: string,
+  conversationId: string,
+  data: {
+    notes?: string | null;
+    appointmentAt?: string | null; // ISO string, or null to clear
+    appointmentNote?: string | null;
+    tags?: string[];
+  },
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  await prisma.conversation.update({
+    where: { id: conversationId, businessId },
+    data: {
+      ...(data.notes !== undefined && { notes: data.notes }),
+      ...(data.appointmentAt !== undefined && {
+        appointmentAt: data.appointmentAt ? new Date(data.appointmentAt) : null,
+      }),
+      ...(data.appointmentNote !== undefined && { appointmentNote: data.appointmentNote }),
+      ...(data.tags !== undefined && { tags: data.tags }),
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+}
+
+export type BroadcastResult = { totalRecipients: number; sentCount: number; failedCount: number };
+
+/**
+ * Sends one message to every conversation in a business, or just the ones in
+ * one pipeline stage. Meta only allows a free-form message to a customer
+ * within 24h of their last message to us — outside that window the send
+ * fails for that one recipient instead of blocking the batch, which shows up
+ * as part of `failedCount`.
+ *
+ * Runs inline (no queue), in small concurrent batches so a pipeline of a few
+ * hundred contacts finishes in one request instead of one giant burst — for
+ * very large pipelines a background job would be safer against serverless
+ * timeouts, but there's no queue infra in this app yet (see the same
+ * tradeoff noted on the inbound webhook in api/webhooks/whatsapp/route.ts).
+ */
+export async function sendBroadcast(businessId: string, formData: FormData): Promise<BroadcastResult> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const message = String(formData.get("message") ?? "").trim();
+  if (!message) throw new Error("message is required");
+  const stageIdRaw = String(formData.get("stageId") ?? "");
+  const stageId = stageIdRaw && stageIdRaw !== "all" ? stageIdRaw : null;
+
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+  if (!business.wabaAccessToken || !business.wabaPhoneNumberId) {
+    throw new Error("This business has no WhatsApp credentials configured");
+  }
+  const accessToken = decryptSecret(business.wabaAccessToken);
+  const phoneNumberId = business.wabaPhoneNumberId;
+
+  const conversations = await prisma.conversation.findMany({
+    where: { businessId, ...(stageId ? { stageId } : {}) },
+    select: { id: true, customerPhone: true },
+  });
+
+  const broadcast = await prisma.broadcast.create({
+    data: {
+      businessId,
+      stageId,
+      message,
+      createdByUserId: session.user.id,
+      totalRecipients: conversations.length,
+    },
+  });
+
+  const resultLog: { conversationId: string; ok: boolean; error?: string }[] = [];
+  let sentCount = 0;
+
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < conversations.length; i += BATCH_SIZE) {
+    const batch = conversations.slice(i, i + BATCH_SIZE);
+    const outcomes = await Promise.allSettled(
+      batch.map(async (conv) => {
+        const { messageId } = await sendWhatsAppTextMessage({
+          phoneNumberId,
+          accessToken,
+          to: conv.customerPhone,
+          text: message,
+        });
+        await prisma.message.create({
+          data: { conversationId: conv.id, role: "AGENT", content: message, whatsappMsgId: messageId, sentByHuman: true },
+        });
+      }),
+    );
+
+    outcomes.forEach((outcome, idx) => {
+      const conversationId = batch[idx].id;
+      if (outcome.status === "fulfilled") {
+        sentCount++;
+        resultLog.push({ conversationId, ok: true });
+      } else {
+        resultLog.push({ conversationId, ok: false, error: String(outcome.reason).slice(0, 300) });
+      }
+    });
+  }
+
+  const failedCount = conversations.length - sentCount;
+
+  await prisma.broadcast.update({
+    where: { id: broadcast.id },
+    data: { sentCount, failedCount, resultLog, completedAt: new Date() },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+
+  return { totalRecipients: conversations.length, sentCount, failedCount };
+}
+
 export async function addPipelineStage(businessId: string, formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
@@ -488,7 +610,9 @@ export async function sendManualMessage(
   await requireBusinessMembership(session.user.id, businessId);
 
   const text = String(formData.get("text") ?? "").trim();
-  if (!text) throw new Error("text is required");
+  const fileEntry = formData.get("file");
+  const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
+  if (!text && !file) throw new Error("text or file is required");
 
   const [business, conversation] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id: businessId } }),
@@ -499,22 +623,60 @@ export async function sendManualMessage(
     throw new Error("This business has no WhatsApp credentials configured");
   }
 
-  const { messageId } = await sendWhatsAppTextMessage({
-    phoneNumberId: business.wabaPhoneNumberId,
-    accessToken: decryptSecret(business.wabaAccessToken),
-    to: conversation.customerPhone,
-    text,
-  });
+  const accessToken = decryptSecret(business.wabaAccessToken);
+  const phoneNumberId = business.wabaPhoneNumberId;
+  const to = conversation.customerPhone;
 
-  await prisma.message.create({
-    data: {
-      conversationId,
-      role: "AGENT",
-      content: text,
-      whatsappMsgId: messageId,
-      sentByHuman: true,
-    },
-  });
+  if (file) {
+    const mediaType = resolveMediaType(file.type);
+    if (!mediaType) throw new Error("Tipo de archivo no soportado");
+    if (file.size > MAX_ATTACHMENT_BYTES[mediaType]) {
+      throw new Error(`El archivo supera el máximo permitido (${maxMbFor(mediaType)} MB)`);
+    }
+
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const { url } = await uploadAttachment({ bytes, filename: file.name, contentType: file.type });
+
+    // Meta doesn't support a caption on audio messages — if there's text
+    // alongside a voice note, it goes out as its own follow-up message.
+    const supportsCaption = mediaType !== "audio";
+    const { messageId } = await sendWhatsAppMediaMessage({
+      phoneNumberId,
+      accessToken,
+      to,
+      type: mediaType,
+      link: url,
+      caption: supportsCaption && text ? text : undefined,
+      filename: mediaType === "document" ? file.name : undefined,
+    });
+
+    await prisma.message.create({
+      data: {
+        conversationId,
+        role: "AGENT",
+        content: supportsCaption ? text : "",
+        whatsappMsgId: messageId,
+        sentByHuman: true,
+        mediaUrl: url,
+        mediaType,
+        mediaMimeType: file.type,
+        mediaFilename: file.name,
+        mediaSizeBytes: file.size,
+      },
+    });
+
+    if (!supportsCaption && text) {
+      const { messageId: textMessageId } = await sendWhatsAppTextMessage({ phoneNumberId, accessToken, to, text });
+      await prisma.message.create({
+        data: { conversationId, role: "AGENT", content: text, whatsappMsgId: textMessageId, sentByHuman: true },
+      });
+    }
+  } else {
+    const { messageId } = await sendWhatsAppTextMessage({ phoneNumberId, accessToken, to, text });
+    await prisma.message.create({
+      data: { conversationId, role: "AGENT", content: text, whatsappMsgId: messageId, sentByHuman: true },
+    });
+  }
 
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
 }

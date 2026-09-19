@@ -1,9 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
-import { sendWhatsAppTextMessage, type WhatsAppInboundMessage } from "@/lib/whatsapp";
+import {
+  sendWhatsAppTextMessage,
+  fetchWhatsAppMediaMeta,
+  downloadWhatsAppMedia,
+  type WhatsAppInboundMessage,
+} from "@/lib/whatsapp";
+import { uploadAttachment } from "@/lib/attachments";
 import { generateAgentReply, type AgentHistoryMessage, type AgentReplyUsage } from "@/lib/ai";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS } from "@/lib/plans";
+
+const MEDIA_TYPE_LABEL: Record<string, string> = {
+  image: "Imagen",
+  audio: "Nota de voz",
+  document: "Documento",
+  video: "Video",
+};
 
 const HISTORY_LIMIT = 20;
 
@@ -28,6 +41,10 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     console.warn(`AI agent disabled or not configured for business ${business.id}`);
     return;
   }
+
+  // Decrypted once and reused for both the inbound media download below and
+  // the outbound reply send further down.
+  const accessToken = decryptSecret(business.wabaAccessToken);
 
   // Background context (city/country/social media/phone) the owner set once
   // in "Mi perfil" — fed into the prompt automatically, see buildSystemPrompt.
@@ -103,12 +120,54 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     }
   }
 
+  // Media arrives from Meta as a short-lived id (its download URL expires
+  // within minutes), so it has to be fetched and re-hosted on our own
+  // storage right away, before this message row is even written — the AI
+  // never "sees" the file itself (no vision call here), it only gets a
+  // plain-text placeholder in its history so the conversation still reads
+  // naturally if the owner scrolls back or the agent references it.
+  let messageContent = message.text;
+  let mediaFields: {
+    mediaUrl?: string;
+    mediaType?: string;
+    mediaMimeType?: string;
+    mediaFilename?: string;
+    mediaSizeBytes?: number;
+  } = {};
+
+  if (message.media) {
+    try {
+      const meta = await fetchWhatsAppMediaMeta({ mediaId: message.media.mediaId, accessToken });
+      if (meta) {
+        const bytes = await downloadWhatsAppMedia({ url: meta.url, accessToken });
+        const filename = message.media.filename ?? `${message.media.type}-${message.media.mediaId}`;
+        const { url, size } = await uploadAttachment({ bytes, filename, contentType: meta.mimeType });
+        mediaFields = {
+          mediaUrl: url,
+          mediaType: message.media.type,
+          mediaMimeType: meta.mimeType,
+          mediaFilename: message.media.filename,
+          mediaSizeBytes: size,
+        };
+      }
+    } catch (err) {
+      console.error("Failed to fetch/store inbound WhatsApp media:", err);
+    }
+    if (!messageContent) {
+      const label = MEDIA_TYPE_LABEL[message.media.type] ?? "Adjunto";
+      messageContent = mediaFields.mediaUrl
+        ? `[${label}${message.media.filename ? `: ${message.media.filename}` : ""}]`
+        : "[Adjunto recibido — no se pudo procesar]";
+    }
+  }
+
   await prisma.message.create({
     data: {
       conversationId: conversation.id,
       role: "CUSTOMER",
-      content: message.text,
+      content: messageContent,
       whatsappMsgId: message.whatsappMsgId,
+      ...mediaFields,
     },
   });
 
@@ -160,7 +219,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   try {
     const { messageId } = await sendWhatsAppTextMessage({
       phoneNumberId: business.wabaPhoneNumberId!,
-      accessToken: decryptSecret(business.wabaAccessToken),
+      accessToken,
       to: message.from,
       text: reply,
     });

@@ -7,6 +7,7 @@ import { CrmBoard } from "../CrmBoard";
 import { ContactsTable } from "../ContactsTable";
 import { CrmTabs } from "./CrmTabs";
 import { ConversationSplitView } from "./ConversationSplitView";
+import { BroadcastDialog } from "./BroadcastDialog";
 import { AgentSwitcher } from "../AgentSwitcher";
 
 export default async function CrmPage({
@@ -63,6 +64,10 @@ export default async function CrmPage({
         customerPhone: full.customerPhone,
         aiPaused: full.aiPaused,
         stageId: full.stageId,
+        tags: full.tags,
+        notes: full.notes,
+        appointmentAt: full.appointmentAt,
+        appointmentNote: full.appointmentNote,
         messages: full.messages,
       };
     }
@@ -83,7 +88,10 @@ export default async function CrmPage({
       <PipelineManager businessId={id} stages={stages} />
 
       <div className="space-y-3">
-        <CrmTabs activeTab={tab} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CrmTabs activeTab={tab} />
+          <BroadcastDialog businessId={id} stages={stages} />
+        </div>
 
         {tab === "board" && <CrmBoard businessId={id} stages={stages} conversations={conversationSummaries} />}
         {tab === "list" && <ContactsTable businessId={id} stages={stages} conversations={conversationSummaries} />}

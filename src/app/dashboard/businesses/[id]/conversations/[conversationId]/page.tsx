@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ConversationThread } from "../../ConversationThread";
+import { LeadDetailPanel } from "../../LeadDetailPanel";
 
 export default async function ConversationPage({
   params,
@@ -29,17 +30,28 @@ export default async function ConversationPage({
   ]);
 
   return (
-    <div className="fl-card mx-auto flex h-[calc(100vh-8rem)] max-w-2xl flex-col overflow-hidden">
-      <ConversationThread
+    <div className="fl-card mx-auto flex h-[calc(100vh-8rem)] max-w-5xl overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <ConversationThread
+          businessId={id}
+          conversationId={conversationId}
+          businessName={business.name}
+          customerName={conversation.customerName}
+          customerPhone={conversation.customerPhone}
+          aiPaused={conversation.aiPaused}
+          stageId={conversation.stageId}
+          stages={stages}
+          messages={conversation.messages}
+        />
+      </div>
+      <LeadDetailPanel
         businessId={id}
         conversationId={conversationId}
-        businessName={business.name}
-        customerName={conversation.customerName}
         customerPhone={conversation.customerPhone}
-        aiPaused={conversation.aiPaused}
-        stageId={conversation.stageId}
-        stages={stages}
-        messages={conversation.messages}
+        tags={conversation.tags}
+        notes={conversation.notes}
+        appointmentAt={conversation.appointmentAt}
+        appointmentNote={conversation.appointmentNote}
       />
     </div>
   );

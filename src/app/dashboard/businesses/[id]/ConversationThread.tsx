@@ -8,6 +8,9 @@ type ThreadMessage = {
   content: string;
   sentByHuman: boolean;
   createdAt: Date;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  mediaFilename?: string | null;
 };
 
 // The message thread + composer for one WhatsApp conversation — shared by
@@ -67,6 +70,12 @@ export function ConversationThread({
           }
 
           const isAgent = message.role === "AGENT";
+          const hasMedia = !!message.mediaUrl;
+          // Inbound media with no real caption gets a bracketed placeholder
+          // (e.g. "[Imagen]") so the AI's text-only history still reads
+          // naturally — but once we're rendering the actual attachment, that
+          // placeholder is redundant and gets hidden here.
+          const isPlaceholderCaption = hasMedia && /^\[.*\]$/.test(message.content);
           const bubble = (
             <div
               className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
@@ -77,7 +86,12 @@ export function ConversationThread({
                   : "rounded-bl-sm border border-border bg-surface text-ink"
               }`}
             >
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              {hasMedia && (
+                <MediaPreview url={message.mediaUrl!} type={message.mediaType ?? null} filename={message.mediaFilename ?? null} />
+              )}
+              {(!hasMedia || !isPlaceholderCaption) && message.content && (
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              )}
               <p className="mt-1 text-right text-[10px] opacity-60">
                 {message.createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </p>
@@ -115,6 +129,29 @@ export function ConversationThread({
 
       <ManualMessageForm businessId={businessId} conversationId={conversationId} />
     </div>
+  );
+}
+
+function MediaPreview({ url, type, filename }: { url: string; type: string | null; filename: string | null }) {
+  if (type === "image") {
+    // eslint-disable-next-line @next/next/no-img-element -- external blob-storage URL, no next/image remote config
+    return <img src={url} alt={filename ?? "Imagen adjunta"} className="mb-1.5 max-h-64 w-full rounded-lg object-cover" />;
+  }
+  if (type === "audio") {
+    return <audio controls src={url} className="mb-1.5 w-56 max-w-full" />;
+  }
+  if (type === "video") {
+    return <video controls src={url} className="mb-1.5 max-h-64 w-full rounded-lg" />;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mb-1.5 flex items-center gap-2 rounded-lg border border-border/60 bg-background/40 px-2.5 py-2 text-xs underline"
+    >
+      📄 {filename ?? "Documento"}
+    </a>
   );
 }
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { stageStyle } from "@/lib/crmStages";
 import { ConversationThread } from "../ConversationThread";
+import { LeadDetailPanel } from "../LeadDetailPanel";
 import type { CrmStage, CrmConversation } from "../CrmBoard";
 
 function formatRelativeTime(iso: string): string {
@@ -37,7 +38,20 @@ export function ConversationSplitView({
     customerPhone: string;
     aiPaused: boolean;
     stageId: string;
-    messages: { id: string; role: "AGENT" | "CUSTOMER"; content: string; sentByHuman: boolean; createdAt: Date }[];
+    tags: string[];
+    notes: string | null;
+    appointmentAt: Date | null;
+    appointmentNote: string | null;
+    messages: {
+      id: string;
+      role: "AGENT" | "CUSTOMER";
+      content: string;
+      sentByHuman: boolean;
+      createdAt: Date;
+      mediaUrl: string | null;
+      mediaType: string | null;
+      mediaFilename: string | null;
+    }[];
   } | null;
 }) {
   const stageById = new Map(stages.map((s) => [s.id, s]));
@@ -101,6 +115,18 @@ export function ConversationSplitView({
           </div>
         )}
       </div>
+
+      {selectedConversation && selectedConversationId && (
+        <LeadDetailPanel
+          businessId={businessId}
+          conversationId={selectedConversationId}
+          customerPhone={selectedConversation.customerPhone}
+          tags={selectedConversation.tags}
+          notes={selectedConversation.notes}
+          appointmentAt={selectedConversation.appointmentAt}
+          appointmentNote={selectedConversation.appointmentNote}
+        />
+      )}
     </div>
   );
 }

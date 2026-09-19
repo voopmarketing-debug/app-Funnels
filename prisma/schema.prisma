@@ -46,6 +46,7 @@ model Business {
   agent          AIAgent?
   conversations  Conversation[]
   pipelineStages PipelineStage[]
+  broadcasts     Broadcast[]
 }
 
 enum PlanTier {
@@ -150,6 +151,20 @@ model Conversation {
   lastMessageAt  DateTime @default(now())
   createdAt      DateTime @default(now())
 
+  // Freeform labels the business/agency sets on this lead (e.g. "Empresa",
+  // "Cotización") — shown as chips in the lead detail panel. Not tied to
+  // pipeline stage, which already tracks funnel position on its own.
+  tags        String[] @default([])
+  // Manually-set summary of the lead shown in the detail panel — e.g. what
+  // the AI agent picked up on, or a note the business owner typed in.
+  notes       String?  @db.Text
+  // Manually recorded from the detail panel today (see updateConversationDetails
+  // in lib/actions.ts) — there's no live sync yet from the separate
+  // agenda.funnelslabs.app booking project, so this reflects what the
+  // business owner/agency entered, not a real-time calendar feed.
+  appointmentAt   DateTime?
+  appointmentNote String?
+
   business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   stage    PipelineStage @relation(fields: [stageId], references: [id])
   messages Message[]
@@ -185,7 +200,43 @@ model Message {
   cacheCreationInputTokens Int?
   cacheReadInputTokens     Int?
 
+  // Set when this message carries an attachment (image/audio/document/video)
+  // instead of, or alongside, `content` as a caption. `mediaUrl` always
+  // points at OUR OWN storage (see lib/attachments.ts) — never a raw Meta
+  // media URL, since those expire after a few minutes, so an inbound
+  // attachment is downloaded and re-uploaded immediately in the webhook
+  // handler before this row is written.
+  mediaUrl      String?
+  mediaType     String? // "image" | "audio" | "document" | "video"
+  mediaMimeType String?
+  mediaFilename String?
+  mediaSizeBytes Int?
+
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
+}
+
+// One mass-send of a single message to every conversation in a business
+// (optionally scoped to one pipeline stage). Meta only allows free-form
+// messages to a customer within 24h of their last message — outside that
+// window a send fails per-recipient rather than blocking the whole batch,
+// which `failedCount`/`resultLog` surface back to whoever sent it.
+model Broadcast {
+  id              String    @id @default(cuid())
+  businessId      String
+  stageId         String? // null = every conversation in the business
+  message         String    @db.Text
+  createdByUserId String
+  totalRecipients Int
+  sentCount       Int       @default(0)
+  failedCount     Int       @default(0)
+  // Per-recipient outcome, e.g. [{"conversationId":"...","ok":false,"error":"..."}]
+  resultLog       Json?
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
 }
