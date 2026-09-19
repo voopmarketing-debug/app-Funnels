@@ -4,7 +4,18 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessAnalytics, isDateRangeKey, type DateRangeKey } from "@/lib/analytics";
 import { StatTile } from "./StatTile";
-import { ChatIcon, MessageIcon, BoltIcon, ClockIcon, AlertIcon, HourglassIcon, LayersIcon, CostIcon } from "./StatIcons";
+import {
+  ChatIcon,
+  MessageIcon,
+  BoltIcon,
+  ClockIcon,
+  AlertIcon,
+  HourglassIcon,
+  LayersIcon,
+  CostIcon,
+  GlobeIcon,
+  CursorClickIcon,
+} from "./StatIcons";
 import { ConversationsTrendChart } from "./ConversationsTrendChart";
 import { MessagesStackedChart } from "./MessagesStackedChart";
 import { StageDistributionChart } from "./StageDistributionChart";
@@ -218,6 +229,25 @@ export default async function AnalyticsPage({
           description="Conversaciones donde el cliente escribió último y todavía nadie —ni la IA ni una persona— le ha contestado."
           tone="blue"
           icon={<HourglassIcon />}
+        />
+        <StatTile
+          label={`Visitas al sitio web (${RANGE_NOUN_PHRASE[rangeKey]})`}
+          value={String(analytics.websiteViews)}
+          description="Cuántas veces se abrió alguna de las páginas web de este negocio (ver sección Sitio web) en el período seleccionado."
+          tone="blue"
+          icon={<GlobeIcon />}
+        />
+        <StatTile
+          label={`Clics en el sitio web (${RANGE_NOUN_PHRASE[rangeKey]})`}
+          value={String(analytics.websiteClicks)}
+          sublabel={
+            analytics.websiteViews > 0
+              ? `${Math.round((analytics.websiteClicks / analytics.websiteViews) * 100)}% de las visitas`
+              : undefined
+          }
+          description="Cuántas veces alguien le dio clic a un botón (WhatsApp, agenda, etc.) en alguna página web de este negocio."
+          tone="accent"
+          icon={<CursorClickIcon />}
         />
         {membership.role === "ADMIN" && (
           <StatTile

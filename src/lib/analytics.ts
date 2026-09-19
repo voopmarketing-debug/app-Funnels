@@ -40,6 +40,11 @@ export type BusinessAnalytics = {
   conversationsTrend: DailyPoint[];
   messagesTrend: DailyMessagePoint[];
   stageDistribution: StagePoint[];
+  // Visits and CTA-button clicks across every Website page this business
+  // has generated (see WebsiteEvent, logged from app/sitio/[slug]/route.ts,
+  // its /ir click redirect, and proxy.ts for connected custom domains).
+  websiteViews: number;
+  websiteClicks: number;
 };
 
 function dayKey(date: Date): string {
@@ -98,45 +103,59 @@ export async function getBusinessAnalytics(
   const now = new Date();
   const { since, until } = resolveDateRange(rangeKey, now);
 
-  const [totalConversations, newConversations, recentConversations, recentMessages, stages, conversationsForActivity] =
-    await Promise.all([
-      prisma.conversation.count({ where: { businessId } }),
-      prisma.conversation.count({ where: { businessId, createdAt: { gte: since, lt: until } } }),
-      prisma.conversation.findMany({
-        where: { businessId, createdAt: { gte: since, lt: until } },
-        select: { createdAt: true },
-      }),
-      prisma.message.findMany({
-        where: { conversation: { businessId }, createdAt: { gte: since, lt: until } },
-        select: {
-          createdAt: true,
-          role: true,
-          sentByHuman: true,
-          content: true,
-          conversationId: true,
-          model: true,
-          inputTokens: true,
-          outputTokens: true,
-          cacheCreationInputTokens: true,
-          cacheReadInputTokens: true,
-        },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.pipelineStage.findMany({
-        where: { businessId },
-        orderBy: { position: "asc" },
-        include: { _count: { select: { conversations: true } } },
-      }),
-      prisma.conversation.findMany({
-        where: { businessId },
-        select: {
-          lastMessageAt: true,
-          messages: { take: 1, orderBy: { createdAt: "desc" }, select: { role: true } },
-        },
-        orderBy: { lastMessageAt: "desc" },
-        take: 2000,
-      }),
-    ]);
+  const [
+    totalConversations,
+    newConversations,
+    recentConversations,
+    recentMessages,
+    stages,
+    conversationsForActivity,
+    websiteViews,
+    websiteClicks,
+  ] = await Promise.all([
+    prisma.conversation.count({ where: { businessId } }),
+    prisma.conversation.count({ where: { businessId, createdAt: { gte: since, lt: until } } }),
+    prisma.conversation.findMany({
+      where: { businessId, createdAt: { gte: since, lt: until } },
+      select: { createdAt: true },
+    }),
+    prisma.message.findMany({
+      where: { conversation: { businessId }, createdAt: { gte: since, lt: until } },
+      select: {
+        createdAt: true,
+        role: true,
+        sentByHuman: true,
+        content: true,
+        conversationId: true,
+        model: true,
+        inputTokens: true,
+        outputTokens: true,
+        cacheCreationInputTokens: true,
+        cacheReadInputTokens: true,
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.pipelineStage.findMany({
+      where: { businessId },
+      orderBy: { position: "asc" },
+      include: { _count: { select: { conversations: true } } },
+    }),
+    prisma.conversation.findMany({
+      where: { businessId },
+      select: {
+        lastMessageAt: true,
+        messages: { take: 1, orderBy: { createdAt: "desc" }, select: { role: true } },
+      },
+      orderBy: { lastMessageAt: "desc" },
+      take: 2000,
+    }),
+    prisma.websiteEvent.count({
+      where: { type: "view", createdAt: { gte: since, lt: until }, website: { businessId } },
+    }),
+    prisma.websiteEvent.count({
+      where: { type: "cta_click", createdAt: { gte: since, lt: until }, website: { businessId } },
+    }),
+  ]);
 
   const dayKeys = buildDayKeys(rangeKey, now);
 
@@ -240,6 +259,8 @@ export async function getBusinessAnalytics(
       ...(messagesByDay.get(date) ?? { cliente: 0, ia: 0, humano: 0 }),
     })),
     stageDistribution: stages.map((s) => ({ name: s.name, position: s.position, count: s._count.conversations })),
+    websiteViews,
+    websiteClicks,
   };
 }
 

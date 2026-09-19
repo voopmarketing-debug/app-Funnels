@@ -96,6 +96,24 @@ export function HourglassIcon() {
   );
 }
 
+export function GlobeIcon() {
+  return (
+    <IconBase>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" />
+      <path d="M3.5 12h17M12 3.5c2.2 2.3 3.4 5.3 3.4 8.5s-1.2 6.2-3.4 8.5c-2.2-2.3-3.4-5.3-3.4-8.5S9.8 5.8 12 3.5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
+export function CursorClickIcon() {
+  return (
+    <IconBase>
+      <path d="m6 4 3.5 13.5 2-4.8 4.8-2L6 4Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <path d="M16 16.5 19 19.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </IconBase>
+  );
+}
+
 export function CostIcon() {
   return (
     <IconBase>
