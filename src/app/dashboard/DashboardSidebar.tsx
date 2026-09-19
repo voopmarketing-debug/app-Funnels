@@ -44,6 +44,24 @@ function CrmIcon() {
   );
 }
 
+function TemplateIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <rect x="4" y="3.5" width="16" height="17" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M7.5 8h9M7.5 12h9M7.5 16h5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function WebsiteIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" />
+      <path d="M3.5 12h17M12 3.5c2.2 2.3 3.4 5.3 3.4 8.5s-1.2 6.2-3.4 8.5c-2.2-2.3-3.4-5.3-3.4-8.5S9.8 5.8 12 3.5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function UserIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
@@ -127,6 +145,26 @@ export function DashboardSidebar({
           >
             <CrmIcon />
             CRM
+          </Link>
+        )}
+        {primaryBusinessId && (
+          <Link
+            href={`/dashboard/businesses/${primaryBusinessId}/website`}
+            className="fl-nav-item"
+            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/website`)}
+          >
+            <WebsiteIcon />
+            Sitio web
+          </Link>
+        )}
+        {primaryBusinessId && (
+          <Link
+            href={`/dashboard/businesses/${primaryBusinessId}/templates`}
+            className="fl-nav-item"
+            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/templates`)}
+          >
+            <TemplateIcon />
+            Plantillas
           </Link>
         )}
         {isAgencyAdmin && (
