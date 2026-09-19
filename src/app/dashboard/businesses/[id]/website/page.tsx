@@ -15,19 +15,23 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
   });
   if (!membership) notFound();
 
-  const websites = await prisma.website.findMany({
-    where: { businessId: id },
-    orderBy: { generatedAt: "asc" },
-    select: {
-      id: true,
-      name: true,
-      purpose: true,
-      slug: true,
-      generatedAt: true,
-      customDomain: true,
-      _count: { select: { events: { where: { type: "view" } } } },
-    },
-  });
+  const [websites, totalViews, totalClicks] = await Promise.all([
+    prisma.website.findMany({
+      where: { businessId: id },
+      orderBy: { generatedAt: "asc" },
+      select: {
+        id: true,
+        name: true,
+        purpose: true,
+        slug: true,
+        generatedAt: true,
+        customDomain: true,
+        _count: { select: { events: { where: { type: "view" } } } },
+      },
+    }),
+    prisma.websiteEvent.count({ where: { type: "view", website: { businessId: id } } }),
+    prisma.websiteEvent.count({ where: { type: "cta_click", website: { businessId: id } } }),
+  ]);
   const pages = websites.map((w) => ({ ...w, viewCount: w._count.events }));
   const appHost = process.env.APP_HOST ?? "funnelslabs.app";
 
@@ -50,6 +54,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
         hasWabaCredentials={!!membership.business.wabaPhoneNumberId}
         pages={pages}
         publicUrlBase={`https://${appHost}/sitio`}
+        stats={{ totalViews, totalClicks }}
       />
     </div>
   );

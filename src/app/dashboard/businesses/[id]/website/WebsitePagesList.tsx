@@ -20,17 +20,32 @@ export function WebsitePagesList({
   hasWabaCredentials,
   pages,
   publicUrlBase,
+  stats,
 }: {
   businessId: string;
   hasWabaCredentials: boolean;
   pages: Page[];
   publicUrlBase: string;
+  stats: { totalViews: number; totalClicks: number };
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [formKey, setFormKey] = useState(0);
 
   return (
     <div className="space-y-4">
+      {pages.length > 0 && (
+        <div className="fl-card grid grid-cols-2 gap-3 p-4 sm:max-w-sm">
+          <div>
+            <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Visitas totales</p>
+            <p className="text-2xl font-bold text-ink">{stats.totalViews}</p>
+          </div>
+          <div>
+            <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics totales</p>
+            <p className="text-2xl font-bold text-accent">{stats.totalClicks}</p>
+          </div>
+        </div>
+      )}
+
       {!hasWabaCredentials && (
         <div className="rounded-md border-2 border-[#fab219]/50 bg-surface p-4 text-sm text-ink">
           Conecta primero las credenciales de WhatsApp de este negocio (página del negocio) — cada página usa ese
@@ -185,10 +200,14 @@ function NewPageForm({ businessId, onClose }: { businessId: string; onClose: () 
         <label htmlFor="ctaUrl" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
           Link externo del botón principal (opcional)
         </label>
+        <p className="text-[11px] text-ink-faint">
+          Si lo dejas vacío, el botón lleva automáticamente al WhatsApp del negocio. Solo llénalo si quieres que
+          lleve a otro lado, como tu agenda.
+        </p>
         <input
           id="ctaUrl"
           name="ctaUrl"
-          placeholder="https://agenda.funnelslabs.app/agenda (déjalo vacío para usar WhatsApp)"
+          placeholder="https://agenda.funnelslabs.app/agenda"
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
         />
       </div>
