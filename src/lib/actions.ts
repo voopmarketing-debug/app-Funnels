@@ -16,7 +16,7 @@ import {
   fetchWhatsAppTemplateStatus,
   fetchWhatsAppDisplayNumber,
 } from "@/lib/whatsapp";
-import { generateWebsiteContent } from "@/lib/websiteGenerator";
+import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { resolveMediaType, uploadAttachment, MAX_ATTACHMENT_BYTES, maxMbFor } from "@/lib/attachments";
 import { requireBusinessMembership } from "@/lib/authz";
@@ -1262,6 +1262,40 @@ export async function updateWebsiteContent(businessId: string, websiteId: string
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
+}
+
+/**
+ * The "pide cambios con IA" box in the editor — takes a free-text
+ * instruction (e.g. "pon el botón en azul", "agrega una sección de
+ * preguntas frecuentes"), applies it to the page's current content, and
+ * saves the result immediately (same as editing a field by hand and
+ * hitting Guardar). Returns the updated content so the editor can sync its
+ * local state without a full reload.
+ */
+export async function applyWebsitePrompt(
+  businessId: string,
+  websiteId: string,
+  instruction: string,
+): Promise<WebsiteContent> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const trimmed = instruction.trim();
+  if (!trimmed) throw new Error("Escribe qué cambio quieres");
+
+  const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+  const currentContent = WebsiteContentSchema.parse(website.content);
+
+  const updated = await applyWebsiteEdit(currentContent, trimmed);
+
+  await prisma.website.update({
+    where: { id: websiteId },
+    data: { content: updated },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website`);
+  return updated;
 }
 
 /**

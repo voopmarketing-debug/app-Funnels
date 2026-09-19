@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage } from "@/lib/actions";
+import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage, applyWebsitePrompt } from "@/lib/actions";
 import { FONT_OPTIONS, type WebsiteContent } from "@/lib/websiteContent";
 
 const LABEL_NAMES: Record<string, string> = {
@@ -36,6 +36,10 @@ export function WebsiteEditor({
   const [saved, setSaved] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [promptText, setPromptText] = useState("");
+  const [isApplyingPrompt, startApplyingPrompt] = useTransition();
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [promptApplied, setPromptApplied] = useState(false);
 
   function save() {
     setSaveError(null);
@@ -60,9 +64,62 @@ export function WebsiteEditor({
     });
   }
 
+  function applyPrompt() {
+    if (!promptText.trim()) return;
+    setPromptError(null);
+    setPromptApplied(false);
+    startApplyingPrompt(async () => {
+      try {
+        const updated = await applyWebsitePrompt(businessId, websiteId, promptText);
+        setContent(updated);
+        setPromptText("");
+        setPromptApplied(true);
+        setPreviewKey((k) => k + 1);
+        setTimeout(() => setPromptApplied(false), 2500);
+      } catch (err) {
+        setPromptError(err instanceof Error ? err.message : "No se pudo aplicar el cambio");
+      }
+    });
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-4">
+        <div className="fl-card space-y-2 p-4">
+          <h2 className="text-sm font-semibold text-ink">✨ Pide cambios con IA</h2>
+          <p className="text-xs text-ink-muted">
+            Escribe qué quieres cambiar, como si le hablaras a un diseñador — ej. "pon el botón principal en azul",
+            "agrega una sección de preguntas frecuentes", "hazlo sonar más formal". La IA hace el cambio directo en
+            la página.
+          </p>
+          <textarea
+            value={promptText}
+            onChange={(e) => setPromptText(e.target.value)}
+            rows={2}
+            placeholder="Ej: cambia el color principal a morado y hazlo más corto"
+            disabled={isApplyingPrompt}
+            className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent disabled:opacity-60"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                applyPrompt();
+              }
+            }}
+          />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={applyPrompt}
+              disabled={isApplyingPrompt || !promptText.trim()}
+              className="rounded-md bg-accent-secondary px-4 py-2 text-sm font-semibold text-accent-ink transition hover:opacity-90 disabled:opacity-50"
+            >
+              {isApplyingPrompt ? "Aplicando..." : "Aplicar cambio"}
+            </button>
+            {promptApplied && <span className="fl-mono text-xs text-accent">✓ Cambio aplicado y guardado</span>}
+            {promptError && <span className="text-xs text-error">{promptError}</span>}
+          </div>
+        </div>
+
         <div className="fl-card flex flex-wrap items-center gap-3 p-4">
           <button
             type="button"

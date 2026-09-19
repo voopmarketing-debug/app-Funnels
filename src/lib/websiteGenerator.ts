@@ -98,3 +98,34 @@ Reglas:
 
   return content;
 }
+
+/**
+ * Applies a free-text instruction to an already-generated page — the
+ * "Lovable-style" prompt box in the website editor. Claude sees the current
+ * structured content as-is and returns the whole thing back, changed only
+ * where the instruction asked for it; everything else must come back
+ * untouched, which is why the current content is handed over as data
+ * instead of just describing the page in prose.
+ */
+export async function applyWebsiteEdit(currentContent: WebsiteContent, instruction: string): Promise<WebsiteContent> {
+  const prompt = `Aquí está el contenido actual de una página web, en JSON:
+
+${JSON.stringify(currentContent, null, 2)}
+
+El dueño del negocio pidió este cambio: "${instruction}"
+
+Devuelve el contenido COMPLETO de la página (mismo formato) aplicando ese cambio. Todo lo que no tenga que ver con el pedido debe quedar EXACTAMENTE igual — no reescribas ni "mejores" texto que no te pidieron cambiar.`;
+
+  const response = await anthropic.messages.parse({
+    model: "claude-sonnet-5",
+    max_tokens: 4096,
+    output_config: { format: zodOutputFormat(WebsiteContentSchema) },
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  if (!response.parsed_output) {
+    throw new Error("Claude no devolvió el contenido actualizado");
+  }
+
+  return response.parsed_output;
+}
