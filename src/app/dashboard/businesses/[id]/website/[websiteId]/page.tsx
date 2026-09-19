@@ -28,6 +28,13 @@ export default async function WebsiteEditorPage({
 
   const appHost = process.env.APP_HOST ?? "funnelslabs.app";
 
+  const [totalViews, totalClicks, clicksByLabelRaw] = await Promise.all([
+    prisma.websiteEvent.count({ where: { websiteId, type: "view" } }),
+    prisma.websiteEvent.count({ where: { websiteId, type: "cta_click" } }),
+    prisma.websiteEvent.groupBy({ by: ["label"], where: { websiteId, type: "cta_click" }, _count: { _all: true } }),
+  ]);
+  const clicksByLabel = Object.fromEntries(clicksByLabelRaw.map((row) => [row.label ?? "otro", row._count._all]));
+
   return (
     <div className="space-y-6">
       <div>
@@ -48,6 +55,7 @@ export default async function WebsiteEditorPage({
         customDomain={website.customDomain}
         generatedAt={website.generatedAt}
         publicUrl={`https://${appHost}/sitio/${website.slug}`}
+        stats={{ totalViews, totalClicks, clicksByLabel }}
       />
     </div>
   );

@@ -37,11 +37,16 @@ function fontLink(fonts: string[]): string {
 
 export function renderWebsiteHtml(
   content: WebsiteContent,
-  ctx: { businessName: string; whatsappNumber: string },
+  // trackingBasePath: "/sitio/{slug}" when served at that path, or "" when
+  // served at the root of a connected custom domain (see proxy.ts) — either
+  // way CTAs route through "{trackingBasePath}/ir?label=..." so a click is
+  // logged (see app/sitio/[slug]/ir/route.ts) before redirecting to the
+  // real target, which is resolved server-side there (never trusts a
+  // client-supplied URL, so this can't be abused as an open redirect).
+  ctx: { businessName: string; whatsappNumber: string; trackingBasePath: string },
 ): string {
-  const waLink = `https://wa.me/${ctx.whatsappNumber.replace(/[^0-9]/g, "")}`;
-  const heroCtaHref = content.hero.ctaUrl || waLink;
   const embedUrl = content.videoUrl ? toEmbedUrl(content.videoUrl) : null;
+  const trackedHref = (label: string) => `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(label)}`;
   const fonts = Array.from(new Set([content.theme.headingFont, content.theme.bodyFont]));
 
   const servicesHtml = content.services
@@ -111,7 +116,7 @@ ${fontLink(fonts)}
   <header class="top">
     <div class="wrap">
       <span class="brand">${escapeHtml(ctx.businessName)}</span>
-      <a class="btn" href="${escapeHtml(waLink)}" target="_blank" rel="noopener noreferrer" style="padding:10px 20px;">WhatsApp</a>
+      <a class="btn" href="${escapeHtml(trackedHref("header"))}" target="_blank" rel="noopener noreferrer" style="padding:10px 20px;">WhatsApp</a>
     </div>
   </header>
 
@@ -119,7 +124,7 @@ ${fontLink(fonts)}
     <div class="wrap">
       <h1>${escapeHtml(content.hero.heading)}</h1>
       <p class="subheading">${escapeHtml(content.hero.subheading)}</p>
-      <a class="btn" href="${escapeHtml(heroCtaHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(content.hero.ctaLabel)}</a>
+      <a class="btn" href="${escapeHtml(trackedHref("hero"))}" target="_blank" rel="noopener noreferrer">${escapeHtml(content.hero.ctaLabel)}</a>
     </div>
   </section>
 
@@ -162,7 +167,7 @@ ${fontLink(fonts)}
     <div class="wrap" style="text-align:center;">
       <h2>${escapeHtml(content.contact.heading)}</h2>
       <p>${escapeHtml(content.contact.body)}</p>
-      <a class="btn" href="${escapeHtml(heroCtaHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(content.hero.ctaLabel)}</a>
+      <a class="btn" href="${escapeHtml(trackedHref("contact"))}" target="_blank" rel="noopener noreferrer">${escapeHtml(content.hero.ctaLabel)}</a>
     </div>
   </section>
 

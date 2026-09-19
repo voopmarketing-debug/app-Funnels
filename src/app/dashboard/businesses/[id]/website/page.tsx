@@ -18,8 +18,17 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
   const websites = await prisma.website.findMany({
     where: { businessId: id },
     orderBy: { generatedAt: "asc" },
-    select: { id: true, name: true, purpose: true, slug: true, generatedAt: true, customDomain: true },
+    select: {
+      id: true,
+      name: true,
+      purpose: true,
+      slug: true,
+      generatedAt: true,
+      customDomain: true,
+      _count: { select: { events: { where: { type: "view" } } } },
+    },
   });
+  const pages = websites.map((w) => ({ ...w, viewCount: w._count.events }));
   const appHost = process.env.APP_HOST ?? "funnelslabs.app";
 
   return (
@@ -39,7 +48,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
       <WebsitePagesList
         businessId={id}
         hasWabaCredentials={!!membership.business.wabaPhoneNumberId}
-        pages={websites}
+        pages={pages}
         publicUrlBase={`https://${appHost}/sitio`}
       />
     </div>

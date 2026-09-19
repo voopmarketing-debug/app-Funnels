@@ -12,6 +12,7 @@ type Page = {
   slug: string;
   generatedAt: Date;
   customDomain: string | null;
+  viewCount: number;
 };
 
 export function WebsitePagesList({
@@ -113,6 +114,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
         <span className="text-[11px] text-ink-faint">
           {page.generatedAt.toLocaleDateString("es-CO", { day: "numeric", month: "short" })}
         </span>
+        <span className="fl-mono text-[11px] text-ink-muted">{page.viewCount} visitas</span>
         {page.customDomain && <span className="fl-mono text-[11px] text-accent">{page.customDomain}</span>}
       </div>
     </div>

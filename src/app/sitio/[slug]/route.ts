@@ -12,16 +12,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 
   const website = await prisma.website.findUnique({
     where: { slug },
-    select: { content: true, whatsappNumber: true, business: { select: { name: true } } },
+    select: { id: true, content: true, whatsappNumber: true, business: { select: { name: true } } },
   });
   if (!website) {
     return new NextResponse("Sitio no encontrado", { status: 404 });
+  }
+
+  try {
+    await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "view" } });
+  } catch (err) {
+    console.error("Failed to log website view event:", err);
   }
 
   const content = WebsiteContentSchema.parse(website.content);
   const html = renderWebsiteHtml(content, {
     businessName: website.business.name,
     whatsappNumber: website.whatsappNumber,
+    trackingBasePath: `/sitio/${slug}`,
   });
 
   return new NextResponse(html, {

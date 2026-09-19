@@ -269,8 +269,27 @@ model Website {
   updatedAt    DateTime @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  events   WebsiteEvent[]
 
   @@index([businessId])
+}
+
+// A page view or a click on one of the page's call-to-action buttons —
+// logged by app/sitio/[slug]/route.ts and the /ir click-through redirect
+// (see app/sitio/[slug]/ir/route.ts and proxy.ts for the custom-domain
+// path), aggregated in the website editor. Deliberately minimal — no IP or
+// user-agent capture, just enough to answer "is this page getting visits,
+// and are people clicking through to WhatsApp/the agenda link."
+model WebsiteEvent {
+  id        String   @id @default(cuid())
+  websiteId String
+  type      String // "view" | "cta_click"
+  label     String? // which CTA, e.g. "hero" | "header" | "contact" — null for "view"
+  createdAt DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId, type, createdAt])
 }
 
 enum TemplateStatus {
