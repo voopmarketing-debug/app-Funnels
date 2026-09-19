@@ -1156,14 +1156,11 @@ async function resolveWhatsappNumberForBusiness(businessId: string): Promise<{ a
  */
 export async function createWebsitePage(
   businessId: string,
-  input: { name: string; purpose?: string; ctaUrl?: string },
+  input: { name?: string; purpose?: string; ctaUrl?: string },
 ): Promise<{ id: string }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
-
-  const name = input.name.trim();
-  if (!name) throw new Error("El nombre de la página es obligatorio");
 
   const [business, ownerMembership, existingCount] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id: businessId }, include: { agent: true } }),
@@ -1173,6 +1170,13 @@ export async function createWebsitePage(
     }),
     prisma.website.count({ where: { businessId } }),
   ]);
+
+  // No manual naming needed — the client never has to type anything that
+  // looks like it's setting up a URL/domain (that confused people). The
+  // public link's slug is derived from the business name automatically
+  // (see generateUniqueWebsiteSlug below), completely separate from this
+  // internal label.
+  const name = input.name?.trim() || (existingCount === 0 ? "Sitio principal" : `Página ${existingCount + 1}`);
 
   const { displayNumber } = await resolveWhatsappNumberForBusiness(businessId);
 

@@ -28,54 +28,71 @@ export function WebsitePagesList({
   publicUrlBase: string;
   stats: { totalViews: number; totalClicksWhatsapp: number; totalClicksAgenda: number };
 }) {
+  const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [formKey, setFormKey] = useState(0);
+  const [isGenerating, startGenerating] = useTransition();
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  function generateFirstSite() {
+    setGenerateError(null);
+    startGenerating(async () => {
+      try {
+        const { id } = await createWebsitePage(businessId, {});
+        router.push(`/dashboard/businesses/${businessId}/website/${id}`);
+      } catch (err) {
+        setGenerateError(err instanceof Error ? err.message : "No se pudo generar el sitio");
+      }
+    });
+  }
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-3">
-          <div className="fl-card flex items-center gap-3 px-4 py-3">
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[rgba(var(--glow-blue),0.15)] text-[rgb(var(--glow-blue))]">
-              <EyeIcon />
-            </span>
-            <div>
-              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Visitas totales</p>
-              <p className="text-xl font-bold text-ink">{stats.totalViews}</p>
+      {pages.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-3">
+            <div className="fl-card flex items-center gap-3 px-4 py-3">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[rgba(var(--glow-blue),0.15)] text-[rgb(var(--glow-blue))]">
+                <EyeIcon />
+              </span>
+              <div>
+                <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Visitas totales</p>
+                <p className="text-xl font-bold text-ink">{stats.totalViews}</p>
+              </div>
+            </div>
+            <div className="fl-card flex items-center gap-3 px-4 py-3">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-accent/15 text-accent">
+                <CursorIcon />
+              </span>
+              <div>
+                <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a WhatsApp</p>
+                <p className="text-xl font-bold text-accent">{stats.totalClicksWhatsapp}</p>
+              </div>
+            </div>
+            <div className="fl-card flex items-center gap-3 px-4 py-3">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[rgba(var(--glow-secondary),0.15)] text-[rgb(var(--glow-secondary))]">
+                <CursorIcon />
+              </span>
+              <div>
+                <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a agenda/link</p>
+                <p className="text-xl font-bold text-[rgb(var(--glow-secondary))]">{stats.totalClicksAgenda}</p>
+              </div>
             </div>
           </div>
-          <div className="fl-card flex items-center gap-3 px-4 py-3">
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-accent/15 text-accent">
-              <CursorIcon />
-            </span>
-            <div>
-              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a WhatsApp</p>
-              <p className="text-xl font-bold text-accent">{stats.totalClicksWhatsapp}</p>
-            </div>
-          </div>
-          <div className="fl-card flex items-center gap-3 px-4 py-3">
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[rgba(var(--glow-secondary),0.15)] text-[rgb(var(--glow-secondary))]">
-              <CursorIcon />
-            </span>
-            <div>
-              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a agenda/link</p>
-              <p className="text-xl font-bold text-[rgb(var(--glow-secondary))]">{stats.totalClicksAgenda}</p>
-            </div>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setFormKey((k) => k + 1);
-            dialogRef.current?.showModal();
-          }}
-          disabled={!hasWabaCredentials}
-          className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover disabled:opacity-50"
-        >
-          + Nueva página
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              setFormKey((k) => k + 1);
+              dialogRef.current?.showModal();
+            }}
+            disabled={!hasWabaCredentials}
+            className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover disabled:opacity-50"
+          >
+            + Nueva página
+          </button>
+        </div>
+      )}
 
       {!hasWabaCredentials && (
         <div className="rounded-md border-2 border-[#fab219]/50 bg-surface p-4 text-sm text-ink">
@@ -85,24 +102,38 @@ export function WebsitePagesList({
       )}
 
       <dialog ref={dialogRef} className="fl-card-hero w-full max-w-md p-0">
-        <NewPageForm key={formKey} businessId={businessId} onClose={() => dialogRef.current?.close()} />
+        <NewPageForm key={formKey} businessId={businessId} pageNumber={pages.length + 1} onClose={() => dialogRef.current?.close()} />
       </dialog>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {pages.map((page) => (
-          <PageCard key={page.id} businessId={businessId} page={page} publicUrl={`${publicUrlBase}/${page.slug}`} />
-        ))}
-      </div>
+      {pages.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {pages.map((page) => (
+            <PageCard key={page.id} businessId={businessId} page={page} publicUrl={`${publicUrlBase}/${page.slug}`} />
+          ))}
+        </div>
+      )}
 
       {pages.length === 0 && hasWabaCredentials && (
-        <div className="fl-card flex flex-col items-center gap-2 p-10 text-center">
+        <div className="fl-card flex flex-col items-center gap-3 p-10 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent">
             <GlobeIcon />
           </span>
-          <p className="text-sm font-medium text-ink">Todavía no has creado ninguna página</p>
-          <p className="max-w-xs text-xs text-ink-muted">
-            Dale a "+ Nueva página" y en un minuto tienes un sitio listo, generado con IA para este negocio.
-          </p>
+          <div>
+            <p className="text-sm font-medium text-ink">Este negocio todavía no tiene sitio web</p>
+            <p className="mx-auto mt-1 max-w-xs text-xs text-ink-muted">
+              Un clic y la IA arma la página completa — después puedes editar todo (textos, colores, link) o pedirle
+              cambios con IA.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={generateFirstSite}
+            disabled={isGenerating}
+            className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover disabled:opacity-50"
+          >
+            {isGenerating ? "Generando... (puede tardar un minuto)" : "✨ Generar sitio web"}
+          </button>
+          {generateError && <p className="text-xs text-error">{generateError}</p>}
         </div>
       )}
     </div>
@@ -210,26 +241,36 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
   );
 }
 
-type FormState = { error: string | null; createdId: string | null };
-const INITIAL_STATE: FormState = { error: null, createdId: null };
+type FormState = { error: string | null };
+const INITIAL_STATE: FormState = { error: null };
 
-function NewPageForm({ businessId, onClose }: { businessId: string; onClose: () => void }) {
+// Only asks for what actually changes the generated copy (the page's
+// purpose) — no name field (auto-numbered, never something the client has
+// to invent) and no link field (that's editable afterward, in the page's
+// own editor, alongside everything else).
+function NewPageForm({
+  businessId,
+  pageNumber,
+  onClose,
+}: {
+  businessId: string;
+  pageNumber: number;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [state, setState] = useState<FormState>(INITIAL_STATE);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
-    const name = String(formData.get("name") ?? "").trim();
     const purpose = String(formData.get("purpose") ?? "").trim();
-    const ctaUrl = String(formData.get("ctaUrl") ?? "").trim();
 
     startTransition(async () => {
       try {
-        const { id } = await createWebsitePage(businessId, { name, purpose: purpose || undefined, ctaUrl: ctaUrl || undefined });
+        const { id } = await createWebsitePage(businessId, { purpose: purpose || undefined });
         onClose();
         router.push(`/dashboard/businesses/${businessId}/website/${id}`);
       } catch (err) {
-        setState({ error: err instanceof Error ? err.message : "No se pudo crear la página", createdId: null });
+        setState({ error: err instanceof Error ? err.message : "No se pudo crear la página" });
       }
     });
   }
@@ -237,24 +278,11 @@ function NewPageForm({ businessId, onClose }: { businessId: string; onClose: () 
   return (
     <form action={handleSubmit} className="space-y-4 p-6">
       <div className="space-y-1">
-        <h2 className="text-lg font-bold text-ink">Nueva página</h2>
+        <h2 className="text-lg font-bold text-ink">Nueva página (Página {pageNumber})</h2>
         <p className="text-sm text-ink-muted">
-          Crea todas las que necesites: un sitio principal, una página para que agenden una demo, una oferta puntual
-          — cada una con su propio objetivo.
+          Para qué es esta página además de la principal — por ejemplo, que el visitante agende una demo, o una
+          oferta puntual. La IA ajusta el texto y el botón a eso.
         </p>
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="name" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Nombre (para identificarla en tu panel)
-        </label>
-        <input
-          id="name"
-          name="name"
-          required
-          placeholder="Sitio principal"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
       </div>
 
       <div className="space-y-1">
@@ -267,22 +295,6 @@ function NewPageForm({ businessId, onClose }: { businessId: string; onClose: () 
           rows={2}
           placeholder="Ej: que el visitante agende una demo con nosotros"
           className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="ctaUrl" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Link externo del botón principal (opcional)
-        </label>
-        <p className="text-[11px] text-ink-faint">
-          Si lo dejas vacío, el botón lleva automáticamente al WhatsApp del negocio. Solo llénalo si quieres que
-          lleve a otro lado, como tu agenda.
-        </p>
-        <input
-          id="ctaUrl"
-          name="ctaUrl"
-          placeholder="https://agenda.funnelslabs.app/agenda"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
         />
       </div>
 
@@ -301,7 +313,7 @@ function NewPageForm({ businessId, onClose }: { businessId: string; onClose: () 
           disabled={isPending}
           className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
         >
-          {isPending ? "Generando... (puede tardar un minuto)" : "Crear página"}
+          {isPending ? "Generando... (puede tardar un minuto)" : "✨ Generar página"}
         </button>
       </div>
     </form>
