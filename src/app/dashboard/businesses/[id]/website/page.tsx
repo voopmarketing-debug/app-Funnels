@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { WebsiteManager } from "./WebsiteManager";
+import { WebsitePagesList } from "./WebsitePagesList";
 
 export default async function WebsitePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,7 +15,11 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
   });
   if (!membership) notFound();
 
-  const website = await prisma.website.findUnique({ where: { businessId: id } });
+  const websites = await prisma.website.findMany({
+    where: { businessId: id },
+    orderBy: { generatedAt: "asc" },
+    select: { id: true, name: true, purpose: true, slug: true, generatedAt: true, customDomain: true },
+  });
   const appHost = process.env.APP_HOST ?? "funnelslabs.app";
 
   return (
@@ -24,21 +28,18 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
         <Link href={`/dashboard/businesses/${id}`} className="text-sm text-ink-muted underline hover:text-ink">
           ← {membership.business.name}
         </Link>
-        <h1 className="mt-1 text-xl font-bold">Sitio web</h1>
+        <h1 className="mt-1 text-xl font-bold">Sitios web</h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-          Creamos con IA una página completa para este negocio, adaptada a su rubro, con el WhatsApp del negocio
-          como botón principal — todo lo que llega por ahí cae directo en el CRM de arriba.
+          Crea con IA todas las páginas que necesites para este negocio — un sitio principal, una página para
+          agendar una demo, o lo que haga falta — cada una con su propio link, y editable después: textos, colores,
+          fuentes y video.
         </p>
       </div>
 
-      <WebsiteManager
+      <WebsitePagesList
         businessId={id}
         hasWabaCredentials={!!membership.business.wabaPhoneNumberId}
-        website={
-          website
-            ? { slug: website.slug, generatedAt: website.generatedAt, customDomain: website.customDomain }
-            : null
-        }
+        pages={websites}
         publicUrlBase={`https://${appHost}/sitio`}
       />
     </div>

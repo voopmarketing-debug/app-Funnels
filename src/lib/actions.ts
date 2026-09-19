@@ -16,7 +16,8 @@ import {
   fetchWhatsAppTemplateStatus,
   fetchWhatsAppDisplayNumber,
 } from "@/lib/whatsapp";
-import { generateWebsiteHtml } from "@/lib/websiteGenerator";
+import { generateWebsiteContent } from "@/lib/websiteGenerator";
+import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { resolveMediaType, uploadAttachment, MAX_ATTACHMENT_BYTES, maxMbFor } from "@/lib/attachments";
 import { requireBusinessMembership } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
@@ -1112,37 +1113,70 @@ export async function adminResetUserPassword(targetUserId: string): Promise<{ pa
   return { password: newPassword };
 }
 
-/**
- * Generates (or regenerates) this business's marketing site with Claude,
- * tailored to its industry, and stores it for public serving at
- * /sitio/[slug] (see app/sitio/[slug]/route.ts). Reuses the same WhatsApp
- * credentials as the AI agent to look up the real, dialable number for the
- * site's WhatsApp call-to-action — wabaPhoneNumberId itself isn't dialable.
- */
-export async function generateBusinessWebsite(businessId: string): Promise<void> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
-  await requireBusinessMembership(session.user.id, businessId);
+function slugifyText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
 
-  const [business, ownerMembership] = await Promise.all([
-    prisma.business.findUniqueOrThrow({ where: { id: businessId }, include: { agent: true } }),
-    prisma.membership.findFirst({
-      where: { businessId, role: "OWNER" },
-      include: { user: { select: { city: true, country: true, facebook: true, instagram: true, tiktok: true } } },
-    }),
-  ]);
+/** Clean, human-readable, and unique — the business name alone for a first page, name+page-label for extra ones; a short numeric suffix only on an actual collision. */
+async function generateUniqueWebsiteSlug(businessName: string, pageName: string, isFirstPage: boolean, excludeId?: string): Promise<string> {
+  const base = slugifyText(isFirstPage ? businessName : `${businessName} ${pageName}`) || "sitio";
 
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const candidate = attempt === 0 ? base : `${base}-${attempt + 1}`;
+    const existing = await prisma.website.findUnique({ where: { slug: candidate }, select: { id: true } });
+    if (!existing || existing.id === excludeId) return candidate;
+  }
+  return `${base}-${Date.now()}`;
+}
+
+async function resolveWhatsappNumberForBusiness(businessId: string): Promise<{ accessToken: string; displayNumber: string }> {
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
   if (!business.wabaAccessToken || !business.wabaPhoneNumberId) {
     throw new Error("Conecta primero las credenciales de WhatsApp de este negocio (Phone Number ID y token)");
   }
-
   const accessToken = decryptSecret(business.wabaAccessToken);
   const displayNumber = await fetchWhatsAppDisplayNumber({ phoneNumberId: business.wabaPhoneNumberId, accessToken });
   if (!displayNumber) {
     throw new Error("No se pudo obtener el número de WhatsApp desde Meta — revisa que el token siga vigente");
   }
+  return { accessToken, displayNumber };
+}
 
-  const html = await generateWebsiteHtml({
+/**
+ * Creates a new page for this business — a business can have several (its
+ * own mini funnel: a main site plus purpose-built pages like a demo-booking
+ * page), each generated with structured, editable content (see
+ * lib/websiteContent.ts) and served publicly at /sitio/[slug].
+ */
+export async function createWebsitePage(
+  businessId: string,
+  input: { name: string; purpose?: string; ctaUrl?: string },
+): Promise<{ id: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const name = input.name.trim();
+  if (!name) throw new Error("El nombre de la página es obligatorio");
+
+  const [business, ownerMembership, existingCount] = await Promise.all([
+    prisma.business.findUniqueOrThrow({ where: { id: businessId }, include: { agent: true } }),
+    prisma.membership.findFirst({
+      where: { businessId, role: "OWNER" },
+      include: { user: { select: { city: true, country: true, facebook: true, instagram: true, tiktok: true } } },
+    }),
+    prisma.website.count({ where: { businessId } }),
+  ]);
+
+  const { displayNumber } = await resolveWhatsappNumberForBusiness(businessId);
+
+  const content = await generateWebsiteContent({
     businessName: business.name,
     industry: business.industry,
     description: business.agent?.systemPrompt ?? "",
@@ -1152,24 +1186,91 @@ export async function generateBusinessWebsite(businessId: string): Promise<void>
     instagram: ownerMembership?.user.instagram,
     facebook: ownerMembership?.user.facebook,
     tiktok: ownerMembership?.user.tiktok,
+    purpose: input.purpose,
+    ctaUrl: input.ctaUrl,
   });
 
-  await prisma.website.upsert({
-    where: { businessId },
-    create: { businessId, slug: business.slug, html, model: "claude-sonnet-5" },
-    update: { html, model: "claude-sonnet-5" },
+  const slug = await generateUniqueWebsiteSlug(business.name, name, existingCount === 0);
+
+  const website = await prisma.website.create({
+    data: {
+      businessId,
+      name,
+      purpose: input.purpose || null,
+      slug,
+      content,
+      whatsappNumber: displayNumber,
+      model: "claude-sonnet-5",
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website`);
+  return { id: website.id };
+}
+
+/** Regenerates one page's content from scratch, reusing its stored name/purpose. */
+export async function regenerateWebsitePage(businessId: string, websiteId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const [business, ownerMembership, website] = await Promise.all([
+    prisma.business.findUniqueOrThrow({ where: { id: businessId }, include: { agent: true } }),
+    prisma.membership.findFirst({
+      where: { businessId, role: "OWNER" },
+      include: { user: { select: { city: true, country: true, facebook: true, instagram: true, tiktok: true } } },
+    }),
+    prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } }),
+  ]);
+
+  const { displayNumber } = await resolveWhatsappNumberForBusiness(businessId);
+  const existingContent = WebsiteContentSchema.safeParse(website.content);
+
+  const content = await generateWebsiteContent({
+    businessName: business.name,
+    industry: business.industry,
+    description: business.agent?.systemPrompt ?? "",
+    whatsappNumber: displayNumber,
+    city: ownerMembership?.user.city,
+    country: ownerMembership?.user.country,
+    instagram: ownerMembership?.user.instagram,
+    facebook: ownerMembership?.user.facebook,
+    tiktok: ownerMembership?.user.tiktok,
+    purpose: website.purpose,
+    ctaUrl: (existingContent.success ? existingContent.data.hero.ctaUrl : null) ?? undefined,
+  });
+
+  await prisma.website.update({
+    where: { id: websiteId },
+    data: { content, whatsappNumber: displayNumber, model: "claude-sonnet-5" },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website`);
+}
+
+/** Saves edits made in the WebsiteEditor — text, colors, fonts, services/testimonials, video. Live immediately, no separate publish step. */
+export async function updateWebsiteContent(businessId: string, websiteId: string, content: WebsiteContent): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const parsed = WebsiteContentSchema.parse(content);
+
+  await prisma.website.update({
+    where: { id: websiteId, businessId },
+    data: { content: parsed },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
 }
 
 /**
- * Records the custom domain a client wants pointed at their site. There's
- * no automated DNS/Vercel-domain wiring here — this just saves the request
- * so the agency can connect it manually (same DNS process used for
+ * Records the custom domain a client wants pointed at this specific page.
+ * There's no automated DNS/Vercel-domain wiring here — this just saves the
+ * request so the agency can connect it manually (same DNS process used for
  * agente.funnelslabs.app) and confirm with the client once it's live.
  */
-export async function updateWebsiteCustomDomain(businessId: string, formData: FormData): Promise<void> {
+export async function updateWebsiteCustomDomain(businessId: string, websiteId: string, formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
@@ -1180,13 +1281,20 @@ export async function updateWebsiteCustomDomain(businessId: string, formData: Fo
     .replace(/^https?:\/\//, "")
     .replace(/\/$/, "");
 
-  const website = await prisma.website.findUnique({ where: { businessId } });
-  if (!website) throw new Error("Genera primero el sitio web de este negocio");
-
   await prisma.website.update({
-    where: { businessId },
+    where: { id: websiteId, businessId },
     data: { customDomain: customDomain || null },
   });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website`);
+}
+
+export async function deleteWebsitePage(businessId: string, websiteId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  await prisma.website.delete({ where: { id: websiteId, businessId } });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
 }

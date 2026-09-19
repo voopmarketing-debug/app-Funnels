@@ -53,7 +53,7 @@ model Business {
   pipelineStages PipelineStage[]
   broadcasts     Broadcast[]
   messageTemplates MessageTemplate[]
-  website        Website?
+  websites       Website[]
 }
 
 enum PlanTier {
@@ -224,21 +224,53 @@ model Message {
   @@index([conversationId, createdAt])
 }
 
-// A Claude-generated marketing site for one business, tailored to its
-// industry — served publicly at /sitio/[slug] (see app/sitio/[slug]/route.ts)
-// and, once DNS is wired up the same way agente.funnelslabs.app was, at a
-// real subdomain or the client's own domain. One per business for now.
+// An AI-generated marketing page for a business — served publicly at
+// /sitio/[slug] (see app/sitio/[slug]/route.ts) and, once DNS is wired up
+// the same way agente.funnelslabs.app was, at a real subdomain or the
+// client's own domain. A business can have MANY of these (its own mini
+// funnel — a main site plus purpose-built pages like a demo-booking page —
+// mirroring how Funnels Labs' own funnel is funnelslabs.app + a dedicated
+// agenda/diagnóstico page), not just one.
 model Website {
-  id           String    @id @default(cuid())
-  businessId   String    @unique
-  slug         String    @unique
-  html         String    @db.Text
+  id         String @id @default(cuid())
+  businessId String
+
+  // Client-facing label to tell pages apart in the list, e.g. "Sitio
+  // principal", "Página para agendar demo".
+  name String
+
+  // What this specific page is for — fed into the generation prompt (see
+  // lib/websiteGenerator.ts) so its copy and call-to-action match, e.g.
+  // "que el visitante agende una demo" vs "presentar el negocio en general".
+  // Stored (not just used once) so regenerating this page reuses the same
+  // intent instead of losing it.
+  purpose String?
+
+  // Human-readable, derived from the business + page name — this stays
+  // clean so people can recognize/search the site, with a short numeric
+  // suffix appended only on an actual collision.
+  slug String @unique
+
+  // Structured, editable copy + theme (see lib/websiteContent.ts for the
+  // zod schema) — the public page is rendered from this on every request
+  // (see app/sitio/[slug]/route.ts), so an edit here is live immediately,
+  // no separate "publish" step and no stale cached HTML to fall out of sync.
+  content Json
+
+  // Resolved from the business's WhatsApp credentials at generation time
+  // (see fetchWhatsAppDisplayNumber) and snapshotted here rather than
+  // re-fetched on every public page view — cheaper, faster, and doesn't
+  // depend on the access token staying valid for a page to load.
+  whatsappNumber String
+
   model        String?
-  customDomain String?   @unique
-  generatedAt  DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  customDomain String? @unique
+  generatedAt  DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
 }
 
 enum TemplateStatus {
