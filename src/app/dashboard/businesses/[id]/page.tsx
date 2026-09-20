@@ -3,11 +3,10 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessAnalytics, getActiveContactsThisMonth } from "@/lib/analytics";
-import { PLAN_LIMITS, TEAM_MEMBER_LIMITS, planUsageStatus } from "@/lib/plans";
+import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
 import { AgentMediaManager } from "./AgentMediaManager";
-import { TeamMembersManager } from "./TeamMembersManager";
 import { AgentPowerButton } from "./AgentPowerButton";
 import { PlanUsageCard } from "./PlanUsageCard";
 import { StatTile } from "./analytics/StatTile";
@@ -66,7 +65,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   // entirely for them, not just visually hidden.
   const canManageBusiness = membership.role !== "MEMBER";
 
-  const [analytics, activeContacts, agentMedia, teamMemberships] = await Promise.all([
+  const [analytics, activeContacts, agentMedia] = await Promise.all([
     getBusinessAnalytics(id),
     getActiveContactsThisMonth(id),
     canManageBusiness
@@ -76,14 +75,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           select: { id: true, label: true, mediaType: true, filename: true, sizeBytes: true, url: true },
         })
       : Promise.resolve([]),
-    canManageBusiness
-      ? prisma.membership.findMany({
-          where: { businessId: id, role: "MEMBER" },
-          include: { user: { select: { id: true, name: true, email: true } } },
-        })
-      : Promise.resolve([]),
   ]);
-  const teamMembers = teamMemberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email }));
 
   const planLimit = PLAN_LIMITS[business.planTier];
   const planStatus = planUsageStatus(activeContacts, planLimit);
@@ -123,6 +115,14 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           >
             Sitio web
           </Link>
+          {canManageBusiness && (
+            <Link
+              href="/dashboard/account"
+              className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+            >
+              Equipo
+            </Link>
+          )}
           {canManageBusiness && <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />}
         </div>
       </div>
@@ -191,8 +191,6 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           />
 
           <AgentMediaManager businessId={id} media={agentMedia} />
-
-          <TeamMembersManager businessId={id} members={teamMembers} limit={TEAM_MEMBER_LIMITS[business.planTier]} />
         </div>
       ) : (
         <div className="fl-card p-6 text-center">

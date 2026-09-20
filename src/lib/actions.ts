@@ -1595,7 +1595,7 @@ export async function deleteAgentMedia(businessId: string, mediaId: string): Pro
 }
 
 export type InviteTeamMemberResult =
-  | { status: "created"; email: string; password: string }
+  | { status: "created"; email: string }
   | { status: "existing_user_added"; email: string };
 
 /**
@@ -1606,6 +1606,10 @@ export type InviteTeamMemberResult =
  * OWNER: see requireBusinessOwnerOrAdmin in lib/authz.ts for exactly what
  * that locks out (WhatsApp credentials, AI agent config, billing, deleting
  * the business, managing the team itself).
+ *
+ * The owner types the teammate's username and password themselves (instead
+ * of the platform generating one) so the account is usable immediately —
+ * no separate "reveal this once" step to relay.
  */
 export async function inviteTeamMember(businessId: string, formData: FormData): Promise<InviteTeamMemberResult> {
   const session = await auth();
@@ -1614,6 +1618,7 @@ export async function inviteTeamMember(businessId: string, formData: FormData): 
 
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
   if (!name || !email) throw new Error("Nombre y correo son obligatorios");
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { planTier: true } });
@@ -1638,13 +1643,14 @@ export async function inviteTeamMember(businessId: string, formData: FormData): 
     await prisma.membership.create({
       data: { userId: existingUser.id, businessId, role: "MEMBER" },
     });
-    revalidatePath(`/dashboard/businesses/${businessId}`);
+    revalidatePath("/dashboard/account");
     // Already has an account (and its own password) from elsewhere — nothing
-    // new to hand them, they just log in as usual and now see this business too.
+    // new to set, they just log in as usual and now see this business too.
     return { status: "existing_user_added", email };
   }
 
-  const password = crypto.randomBytes(6).toString("base64url");
+  if (password.length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres");
+
   const passwordHash = await bcrypt.hash(password, 10);
 
   await prisma.user.create({
@@ -1656,8 +1662,8 @@ export async function inviteTeamMember(businessId: string, formData: FormData): 
     },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}`);
-  return { status: "created", email, password };
+  revalidatePath("/dashboard/account");
+  return { status: "created", email };
 }
 
 export async function removeTeamMember(businessId: string, userId: string): Promise<void> {
@@ -1674,5 +1680,5 @@ export async function removeTeamMember(businessId: string, userId: string): Prom
   }
 
   await prisma.membership.delete({ where: { userId_businessId: { userId, businessId } } });
-  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath("/dashboard/account");
 }
