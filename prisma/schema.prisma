@@ -9,6 +9,13 @@ datasource db {
 enum Role {
   OWNER
   ADMIN
+  // A teammate the OWNER invited into their own business (e.g. a
+  // salesperson) — see inviteTeamMember in lib/actions.ts. Restricted on
+  // purpose: full CRM access (conversations, their own embudo/pipeline,
+  // broadcasts) but no WhatsApp credentials, no AI agent configuration, no
+  // billing/plan, and can't delete the business or manage the team — see
+  // requireBusinessOwnerOrAdmin in lib/authz.ts for what's gated.
+  MEMBER
 }
 
 // A client company that has bought the WhatsApp AI agent product.

@@ -7,6 +7,7 @@ import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
 import { AgentMediaManager } from "./AgentMediaManager";
+import { TeamMembersManager } from "./TeamMembersManager";
 import { AgentPowerButton } from "./AgentPowerButton";
 import { PlanUsageCard } from "./PlanUsageCard";
 import { StatTile } from "./analytics/StatTile";
@@ -59,16 +60,30 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
 
   if (!membership) notFound();
   const { business } = membership;
+  // A MEMBER is an invited teammate (e.g. a salesperson) — full CRM access,
+  // but locked out of business-wide settings (see requireBusinessOwnerOrAdmin
+  // in lib/authz.ts). Everything below that's owner/admin-only is skipped
+  // entirely for them, not just visually hidden.
+  const canManageBusiness = membership.role !== "MEMBER";
 
-  const [analytics, activeContacts, agentMedia] = await Promise.all([
+  const [analytics, activeContacts, agentMedia, teamMemberships] = await Promise.all([
     getBusinessAnalytics(id),
     getActiveContactsThisMonth(id),
-    prisma.agentMedia.findMany({
-      where: { businessId: id },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, label: true, mediaType: true, filename: true, sizeBytes: true, url: true },
-    }),
+    canManageBusiness
+      ? prisma.agentMedia.findMany({
+          where: { businessId: id },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, label: true, mediaType: true, filename: true, sizeBytes: true, url: true },
+        })
+      : Promise.resolve([]),
+    canManageBusiness
+      ? prisma.membership.findMany({
+          where: { businessId: id, role: "MEMBER" },
+          include: { user: { select: { id: true, name: true, email: true } } },
+        })
+      : Promise.resolve([]),
   ]);
+  const teamMembers = teamMemberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email }));
 
   const planLimit = PLAN_LIMITS[business.planTier];
   const planStatus = planUsageStatus(activeContacts, planLimit);
@@ -108,18 +123,20 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           >
             Sitio web
           </Link>
-          <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
+          {canManageBusiness && <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />}
         </div>
       </div>
 
-      <PlanUsageCard
-        businessId={id}
-        planTier={business.planTier}
-        used={activeContacts}
-        limit={planLimit}
-        status={planStatus}
-        canEditPlan={canEditPlan}
-      />
+      {canManageBusiness && (
+        <PlanUsageCard
+          businessId={id}
+          planTier={business.planTier}
+          used={activeContacts}
+          limit={planLimit}
+          status={planStatus}
+          canEditPlan={canEditPlan}
+        />
+      )}
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile
@@ -157,23 +174,40 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
         />
       </section>
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <AgentForm
-          businessId={id}
-          systemPrompt={business.agent?.systemPrompt ?? ""}
-          tone={business.agent?.tone ?? "cercano"}
-          replyLength={business.agent?.replyLength ?? "breve"}
-          industry={business.industry}
-        />
+      {canManageBusiness ? (
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          <AgentForm
+            businessId={id}
+            systemPrompt={business.agent?.systemPrompt ?? ""}
+            tone={business.agent?.tone ?? "cercano"}
+            replyLength={business.agent?.replyLength ?? "breve"}
+            industry={business.industry}
+          />
 
-        <WabaCredentialsForm
-          businessId={id}
-          wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""}
-          wabaId={business.wabaId ?? ""}
-        />
+          <WabaCredentialsForm
+            businessId={id}
+            wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""}
+            wabaId={business.wabaId ?? ""}
+          />
 
-        <AgentMediaManager businessId={id} media={agentMedia} />
-      </div>
+          <AgentMediaManager businessId={id} media={agentMedia} />
+
+          <TeamMembersManager businessId={id} members={teamMembers} />
+        </div>
+      ) : (
+        <div className="fl-card p-6 text-center">
+          <p className="text-sm text-ink">
+            Tu acceso a este negocio es de equipo de ventas: puedes trabajar el CRM y tus conversaciones, pero no
+            la configuración del negocio.
+          </p>
+          <Link
+            href={`/dashboard/businesses/${id}/crm`}
+            className="mt-3 inline-block rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
+          >
+            Ir al CRM
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,7 +25,7 @@ import {
   maxMbFor,
   MAX_AGENT_MEDIA_PER_BUSINESS,
 } from "@/lib/attachments";
-import { requireBusinessMembership } from "@/lib/authz";
+import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
@@ -326,7 +326,7 @@ export async function createBusiness(formData: FormData): Promise<void> {
 export async function updateWabaCredentials(businessId: string, formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
-  await requireBusinessMembership(session.user.id, businessId);
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   const wabaPhoneNumberId = sanitizeAsciiToken(String(formData.get("wabaPhoneNumberId") ?? ""));
   const wabaAccessToken = sanitizeAsciiToken(String(formData.get("wabaAccessToken") ?? ""));
@@ -436,7 +436,7 @@ export async function refreshTemplateStatus(businessId: string, templateId: stri
 export async function updateAgent(businessId: string, formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
-  await requireBusinessMembership(session.user.id, businessId);
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   const systemPrompt = String(formData.get("systemPrompt") ?? "").trim();
   const tone = String(formData.get("tone") ?? "cercano");
@@ -852,7 +852,7 @@ export async function movePipelineStage(
 export async function toggleAgentEnabled(businessId: string, enabled: boolean): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
-  await requireBusinessMembership(session.user.id, businessId);
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   await prisma.aIAgent.update({ where: { businessId }, data: { enabled } });
 
@@ -1079,7 +1079,7 @@ export async function deleteBusiness(businessId: string): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
-  await requireBusinessMembership(session.user.id, businessId);
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   await prisma.business.delete({ where: { id: businessId } });
   revalidatePath("/dashboard");
@@ -1551,7 +1551,7 @@ export async function deleteWebsitePage(businessId: string, websiteId: string): 
 export async function addAgentMedia(businessId: string, formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
-  await requireBusinessMembership(session.user.id, businessId);
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   const label = String(formData.get("label") ?? "").trim();
   const fileEntry = formData.get("file");
@@ -1587,9 +1587,81 @@ export async function addAgentMedia(businessId: string, formData: FormData): Pro
 export async function deleteAgentMedia(businessId: string, mediaId: string): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
-  await requireBusinessMembership(session.user.id, businessId);
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   await prisma.agentMedia.delete({ where: { id: mediaId, businessId } });
 
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
+export type InviteTeamMemberResult =
+  | { status: "created"; email: string; password: string }
+  | { status: "existing_user_added"; email: string };
+
+/**
+ * Lets the business owner (or the agency) add a teammate — e.g. a
+ * salesperson — with their own login, so two people can be logged in at the
+ * same time each working their own embudo (see the Pipeline model),
+ * instead of everyone sharing one password. Deliberately role MEMBER, not
+ * OWNER: see requireBusinessOwnerOrAdmin in lib/authz.ts for exactly what
+ * that locks out (WhatsApp credentials, AI agent config, billing, deleting
+ * the business, managing the team itself).
+ */
+export async function inviteTeamMember(businessId: string, formData: FormData): Promise<InviteTeamMemberResult> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!name || !email) throw new Error("Nombre y correo son obligatorios");
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+
+  if (existingUser) {
+    const existingMembership = await prisma.membership.findUnique({
+      where: { userId_businessId: { userId: existingUser.id, businessId } },
+    });
+    if (existingMembership) throw new Error("Esa persona ya es parte de este equipo");
+
+    await prisma.membership.create({
+      data: { userId: existingUser.id, businessId, role: "MEMBER" },
+    });
+    revalidatePath(`/dashboard/businesses/${businessId}`);
+    // Already has an account (and its own password) from elsewhere — nothing
+    // new to hand them, they just log in as usual and now see this business too.
+    return { status: "existing_user_added", email };
+  }
+
+  const password = crypto.randomBytes(6).toString("base64url");
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  await prisma.user.create({
+    data: {
+      email,
+      name,
+      passwordHash,
+      memberships: { create: { businessId, role: "MEMBER" } },
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  return { status: "created", email, password };
+}
+
+export async function removeTeamMember(businessId: string, userId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+
+  const membership = await prisma.membership.findUnique({
+    where: { userId_businessId: { userId, businessId } },
+  });
+  if (!membership) throw new Error("Esa persona no es parte de este equipo");
+  if (membership.role !== "MEMBER") {
+    throw new Error("No puedes quitar al dueño del negocio o a la agencia desde aquí");
+  }
+
+  await prisma.membership.delete({ where: { userId_businessId: { userId, businessId } } });
   revalidatePath(`/dashboard/businesses/${businessId}`);
 }
