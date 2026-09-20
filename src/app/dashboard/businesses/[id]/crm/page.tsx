@@ -19,7 +19,9 @@ export default async function CrmPage({
 }) {
   const { id } = await params;
   const { tab: tabParam, conv } = await searchParams;
-  const tab = tabParam === "list" || tabParam === "chat" ? tabParam : "board";
+  // Conversaciones is the default landing view — it's what an agency opens
+  // CRM for day to day; Tablero/Lista are reached via their own ?tab= link.
+  const tab = tabParam === "board" || tabParam === "list" ? tabParam : "chat";
 
   const session = await auth();
   if (!session?.user?.id) return null;

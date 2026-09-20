@@ -157,6 +157,17 @@ export function CostIcon() {
   );
 }
 
+export function ListIcon() {
+  return (
+    <IconBase>
+      <path d="M9 6.5h11M9 12h11M9 17.5h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="4.5" cy="6.5" r="1.3" fill="currentColor" />
+      <circle cx="4.5" cy="12" r="1.3" fill="currentColor" />
+      <circle cx="4.5" cy="17.5" r="1.3" fill="currentColor" />
+    </IconBase>
+  );
+}
+
 export function CalendarCheckIcon() {
   return (
     <IconBase>
