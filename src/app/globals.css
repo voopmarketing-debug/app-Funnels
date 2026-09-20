@@ -84,14 +84,28 @@
   --font-mono: var(--font-jetbrains-mono);
 }
 
+html {
+  /* Slightly above the 16px browser default — every Tailwind size utility
+   * (text-xs, text-sm, …) is rem-based, so this scales the whole platform's
+   * type up ~6% without having to touch every component individually. */
+  font-size: 17px;
+}
+
 body {
   background: var(--background);
   color: var(--ink);
   font-family: var(--font-montserrat), -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
+/* .fl-mono used to switch to JetBrains Mono (a genuinely different
+ * typeface) for labels, IDs and small caps text — mixing two typefaces
+ * across the platform read as inconsistent. It now just aliases to the
+ * same font as everything else (Montserrat); the class stays in markup
+ * purely so callers don't need touching, and tabular-nums keeps any
+ * digit-heavy text (IDs, scores) aligned without a real monospace font. */
 .fl-mono {
-  font-family: var(--font-jetbrains-mono), "SFMono-Regular", Menlo, monospace;
+  font-family: var(--font-montserrat), -apple-system, "Segoe UI", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 dialog::backdrop {

@@ -333,7 +333,7 @@ export default async function AnalyticsPage({
         )}
       </section>
 
-      <SalesDiagnosisPanel businessId={id} initialDiagnosis={diagnosis} />
+      <SalesDiagnosisPanel businessId={id} businessName={business.name} initialDiagnosis={diagnosis} />
     </div>
   );
 }

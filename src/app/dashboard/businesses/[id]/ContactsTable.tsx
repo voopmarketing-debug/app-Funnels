@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { stageStyle } from "@/lib/crmStages";
+import { DownloadCsvButton } from "@/components/DownloadCsvButton";
 import type { CrmStage, CrmConversation } from "./CrmBoard";
 
 function formatDate(iso: string): string {
@@ -20,8 +21,21 @@ export function ContactsTable({
   const stageById = new Map(stages.map((s) => [s.id, s]));
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-left text-sm">
+    <div className="space-y-2">
+      <div className="flex justify-end">
+        <DownloadCsvButton
+          filename="contactos"
+          headers={["Nombre", "Teléfono", "Etapa", "Última actividad"]}
+          rows={conversations.map((c) => [
+            c.customerName ?? "",
+            c.customerPhone,
+            stageById.get(c.stageId)?.name ?? "",
+            formatDate(c.lastMessageAt),
+          ])}
+        />
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-border bg-surface text-xs uppercase tracking-wide text-ink-muted">
             <th className="px-4 py-3 font-medium">Nombre</th>
@@ -58,7 +72,8 @@ export function ContactsTable({
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }

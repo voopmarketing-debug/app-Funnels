@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage, applyWebsitePrompt } from "@/lib/actions";
 import { FONT_OPTIONS, type WebsiteContent } from "@/lib/websiteContent";
+import { DownloadCsvButton } from "@/components/DownloadCsvButton";
 
 export function WebsiteEditor({
   businessId,
@@ -386,7 +387,19 @@ export function WebsiteEditor({
 
         {leads.length > 0 && (
           <div className="fl-card space-y-2 p-4">
-            <h2 className="text-sm font-semibold text-ink">Últimos registros</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-ink">Últimos registros</h2>
+              <DownloadCsvButton
+                filename="registros-sitio-web"
+                headers={["Nombre", "Contacto", "Mensaje", "Fecha"]}
+                rows={leads.map((lead) => [
+                  lead.name,
+                  lead.contact,
+                  lead.message ?? "",
+                  lead.createdAt.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }),
+                ])}
+              />
+            </div>
             <div className="max-h-64 space-y-2 overflow-y-auto">
               {leads.map((lead) => (
                 <div key={lead.id} className="rounded-md border border-border bg-background p-3">

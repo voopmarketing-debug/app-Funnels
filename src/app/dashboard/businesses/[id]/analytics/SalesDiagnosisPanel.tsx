@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { generateSalesDiagnosis, type SalesDiagnosisResult } from "@/lib/actions";
 import type { SalesDiagnosis } from "@/lib/diagnosis";
+import { StatTile } from "./StatTile";
+import { BoltIcon, AlertIcon, FunnelIcon } from "./StatIcons";
 
 type InitialDiagnosis = { diagnosis: SalesDiagnosis; generatedAt: string } | null;
 
@@ -20,28 +22,6 @@ function severityColors(score: number): { fill: string; track: string } {
   return { fill: "#d03b3b", track: "rgba(208,59,59,0.16)" };
 }
 
-// The model consistently quotes the exact customer/agent messages it's
-// using as evidence (e.g. 'Agendemos una llamada'). Bolding those quoted
-// spans in a brighter color turns a wall of same-toned text into something
-// scannable — the quotes ARE the concrete, important points; everything
-// else is connective narration.
-function HighlightedText({ text }: { text: string }) {
-  const parts = text.split(/('[^']+'|"[^"]+")/g);
-  return (
-    <>
-      {parts.map((part, i) =>
-        /^['"]/.test(part) ? (
-          <strong key={i} className="font-semibold text-ink">
-            {part}
-          </strong>
-        ) : (
-          part
-        ),
-      )}
-    </>
-  );
-}
-
 function ScoreMeter({ score }: { score: number }) {
   const { fill, track } = severityColors(score);
   return (
@@ -56,11 +36,56 @@ function ScoreMeter({ score }: { score: number }) {
   );
 }
 
+// Builds and downloads the report as a PDF client-side (jsPDF) — the report
+// is short, plain-text prose, so this needed no server round-trip or heavy
+// layout engine, just paginated wrapped text.
+async function downloadDiagnosisPdf(businessName: string, diagnosis: SalesDiagnosis, generatedAt: string) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const marginX = 48;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const maxWidth = doc.internal.pageSize.getWidth() - marginX * 2;
+  let y = 56;
+
+  function write(text: string, fontSize: number, bold = false, lineGap = 15, gapAfter = 10) {
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFontSize(fontSize);
+    for (const line of doc.splitTextToSize(text, maxWidth) as string[]) {
+      if (y > pageHeight - 56) {
+        doc.addPage();
+        y = 56;
+      }
+      doc.text(line, marginX, y);
+      y += lineGap;
+    }
+    y += gapAfter;
+  }
+
+  write(`Diagnóstico de ventas — ${businessName}`, 17, true, 20, 4);
+  write(`Generado el ${formatDate(generatedAt)}`, 10, false, 12, 14);
+  write(`Puntuación: ${diagnosis.puntuacion} / 10`, 13, true, 15, 12);
+  write(diagnosis.resumen, 11);
+
+  write("Fortalezas", 13, true, 15, 6);
+  diagnosis.fortalezas.forEach((item) => write(`+  ${item}`, 11));
+
+  write("Debilidades", 13, true, 15, 6);
+  diagnosis.debilidades.forEach((item) => write(`–  ${item}`, 11));
+
+  write("Recomendaciones", 13, true, 15, 6);
+  diagnosis.recomendaciones.forEach((item, i) => write(`${i + 1}.  ${item}`, 11));
+
+  const safeName = businessName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  doc.save(`diagnostico-ventas-${safeName || "negocio"}.pdf`);
+}
+
 export function SalesDiagnosisPanel({
   businessId,
+  businessName,
   initialDiagnosis,
 }: {
   businessId: string;
+  businessName: string;
   initialDiagnosis: InitialDiagnosis;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -99,15 +124,26 @@ export function SalesDiagnosisPanel({
           </p>
         </div>
         <div className="flex flex-none flex-col items-end gap-1">
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={isPending}
-            className="flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
-          >
-            {isPending && <span className="h-2 w-2 animate-pulse rounded-full bg-accent-ink" />}
-            {isPending ? "Analizando..." : current ? "Actualizar diagnóstico" : "Generar diagnóstico"}
-          </button>
+          <div className="flex items-center gap-2">
+            {current && (
+              <button
+                type="button"
+                onClick={() => downloadDiagnosisPdf(businessName, current.diagnosis, current.generatedAt)}
+                className="flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+              >
+                <DownloadIcon /> Descargar PDF
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={isPending}
+              className="flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            >
+              {isPending && <span className="h-2 w-2 animate-pulse rounded-full bg-accent-ink" />}
+              {isPending ? "Analizando..." : current ? "Actualizar diagnóstico" : "Generar diagnóstico"}
+            </button>
+          </div>
           {isPending && <p className="text-[11px] text-ink-faint">Puede tardar hasta 30 segundos — está leyendo tus conversaciones a fondo.</p>}
         </div>
       </div>
@@ -150,9 +186,31 @@ export function SalesDiagnosisPanel({
           </summary>
 
           <div className="mt-5 space-y-5 border-t border-border pt-5">
-            <p className="text-sm text-ink-muted">
-              <HighlightedText text={current.diagnosis.resumen} />
-            </p>
+            <p className="text-sm text-ink-muted">{current.diagnosis.resumen}</p>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <StatTile
+                label="Fortalezas"
+                value={String(current.diagnosis.fortalezas.length)}
+                description="Cosas que el agente ya está haciendo bien en estas conversaciones reales."
+                tone="accent"
+                icon={<BoltIcon />}
+              />
+              <StatTile
+                label="Debilidades"
+                value={String(current.diagnosis.debilidades.length)}
+                description="Problemas concretos que están costando ventas, detallados abajo."
+                tone="amber"
+                icon={<AlertIcon />}
+              />
+              <StatTile
+                label="Recomendaciones"
+                value={String(current.diagnosis.recomendaciones.length)}
+                description="Acciones concretas para vender más, listas abajo."
+                tone="secondary"
+                icon={<FunnelIcon />}
+              />
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -165,9 +223,7 @@ export function SalesDiagnosisPanel({
                       <span className="mt-0.5 flex-none" style={{ color: "var(--accent)" }}>
                         +
                       </span>
-                      <span>
-                        <HighlightedText text={item} />
-                      </span>
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -179,9 +235,7 @@ export function SalesDiagnosisPanel({
                   {current.diagnosis.debilidades.map((item, i) => (
                     <li key={i} className="flex gap-2 text-sm text-ink-muted">
                       <span className="mt-0.5 flex-none text-error">−</span>
-                      <span>
-                        <HighlightedText text={item} />
-                      </span>
+                      <span>{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -198,9 +252,7 @@ export function SalesDiagnosisPanel({
                     <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">
                       {i + 1}
                     </span>
-                    <span>
-                      <HighlightedText text={item} />
-                    </span>
+                    <span>{item}</span>
                   </li>
                 ))}
               </ol>
@@ -209,5 +261,14 @@ export function SalesDiagnosisPanel({
         </details>
       )}
     </section>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3.5v12M12 15.5 8 11.5M12 15.5l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.5 17v2.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
