@@ -151,16 +151,14 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
         />
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="fl-card p-4">
-          <AgentForm
-            businessId={id}
-            systemPrompt={business.agent?.systemPrompt ?? ""}
-            tone={business.agent?.tone ?? "cercano"}
-            replyLength={business.agent?.replyLength ?? "breve"}
-            industry={business.industry}
-          />
-        </div>
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <AgentForm
+          businessId={id}
+          systemPrompt={business.agent?.systemPrompt ?? ""}
+          tone={business.agent?.tone ?? "cercano"}
+          replyLength={business.agent?.replyLength ?? "breve"}
+          industry={business.industry}
+        />
 
         <WabaCredentialsForm
           businessId={id}

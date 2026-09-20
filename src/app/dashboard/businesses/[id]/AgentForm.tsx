@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { updateAgent } from "@/lib/actions";
 import { TONE_OPTIONS, LENGTH_OPTIONS, INDUSTRY_OPTIONS } from "@/lib/agentOptions";
+import { ChatIcon } from "./analytics/StatIcons";
 
 type SaveState = { saved: boolean };
 
@@ -28,14 +29,39 @@ export function AgentForm({
   );
 
   return (
-    <form action={formAction} className="space-y-4">
+    <details
+      open
+      className="group self-start overflow-hidden rounded-2xl border p-4"
+      style={{
+        borderColor: "rgba(var(--glow-secondary), 0.28)",
+        background:
+          "radial-gradient(120% 140% at 100% 0%, rgba(var(--glow-secondary), 0.16), transparent 60%), var(--surface)",
+      }}
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
+        <span
+          className="flex h-8 w-8 flex-none items-center justify-center rounded-xl"
+          style={{ backgroundColor: "rgba(var(--glow-secondary), 0.16)", color: "rgba(var(--glow-secondary), 1)" }}
+        >
+          <ChatIcon />
+        </span>
+        <span className="fl-mono flex-1 text-xs tracking-wide text-ink uppercase">Instrucciones del agente de IA</span>
+        <svg
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-4 w-4 flex-none transition-transform group-open:rotate-180"
+          style={{ color: "rgba(var(--glow-secondary), 1)" }}
+        >
+          <path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </summary>
+
+      <form action={formAction} className="mt-4 space-y-4">
       <div className="space-y-1">
-        <label htmlFor="systemPrompt" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Instrucciones del agente de IA
-        </label>
         <textarea
           id="systemPrompt"
           name="systemPrompt"
+          aria-label="Instrucciones del agente de IA"
           defaultValue={systemPrompt}
           placeholder="Pega aquí las instrucciones de tu negocio para el agente..."
           rows={8}
@@ -112,6 +138,7 @@ export function AgentForm({
           <span className="fl-mono text-xs text-accent">✓ Guardado</span>
         )}
       </div>
-    </form>
+      </form>
+    </details>
   );
 }
