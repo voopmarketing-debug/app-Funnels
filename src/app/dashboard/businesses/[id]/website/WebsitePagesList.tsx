@@ -13,6 +13,7 @@ type Page = {
   generatedAt: Date;
   customDomain: string | null;
   viewCount: number;
+  leadCount: number;
 };
 
 export function WebsitePagesList({
@@ -26,7 +27,7 @@ export function WebsitePagesList({
   hasWabaCredentials: boolean;
   pages: Page[];
   publicUrlBase: string;
-  stats: { totalViews: number; totalClicksWhatsapp: number; totalClicksAgenda: number };
+  stats: { totalViews: number; totalClicksWhatsapp: number; totalClicksAgenda: number; totalLeads: number };
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -76,6 +77,15 @@ export function WebsitePagesList({
               <div>
                 <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a agenda/link</p>
                 <p className="text-xl font-bold text-[rgb(var(--glow-secondary))]">{stats.totalClicksAgenda}</p>
+              </div>
+            </div>
+            <div className="fl-card flex items-center gap-3 px-4 py-3">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[rgba(var(--glow-blue),0.15)] text-[rgb(var(--glow-blue))]">
+                <FormIcon />
+              </span>
+              <div>
+                <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Registros</p>
+                <p className="text-xl font-bold text-ink">{stats.totalLeads}</p>
               </div>
             </div>
           </div>
@@ -158,6 +168,15 @@ function CursorIcon() {
   );
 }
 
+function FormIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <rect x="3.5" y="4" width="17" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M7.5 9h9M7.5 13h9M7.5 17h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function GlobeIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -230,6 +249,9 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-[11px]">
           <span className="fl-mono flex items-center gap-1 text-ink-muted">
             <EyeIcon /> {page.viewCount}
+          </span>
+          <span className="fl-mono flex items-center gap-1 text-ink-muted">
+            <FormIcon /> {page.leadCount}
           </span>
           <span className="text-ink-faint">
             {page.generatedAt.toLocaleDateString("es-CO", { day: "numeric", month: "short" })}

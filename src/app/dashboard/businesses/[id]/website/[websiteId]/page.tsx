@@ -44,10 +44,15 @@ export default async function WebsiteEditorPage({
     );
   }
 
-  const [totalViews, clicksWhatsapp, clicksAgenda] = await Promise.all([
+  const [totalViews, clicksWhatsapp, clicksAgenda, leads] = await Promise.all([
     prisma.websiteEvent.count({ where: { websiteId, type: "view" } }),
     prisma.websiteEvent.count({ where: { websiteId, type: "cta_click", destination: "whatsapp" } }),
     prisma.websiteEvent.count({ where: { websiteId, type: "cta_click", destination: "agenda" } }),
+    prisma.websiteLead.findMany({
+      where: { websiteId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true, contact: true, message: true, createdAt: true },
+    }),
   ]);
 
   return (
@@ -71,6 +76,7 @@ export default async function WebsiteEditorPage({
         generatedAt={website.generatedAt}
         publicUrl={`https://${appHost}/sitio/${website.slug}`}
         stats={{ totalViews, clicksWhatsapp, clicksAgenda }}
+        leads={leads}
       />
     </div>
   );

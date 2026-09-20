@@ -15,7 +15,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
   });
   if (!membership) notFound();
 
-  const [websites, totalViews, totalClicksWhatsapp, totalClicksAgenda] = await Promise.all([
+  const [websites, totalViews, totalClicksWhatsapp, totalClicksAgenda, totalLeads] = await Promise.all([
     prisma.website.findMany({
       where: { businessId: id },
       orderBy: { generatedAt: "asc" },
@@ -26,14 +26,15 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
         slug: true,
         generatedAt: true,
         customDomain: true,
-        _count: { select: { events: { where: { type: "view" } } } },
+        _count: { select: { events: { where: { type: "view" } }, leads: true } },
       },
     }),
     prisma.websiteEvent.count({ where: { type: "view", website: { businessId: id } } }),
     prisma.websiteEvent.count({ where: { type: "cta_click", destination: "whatsapp", website: { businessId: id } } }),
     prisma.websiteEvent.count({ where: { type: "cta_click", destination: "agenda", website: { businessId: id } } }),
+    prisma.websiteLead.count({ where: { website: { businessId: id } } }),
   ]);
-  const pages = websites.map((w) => ({ ...w, viewCount: w._count.events }));
+  const pages = websites.map((w) => ({ ...w, viewCount: w._count.events, leadCount: w._count.leads }));
   const appHost = process.env.APP_HOST ?? "funnelslabs.app";
 
   return (
@@ -55,7 +56,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
         hasWabaCredentials={!!membership.business.wabaPhoneNumberId}
         pages={pages}
         publicUrlBase={`https://${appHost}/sitio`}
-        stats={{ totalViews, totalClicksWhatsapp, totalClicksAgenda }}
+        stats={{ totalViews, totalClicksWhatsapp, totalClicksAgenda, totalLeads }}
       />
     </div>
   );

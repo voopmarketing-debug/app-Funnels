@@ -270,8 +270,29 @@ model Website {
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   events   WebsiteEvent[]
+  leads    WebsiteLead[]
 
   @@index([businessId])
+}
+
+// Someone who filled the page's own lead-capture form (name + WhatsApp/phone
+// + optional message) — see app/sitio/[slug]/registro/route.ts and proxy.ts's
+// "/registro" branch for the custom-domain path. Deliberately separate from
+// WebsiteEvent: this is a person's real contact info, not an anonymous click.
+// A click on the external agenda/booking link is still only tracked as a
+// WebsiteEvent (destination "agenda") — that booking form lives outside this
+// app, so its submissions aren't something this app can see or record here.
+model WebsiteLead {
+  id        String   @id @default(cuid())
+  websiteId String
+  name      String
+  contact   String
+  message   String?
+  createdAt DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId, createdAt])
 }
 
 // A page view or a click on one of the page's call-to-action buttons —

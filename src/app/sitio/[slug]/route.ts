@@ -7,8 +7,9 @@ import { renderWebsiteHtml } from "@/lib/websiteTemplate";
 // like any regular website. Rendered fresh from the structured content on
 // every request (see lib/websiteTemplate.ts), so an edit in the dashboard
 // is live immediately — no separate "publish" step, no stale cached HTML.
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  const leadSubmitted = req.nextUrl.searchParams.get("registrado") === "1";
 
   const website = await prisma.website.findUnique({
     where: { slug },
@@ -38,6 +39,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
     businessName: website.business.name,
     whatsappNumber: website.whatsappNumber,
     trackingBasePath: `/sitio/${slug}`,
+    leadSubmitted,
   });
 
   return new NextResponse(html, {

@@ -43,7 +43,7 @@ export function renderWebsiteHtml(
   // logged (see app/sitio/[slug]/ir/route.ts) before redirecting to the
   // real target, which is resolved server-side there (never trusts a
   // client-supplied URL, so this can't be abused as an open redirect).
-  ctx: { businessName: string; whatsappNumber: string; trackingBasePath: string },
+  ctx: { businessName: string; whatsappNumber: string; trackingBasePath: string; leadSubmitted?: boolean },
 ): string {
   const embedUrl = content.videoUrl ? toEmbedUrl(content.videoUrl) : null;
   const trackedHref = (label: string) => `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(label)}`;
@@ -107,6 +107,12 @@ ${fontLink(fonts)}
   .objection-card { border-left: 3px solid var(--primary); padding: 4px 0 4px 20px; }
   .objection-q { font-weight: 600; margin-bottom: 0.3em; }
   .objection-a { opacity: 0.85; margin: 0; }
+  .lead-section .wrap { max-width: 480px; text-align: center; }
+  .lead-form { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; text-align: left; }
+  .lead-form input, .lead-form textarea { font: inherit; font-family: var(--body-font); padding: 12px 14px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--text) 25%, transparent); background: color-mix(in srgb, var(--bg) 92%, var(--text)); color: var(--text); }
+  .lead-form textarea { resize: vertical; }
+  .lead-form button { align-self: center; border: none; cursor: pointer; }
+  .lead-thanks { font-weight: 600; color: var(--primary); }
   footer { padding: 40px 0; text-align: center; opacity: 0.6; font-size: 13px; }
   footer a { color: inherit; }
   @media (max-width: 600px) { .wrap { padding: 0 16px; } section { padding: 40px 0; } }
@@ -157,6 +163,23 @@ ${fontLink(fonts)}
       <h2>${escapeHtml(content.contact.heading)}</h2>
       <p>${escapeHtml(content.contact.body)}</p>
       <a class="btn" href="${escapeHtml(trackedHref("contact"))}" target="_blank" rel="noopener noreferrer">${escapeHtml(content.hero.ctaLabel)}</a>
+    </div>
+  </section>
+
+  <section class="lead-section">
+    <div class="wrap">
+      <h2>Déjanos tus datos</h2>
+      ${
+        ctx.leadSubmitted
+          ? `<p class="lead-thanks">¡Listo! Ya tenemos tus datos, te contactamos muy pronto.</p>`
+          : `<p>Te escribimos apenas los recibamos.</p>
+      <form class="lead-form" method="POST" action="${escapeHtml(`${ctx.trackingBasePath}/registro`)}">
+        <input type="text" name="name" placeholder="Tu nombre" maxlength="120" required>
+        <input type="text" name="contact" placeholder="Tu WhatsApp o teléfono" maxlength="120" required>
+        <textarea name="message" placeholder="Cuéntanos qué necesitas (opcional)" rows="2" maxlength="500"></textarea>
+        <button class="btn" type="submit">Enviar</button>
+      </form>`
+      }
     </div>
   </section>
 

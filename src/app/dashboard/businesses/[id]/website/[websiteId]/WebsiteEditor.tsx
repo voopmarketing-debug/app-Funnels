@@ -13,6 +13,7 @@ export function WebsiteEditor({
   generatedAt,
   publicUrl,
   stats,
+  leads,
 }: {
   businessId: string;
   websiteId: string;
@@ -21,6 +22,7 @@ export function WebsiteEditor({
   generatedAt: Date;
   publicUrl: string;
   stats: { totalViews: number; clicksWhatsapp: number; clicksAgenda: number };
+  leads: { id: string; name: string; contact: string; message: string | null; createdAt: Date }[];
 }) {
   const router = useRouter();
   const [content, setContent] = useState<WebsiteContent>(initialContent);
@@ -372,7 +374,35 @@ export function WebsiteEditor({
             Van por separado a propósito: "WhatsApp" es cuando el botón usa el número del negocio; "Agenda/link" es
             cuando esta página tiene un link externo configurado (ver campo "Link del botón" arriba).
           </p>
+          <div className="rounded-md border border-border bg-background p-3">
+            <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Registros (datos dejados)</p>
+            <p className="text-2xl font-bold text-ink">{leads.length}</p>
+          </div>
+          <p className="text-[11px] text-ink-faint">
+            Personas que llenaron el formulario "Déjanos tus datos" de esta página. No incluye lo que agenden en un
+            link externo de agenda — eso vive fuera de esta app y solo vemos el clic, no el registro.
+          </p>
         </div>
+
+        {leads.length > 0 && (
+          <div className="fl-card space-y-2 p-4">
+            <h2 className="text-sm font-semibold text-ink">Últimos registros</h2>
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {leads.map((lead) => (
+                <div key={lead.id} className="rounded-md border border-border bg-background p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-medium text-ink">{lead.name}</p>
+                    <p className="fl-mono flex-none text-[10px] text-ink-faint">
+                      {lead.createdAt.toLocaleDateString("es-CO", { day: "numeric", month: "short" })}
+                    </p>
+                  </div>
+                  <p className="fl-mono text-xs text-accent">{lead.contact}</p>
+                  {lead.message && <p className="mt-1 text-xs text-ink-muted">{lead.message}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="fl-card space-y-2 p-4">
           <p className="text-xs text-ink-muted">

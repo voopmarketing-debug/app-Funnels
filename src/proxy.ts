@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { renderWebsiteHtml } from "@/lib/websiteTemplate";
+import { captureWebsiteLead } from "@/lib/websiteLeads";
 
 // Hosts this app already answers for on purpose — everything else that
 // reaches this deployment has been manually connected in Vercel as a
@@ -43,6 +44,16 @@ export async function proxy(request: NextRequest) {
   }
   const content = parsedContent.data;
 
+  // Same lead-capture form POST as /sitio/[slug]/registro, reached here as
+  // a root-relative "/registro" action since a custom domain has no slug.
+  if (request.nextUrl.pathname === "/registro" && request.method === "POST") {
+    const formData = await request.formData();
+    const ok = await captureWebsiteLead(website.id, formData);
+    const url = new URL("/", request.url);
+    if (ok) url.searchParams.set("registrado", "1");
+    return NextResponse.redirect(url, { status: 303 });
+  }
+
   // Same click-through redirect as /sitio/[slug]/ir, reached here as a
   // root-relative "/ir" link since a custom domain has no slug in its path.
   if (request.nextUrl.pathname === "/ir") {
@@ -69,6 +80,7 @@ export async function proxy(request: NextRequest) {
     businessName: website.business.name,
     whatsappNumber: website.whatsappNumber,
     trackingBasePath: "",
+    leadSubmitted: request.nextUrl.searchParams.get("registrado") === "1",
   });
 
   return new NextResponse(html, {
