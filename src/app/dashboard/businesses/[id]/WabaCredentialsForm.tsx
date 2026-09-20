@@ -2,6 +2,13 @@
 
 import { useActionState } from "react";
 import { updateWabaCredentials } from "@/lib/actions";
+import { WhatsAppSmallIcon } from "./analytics/StatIcons";
+
+// WhatsApp's own brand green — deliberately not one of the shared KPI
+// tones (accent/secondary/amber/blue), so this card reads as "WhatsApp"
+// at a glance next to the purple "Instrucciones del agente" card it
+// otherwise matches structurally.
+const WHATSAPP_GREEN = "37, 211, 102";
 
 type SaveState = { saved: boolean };
 
@@ -25,23 +32,33 @@ export function WabaCredentialsForm({
   return (
     <details
       open
-      className="group self-start rounded-md border-2 border-[#fab219]/50 bg-surface p-4"
+      className="group self-start overflow-hidden rounded-2xl border p-4"
+      style={{
+        borderColor: `rgba(${WHATSAPP_GREEN}, 0.28)`,
+        background: `radial-gradient(120% 140% at 100% 0%, rgba(${WHATSAPP_GREEN}, 0.16), transparent 60%), var(--surface)`,
+      }}
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 fl-mono text-xs tracking-wide text-ink uppercase [&::-webkit-details-marker]:hidden">
-        <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[#fab219] text-[11px] font-bold text-black">
-          !
+      <summary className="flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
+        <span
+          className="flex h-8 w-8 flex-none items-center justify-center rounded-xl"
+          style={{ backgroundColor: `rgba(${WHATSAPP_GREEN}, 0.16)`, color: `rgba(${WHATSAPP_GREEN}, 1)` }}
+        >
+          <WhatsAppSmallIcon />
         </span>
-        <span className="flex-1">Credenciales de WhatsApp — paso obligatorio</span>
+        <span className="fl-mono flex-1 text-xs tracking-wide text-ink uppercase">
+          Credenciales de WhatsApp — paso obligatorio
+        </span>
         <svg
           viewBox="0 0 20 20"
           fill="none"
-          className="h-4 w-4 flex-none text-[#fab219] transition-transform group-open:rotate-180"
+          className="h-4 w-4 flex-none transition-transform group-open:rotate-180"
+          style={{ color: `rgba(${WHATSAPP_GREEN}, 1)` }}
         >
           <path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </summary>
 
-      <p className="mt-3 text-sm text-ink">
+      <p className="mt-4 text-sm text-ink">
         Sin esto bien puesto, tu agente de IA <strong>no puede enviar ni recibir</strong> mensajes
         de WhatsApp. Los dos datos de abajo no te los inventas tú: te los entrega Meta (el dueño de
         WhatsApp) cuando conectas tu número al WhatsApp Business API. Sigue los pasos:

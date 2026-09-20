@@ -30,7 +30,6 @@ export function AgentForm({
 
   return (
     <details
-      open
       className="group self-start overflow-hidden rounded-2xl border p-4"
       style={{
         borderColor: "rgba(var(--glow-secondary), 0.28)",
@@ -70,16 +69,16 @@ export function AgentForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="space-y-1">
-          <label htmlFor="industry" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="min-w-0 space-y-1">
+          <label htmlFor="industry" className="fl-mono block truncate text-[10px] tracking-wide text-ink-muted uppercase">
             Tipo de negocio
           </label>
           <select
             id="industry"
             name="industry"
             defaultValue={industry}
-            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
+            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
           >
             {INDUSTRY_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -89,15 +88,15 @@ export function AgentForm({
           </select>
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="tone" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+        <div className="min-w-0 space-y-1">
+          <label htmlFor="tone" className="fl-mono block truncate text-[10px] tracking-wide text-ink-muted uppercase">
             Tono del agente
           </label>
           <select
             id="tone"
             name="tone"
             defaultValue={tone}
-            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
+            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
           >
             {TONE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -107,15 +106,15 @@ export function AgentForm({
           </select>
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="replyLength" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            Largo de las respuestas
+        <div className="min-w-0 space-y-1">
+          <label htmlFor="replyLength" className="fl-mono block truncate text-[10px] tracking-wide text-ink-muted uppercase">
+            Largo de respuestas
           </label>
           <select
             id="replyLength"
             name="replyLength"
             defaultValue={replyLength}
-            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink outline-none focus:border-accent"
+            className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink outline-none focus:border-accent"
           >
             {LENGTH_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
