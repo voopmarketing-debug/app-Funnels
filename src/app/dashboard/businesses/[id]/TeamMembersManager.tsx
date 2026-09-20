@@ -11,13 +11,22 @@ const TONE_VAR = "--glow-amber";
 
 export type TeamMember = { userId: string; name: string | null; email: string };
 
-export function TeamMembersManager({ businessId, members }: { businessId: string; members: TeamMember[] }) {
+export function TeamMembersManager({
+  businessId,
+  members,
+  limit,
+}: {
+  businessId: string;
+  members: TeamMember[];
+  limit: number | null;
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isInviting, startInviting] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InviteTeamMemberResult | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const atLimit = limit !== null && members.length >= limit;
 
   function handleInvite(formData: FormData) {
     setError(null);
@@ -61,7 +70,7 @@ export function TeamMembersManager({ businessId, members }: { businessId: string
         </span>
         <span className="min-w-0 flex-1">
           <span className="fl-mono block text-xs tracking-wide text-ink uppercase">
-            Equipo ({members.length})
+            Equipo ({members.length}{limit !== null ? `/${limit}` : ""})
           </span>
           <span className="mt-0.5 block text-xs normal-case text-ink-faint group-open:hidden">
             Haz clic para invitar vendedores con su propio usuario.
@@ -105,34 +114,41 @@ export function TeamMembersManager({ businessId, members }: { businessId: string
         </ul>
       )}
 
-      <form ref={formRef} action={handleInvite} className="mt-4 space-y-2 border-t border-border pt-4">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            type="text"
-            name="name"
-            required
-            placeholder="Nombre, ej: Juan Pérez"
-            disabled={isInviting}
-            className="w-full flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
-          />
-          <input
-            type="email"
-            name="email"
-            required
-            placeholder="correo@ejemplo.com"
-            disabled={isInviting}
-            className="w-full flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
-          />
-          <button
-            type="submit"
-            disabled={isInviting}
-            className="flex-none rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
-          >
-            {isInviting ? "Invitando..." : "+ Invitar"}
-          </button>
-        </div>
-        {error && <p className="text-xs text-error">{error}</p>}
-      </form>
+      {atLimit ? (
+        <p className="mt-4 rounded-md border border-dashed border-border bg-background px-3 py-2.5 text-xs text-ink-muted">
+          Llegaste al máximo de {limit} personas de equipo de tu plan actual. Quita a alguien de la lista de arriba
+          para invitar a otra persona, o actualiza de plan para tener más cupos.
+        </p>
+      ) : (
+        <form ref={formRef} action={handleInvite} className="mt-4 space-y-2 border-t border-border pt-4">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              name="name"
+              required
+              placeholder="Nombre, ej: Juan Pérez"
+              disabled={isInviting}
+              className="w-full flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
+            />
+            <input
+              type="email"
+              name="email"
+              required
+              placeholder="correo@ejemplo.com"
+              disabled={isInviting}
+              className="w-full flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
+            />
+            <button
+              type="submit"
+              disabled={isInviting}
+              className="flex-none rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            >
+              {isInviting ? "Invitando..." : "+ Invitar"}
+            </button>
+          </div>
+          {error && <p className="text-xs text-error">{error}</p>}
+        </form>
+      )}
 
       {result && result.status === "created" && (
         <div className="mt-3 rounded-md border-2 border-accent/50 bg-background p-3">

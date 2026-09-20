@@ -29,7 +29,7 @@ import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/au
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
-import { PLAN_TIERS, PLAN_LABELS } from "@/lib/plans";
+import { PLAN_TIERS, PLAN_LABELS, TEAM_MEMBER_LIMITS } from "@/lib/plans";
 import { getAccountLineStatus } from "@/lib/lineLimits";
 import { logRegistrationForRemarketing } from "@/lib/remarketingSheet";
 import { sendEmail } from "@/lib/email";
@@ -1615,6 +1615,17 @@ export async function inviteTeamMember(businessId: string, formData: FormData): 
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!name || !email) throw new Error("Nombre y correo son obligatorios");
+
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { planTier: true } });
+  const teamLimit = TEAM_MEMBER_LIMITS[business.planTier];
+  if (teamLimit !== null) {
+    const teamCount = await prisma.membership.count({ where: { businessId, role: "MEMBER" } });
+    if (teamCount >= teamLimit) {
+      throw new Error(
+        `Alcanzaste el límite de ${teamLimit} usuarios de equipo de tu plan ${PLAN_LABELS[business.planTier]}. Actualiza de plan o contáctanos para agregar más.`,
+      );
+    }
+  }
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
 

@@ -37,6 +37,17 @@ export const LINE_LIMITS: Record<PlanTier, number | null> = {
   SCALE: null,
 };
 
+// How many invited teammates (MEMBER role — see inviteTeamMember in
+// actions.ts) a business can have at once, on top of its owner. Starter is
+// capped at 3 so a small team (e.g. 3 salespeople sharing one WhatsApp
+// line, each on their own embudo) fits without needing Pro. `null` means
+// no cap.
+export const TEAM_MEMBER_LIMITS: Record<PlanTier, number | null> = {
+  STARTER: 3,
+  PRO: 10,
+  SCALE: null,
+};
+
 export const PLAN_TIERS: PlanTier[] = ["STARTER", "PRO", "SCALE"];
 
 export type PlanUsageStatus = "good" | "warning" | "critical" | "unlimited";

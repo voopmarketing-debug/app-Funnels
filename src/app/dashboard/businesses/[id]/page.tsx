@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessAnalytics, getActiveContactsThisMonth } from "@/lib/analytics";
-import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
+import { PLAN_LIMITS, TEAM_MEMBER_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
 import { AgentMediaManager } from "./AgentMediaManager";
@@ -192,7 +192,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
 
           <AgentMediaManager businessId={id} media={agentMedia} />
 
-          <TeamMembersManager businessId={id} members={teamMembers} />
+          <TeamMembersManager businessId={id} members={teamMembers} limit={TEAM_MEMBER_LIMITS[business.planTier]} />
         </div>
       ) : (
         <div className="fl-card p-6 text-center">
