@@ -6,6 +6,7 @@ import { getBusinessAnalytics, getActiveContactsThisMonth } from "@/lib/analytic
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
+import { AgentMediaManager } from "./AgentMediaManager";
 import { AgentPowerButton } from "./AgentPowerButton";
 import { PlanUsageCard } from "./PlanUsageCard";
 import { StatTile } from "./analytics/StatTile";
@@ -59,9 +60,14 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   if (!membership) notFound();
   const { business } = membership;
 
-  const [analytics, activeContacts] = await Promise.all([
+  const [analytics, activeContacts, agentMedia] = await Promise.all([
     getBusinessAnalytics(id),
     getActiveContactsThisMonth(id),
+    prisma.agentMedia.findMany({
+      where: { businessId: id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, label: true, mediaType: true, filename: true, sizeBytes: true, url: true },
+    }),
   ]);
 
   const planLimit = PLAN_LIMITS[business.planTier];
@@ -165,6 +171,8 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""}
           wabaId={business.wabaId ?? ""}
         />
+
+        <AgentMediaManager businessId={id} media={agentMedia} />
       </div>
     </div>
   );

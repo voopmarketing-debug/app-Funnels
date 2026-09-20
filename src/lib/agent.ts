@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import {
   sendWhatsAppTextMessage,
+  sendWhatsAppMediaMessage,
   fetchWhatsAppMediaMeta,
   downloadWhatsAppMedia,
   type WhatsAppInboundMessage,
@@ -192,8 +193,14 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     content: msg.content,
   }));
 
+  const availableMedia = await prisma.agentMedia.findMany({
+    where: { businessId: business.id },
+    select: { id: true, label: true, mediaType: true },
+  });
+
   let reply: string;
   let usage: AgentReplyUsage;
+  let sendMediaId: string | undefined;
   try {
     const result = await generateAgentReply({
       systemPrompt: business.agent.systemPrompt,
@@ -204,9 +211,11 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       history,
       userMessage: message.text,
       owner: ownerMembership?.user,
+      availableMedia,
     });
     reply = result.text;
     usage = result.usage;
+    sendMediaId = result.sendMediaId;
   } catch (err) {
     // Surface the failure straight into the conversation thread in the
     // dashboard — a plain, ASCII-only summary, since the raw error object
@@ -217,12 +226,31 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   }
 
   try {
-    const { messageId } = await sendWhatsAppTextMessage({
-      phoneNumberId: business.wabaPhoneNumberId!,
-      accessToken,
-      to: message.from,
-      text: reply,
-    });
+    const media = sendMediaId ? await prisma.agentMedia.findUnique({ where: { id: sendMediaId } }) : null;
+
+    const { messageId } = media
+      ? await sendWhatsAppMediaMessage({
+          phoneNumberId: business.wabaPhoneNumberId!,
+          accessToken,
+          to: message.from,
+          type: media.mediaType as "image" | "document",
+          link: media.url,
+          // Meta caps an image/document caption well under a plain text
+          // message's limit — truncated so a "detallada" reply never gets
+          // rejected outright when it's riding along with a file.
+          caption: reply ? reply.slice(0, 900) : undefined,
+          filename: media.mediaType === "document" ? (media.filename ?? undefined) : undefined,
+        })
+      : await sendWhatsAppTextMessage({
+          phoneNumberId: business.wabaPhoneNumberId!,
+          accessToken,
+          to: message.from,
+          // Only reachable with an empty reply if Claude replied with just a
+          // tool call and the referenced media vanished between generation
+          // and send (deleted mid-flight) — an empty WhatsApp text send
+          // would otherwise fail outright.
+          text: reply || "Un momento, ya te cuento.",
+        });
 
     await prisma.message.create({
       data: {
@@ -235,6 +263,12 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
         outputTokens: usage.outputTokens,
         cacheCreationInputTokens: usage.cacheCreationInputTokens,
         cacheReadInputTokens: usage.cacheReadInputTokens,
+        ...(media && {
+          mediaUrl: media.url,
+          mediaType: media.mediaType,
+          mediaFilename: media.filename,
+          mediaSizeBytes: media.sizeBytes,
+        }),
       },
     });
   } catch (err) {

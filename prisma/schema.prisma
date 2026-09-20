@@ -54,6 +54,28 @@ model Business {
   broadcasts     Broadcast[]
   messageTemplates MessageTemplate[]
   websites       Website[]
+  agentMedia     AgentMedia[]
+}
+
+// A photo or document (product shot, PDF catalog, etc.) the client uploads
+// once so the AI agent can decide, mid-conversation, to send it to a
+// customer — see lib/ai.ts's "send_media" tool and lib/agent.ts's handling
+// of it. `label` is what the AI actually reads to know what the file is and
+// when sending it makes sense — kept short and descriptive on purpose
+// ("Catálogo de productos", "Foto silla azul"), not a filename.
+model AgentMedia {
+  id         String   @id @default(cuid())
+  businessId String
+  url        String
+  mediaType  String // "image" | "document" — the only two types offered here
+  filename   String?
+  label      String
+  sizeBytes  Int
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
 }
 
 enum PlanTier {
@@ -359,6 +381,12 @@ model Broadcast {
   businessId      String
   stageId         String? // null = every conversation in the business
   message         String    @db.Text
+  // Optional image/document attached to a free-form broadcast (see
+  // sendBroadcast in lib/actions.ts) — not supported for template broadcasts,
+  // since an approved Meta template's media header is a separate feature.
+  mediaUrl        String?
+  mediaType       String?
+  mediaFilename   String?
   createdByUserId String
   totalRecipients Int
   sentCount       Int       @default(0)

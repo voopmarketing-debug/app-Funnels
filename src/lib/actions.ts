@@ -506,9 +506,12 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
   // Two ways to send: a free-text message (only reaches contacts who wrote
   // in the last 24h — Meta rejects the rest) or an approved template
   // (works anytime, but its body is fixed — see /templates). Exactly one
-  // of these resolves per call.
+  // of these resolves per call. An attached image/document is only offered
+  // for the free-text path — an approved template's media header is a
+  // separate Meta feature this app doesn't manage yet.
   let message: string;
   let template: { name: string; language: string } | null = null;
+  let media: { url: string; type: "image" | "document"; filename?: string } | null = null;
   if (templateId) {
     const approvedTemplate = await prisma.messageTemplate.findFirst({
       where: { id: templateId, businessId, status: "APPROVED" },
@@ -518,7 +521,22 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
     template = { name: approvedTemplate.name, language: approvedTemplate.language };
   } else {
     message = String(formData.get("message") ?? "").trim();
-    if (!message) throw new Error("message is required");
+    const fileEntry = formData.get("file");
+    const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
+    if (!message && !file) throw new Error("message is required");
+
+    if (file) {
+      const mediaType = resolveMediaType(file.type);
+      if (mediaType !== "image" && mediaType !== "document") {
+        throw new Error("Solo se aceptan fotos o documentos (PDF) como adjunto de difusión");
+      }
+      if (file.size > MAX_ATTACHMENT_BYTES[mediaType]) {
+        throw new Error(`El archivo supera el máximo permitido (${maxMbFor(mediaType)} MB)`);
+      }
+      const bytes = Buffer.from(await file.arrayBuffer());
+      const { url } = await uploadAttachment({ bytes, filename: file.name, contentType: file.type });
+      media = { url, type: mediaType, filename: file.name };
+    }
   }
 
   const conversations = await prisma.conversation.findMany({
@@ -531,6 +549,9 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
       businessId,
       stageId,
       message,
+      mediaUrl: media?.url,
+      mediaType: media?.type,
+      mediaFilename: media?.filename,
       createdByUserId: session.user.id,
       totalRecipients: conversations.length,
     },
@@ -552,9 +573,30 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
               templateName: template.name,
               language: template.language,
             })
-          : await sendWhatsAppTextMessage({ phoneNumberId, accessToken, to: conv.customerPhone, text: message });
+          : media
+            ? await sendWhatsAppMediaMessage({
+                phoneNumberId,
+                accessToken,
+                to: conv.customerPhone,
+                type: media.type,
+                link: media.url,
+                caption: message || undefined,
+                filename: media.type === "document" ? media.filename : undefined,
+              })
+            : await sendWhatsAppTextMessage({ phoneNumberId, accessToken, to: conv.customerPhone, text: message });
         await prisma.message.create({
-          data: { conversationId: conv.id, role: "AGENT", content: message, whatsappMsgId: messageId, sentByHuman: true },
+          data: {
+            conversationId: conv.id,
+            role: "AGENT",
+            content: message,
+            whatsappMsgId: messageId,
+            sentByHuman: true,
+            ...(media && {
+              mediaUrl: media.url,
+              mediaType: media.type,
+              mediaFilename: media.filename,
+            }),
+          },
         });
       }),
     );
@@ -1380,4 +1422,46 @@ export async function deleteWebsitePage(businessId: string, websiteId: string): 
   await prisma.website.delete({ where: { id: websiteId, businessId } });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
+}
+
+// Photos/PDFs the AI agent can choose to send mid-conversation — see
+// lib/ai.ts's "send_media" tool. Only image/document are offered here (no
+// audio/video — an AI-initiated voice note or video doesn't make sense).
+export async function addAgentMedia(businessId: string, formData: FormData): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const label = String(formData.get("label") ?? "").trim();
+  const fileEntry = formData.get("file");
+  const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
+  if (!label) throw new Error("Escribe una descripción corta de qué es el archivo");
+  if (!file) throw new Error("Selecciona una foto o un PDF");
+
+  const mediaType = resolveMediaType(file.type);
+  if (mediaType !== "image" && mediaType !== "document") {
+    throw new Error("Solo se aceptan fotos o documentos (PDF) para esto");
+  }
+  if (file.size > MAX_ATTACHMENT_BYTES[mediaType]) {
+    throw new Error(`El archivo supera el máximo permitido (${maxMbFor(mediaType)} MB)`);
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const { url, size } = await uploadAttachment({ bytes, filename: file.name, contentType: file.type });
+
+  await prisma.agentMedia.create({
+    data: { businessId, url, mediaType, filename: file.name, label, sizeBytes: size },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+}
+
+export async function deleteAgentMedia(businessId: string, mediaId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  await prisma.agentMedia.delete({ where: { id: mediaId, businessId } });
+
+  revalidatePath(`/dashboard/businesses/${businessId}`);
 }

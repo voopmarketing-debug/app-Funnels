@@ -159,18 +159,34 @@ function BroadcastDialogContent({
       </div>
 
       {mode === "free" ? (
-        <div className="space-y-1">
-          <label htmlFor="message" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            Mensaje
-          </label>
-          <textarea
-            id="message"
-            name="message"
-            required
-            rows={4}
-            placeholder="Escribe el mensaje que van a recibir..."
-            className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label htmlFor="message" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+              Mensaje
+            </label>
+            <textarea
+              id="message"
+              name="message"
+              rows={4}
+              placeholder="Escribe el mensaje que van a recibir..."
+              className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="file" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+              Foto o PDF (opcional)
+            </label>
+            <input
+              id="file"
+              name="file"
+              type="file"
+              accept="image/*,application/pdf"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-ink outline-none file:mr-2 file:rounded file:border-0 file:bg-accent file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent-ink"
+            />
+            <p className="text-[11px] text-ink-faint">
+              Se manda como foto/documento con el mensaje de arriba como pie de foto. Fotos hasta 5 MB, PDFs hasta 20 MB.
+            </p>
+          </div>
         </div>
       ) : templates.length === 0 ? (
         <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-ink-muted">

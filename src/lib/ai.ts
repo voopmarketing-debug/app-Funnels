@@ -210,6 +210,39 @@ export type AgentReplyUsage = {
   cacheReadInputTokens: number;
 };
 
+export type AvailableMedia = { id: string; label: string; mediaType: string };
+
+const SEND_MEDIA_TOOL_NAME = "send_media";
+
+// Only built (and only added to the request) when the business actually has
+// media uploaded — a business with none pays zero extra tokens/latency for
+// this feature, and Claude never sees a tool it can't use.
+function buildSendMediaTool(media: AvailableMedia[]): Anthropic.Tool {
+  return {
+    name: SEND_MEDIA_TOOL_NAME,
+    description:
+      "Envía una foto o un documento (PDF) real de este negocio al cliente por WhatsApp, junto con tu respuesta de texto. Úsala solo cuando el cliente pida ver algo (una foto, el catálogo, una ficha técnica) o cuando compartir uno de estos archivos claramente ayude a avanzar la venta — nunca por iniciativa sin que venga a cuento. Como mucho un archivo por turno.",
+    input_schema: {
+      type: "object",
+      properties: {
+        mediaId: {
+          type: "string",
+          description: "El id EXACTO del archivo a enviar, tomado de la lista de MATERIAL DISPONIBLE — nunca inventado.",
+        },
+      },
+      required: ["mediaId"],
+    },
+  };
+}
+
+function buildAvailableMediaBlock(media: AvailableMedia[]): string {
+  if (media.length === 0) return "";
+  const lines = media
+    .map((m) => `- id: ${m.id} | tipo: ${m.mediaType === "document" ? "documento (PDF)" : "foto"} | ${m.label}`)
+    .join("\n");
+  return `\n\nMATERIAL DISPONIBLE PARA ENVIAR (archivos reales de este negocio — usa la herramienta ${SEND_MEDIA_TOOL_NAME} solo si de verdad aplica, con uno de estos ids exactos):\n${lines}`;
+}
+
 export async function generateAgentReply(params: {
   systemPrompt: string;
   tone: string;
@@ -219,8 +252,22 @@ export async function generateAgentReply(params: {
   history: AgentHistoryMessage[];
   userMessage: string;
   owner?: OwnerContext;
-}): Promise<{ text: string; usage: AgentReplyUsage }> {
+  availableMedia?: AvailableMedia[];
+}): Promise<{ text: string; usage: AgentReplyUsage; sendMediaId?: string }> {
   const isFirstMessage = params.history.length === 0;
+  const availableMedia = params.availableMedia ?? [];
+
+  const system = buildSystemPrompt(
+    params.systemPrompt,
+    params.tone,
+    params.replyLength,
+    params.industry,
+    params.history,
+    params.owner,
+  );
+  if (availableMedia.length > 0) {
+    system[system.length - 1].text += buildAvailableMediaBlock(availableMedia);
+  }
 
   const response = await anthropic.messages.create({
     model: params.model,
@@ -234,24 +281,32 @@ export async function generateAgentReply(params: {
     // benchmarks). Left untouched on the sales-diagnosis call in
     // diagnosis.ts, which genuinely reasons over several transcripts.
     output_config: { effort: "low" },
-    system: buildSystemPrompt(
-      params.systemPrompt,
-      params.tone,
-      params.replyLength,
-      params.industry,
-      params.history,
-      params.owner,
-    ),
+    system,
     messages: [...params.history, { role: "user", content: params.userMessage }],
+    ...(availableMedia.length > 0 ? { tools: [buildSendMediaTool(availableMedia)] } : {}),
   });
 
   const textBlock = response.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
+  const toolUseBlock = response.content.find(
+    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use" && block.name === SEND_MEDIA_TOOL_NAME,
+  );
+
+  // A tool-use turn can come back with no text block at all (Claude decided
+  // the file speaks for itself) — that's fine as long as media is attached;
+  // only a genuinely empty reply (no text AND no media) is an error.
+  const rawText = textBlock && textBlock.type === "text" ? textBlock.text : "";
+  if (!rawText && !toolUseBlock) {
     throw new Error("Claude did not return a text response");
   }
 
+  const sendMediaId =
+    toolUseBlock && typeof toolUseBlock.input === "object" && toolUseBlock.input !== null
+      ? (toolUseBlock.input as { mediaId?: string }).mediaId
+      : undefined;
+
   return {
-    text: stripGreetings(textBlock.text, isFirstMessage),
+    text: stripGreetings(rawText, isFirstMessage),
+    sendMediaId: sendMediaId && availableMedia.some((m) => m.id === sendMediaId) ? sendMediaId : undefined,
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
