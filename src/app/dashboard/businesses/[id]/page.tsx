@@ -8,6 +8,8 @@ import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
 import { AgentPowerButton } from "./AgentPowerButton";
 import { PlanUsageCard } from "./PlanUsageCard";
+import { StatTile } from "./analytics/StatTile";
+import { ChatIcon, ClockIcon, BoltIcon, HourglassIcon } from "./analytics/StatIcons";
 
 function formatPercent(value: number | null): string {
   return value === null ? "—" : `${Math.round(value)}%`;
@@ -17,6 +19,31 @@ function formatMinutes(value: number | null): string {
   if (value === null) return "—";
   if (value < 1) return "<1 min";
   return value < 10 ? `${value.toFixed(1)} min` : `${Math.round(value)} min`;
+}
+
+// Same thresholds as analytics/page.tsx's stat tiles — kept in sync so this
+// compact row and the full KPI page always agree on what "bien"/"atención"/
+// "crítico" mean for the same metric.
+type Status = "good" | "warning" | "critical" | "neutral";
+
+function automationStatus(rate: number | null): Status {
+  if (rate === null) return "neutral";
+  if (rate >= 80) return "good";
+  if (rate >= 50) return "warning";
+  return "critical";
+}
+
+function responseTimeStatus(minutes: number | null): Status {
+  if (minutes === null) return "neutral";
+  if (minutes <= 5) return "good";
+  if (minutes <= 30) return "warning";
+  return "critical";
+}
+
+function awaitingReplyStatus(count: number): Status {
+  if (count === 0) return "good";
+  if (count <= 3) return "warning";
+  return "critical";
 }
 
 export default async function BusinessPage({ params }: { params: Promise<{ id: string }> }) {
@@ -89,22 +116,39 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
       />
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="fl-card p-4">
-          <p className="text-xs text-ink-muted">Contactos totales</p>
-          <p className="mt-1 text-2xl font-bold text-ink">{analytics.totalConversations}</p>
-        </div>
-        <div className="fl-card p-4">
-          <p className="text-xs text-ink-muted">Tiempo de respuesta</p>
-          <p className="mt-1 text-2xl font-bold text-ink">{formatMinutes(analytics.responseTime.avgMinutes)}</p>
-        </div>
-        <div className="fl-card p-4">
-          <p className="text-xs text-ink-muted">Automatización IA</p>
-          <p className="mt-1 text-2xl font-bold text-ink">{formatPercent(analytics.automationRate)}</p>
-        </div>
-        <div className="fl-card p-4">
-          <p className="text-xs text-ink-muted">Esperando respuesta</p>
-          <p className="mt-1 text-2xl font-bold text-ink">{analytics.awaitingReply}</p>
-        </div>
+        <StatTile
+          label="Contactos totales"
+          value={String(analytics.totalConversations)}
+          description="Cuántas personas distintas te han escrito por WhatsApp en total, desde siempre."
+          tone="accent"
+          icon={<ChatIcon />}
+        />
+        <StatTile
+          label="Tiempo de respuesta"
+          value={formatMinutes(analytics.responseTime.avgMinutes)}
+          status={responseTimeStatus(analytics.responseTime.avgMinutes)}
+          description="En promedio, cuánto tarda en llegar una respuesta después de que un cliente escribe. Entre menos, mejor experiencia para el cliente."
+          tone="amber"
+          icon={<ClockIcon />}
+        />
+        <StatTile
+          label="Automatización IA"
+          value={formatPercent(analytics.automationRate)}
+          sublabel="de respuestas sin humano"
+          status={automationStatus(analytics.automationRate)}
+          description="De cada 100 respuestas enviadas, cuántas las contestó la IA sola, sin que nadie de tu equipo interviniera a mano."
+          tone="secondary"
+          icon={<BoltIcon />}
+        />
+        <StatTile
+          label="Esperando respuesta"
+          value={String(analytics.awaitingReply)}
+          sublabel="conversaciones sin contestar"
+          status={awaitingReplyStatus(analytics.awaitingReply)}
+          description="Conversaciones donde el cliente escribió último y todavía nadie —ni la IA ni una persona— le ha contestado."
+          tone="blue"
+          icon={<HourglassIcon />}
+        />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
