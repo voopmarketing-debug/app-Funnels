@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { WebsiteEditor } from "./WebsiteEditor";
+import { RegenerateOldPageButton } from "./RegenerateOldPageButton";
 
 export default async function WebsiteEditorPage({
   params,
@@ -24,9 +25,24 @@ export default async function WebsiteEditorPage({
   if (!website) notFound();
 
   const parsedContent = WebsiteContentSchema.safeParse(website.content);
-  if (!parsedContent.success) notFound();
-
   const appHost = process.env.APP_HOST ?? "funnelslabs.app";
+
+  if (!parsedContent.success) {
+    return (
+      <div className="space-y-6">
+        <Link href={`/dashboard/businesses/${id}/website`} className="text-sm text-ink-muted underline hover:text-ink">
+          ← Sitios web
+        </Link>
+        <div className="fl-card space-y-2 p-6 text-center">
+          <p className="text-sm font-medium text-ink">Esta página se generó con una versión anterior del sistema</p>
+          <p className="text-xs text-ink-muted">
+            Necesita regenerarse una vez para poder editarla — el contenido actual no se perderá hasta que lo hagas.
+          </p>
+          <RegenerateOldPageButton businessId={id} websiteId={websiteId} />
+        </div>
+      </div>
+    );
+  }
 
   const [totalViews, clicksWhatsapp, clicksAgenda] = await Promise.all([
     prisma.websiteEvent.count({ where: { websiteId, type: "view" } }),

@@ -49,7 +49,7 @@ export function renderWebsiteHtml(
   const trackedHref = (label: string) => `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(label)}`;
   const fonts = Array.from(new Set([content.theme.headingFont, content.theme.bodyFont]));
 
-  const servicesHtml = content.services
+  const offerHtml = content.offer.items
     .map(
       (s) => `
       <div class="card">
@@ -59,12 +59,12 @@ export function renderWebsiteHtml(
     )
     .join("");
 
-  const testimonialsHtml = content.testimonials
+  const objectionsHtml = content.objections.items
     .map(
-      (t) => `
-      <div class="quote-card">
-        <p class="quote">"${escapeHtml(t.quote)}"</p>
-        <p class="author">— ${escapeHtml(t.author)}</p>
+      (o) => `
+      <div class="objection-card">
+        <p class="objection-q">${escapeHtml(o.question)}</p>
+        <p class="objection-a">${escapeHtml(o.answer)}</p>
       </div>`,
     )
     .join("");
@@ -104,9 +104,9 @@ ${fontLink(fonts)}
   .card h3 { font-size: 18px; }
   .video-wrap { position: relative; padding-top: 56.25%; border-radius: 12px; overflow: hidden; margin-top: 16px; }
   .video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .quote-card { border-left: 3px solid var(--primary); padding: 4px 0 4px 20px; }
-  .quote { font-style: italic; }
-  .author { opacity: 0.7; font-size: 14px; margin: 0; }
+  .objection-card { border-left: 3px solid var(--primary); padding: 4px 0 4px 20px; }
+  .objection-q { font-weight: 600; margin-bottom: 0.3em; }
+  .objection-a { opacity: 0.85; margin: 0; }
   footer { padding: 40px 0; text-align: center; opacity: 0.6; font-size: 13px; }
   footer a { color: inherit; }
   @media (max-width: 600px) { .wrap { padding: 0 16px; } section { padding: 40px 0; } }
@@ -128,13 +128,6 @@ ${fontLink(fonts)}
     </div>
   </section>
 
-  <section>
-    <div class="wrap">
-      <h2>${escapeHtml(content.about.heading)}</h2>
-      <p>${escapeHtml(content.about.body)}</p>
-    </div>
-  </section>
-
   ${
     embedUrl
       ? `<section>
@@ -147,21 +140,17 @@ ${fontLink(fonts)}
 
   <section>
     <div class="wrap">
-      <h2>Servicios</h2>
-      <div class="grid">${servicesHtml}</div>
+      <h2>${escapeHtml(content.offer.heading)}</h2>
+      <div class="grid">${offerHtml}</div>
     </div>
   </section>
 
-  ${
-    content.testimonials.length > 0
-      ? `<section>
+  <section>
     <div class="wrap">
-      <h2>Lo que dicen</h2>
-      <div class="grid">${testimonialsHtml}</div>
+      <h2>${escapeHtml(content.objections.heading)}</h2>
+      <div class="grid">${objectionsHtml}</div>
     </div>
-  </section>`
-      : ""
-  }
+  </section>
 
   <section>
     <div class="wrap" style="text-align:center;">

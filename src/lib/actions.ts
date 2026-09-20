@@ -1149,6 +1149,43 @@ async function resolveWhatsappNumberForBusiness(businessId: string): Promise<{ a
 }
 
 /**
+ * Cheap, pre-summarized signal for the website generator's "objections"
+ * block — reuses the sales diagnosis (see lib/diagnosis.ts) when one has
+ * already been generated from this business's real conversations, since
+ * that's already paid for and already a distilled summary (a few short
+ * bullet points, not a transcript). Only falls back to reading raw
+ * messages when no diagnosis exists yet, and even then keeps it small (a
+ * handful of recent customer lines, trimmed) — this must stay cheap since
+ * it runs on every "Generar sitio web" / "Regenerar" click.
+ */
+async function buildSalesContext(businessId: string, diagnosisReport: unknown): Promise<string | null> {
+  if (diagnosisReport && typeof diagnosisReport === "object") {
+    const report = diagnosisReport as Partial<SalesDiagnosis>;
+    if (Array.isArray(report.debilidades) && report.debilidades.length > 0) {
+      const recomendaciones = Array.isArray(report.recomendaciones) ? report.recomendaciones : [];
+      return [
+        "CONTEXTO DE VENTAS REAL (de un diagnóstico ya hecho sobre conversaciones reales de este negocio):",
+        `- Lo que le está costando ventas hoy: ${report.debilidades.join("; ")}`,
+        recomendaciones.length > 0 ? `- Recomendaciones ya identificadas: ${recomendaciones.join("; ")}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    }
+  }
+
+  const recentCustomerMessages = await prisma.message.findMany({
+    where: { role: "CUSTOMER", conversation: { businessId } },
+    orderBy: { createdAt: "desc" },
+    take: 15,
+    select: { content: true },
+  });
+  if (recentCustomerMessages.length === 0) return null;
+
+  const sample = recentCustomerMessages.map((m) => `- ${m.content.slice(0, 140)}`).join("\n");
+  return `CONTEXTO DE VENTAS REAL (mensajes reales recientes de clientes de este negocio — úsalos para detectar dudas/objeciones típicas, no los cites literalmente):\n${sample}`;
+}
+
+/**
  * Creates a new page for this business — a business can have several (its
  * own mini funnel: a main site plus purpose-built pages like a demo-booking
  * page), each generated with structured, editable content (see
@@ -1178,7 +1215,10 @@ export async function createWebsitePage(
   // internal label.
   const name = input.name?.trim() || (existingCount === 0 ? "Sitio principal" : `Página ${existingCount + 1}`);
 
-  const { displayNumber } = await resolveWhatsappNumberForBusiness(businessId);
+  const [{ displayNumber }, salesContext] = await Promise.all([
+    resolveWhatsappNumberForBusiness(businessId),
+    buildSalesContext(businessId, business.agent?.diagnosisReport),
+  ]);
 
   const content = await generateWebsiteContent({
     businessName: business.name,
@@ -1192,6 +1232,7 @@ export async function createWebsitePage(
     tiktok: ownerMembership?.user.tiktok,
     purpose: input.purpose,
     ctaUrl: input.ctaUrl,
+    salesContext,
   });
 
   const slug = await generateUniqueWebsiteSlug(business.name, name, existingCount === 0);
@@ -1227,7 +1268,10 @@ export async function regenerateWebsitePage(businessId: string, websiteId: strin
     prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } }),
   ]);
 
-  const { displayNumber } = await resolveWhatsappNumberForBusiness(businessId);
+  const [{ displayNumber }, salesContext] = await Promise.all([
+    resolveWhatsappNumberForBusiness(businessId),
+    buildSalesContext(businessId, business.agent?.diagnosisReport),
+  ]);
   const existingContent = WebsiteContentSchema.safeParse(website.content);
 
   const content = await generateWebsiteContent({
@@ -1242,6 +1286,7 @@ export async function regenerateWebsitePage(businessId: string, websiteId: strin
     tiktok: ownerMembership?.user.tiktok,
     purpose: website.purpose,
     ctaUrl: (existingContent.success ? existingContent.data.hero.ctaUrl : null) ?? undefined,
+    salesContext,
   });
 
   await prisma.website.update({

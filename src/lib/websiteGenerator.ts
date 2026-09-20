@@ -39,6 +39,14 @@ export type WebsiteGenerationContext = {
   // When the page's goal is to send visitors somewhere other than
   // WhatsApp (e.g. a booking/agenda link) — becomes hero.ctaUrl.
   ctaUrl?: string | null;
+  // Cheap, pre-summarized signal about what this business's real customers
+  // actually ask/hesitate about — either the existing sales-diagnosis
+  // report (see lib/diagnosis.ts, already computed from real transcripts,
+  // reused here for free) or a small sample of recent customer messages.
+  // Feeds the "objections" block specifically. Null when neither exists
+  // yet (brand new business) — the model falls back to industry-typical
+  // objections in that case.
+  salesContext?: string | null;
 };
 
 /**
@@ -48,6 +56,12 @@ export type WebsiteGenerationContext = {
  * action (unless ctaUrl overrides it, e.g. for an agenda-focused page). The
  * structured result is rendered deterministically by lib/websiteTemplate.ts
  * and can be edited field-by-field afterward — see WebsiteEditor.
+ *
+ * Kept to exactly 4 content blocks (hero/offer/objections/contact — see
+ * WebsiteContentSchema) and run at low reasoning effort with a smaller
+ * output budget than a general-purpose generation call would use: this is
+ * "write focused copy from given inputs," not open-ended reasoning, and it
+ * runs on every "Generar sitio web" click, so cost matters.
  */
 export async function generateWebsiteContent(ctx: WebsiteGenerationContext): Promise<WebsiteContent> {
   const industryLabel = INDUSTRY_LABELS[ctx.industry] ?? INDUSTRY_LABELS.otro;
@@ -61,29 +75,29 @@ export async function generateWebsiteContent(ctx: WebsiteGenerationContext): Pro
     .filter((s): s is string => !!s)
     .join(", ");
 
-  const prompt = `Eres un copywriter y diseñador web senior. Genera el contenido estructurado de una página de una sola sección (landing page) para este negocio real:
+  const prompt = `Eres un copywriter y diseñador web senior. Genera el contenido de una landing page de 4 bloques (hero, oferta, objeciones, contacto) para este negocio real:
 
 - Nombre: ${ctx.businessName}
 - Rubro: ${industryLabel}
 - Qué hace / a quién le sirve (fuente real de contenido — escribe copy propio a partir de esto, no lo repitas literal): ${ctx.description || "Negocio local — usa el rubro para inferir servicios típicos y créalos de forma creíble."}
 ${location ? `- Ubicación: ${location}` : ""}
 ${socials ? `- Redes sociales: ${socials}` : ""}
-${ctx.purpose ? `- OBJETIVO ESPECÍFICO DE ESTA PÁGINA (muy importante, ajusta el copy y el botón principal a esto): ${ctx.purpose}` : "- Esta página es la presentación general del negocio."}
+${ctx.purpose ? `- OBJETIVO ESPECÍFICO DE ESTA PÁGINA (ajusta el copy y el botón principal a esto): ${ctx.purpose}` : "- Esta página es la presentación general del negocio."}
+${ctx.salesContext ? `\n${ctx.salesContext}\n` : ""}
 
 DIRECCIÓN VISUAL PARA ESTE RUBRO: ${direction}
 
 Reglas:
-1. Contenido 100% real y específico a este negocio — nada de "Lorem ipsum" ni placeholders genéricos tipo "Servicio 1/2/3". Si falta un dato (precios, horarios), redáctalo de forma creíble para el rubro sin inventar cifras falsas.
-2. Elige colores (hex) y tipografías a propósito para este rubro — nada del look genérico de IA (nada de fondo crema con serif y acento terracota por defecto, nada de gradiente morado-azul plano). Asegura buen contraste entre textColor y backgroundColor.
-3. Entre 3 y 6 servicios/productos concretos.
-4. 0 a 3 testimonios — si no hay reales, márcalos como ejemplo en el nombre del autor, ej. "(ejemplo)".
-5. videoUrl: solo si tiene sentido para este rubro dejarlo listo para un video institucional/demo (ponlo en null si no aplica — el cliente puede agregarlo después desde su panel).
-6. El botón principal (hero.ctaLabel) y el texto de contacto deben reflejar el objetivo específico de la página si se dio uno arriba.`;
+1. Contenido 100% real y específico a este negocio — nada de "Lorem ipsum" ni placeholders genéricos. Si falta un dato (precios, horarios), redáctalo de forma creíble sin inventar cifras falsas.
+2. Colores (hex) y tipografías elegidos a propósito para este rubro — nada del look genérico de IA. Buen contraste entre textColor y backgroundColor.
+3. El bloque "objections" es el más importante: usa el contexto de conversaciones reales dado arriba (si lo hay) para identificar 2-4 dudas u objeciones DE VERDAD que frenan la venta de este negocio, y respóndelas de forma directa y convincente — no pongas preguntas frecuentes genéricas tipo "¿cómo los contacto?". Si no hay contexto de conversaciones, infiere las objeciones típicas más realistas para este rubro específico.
+4. videoUrl: siempre null — no gastes esfuerzo en esto, el cliente lo agrega después si quiere.
+5. El botón principal (hero.ctaLabel) y el texto de contacto deben reflejar el objetivo específico de la página si se dio uno arriba.`;
 
   const response = await anthropic.messages.parse({
     model: "claude-sonnet-5",
-    max_tokens: 4096,
-    output_config: { format: zodOutputFormat(WebsiteContentSchema) },
+    max_tokens: 2200,
+    output_config: { format: zodOutputFormat(WebsiteContentSchema), effort: "low" },
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -118,8 +132,8 @@ Devuelve el contenido COMPLETO de la página (mismo formato) aplicando ese cambi
 
   const response = await anthropic.messages.parse({
     model: "claude-sonnet-5",
-    max_tokens: 4096,
-    output_config: { format: zodOutputFormat(WebsiteContentSchema) },
+    max_tokens: 2200,
+    output_config: { format: zodOutputFormat(WebsiteContentSchema), effort: "low" },
     messages: [{ role: "user", content: prompt }],
   });
 

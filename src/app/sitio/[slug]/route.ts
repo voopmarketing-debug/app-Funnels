@@ -24,8 +24,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
     console.error("Failed to log website view event:", err);
   }
 
-  const content = WebsiteContentSchema.parse(website.content);
-  const html = renderWebsiteHtml(content, {
+  const parsedContent = WebsiteContentSchema.safeParse(website.content);
+  if (!parsedContent.success) {
+    // Content saved under an earlier version of the schema — ask the
+    // owner to regenerate rather than showing a raw 500 to visitors.
+    return new NextResponse(
+      "Esta página necesita actualizarse — pide al dueño del negocio que entre a su panel y le dé 'Regenerar todo con IA'.",
+      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  }
+
+  const html = renderWebsiteHtml(parsedContent.data, {
     businessName: website.business.name,
     whatsappNumber: website.whatsappNumber,
     trackingBasePath: `/sitio/${slug}`,

@@ -32,11 +32,21 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const parsedContent = WebsiteContentSchema.safeParse(website.content);
+  if (!parsedContent.success) {
+    // Content saved under an earlier version of the schema — ask the
+    // owner to regenerate rather than showing a raw error to visitors.
+    return new NextResponse(
+      "Esta página necesita actualizarse — pide al dueño del negocio que entre a su panel y le dé 'Regenerar todo con IA'.",
+      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  }
+  const content = parsedContent.data;
+
   // Same click-through redirect as /sitio/[slug]/ir, reached here as a
   // root-relative "/ir" link since a custom domain has no slug in its path.
   if (request.nextUrl.pathname === "/ir") {
     const label = request.nextUrl.searchParams.get("label") ?? "unknown";
-    const content = WebsiteContentSchema.parse(website.content);
     const destination = content.hero.ctaUrl ? "agenda" : "whatsapp";
     const target = content.hero.ctaUrl || `https://wa.me/${website.whatsappNumber.replace(/[^0-9]/g, "")}`;
 
@@ -55,7 +65,6 @@ export async function proxy(request: NextRequest) {
     console.error("Failed to log website view event:", err);
   }
 
-  const content = WebsiteContentSchema.parse(website.content);
   const html = renderWebsiteHtml(content, {
     businessName: website.business.name,
     whatsappNumber: website.whatsappNumber,

@@ -19,9 +19,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     return new NextResponse("Sitio no encontrado", { status: 404 });
   }
 
-  const content = WebsiteContentSchema.parse(website.content);
-  const destination = content.hero.ctaUrl ? "agenda" : "whatsapp";
-  const target = content.hero.ctaUrl || `https://wa.me/${website.whatsappNumber.replace(/[^0-9]/g, "")}`;
+  const parsedContent = WebsiteContentSchema.safeParse(website.content);
+  const ctaUrl = parsedContent.success ? parsedContent.data.hero.ctaUrl : null;
+  const destination = ctaUrl ? "agenda" : "whatsapp";
+  const target = ctaUrl || `https://wa.me/${website.whatsappNumber.replace(/[^0-9]/g, "")}`;
 
   try {
     await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "cta_click", label, destination } });

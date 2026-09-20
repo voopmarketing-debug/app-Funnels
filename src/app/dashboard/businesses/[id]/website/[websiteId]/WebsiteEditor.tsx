@@ -192,30 +192,22 @@ export function WebsiteEditor({
           />
         </Section>
 
-        <Section title="Sobre el negocio">
+        <Section title={`Oferta (${content.offer.items.length})`} defaultOpen>
           <TextField
-            label="Título"
-            value={content.about.heading}
-            onChange={(v) => setContent((c) => ({ ...c, about: { ...c.about, heading: v } }))}
+            label="Título de la sección"
+            value={content.offer.heading}
+            onChange={(v) => setContent((c) => ({ ...c, offer: { ...c.offer, heading: v } }))}
           />
-          <TextAreaField
-            label="Texto"
-            value={content.about.body}
-            onChange={(v) => setContent((c) => ({ ...c, about: { ...c.about, body: v } }))}
-          />
-        </Section>
-
-        <Section title={`Servicios (${content.services.length})`}>
           <div className="space-y-3">
-            {content.services.map((service, i) => (
+            {content.offer.items.map((item, i) => (
               <div key={i} className="space-y-2 rounded-md border border-border p-3">
                 <div className="flex items-center justify-between">
                   <span className="fl-mono text-[10px] uppercase text-ink-faint">Servicio {i + 1}</span>
-                  {content.services.length > 1 && (
+                  {content.offer.items.length > 3 && (
                     <button
                       type="button"
                       onClick={() =>
-                        setContent((c) => ({ ...c, services: c.services.filter((_, idx) => idx !== i) }))
+                        setContent((c) => ({ ...c, offer: { ...c.offer, items: c.offer.items.filter((_, idx) => idx !== i) } }))
                       }
                       className="text-xs text-ink-faint hover:text-error"
                     >
@@ -225,31 +217,31 @@ export function WebsiteEditor({
                 </div>
                 <TextField
                   label="Título"
-                  value={service.title}
+                  value={item.title}
                   onChange={(v) =>
                     setContent((c) => ({
                       ...c,
-                      services: c.services.map((s, idx) => (idx === i ? { ...s, title: v } : s)),
+                      offer: { ...c.offer, items: c.offer.items.map((s, idx) => (idx === i ? { ...s, title: v } : s)) },
                     }))
                   }
                 />
                 <TextAreaField
                   label="Descripción"
-                  value={service.description}
+                  value={item.description}
                   onChange={(v) =>
                     setContent((c) => ({
                       ...c,
-                      services: c.services.map((s, idx) => (idx === i ? { ...s, description: v } : s)),
+                      offer: { ...c.offer, items: c.offer.items.map((s, idx) => (idx === i ? { ...s, description: v } : s)) },
                     }))
                   }
                 />
               </div>
             ))}
-            {content.services.length < 6 && (
+            {content.offer.items.length < 4 && (
               <button
                 type="button"
                 onClick={() =>
-                  setContent((c) => ({ ...c, services: [...c.services, { title: "", description: "" }] }))
+                  setContent((c) => ({ ...c, offer: { ...c.offer, items: [...c.offer.items, { title: "", description: "" }] } }))
                 }
                 className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-ink-muted transition hover:border-accent hover:text-accent"
               >
@@ -259,53 +251,76 @@ export function WebsiteEditor({
           </div>
         </Section>
 
-        <Section title={`Testimonios (${content.testimonials.length})`}>
+        <Section title={`Objeciones (${content.objections.items.length})`} defaultOpen>
+          <p className="text-xs text-ink-muted">
+            Las dudas reales que frenan la venta de este negocio, respondidas directamente — generadas a partir de
+            conversaciones reales cuando hay datos suficientes.
+          </p>
+          <TextField
+            label="Título de la sección"
+            value={content.objections.heading}
+            onChange={(v) => setContent((c) => ({ ...c, objections: { ...c.objections, heading: v } }))}
+          />
           <div className="space-y-3">
-            {content.testimonials.map((t, i) => (
+            {content.objections.items.map((item, i) => (
               <div key={i} className="space-y-2 rounded-md border border-border p-3">
                 <div className="flex items-center justify-between">
-                  <span className="fl-mono text-[10px] uppercase text-ink-faint">Testimonio {i + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setContent((c) => ({ ...c, testimonials: c.testimonials.filter((_, idx) => idx !== i) }))
-                    }
-                    className="text-xs text-ink-faint hover:text-error"
-                  >
-                    Quitar
-                  </button>
+                  <span className="fl-mono text-[10px] uppercase text-ink-faint">Objeción {i + 1}</span>
+                  {content.objections.items.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setContent((c) => ({
+                          ...c,
+                          objections: { ...c.objections, items: c.objections.items.filter((_, idx) => idx !== i) },
+                        }))
+                      }
+                      className="text-xs text-ink-faint hover:text-error"
+                    >
+                      Quitar
+                    </button>
+                  )}
                 </div>
-                <TextAreaField
-                  label="Cita"
-                  value={t.quote}
+                <TextField
+                  label="Duda / objeción"
+                  value={item.question}
                   onChange={(v) =>
                     setContent((c) => ({
                       ...c,
-                      testimonials: c.testimonials.map((x, idx) => (idx === i ? { ...x, quote: v } : x)),
+                      objections: {
+                        ...c.objections,
+                        items: c.objections.items.map((x, idx) => (idx === i ? { ...x, question: v } : x)),
+                      },
                     }))
                   }
                 />
-                <TextField
-                  label="Autor"
-                  value={t.author}
+                <TextAreaField
+                  label="Respuesta"
+                  value={item.answer}
                   onChange={(v) =>
                     setContent((c) => ({
                       ...c,
-                      testimonials: c.testimonials.map((x, idx) => (idx === i ? { ...x, author: v } : x)),
+                      objections: {
+                        ...c.objections,
+                        items: c.objections.items.map((x, idx) => (idx === i ? { ...x, answer: v } : x)),
+                      },
                     }))
                   }
                 />
               </div>
             ))}
-            {content.testimonials.length < 3 && (
+            {content.objections.items.length < 4 && (
               <button
                 type="button"
                 onClick={() =>
-                  setContent((c) => ({ ...c, testimonials: [...c.testimonials, { quote: "", author: "" }] }))
+                  setContent((c) => ({
+                    ...c,
+                    objections: { ...c.objections, items: [...c.objections.items, { question: "", answer: "" }] },
+                  }))
                 }
                 className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-ink-muted transition hover:border-accent hover:text-accent"
               >
-                + Agregar testimonio
+                + Agregar objeción
               </button>
             )}
           </div>
