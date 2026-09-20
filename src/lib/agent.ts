@@ -58,14 +58,18 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     },
   });
 
-  // Only needed for a brand-new conversation — every business is seeded
-  // with its own pipeline on creation, so this should always find one.
+  // Only needed for a brand-new conversation — every business is seeded with
+  // its own default pipeline on creation, so this should always find one. A
+  // business can have several pipelines (funnels), e.g. one per salesperson
+  // (see the Pipeline model) — every new inbound conversation lands in the
+  // DEFAULT one first; a team member then claims it into their own funnel by
+  // moving it to one of their stages.
   const firstStage = await prisma.pipelineStage.findFirst({
-    where: { businessId: business.id },
+    where: { businessId: business.id, pipeline: { isDefault: true } },
     orderBy: { position: "asc" },
   });
   if (!firstStage) {
-    console.warn(`Business ${business.id} has no pipeline stages configured`);
+    console.warn(`Business ${business.id} has no default pipeline configured`);
     return;
   }
 

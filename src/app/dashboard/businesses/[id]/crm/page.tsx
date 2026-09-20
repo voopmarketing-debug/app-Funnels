@@ -6,6 +6,7 @@ import { PipelineManager } from "../PipelineManager";
 import { CrmBoard } from "../CrmBoard";
 import { ContactsTable } from "../ContactsTable";
 import { CrmTabs } from "./CrmTabs";
+import { PipelineSwitcher } from "./PipelineSwitcher";
 import { ConversationSplitView } from "./ConversationSplitView";
 import { BroadcastDialog } from "./BroadcastDialog";
 import { AgentSwitcher } from "../AgentSwitcher";
@@ -15,10 +16,10 @@ export default async function CrmPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; conv?: string }>;
+  searchParams: Promise<{ tab?: string; conv?: string; pipeline?: string }>;
 }) {
   const { id } = await params;
-  const { tab: tabParam, conv } = await searchParams;
+  const { tab: tabParam, conv, pipeline: pipelineParam } = await searchParams;
   // Conversaciones is the default landing view — it's what an agency opens
   // CRM for day to day; Tablero/Lista are reached via their own ?tab= link.
   const tab = tabParam === "board" || tabParam === "list" ? tabParam : "chat";
@@ -31,11 +32,23 @@ export default async function CrmPage({
   });
   if (!membership) notFound();
 
-  const [business, stages, conversations, accessibleBusinesses, approvedTemplates] = await Promise.all([
+  // A business can have several embudos (funnels) — e.g. one per
+  // salesperson, all sharing the same WhatsApp number but each working their
+  // own board. Everything below (board/list/chat/broadcast/stage editor) is
+  // scoped to whichever one is selected via PipelineSwitcher, defaulting to
+  // the "principal" one every new inbound conversation lands in.
+  const allPipelines = await prisma.pipeline.findMany({
+    where: { businessId: id },
+    orderBy: { position: "asc" },
+    include: { stages: { orderBy: { position: "asc" } } },
+  });
+  const selectedPipeline =
+    allPipelines.find((p) => p.id === pipelineParam) ?? allPipelines.find((p) => p.isDefault) ?? allPipelines[0];
+
+  const [business, conversations, accessibleBusinesses, approvedTemplates] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
-    prisma.pipelineStage.findMany({ where: { businessId: id }, orderBy: { position: "asc" } }),
     prisma.conversation.findMany({
-      where: { businessId: id },
+      where: { businessId: id, stage: { pipelineId: selectedPipeline.id } },
       orderBy: { lastMessageAt: "desc" },
       take: 50,
     }),
@@ -50,6 +63,7 @@ export default async function CrmPage({
       orderBy: { name: "asc" },
     }),
   ]);
+  const stages = selectedPipeline.stages;
 
   const conversationSummaries = conversations.map((c) => ({
     id: c.id,
@@ -92,11 +106,19 @@ export default async function CrmPage({
         </div>
       </div>
 
-      <PipelineManager businessId={id} stages={stages} />
+      <PipelineManager businessId={id} pipelines={allPipelines} />
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CrmTabs activeTab={tab} />
+          <div className="flex flex-wrap items-center gap-2">
+            <CrmTabs activeTab={tab} />
+            {allPipelines.length > 1 && (
+              <PipelineSwitcher
+                pipelines={allPipelines.map((p) => ({ id: p.id, name: p.name }))}
+                selectedPipelineId={selectedPipeline.id}
+              />
+            )}
+          </div>
           <BroadcastDialog businessId={id} stages={stages} templates={approvedTemplates} />
         </div>
 

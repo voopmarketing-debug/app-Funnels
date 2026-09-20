@@ -24,10 +24,18 @@ export default async function ConversationPage({
   });
   if (!conversation) notFound();
 
-  const [business, stages] = await Promise.all([
+  const [business, stagesRaw] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
-    prisma.pipelineStage.findMany({ where: { businessId: id }, orderBy: { position: "asc" } }),
+    prisma.pipelineStage.findMany({
+      where: { businessId: id },
+      orderBy: [{ pipeline: { position: "asc" } }, { position: "asc" }],
+      include: { pipeline: { select: { name: true } } },
+    }),
   ]);
+  // Every stage across every embudo (funnel) this business has — grouped by
+  // embudo in the dropdown (see StageSelector) since two different embudos
+  // can have same-named stages (e.g. both have "Nuevo").
+  const stages = stagesRaw.map((s) => ({ id: s.id, name: s.name, pipelineName: s.pipeline.name }));
 
   return (
     <div className="fl-card mx-auto flex h-[calc(100vh-8rem)] max-w-5xl overflow-hidden">

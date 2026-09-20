@@ -80,8 +80,18 @@ export async function provisionClientFromPurchase(input: {
         industry,
         subscriptionStartedAt: new Date(),
         agent: { create: { systemPrompt: "" } },
-        pipelineStages: {
+      },
+    });
+
+    await tx.pipeline.create({
+      data: {
+        businessId: business.id,
+        name: "Embudo principal",
+        position: 0,
+        isDefault: true,
+        stages: {
           create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
+            businessId: business.id,
             name: stageName,
             position,
           })),

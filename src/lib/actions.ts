@@ -110,8 +110,21 @@ export async function registerBusiness(
         slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
         industry,
         agent: { create: { systemPrompt: "" } },
-        pipelineStages: {
+      },
+    });
+
+    // Every business starts with one default pipeline (funnel) — a team can
+    // later add more, e.g. one per salesperson, from the CRM (see
+    // createPipeline below).
+    await tx.pipeline.create({
+      data: {
+        businessId: business.id,
+        name: "Embudo principal",
+        position: 0,
+        isDefault: true,
+        stages: {
           create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
+            businessId: business.id,
             name: stageName,
             position,
           })),
@@ -208,8 +221,18 @@ export async function createClientAccount(
         slug: `${slugify(businessName)}-${Math.random().toString(36).slice(2, 7)}`,
         industry,
         agent: { create: { systemPrompt: "" } },
-        pipelineStages: {
+      },
+    });
+
+    await tx.pipeline.create({
+      data: {
+        businessId: business.id,
+        name: "Embudo principal",
+        position: 0,
+        isDefault: true,
+        stages: {
           create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
+            businessId: business.id,
             name: stageName,
             position,
           })),
@@ -277,8 +300,18 @@ export async function createBusiness(formData: FormData): Promise<void> {
       industry,
       memberships: { create: { userId: session.user.id, role: "OWNER" } },
       agent: { create: { systemPrompt } },
-      pipelineStages: {
+    },
+  });
+
+  await prisma.pipeline.create({
+    data: {
+      businessId: business.id,
+      name: "Embudo principal",
+      position: 0,
+      isDefault: true,
+      stages: {
         create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
+          businessId: business.id,
           name: stageName,
           position,
         })),
@@ -630,7 +663,88 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
   return { totalRecipients: conversations.length, sentCount, failedCount };
 }
 
-export async function addPipelineStage(businessId: string, formData: FormData): Promise<void> {
+// A business's own funnels (see the Pipeline model) — e.g. one per
+// salesperson, all sharing the same WhatsApp number but each with their own
+// board of leads. Every business keeps its original one, and can add more
+// from here.
+export async function createPipeline(businessId: string, formData: FormData): Promise<{ id: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) throw new Error("Ponle un nombre al embudo");
+
+  const last = await prisma.pipeline.findFirst({ where: { businessId }, orderBy: { position: "desc" } });
+
+  const pipeline = await prisma.pipeline.create({
+    data: {
+      businessId,
+      name,
+      position: (last?.position ?? -1) + 1,
+      stages: {
+        create: DEFAULT_PIPELINE_STAGE_NAMES.map((stageName, position) => ({
+          businessId,
+          name: stageName,
+          position,
+        })),
+      },
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  return { id: pipeline.id };
+}
+
+export async function renamePipeline(businessId: string, pipelineId: string, name: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("name is required");
+
+  await prisma.pipeline.update({ where: { id: pipelineId, businessId }, data: { name: trimmed } });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+}
+
+export async function deletePipeline(businessId: string, pipelineId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const pipelines = await prisma.pipeline.findMany({ where: { businessId }, orderBy: { position: "asc" } });
+  if (pipelines.length <= 1) throw new Error("Debe quedar al menos un embudo");
+
+  const toDelete = pipelines.find((p) => p.id === pipelineId);
+  if (!toDelete) throw new Error("Invalid pipeline");
+
+  // Never delete the default pipeline — it's where every new inbound
+  // WhatsApp conversation lands (see lib/agent.ts) before a team member
+  // claims it into their own funnel.
+  if (toDelete.isDefault) throw new Error("No puedes borrar el embudo principal");
+
+  const fallback = pipelines.find((p) => p.isDefault) ?? pipelines.find((p) => p.id !== pipelineId)!;
+  const fallbackFirstStage = await prisma.pipelineStage.findFirstOrThrow({
+    where: { pipelineId: fallback.id },
+    orderBy: { position: "asc" },
+  });
+
+  await prisma.$transaction([
+    // Conversations sitting anywhere in the deleted embudo move to the
+    // fallback embudo's first stage instead of being blocked or orphaned.
+    prisma.conversation.updateMany({
+      where: { businessId, stage: { pipelineId } },
+      data: { stageId: fallbackFirstStage.id },
+    }),
+    prisma.pipeline.delete({ where: { id: pipelineId } }),
+  ]);
+
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+}
+
+export async function addPipelineStage(businessId: string, pipelineId: string, formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
@@ -639,15 +753,15 @@ export async function addPipelineStage(businessId: string, formData: FormData): 
   if (!name) throw new Error("name is required");
 
   const last = await prisma.pipelineStage.findFirst({
-    where: { businessId },
+    where: { pipelineId },
     orderBy: { position: "desc" },
   });
 
   await prisma.pipelineStage.create({
-    data: { businessId, name, position: (last?.position ?? -1) + 1 },
+    data: { businessId, pipelineId, name, position: (last?.position ?? -1) + 1 },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
 }
 
 export async function renamePipelineStage(
@@ -667,28 +781,28 @@ export async function renamePipelineStage(
     data: { name: trimmed },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
 }
 
-export async function deletePipelineStage(businessId: string, stageId: string): Promise<void> {
+export async function deletePipelineStage(businessId: string, pipelineId: string, stageId: string): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
 
   const stages = await prisma.pipelineStage.findMany({
-    where: { businessId },
+    where: { pipelineId },
     orderBy: { position: "asc" },
   });
 
   if (stages.length <= 1) {
-    throw new Error("A business must keep at least one pipeline stage");
+    throw new Error("Un embudo debe conservar al menos una etapa");
   }
 
   const toDelete = stages.find((s) => s.id === stageId);
   if (!toDelete) throw new Error("Invalid stage");
 
   // Conversations sitting in the deleted stage move to the first remaining
-  // one instead of being blocked or silently orphaned.
+  // one in the same embudo instead of being blocked or silently orphaned.
   const fallback = stages.find((s) => s.id !== stageId)!;
 
   await prisma.$transaction([
@@ -699,11 +813,12 @@ export async function deletePipelineStage(businessId: string, stageId: string): 
     prisma.pipelineStage.delete({ where: { id: stageId } }),
   ]);
 
-  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
 }
 
 export async function movePipelineStage(
   businessId: string,
+  pipelineId: string,
   stageId: string,
   direction: "left" | "right",
 ): Promise<void> {
@@ -712,7 +827,7 @@ export async function movePipelineStage(
   await requireBusinessMembership(session.user.id, businessId);
 
   const stages = await prisma.pipelineStage.findMany({
-    where: { businessId },
+    where: { pipelineId },
     orderBy: { position: "asc" },
   });
 
@@ -724,14 +839,14 @@ export async function movePipelineStage(
   const b = stages[swapWith];
 
   await prisma.$transaction([
-    // Bump `a` out of the way first so the (businessId, position) unique
+    // Bump `a` out of the way first so the (pipelineId, position) unique
     // constraint doesn't collide with `b` while swapping.
     prisma.pipelineStage.update({ where: { id: a.id }, data: { position: -1 } }),
     prisma.pipelineStage.update({ where: { id: b.id }, data: { position: a.position } }),
     prisma.pipelineStage.update({ where: { id: a.id }, data: { position: b.position } }),
   ]);
 
-  revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
 }
 
 export async function toggleAgentEnabled(businessId: string, enabled: boolean): Promise<void> {

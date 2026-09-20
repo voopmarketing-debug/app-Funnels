@@ -35,7 +35,7 @@ export function ConversationThread({
   customerPhone: string;
   aiPaused: boolean;
   stageId: string;
-  stages: { id: string; name: string }[];
+  stages: { id: string; name: string; pipelineName?: string }[];
   messages: ThreadMessage[];
 }) {
   const customerInitial = (customerName?.trim()[0] ?? customerPhone.slice(-2)).toUpperCase();

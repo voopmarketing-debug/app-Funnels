@@ -51,6 +51,7 @@ model Business {
   agent          AIAgent?
   conversations  Conversation[]
   pipelineStages PipelineStage[]
+  pipelines      Pipeline[]
   broadcasts     Broadcast[]
   messageTemplates MessageTemplate[]
   websites       Website[]
@@ -149,21 +150,46 @@ model AIAgent {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
-// A CRM pipeline stage, owned by one business and fully customizable: each
-// business gets its own set of stages (seeded with 5 defaults on creation),
-// and can rename, add, delete, or reorder them independently of every other
-// business.
+// A business's own funnels — e.g. one per salesperson, all working the same
+// shared WhatsApp number but each with their own board of leads. Every
+// business always has at least one (isDefault, auto-created on signup); a
+// brand-new inbound conversation always lands in the default pipeline's
+// first stage (see lib/agent.ts) — a team member then claims it into their
+// own funnel by moving it to one of their stages (see PipelineStage below).
+model Pipeline {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  position   Int
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stages   PipelineStage[]
+
+  @@unique([businessId, position])
+}
+
+// A CRM pipeline stage, owned by one pipeline (funnel) and fully
+// customizable: each pipeline gets its own set of stages (seeded with 5
+// defaults when the pipeline is created), and can rename, add, delete, or
+// reorder them independently of every other pipeline. `businessId` is kept
+// alongside `pipelineId` (denormalized on purpose) so views that show every
+// stage across every funnel at once — the single-conversation stage picker,
+// the KPI stage-distribution chart — don't need an extra join.
 model PipelineStage {
   id         String   @id @default(cuid())
   businessId String
+  pipelineId String
   name       String
   position   Int
   createdAt  DateTime @default(now())
 
   business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  pipeline      Pipeline       @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   conversations Conversation[]
 
-  @@unique([businessId, position])
+  @@unique([pipelineId, position])
 }
 
 // One WhatsApp conversation thread with an end customer of a business.

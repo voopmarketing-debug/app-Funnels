@@ -153,8 +153,8 @@ export async function getBusinessAnalytics(
     }),
     prisma.pipelineStage.findMany({
       where: { businessId },
-      orderBy: { position: "asc" },
-      include: { _count: { select: { conversations: true } } },
+      orderBy: [{ pipeline: { position: "asc" } }, { position: "asc" }],
+      include: { _count: { select: { conversations: true } }, pipeline: { select: { name: true, isDefault: true } } },
     }),
     prisma.conversation.findMany({
       where: { businessId },
@@ -283,7 +283,18 @@ export async function getBusinessAnalytics(
       date,
       ...(messagesByDay.get(date) ?? { cliente: 0, ia: 0, humano: 0 }),
     })),
-    stageDistribution: stages.map((s) => ({ name: s.name, position: s.position, count: s._count.conversations })),
+    // Prefix with the embudo name only when a business actually has more
+    // than one — otherwise it's just noise, and most businesses have just
+    // the one default pipeline. Needed once there's more than one, since two
+    // different embudos can have same-named stages (e.g. both "Nuevo").
+    stageDistribution: (() => {
+      const hasMultiplePipelines = new Set(stages.map((s) => s.pipeline.name)).size > 1;
+      return stages.map((s) => ({
+        name: hasMultiplePipelines ? `${s.pipeline.name} · ${s.name}` : s.name,
+        position: s.position,
+        count: s._count.conversations,
+      }));
+    })(),
     websiteViews,
     websiteClicksWhatsapp,
     websiteClicksAgenda,

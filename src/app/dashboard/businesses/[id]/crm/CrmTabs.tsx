@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChatIcon, LayersIcon, ListIcon } from "../analytics/StatIcons";
 
 // Conversaciones first — it's what an agency actually opens CRM for day to
@@ -16,16 +16,21 @@ const TABS = [
 
 export function CrmTabs({ activeTab }: { activeTab: string }) {
   const pathname = usePathname();
+  // Keeps the selected embudo (?pipeline=) intact when switching tabs — only
+  // ?tab and ?conv are tab-specific.
+  const pipelineParam = useSearchParams().get("pipeline");
+  const suffix = pipelineParam ? `pipeline=${pipelineParam}` : "";
 
   return (
     <div className="flex items-center gap-2">
       {TABS.map((tab) => {
         const active = activeTab === tab.key;
         const Icon = tab.icon;
+        const query = tab.key === "chat" ? suffix : [`tab=${tab.key}`, suffix].filter(Boolean).join("&");
         return (
           <Link
             key={tab.key}
-            href={tab.key === "chat" ? pathname : `${pathname}?tab=${tab.key}`}
+            href={query ? `${pathname}?${query}` : pathname}
             className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition"
             style={
               active
