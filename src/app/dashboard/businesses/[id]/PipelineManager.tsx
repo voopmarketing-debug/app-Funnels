@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addPipelineStage,
@@ -60,55 +60,21 @@ export function PipelineManager({
 
       <ul className="mt-4 space-y-2">
         {stages.map((stage, index) => (
-          <li key={stage.id} className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={isPending || index === 0}
-              onClick={() => run(() => movePipelineStage(businessId, stage.id, "left"))}
-              className="rounded border border-border px-2 py-1 text-xs text-ink-muted transition hover:border-border-strong disabled:opacity-30"
-              title="Mover a la izquierda"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              disabled={isPending || index === stages.length - 1}
-              onClick={() => run(() => movePipelineStage(businessId, stage.id, "right"))}
-              className="rounded border border-border px-2 py-1 text-xs text-ink-muted transition hover:border-border-strong disabled:opacity-30"
-              title="Mover a la derecha"
-            >
-              →
-            </button>
-
-            <input
-              type="text"
-              defaultValue={stage.name}
-              disabled={isPending}
-              onBlur={(e) => {
-                const newName = e.target.value.trim();
-                if (newName && newName !== stage.name) {
-                  run(() => renamePipelineStage(businessId, stage.id, newName));
-                } else {
-                  e.target.value = stage.name;
-                }
-              }}
-              className="w-full flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm text-ink outline-none focus:border-accent"
-            />
-
-            <button
-              type="button"
-              disabled={isPending || stages.length <= 1}
-              onClick={() => {
-                if (confirm(`¿Borrar la etapa "${stage.name}"? Sus conversaciones pasan a la primera etapa.`)) {
-                  run(() => deletePipelineStage(businessId, stage.id));
-                }
-              }}
-              title={stages.length <= 1 ? "Debe quedar al menos una etapa" : "Borrar etapa"}
-              className="rounded border border-error/40 px-2 py-1 text-xs text-error transition hover:bg-error/10 disabled:opacity-30"
-            >
-              Borrar
-            </button>
-          </li>
+          <StageRow
+            key={stage.id}
+            businessId={businessId}
+            stage={stage}
+            isFirst={index === 0}
+            isLast={index === stages.length - 1}
+            canDelete={stages.length > 1}
+            movePending={isPending}
+            onMove={(direction) => run(() => movePipelineStage(businessId, stage.id, direction))}
+            onDelete={() => {
+              if (confirm(`¿Borrar la etapa "${stage.name}"? Sus conversaciones pasan a la primera etapa.`)) {
+                run(() => deletePipelineStage(businessId, stage.id));
+              }
+            }}
+          />
         ))}
       </ul>
 
@@ -130,5 +96,114 @@ export function PipelineManager({
         </button>
       </form>
     </details>
+  );
+}
+
+function StageRow({
+  businessId,
+  stage,
+  isFirst,
+  isLast,
+  canDelete,
+  movePending,
+  onMove,
+  onDelete,
+}: {
+  businessId: string;
+  stage: PipelineStageData;
+  isFirst: boolean;
+  isLast: boolean;
+  canDelete: boolean;
+  movePending: boolean;
+  onMove: (direction: "left" | "right") => void;
+  onDelete: () => void;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState(stage.name);
+  const [isSaving, startSaving] = useTransition();
+  const [saved, setSaved] = useState(false);
+
+  // Once a rename lands and the parent re-fetches, stage.name catches up to
+  // what we already saved — this just keeps the field in sync if it ever
+  // changes from elsewhere (e.g. another tab).
+  useEffect(() => setValue(stage.name), [stage.name]);
+
+  useEffect(() => {
+    if (!saved) return;
+    const timeout = setTimeout(() => setSaved(false), 2000);
+    return () => clearTimeout(timeout);
+  }, [saved]);
+
+  const trimmed = value.trim();
+  const isDirty = trimmed.length > 0 && trimmed !== stage.name;
+
+  function save() {
+    if (!isDirty) return;
+    startSaving(async () => {
+      await renamePipelineStage(businessId, stage.id, trimmed);
+      router.refresh();
+      setSaved(true);
+    });
+  }
+
+  return (
+    <li className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={movePending || isFirst}
+        onClick={() => onMove("left")}
+        className="rounded border border-border px-2 py-1 text-xs text-ink-muted transition hover:border-border-strong disabled:opacity-30"
+        title="Mover a la izquierda"
+      >
+        ←
+      </button>
+      <button
+        type="button"
+        disabled={movePending || isLast}
+        onClick={() => onMove("right")}
+        className="rounded border border-border px-2 py-1 text-xs text-ink-muted transition hover:border-border-strong disabled:opacity-30"
+        title="Mover a la derecha"
+      >
+        →
+      </button>
+
+      <input
+        type="text"
+        value={value}
+        disabled={isSaving}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            save();
+          }
+        }}
+        className="w-full flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm text-ink outline-none focus:border-accent"
+      />
+
+      {isDirty || isSaving ? (
+        <button
+          type="button"
+          disabled={isSaving}
+          onClick={save}
+          className="flex-none rounded-md bg-accent px-3 py-1 text-xs font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+        >
+          {isSaving ? "Guardando..." : "Guardar"}
+        </button>
+      ) : saved ? (
+        <span className="fl-mono flex-none text-xs text-accent">✓ Guardado</span>
+      ) : null}
+
+      <button
+        type="button"
+        disabled={movePending || !canDelete}
+        onClick={onDelete}
+        title={!canDelete ? "Debe quedar al menos una etapa" : "Borrar etapa"}
+        className="flex-none rounded border border-error/40 px-2 py-1 text-xs text-error transition hover:bg-error/10 disabled:opacity-30"
+      >
+        Borrar
+      </button>
+    </li>
   );
 }
