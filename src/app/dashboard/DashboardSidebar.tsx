@@ -115,7 +115,7 @@ export function DashboardSidebar({
     <aside className="flex min-h-screen w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5">
       <Link href="/dashboard" className="mb-4 flex items-center gap-2.5 px-4">
         <FunnelsLogoMark className="h-6 w-6 flex-none" />
-        <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">Funnels_Labs</span>
+        <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
       </Link>
 
       <nav className="flex flex-1 flex-col gap-1 px-3">

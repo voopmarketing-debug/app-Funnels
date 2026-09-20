@@ -85,9 +85,7 @@ function LoginForm() {
       >
         <div className="flex items-center gap-3">
           <FunnelsLogoMark className="h-7 w-7 flex-none" />
-          <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">
-            Funnels_Labs
-          </span>
+          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
         </div>
 
         <div className="space-y-1">

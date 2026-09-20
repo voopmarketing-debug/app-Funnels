@@ -82,9 +82,7 @@ export default async function Home() {
       <header className="relative mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-3">
           <FunnelsLogoMark className="h-7 w-7 flex-none" />
-          <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">
-            Funnels_Labs
-          </span>
+          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/login" className="text-sm text-ink-muted hover:text-ink">

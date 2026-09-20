@@ -23,9 +23,7 @@ export default function ForgotPasswordPage() {
       <div className="relative w-full max-w-sm space-y-6 fl-card-hero p-7">
         <div className="flex items-center gap-3">
           <FunnelsLogoMark className="h-7 w-7 flex-none" />
-          <span className="fl-mono text-xs font-medium tracking-[0.14em] text-ink uppercase">
-            Funnels_Labs
-          </span>
+          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
         </div>
 
         <div className="space-y-1">
