@@ -16,6 +16,9 @@ import {
   GlobeIcon,
   WhatsAppSmallIcon,
   CalendarLinkIcon,
+  CalendarCheckIcon,
+  FunnelIcon,
+  RegisterFormIcon,
 } from "./StatIcons";
 import { ConversationsTrendChart } from "./ConversationsTrendChart";
 import { MessagesStackedChart } from "./MessagesStackedChart";
@@ -76,6 +79,13 @@ function responseTimeStatus(minutes: number | null): Status {
 function awaitingReplyStatus(count: number): Status {
   if (count === 0) return "good";
   if (count <= 3) return "warning";
+  return "critical";
+}
+
+function conversionStatus(rate: number | null): Status {
+  if (rate === null) return "neutral";
+  if (rate >= 20) return "good";
+  if (rate >= 5) return "warning";
   return "critical";
 }
 
@@ -251,6 +261,29 @@ export default async function AnalyticsPage({
           description="Cuántas veces alguien le dio clic a un botón que lleva a un link externo (como tu agenda), en páginas configuradas para eso."
           tone="secondary"
           icon={<CalendarLinkIcon />}
+        />
+        <StatTile
+          label={`Citas agendadas (${RANGE_NOUN_PHRASE[rangeKey]})`}
+          value={String(analytics.appointmentsBooked)}
+          description="Conversaciones con una cita registrada (desde el panel de CRM) cuya fecha cae dentro del período seleccionado."
+          tone="secondary"
+          icon={<CalendarCheckIcon />}
+        />
+        <StatTile
+          label="Tasa de conversión a cita"
+          value={formatPercent(analytics.appointmentConversionRate)}
+          sublabel="de conversaciones nuevas"
+          status={conversionStatus(analytics.appointmentConversionRate)}
+          description="De cada 100 conversaciones nuevas en el período, cuántas terminaron en una cita agendada. Es tu métrica de resultado real, no solo de actividad."
+          tone="amber"
+          icon={<FunnelIcon />}
+        />
+        <StatTile
+          label={`Registros capturados (${RANGE_NOUN_PHRASE[rangeKey]})`}
+          value={String(analytics.websiteLeads)}
+          description="Personas que dejaron sus datos (nombre y WhatsApp) en el formulario de alguna de tus páginas web, en el período seleccionado."
+          tone="blue"
+          icon={<RegisterFormIcon />}
         />
         {membership.role === "ADMIN" && (
           <StatTile

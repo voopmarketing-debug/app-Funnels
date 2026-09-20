@@ -48,6 +48,16 @@ export type BusinessAnalytics = {
   websiteViews: number;
   websiteClicksWhatsapp: number;
   websiteClicksAgenda: number;
+  // Result-oriented metrics, as opposed to the operational/health ones
+  // above — "is this actually turning into business," not just "is the
+  // agent behaving." appointmentsBooked counts conversations whose
+  // appointmentAt (manually recorded, see schema.prisma) falls inside this
+  // range; appointmentConversionRate is that over newConversations in the
+  // same range (null when there were no new conversations to convert).
+  // websiteLeads reuses WebsiteLead the same way clicks reuse WebsiteEvent.
+  appointmentsBooked: number;
+  appointmentConversionRate: number | null;
+  websiteLeads: number;
 };
 
 function dayKey(date: Date): string {
@@ -116,6 +126,8 @@ export async function getBusinessAnalytics(
     websiteViews,
     websiteClicksWhatsapp,
     websiteClicksAgenda,
+    appointmentsBooked,
+    websiteLeads,
   ] = await Promise.all([
     prisma.conversation.count({ where: { businessId } }),
     prisma.conversation.count({ where: { businessId, createdAt: { gte: since, lt: until } } }),
@@ -161,6 +173,12 @@ export async function getBusinessAnalytics(
     }),
     prisma.websiteEvent.count({
       where: { type: "cta_click", destination: "agenda", createdAt: { gte: since, lt: until }, website: { businessId } },
+    }),
+    prisma.conversation.count({
+      where: { businessId, appointmentAt: { gte: since, lt: until } },
+    }),
+    prisma.websiteLead.count({
+      where: { createdAt: { gte: since, lt: until }, website: { businessId } },
     }),
   ]);
 
@@ -269,6 +287,9 @@ export async function getBusinessAnalytics(
     websiteViews,
     websiteClicksWhatsapp,
     websiteClicksAgenda,
+    appointmentsBooked,
+    appointmentConversionRate: newConversations === 0 ? null : (appointmentsBooked / newConversations) * 100,
+    websiteLeads,
   };
 }
 

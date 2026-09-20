@@ -156,3 +156,30 @@ export function CostIcon() {
     </IconBase>
   );
 }
+
+export function CalendarCheckIcon() {
+  return (
+    <IconBase>
+      <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M4 9.5h16M8 3v3.5M16 3v3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M9 14l2 2 4-4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
+export function FunnelIcon() {
+  return (
+    <IconBase>
+      <path d="M4 5h16l-6 7.5v5l-4 2v-7L4 5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
+export function RegisterFormIcon() {
+  return (
+    <IconBase>
+      <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M7.5 9h9M7.5 12.5h9M7.5 16h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </IconBase>
+  );
+}
