@@ -44,7 +44,12 @@ export function AgentForm({
         >
           <ChatIcon />
         </span>
-        <span className="fl-mono flex-1 text-xs tracking-wide text-ink uppercase">Instrucciones del agente de IA</span>
+        <span className="min-w-0 flex-1">
+          <span className="fl-mono block text-xs tracking-wide text-ink uppercase">Instrucciones del agente de IA</span>
+          <span className="mt-0.5 block text-xs normal-case text-ink-faint group-open:hidden">
+            Haz clic para ver y editar cómo responde tu agente.
+          </span>
+        </span>
         <svg
           viewBox="0 0 20 20"
           fill="none"

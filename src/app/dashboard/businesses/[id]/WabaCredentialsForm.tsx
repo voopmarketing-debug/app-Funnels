@@ -31,7 +31,6 @@ export function WabaCredentialsForm({
 
   return (
     <details
-      open
       className="group self-start overflow-hidden rounded-2xl border p-4"
       style={{
         borderColor: `rgba(${WHATSAPP_GREEN}, 0.28)`,
@@ -45,8 +44,13 @@ export function WabaCredentialsForm({
         >
           <WhatsAppSmallIcon />
         </span>
-        <span className="fl-mono flex-1 text-xs tracking-wide text-ink uppercase">
-          Credenciales de WhatsApp — paso obligatorio
+        <span className="min-w-0 flex-1">
+          <span className="fl-mono block text-xs tracking-wide text-ink uppercase">
+            Credenciales de WhatsApp — paso obligatorio
+          </span>
+          <span className="mt-0.5 block text-xs normal-case text-ink-faint group-open:hidden">
+            Haz clic para configurar el Phone Number ID y el token que te da Meta.
+          </span>
         </span>
         <svg
           viewBox="0 0 20 20"
