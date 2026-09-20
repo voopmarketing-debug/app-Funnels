@@ -18,7 +18,13 @@ import {
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
-import { resolveMediaType, uploadAttachment, MAX_ATTACHMENT_BYTES, maxMbFor } from "@/lib/attachments";
+import {
+  resolveMediaType,
+  uploadAttachment,
+  MAX_ATTACHMENT_BYTES,
+  maxMbFor,
+  MAX_AGENT_MEDIA_PER_BUSINESS,
+} from "@/lib/attachments";
 import { requireBusinessMembership } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
@@ -1437,6 +1443,13 @@ export async function addAgentMedia(businessId: string, formData: FormData): Pro
   const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
   if (!label) throw new Error("Escribe una descripción corta de qué es el archivo");
   if (!file) throw new Error("Selecciona una foto o un PDF");
+
+  const existingCount = await prisma.agentMedia.count({ where: { businessId } });
+  if (existingCount >= MAX_AGENT_MEDIA_PER_BUSINESS) {
+    throw new Error(
+      `Ya tienes el máximo de ${MAX_AGENT_MEDIA_PER_BUSINESS} archivos — borra uno para poder subir otro. Deja solo tus ${MAX_AGENT_MEDIA_PER_BUSINESS} productos más importantes.`,
+    );
+  }
 
   const mediaType = resolveMediaType(file.type);
   if (mediaType !== "image" && mediaType !== "document") {

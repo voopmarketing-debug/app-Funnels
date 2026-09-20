@@ -27,6 +27,15 @@ export function maxMbFor(mediaType: MediaType): number {
   return Math.round(MAX_ATTACHMENT_BYTES[mediaType] / (1024 * 1024));
 }
 
+// Kept small on purpose — this list gets read into every single AI reply's
+// prompt (see lib/ai.ts's buildAvailableMediaBlock), so it stays a curated
+// "best sellers" shortlist the AI can actually reason over, not a full
+// product catalog. Enforced both in addAgentMedia (lib/actions.ts) and in
+// AgentMediaManager.tsx (which disables the upload form at the limit) so
+// the UI never lets a client waste an upload only to have the server
+// reject it.
+export const MAX_AGENT_MEDIA_PER_BUSINESS = 10;
+
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "archivo";
 }

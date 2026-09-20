@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addAgentMedia, deleteAgentMedia } from "@/lib/actions";
+import { MAX_AGENT_MEDIA_PER_BUSINESS } from "@/lib/attachments";
 
 // Distinct from --glow-secondary (agent instructions) and the custom
 // WhatsApp green (credentials) so all three collapsible cards on this page
@@ -28,6 +29,7 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
   const [isSubmitting, startSubmitting] = useTransition();
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const atLimit = media.length >= MAX_AGENT_MEDIA_PER_BUSINESS;
 
   function handleSubmit(formData: FormData) {
     setError(null);
@@ -68,7 +70,7 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
         </span>
         <span className="min-w-0 flex-1">
           <span className="fl-mono block text-xs tracking-wide text-ink uppercase">
-            Fotos y catálogo para la IA {media.length > 0 && `(${media.length})`}
+            Fotos y catálogo para la IA ({media.length}/{MAX_AGENT_MEDIA_PER_BUSINESS})
           </span>
           <span className="mt-0.5 block text-xs normal-case text-ink-faint group-open:hidden">
             Haz clic para subir fotos o un PDF que la IA pueda enviar por WhatsApp.
@@ -118,35 +120,45 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
         </ul>
       )}
 
-      <form ref={formRef} action={handleSubmit} className="mt-4 space-y-2 border-t border-border pt-4">
-        <input
-          type="text"
-          name="label"
-          required
-          placeholder='Describe el archivo, ej: "Foto silla azul, $180.000" o "Catálogo completo de productos"'
-          disabled={isSubmitting}
-          className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
-        />
-        <div className="flex flex-col gap-2 sm:flex-row">
+      {atLimit ? (
+        <p className="mt-4 rounded-md border border-dashed border-border bg-background px-3 py-2.5 text-xs text-ink-muted">
+          Llegaste al máximo de {MAX_AGENT_MEDIA_PER_BUSINESS} archivos. Deja solo tus productos más importantes —
+          borra uno de la lista de arriba para poder subir otro.
+        </p>
+      ) : (
+        <form ref={formRef} action={handleSubmit} className="mt-4 space-y-2 border-t border-border pt-4">
           <input
-            type="file"
-            name="file"
-            accept="image/*,application/pdf"
+            type="text"
+            name="label"
             required
+            placeholder='Describe el archivo, ej: "Foto silla azul, $180.000" o "Catálogo completo de productos"'
             disabled={isSubmitting}
-            className="w-full flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-ink outline-none file:mr-2 file:rounded file:border-0 file:bg-accent file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent-ink"
+            className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
           />
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex-none rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
-          >
-            {isSubmitting ? "Subiendo..." : "+ Agregar"}
-          </button>
-        </div>
-        <p className="text-[11px] text-ink-faint">Fotos hasta 5 MB, PDFs hasta 20 MB.</p>
-        {error && <p className="text-xs text-error">{error}</p>}
-      </form>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="file"
+              name="file"
+              accept="image/*,application/pdf"
+              required
+              disabled={isSubmitting}
+              className="w-full flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-ink outline-none file:mr-2 file:rounded file:border-0 file:bg-accent file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent-ink"
+            />
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-none rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            >
+              {isSubmitting ? "Subiendo..." : "+ Agregar"}
+            </button>
+          </div>
+          <p className="text-[11px] text-ink-faint">
+            Fotos hasta 5 MB, PDFs hasta 20 MB — máximo {MAX_AGENT_MEDIA_PER_BUSINESS} archivos, deja solo tus
+            productos más top.
+          </p>
+          {error && <p className="text-xs text-error">{error}</p>}
+        </form>
+      )}
     </details>
   );
 }
