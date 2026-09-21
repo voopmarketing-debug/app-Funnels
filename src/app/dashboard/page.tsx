@@ -50,10 +50,11 @@ export default async function DashboardPage() {
   // already sees their own plan usage on the business page. Skip the extra
   // queries for businesses where it won't be shown.
   const adminBusinessIds = memberships.filter((m) => m.role === "ADMIN").map((m) => m.business.id);
-  // Renaming is an agency-wide privilege, not tied to the role on this one
+  // Being the agency is a global privilege, not tied to the role on this one
   // business — an agency admin can rename any agent, including one where
   // they happen to be the OWNER (their own internal/demo business) rather
-  // than ADMIN.
+  // than ADMIN. A plain client can also rename, but only their own (see the
+  // role === "OWNER" check where this is used below).
   const isAgencyAdmin = adminBusinessIds.length > 0;
   const activeContactsEntries = await Promise.all(
     adminBusinessIds.map(async (businessId) => [businessId, await getActiveContactsThisMonth(businessId)] as const),
@@ -113,7 +114,13 @@ export default async function DashboardPage() {
                   {business._count.conversations} conversaciones
                 </p>
               </Link>
-              <BusinessCardMenu businessId={business.id} currentName={business.name} canRename={isAgencyAdmin} />
+              {(role === "OWNER" || isAgencyAdmin) && (
+                <BusinessCardMenu
+                  businessId={business.id}
+                  currentName={business.name}
+                  canRename={role === "OWNER" || isAgencyAdmin}
+                />
+              )}
             </li>
           );
         })}

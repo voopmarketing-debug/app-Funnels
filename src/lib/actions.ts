@@ -1047,17 +1047,10 @@ export async function updateBusinessSubscription(
 export async function updateBusinessName(businessId: string, name: string): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
-
-  // Agency-wide privilege, not tied to the caller's role on THIS business —
-  // an agency admin can rename any agent, including one where they're only
-  // the OWNER (e.g. their own internal/demo business).
-  const isAgencyAdmin = await prisma.membership.findFirst({
-    where: { userId: session.user.id, role: "ADMIN" },
-    select: { id: true },
-  });
-  if (!isAgencyAdmin) {
-    throw new Error("Only the agency can rename a business");
-  }
+  // The client (OWNER) or the agency (ADMIN) can rename their own business —
+  // same floor as the other business-settings actions (see
+  // requireBusinessOwnerOrAdmin). MEMBER (an invited salesperson) cannot.
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   const trimmed = name.trim();
   if (!trimmed) throw new Error("El nombre no puede estar vacío");
