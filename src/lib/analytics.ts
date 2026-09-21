@@ -112,8 +112,13 @@ function buildDayKeys(key: DateRangeKey, now: Date): string[] {
 export async function getBusinessAnalytics(
   businessId: string,
   rangeKey: DateRangeKey = "30d",
+  // Defaults to now — overridable so lib/metricAlerts.ts can compute the
+  // exact same range shifted back a week (e.g. "7d" ending 7 days ago) to
+  // get a comparable prior-period snapshot, reusing this function's
+  // calculations instead of a second, easily-drifting implementation.
+  referenceDate: Date = new Date(),
 ): Promise<BusinessAnalytics> {
-  const now = new Date();
+  const now = referenceDate;
   const { since, until } = resolveDateRange(rangeKey, now);
 
   const [

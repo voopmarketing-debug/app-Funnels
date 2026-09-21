@@ -47,7 +47,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         message: n.message,
         createdAt: formatNotificationDate(n.createdAt),
         read: n.readAt !== null,
-        href: `/dashboard/businesses/${n.businessId}/conversations/${n.conversationId}`,
+        // Appointment notifications point straight at the conversation;
+        // metric alerts (see lib/metricAlerts.ts) have no single
+        // conversation to point to, so they go to the KPIs page instead.
+        href: n.conversationId
+          ? `/dashboard/businesses/${n.businessId}/conversations/${n.conversationId}`
+          : `/dashboard/businesses/${n.businessId}/analytics`,
         businessName: n.business.name,
       }));
       unreadCount = count;

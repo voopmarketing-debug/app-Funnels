@@ -240,22 +240,23 @@ model Conversation {
 }
 
 // Surfaced in the dashboard header's notification bell (see NotificationBell)
-// — created automatically when the AI agent detects, from the conversation
-// itself, that a lead confirmed a concrete appointment (see the
-// mark_appointment tool in lib/ai.ts and its handling in lib/agent.ts).
-// Room to grow beyond appointments later (type is a plain string, not an
-// enum, on purpose) but only that one case exists today.
+// — created automatically either when the AI agent detects a lead
+// confirming a concrete appointment (mark_appointment tool in lib/ai.ts,
+// handled in lib/agent.ts; conversationId set) or by the daily metric-alert
+// job (lib/metricAlerts.ts, run from api/cron/metric-alerts; no single
+// conversation to point to, so conversationId is null there). `type` is a
+// plain string, not an enum, so new alert kinds don't need a migration.
 model Notification {
   id             String    @id @default(cuid())
   businessId     String
-  conversationId String
+  conversationId String?
   type           String
   message        String
   readAt         DateTime?
   createdAt      DateTime  @default(now())
 
-  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([businessId, readAt])
 }
