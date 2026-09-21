@@ -10,7 +10,7 @@ import { WhatsAppSmallIcon } from "./analytics/StatIcons";
 // otherwise matches structurally.
 const WHATSAPP_GREEN = "37, 211, 102";
 
-type SaveState = { saved: boolean };
+type SaveState = { saved: boolean; error: string | null };
 
 export function WabaCredentialsForm({
   businessId,
@@ -23,10 +23,14 @@ export function WabaCredentialsForm({
 }) {
   const [state, formAction, isPending] = useActionState<SaveState, FormData>(
     async (_prevState, formData) => {
-      await updateWabaCredentials(businessId, formData);
-      return { saved: true };
+      try {
+        await updateWabaCredentials(businessId, formData);
+        return { saved: true, error: null };
+      } catch (err) {
+        return { saved: false, error: err instanceof Error ? err.message : "No se pudo guardar, intenta de nuevo" };
+      }
     },
-    { saved: false },
+    { saved: false, error: null },
   );
 
   return (
@@ -145,6 +149,7 @@ export function WabaCredentialsForm({
             <span className="fl-mono text-xs text-accent">✓ Guardado</span>
           )}
         </div>
+        {state.error && <p className="text-sm text-error">{state.error}</p>}
       </form>
     </details>
   );

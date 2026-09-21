@@ -33,7 +33,7 @@ import { PLAN_TIERS, PLAN_LABELS, TEAM_MEMBER_LIMITS } from "@/lib/plans";
 import { getAccountLineStatus } from "@/lib/lineLimits";
 import { logRegistrationForRemarketing } from "@/lib/remarketingSheet";
 import { sendEmail } from "@/lib/email";
-import type { PlanTier } from "@prisma/client";
+import { Prisma, type PlanTier } from "@prisma/client";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -291,17 +291,30 @@ export async function createBusiness(formData: FormData): Promise<void> {
     );
   }
 
-  const business = await prisma.business.create({
-    data: {
-      name,
-      slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
-      wabaPhoneNumberId,
-      wabaAccessToken: encryptSecret(wabaAccessToken),
-      industry,
-      memberships: { create: { userId: session.user.id, role: "OWNER" } },
-      agent: { create: { systemPrompt } },
-    },
-  });
+  let business;
+  try {
+    business = await prisma.business.create({
+      data: {
+        name,
+        slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
+        wabaPhoneNumberId,
+        wabaAccessToken: encryptSecret(wabaAccessToken),
+        industry,
+        memberships: { create: { userId: session.user.id, role: "OWNER" } },
+        agent: { create: { systemPrompt } },
+      },
+    });
+  } catch (err) {
+    // Same @unique wabaPhoneNumberId constraint as updateWabaCredentials —
+    // a reused Meta test number (or a copy-pasted production one) can't
+    // create a second business here either.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new Error(
+        "Ese Phone Number ID ya está conectado a otro negocio en la plataforma. Cada negocio necesita su propio número de WhatsApp — no se puede repetir el mismo Phone Number ID en dos negocios.",
+      );
+    }
+    throw err;
+  }
 
   await prisma.pipeline.create({
     data: {
@@ -340,14 +353,28 @@ export async function updateWabaCredentials(businessId: string, formData: FormDa
   // previous one expired. An empty submission just keeps the stored token.
   // wabaId is optional too — only needed to create WhatsApp message
   // templates (see /templates), not for regular sending/receiving.
-  await prisma.business.update({
-    where: { id: businessId },
-    data: {
-      wabaPhoneNumberId,
-      ...(wabaAccessToken ? { wabaAccessToken: encryptSecret(wabaAccessToken) } : {}),
-      ...(wabaId ? { wabaId } : {}),
-    },
-  });
+  try {
+    await prisma.business.update({
+      where: { id: businessId },
+      data: {
+        wabaPhoneNumberId,
+        ...(wabaAccessToken ? { wabaAccessToken: encryptSecret(wabaAccessToken) } : {}),
+        ...(wabaId ? { wabaId } : {}),
+      },
+    });
+  } catch (err) {
+    // wabaPhoneNumberId is @unique — it's how the WhatsApp webhook routes an
+    // incoming message to the right business. Two businesses can never share
+    // one (including two Meta test numbers copy-pasted from the same
+    // developer app): the second save must fail loudly instead of silently
+    // stealing the first business's WhatsApp line.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new Error(
+        "Ese Phone Number ID ya está conectado a otro negocio en la plataforma. Cada negocio necesita su propio número de WhatsApp — no se puede repetir el mismo Phone Number ID en dos negocios.",
+      );
+    }
+    throw err;
+  }
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
 }
