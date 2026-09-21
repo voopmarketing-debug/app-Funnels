@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { stripGreetings } from "./ai";
+import { describe, expect, it, vi } from "vitest";
+
+const createMock = vi.fn();
+vi.mock("./anthropicClient", () => ({
+  anthropic: { messages: { create: (...args: unknown[]) => createMock(...args) } },
+}));
+
+const { stripGreetings, generateAgentReply } = await import("./ai");
 
 describe("stripGreetings", () => {
   it("leaves the first message of a conversation untouched", () => {
@@ -82,5 +88,91 @@ describe("stripGreetings", () => {
 
   it("falls back to the original text if the reply is only a greeting", () => {
     expect(stripGreetings("Hola", false)).toBe("Hola");
+  });
+});
+
+describe("generateAgentReply — mark_appointment tool", () => {
+  it("parses a valid appointment tool_use block and includes the current-date context", async () => {
+    createMock.mockResolvedValueOnce({
+      content: [
+        { type: "text", text: "Perfecto, quedas agendado para el jueves a las 3pm." },
+        {
+          type: "tool_use",
+          id: "toolu_test",
+          name: "mark_appointment",
+          input: { appointmentAt: "2026-09-25T15:00:00-05:00", note: "Valoración estética" },
+        },
+      ],
+      usage: { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+    });
+
+    const result = await generateAgentReply({
+      systemPrompt: "Eres el agente de una clínica.",
+      tone: "cercano",
+      replyLength: "breve",
+      industry: "otro",
+      model: "claude-sonnet-5",
+      history: [
+        { role: "user", content: "Hola, quiero agendar una valoración" },
+        { role: "assistant", content: "Claro, ¿qué día te queda bien? Jueves 3pm o viernes 10am." },
+      ],
+      userMessage: "Sí, el jueves a las 3pm me sirve perfecto",
+    });
+
+    expect(result.appointment).toEqual({ at: "2026-09-25T15:00:00-05:00", note: "Valoración estética" });
+    expect(result.text).toContain("agendado");
+
+    const requestArg = createMock.mock.calls[0][0] as { tools: { name: string }[]; system: { text: string }[] };
+    expect(requestArg.tools.map((t) => t.name)).toContain("mark_appointment");
+    expect(requestArg.system[1].text).toContain("FECHA Y HORA ACTUAL");
+  });
+
+  it("discards a malformed appointment date instead of crashing", async () => {
+    createMock.mockResolvedValueOnce({
+      content: [
+        { type: "text", text: "Listo, te aviso." },
+        {
+          type: "tool_use",
+          id: "toolu_test2",
+          name: "mark_appointment",
+          input: { appointmentAt: "no-es-una-fecha", note: "algo" },
+        },
+      ],
+      usage: { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+    });
+
+    const result = await generateAgentReply({
+      systemPrompt: "Eres el agente de una clínica.",
+      tone: "cercano",
+      replyLength: "breve",
+      industry: "otro",
+      model: "claude-sonnet-5",
+      history: [],
+      userMessage: "algo",
+    });
+
+    expect(result.appointment).toBeUndefined();
+    expect(result.text).toBeTruthy();
+  });
+
+  it("always offers the mark_appointment tool even with no media available", async () => {
+    createMock.mockResolvedValueOnce({
+      content: [{ type: "text", text: "Hola, ¿en qué te ayudo?" }],
+      usage: { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+    });
+
+    await generateAgentReply({
+      systemPrompt: "Eres el agente de una clínica.",
+      tone: "cercano",
+      replyLength: "breve",
+      industry: "otro",
+      model: "claude-sonnet-5",
+      history: [],
+      userMessage: "Hola",
+    });
+
+    const requestArg = createMock.mock.calls[0][0] as { tools: { name: string }[] };
+    expect(requestArg.tools).toHaveLength(1);
+    expect(requestArg.tools[0].name).toBe("mark_appointment");
   });
 });

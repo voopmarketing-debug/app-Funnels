@@ -243,6 +243,59 @@ function buildAvailableMediaBlock(media: AvailableMedia[]): string {
   return `\n\nMATERIAL DISPONIBLE PARA ENVIAR (archivos reales de este negocio — usa la herramienta ${SEND_MEDIA_TOOL_NAME} solo si de verdad aplica, con uno de estos ids exactos):\n${lines}`;
 }
 
+const MARK_APPOINTMENT_TOOL_NAME = "mark_appointment";
+
+// Always offered (unlike send_media, which only makes sense when a business
+// has files uploaded) — any business's agent can end up confirming a
+// meeting time in the chat itself, not just through an external booking
+// link. Feeds Conversation.appointmentAt/appointmentNote (see
+// updateConversationDetails in actions.ts) and a Notification row — see
+// lib/agent.ts's handling of the tool_use block this produces.
+function buildMarkAppointmentTool(): Anthropic.Tool {
+  return {
+    name: MARK_APPOINTMENT_TOOL_NAME,
+    description:
+      "Registra una cita SOLO cuando el cliente confirma una fecha y hora EXACTAS para una llamada, reunión, cita o demo (ej: 'sí, el jueves a las 3pm me sirve'). No la uses si solo se menciona la posibilidad de agendar, si falta la fecha o la hora, o si el cliente solo dice que va a agendar por un link sin confirmarte el horario que eligió.",
+    input_schema: {
+      type: "object",
+      properties: {
+        appointmentAt: {
+          type: "string",
+          description:
+            "Fecha y hora exacta de la cita en formato ISO 8601 con offset de zona horaria, ej: '2026-09-25T15:00:00-05:00'. Usa la FECHA Y HORA ACTUAL de arriba para calcular fechas relativas ('mañana', 'el jueves'). Si el cliente no dio zona horaria, usa -05:00 (Colombia).",
+        },
+        note: {
+          type: "string",
+          description:
+            "Breve descripción de la cita en pocas palabras, ej: 'Llamada de diagnóstico gratuito' o 'Demo del producto por Zoom'.",
+        },
+      },
+      required: ["appointmentAt", "note"],
+    },
+  };
+}
+
+// Relative-date phrases ("mañana", "el viernes") only resolve correctly if
+// the model knows what "today" actually is — it has no live clock of its
+// own. Colombia time since that's this product's primary market; a customer
+// who states a different timezone explicitly overrides it (see the tool
+// description above).
+function buildCurrentDateTimeBlock(): string {
+  const formatted = new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+  return `\n\nFECHA Y HORA ACTUAL (zona horaria Colombia, UTC-5): ${formatted}. Úsala para calcular fechas relativas como "mañana" o "el viernes" al confirmar una cita con la herramienta ${MARK_APPOINTMENT_TOOL_NAME}.`;
+}
+
+export type DetectedAppointment = { at: string; note: string };
+
 export async function generateAgentReply(params: {
   systemPrompt: string;
   tone: string;
@@ -253,7 +306,7 @@ export async function generateAgentReply(params: {
   userMessage: string;
   owner?: OwnerContext;
   availableMedia?: AvailableMedia[];
-}): Promise<{ text: string; usage: AgentReplyUsage; sendMediaId?: string }> {
+}): Promise<{ text: string; usage: AgentReplyUsage; sendMediaId?: string; appointment?: DetectedAppointment }> {
   const isFirstMessage = params.history.length === 0;
   const availableMedia = params.availableMedia ?? [];
 
@@ -265,9 +318,13 @@ export async function generateAgentReply(params: {
     params.history,
     params.owner,
   );
+  system[system.length - 1].text += buildCurrentDateTimeBlock();
   if (availableMedia.length > 0) {
     system[system.length - 1].text += buildAvailableMediaBlock(availableMedia);
   }
+
+  const tools: Anthropic.Tool[] = [buildMarkAppointmentTool()];
+  if (availableMedia.length > 0) tools.push(buildSendMediaTool(availableMedia));
 
   const response = await anthropic.messages.create({
     model: params.model,
@@ -283,30 +340,44 @@ export async function generateAgentReply(params: {
     output_config: { effort: "low" },
     system,
     messages: [...params.history, { role: "user", content: params.userMessage }],
-    ...(availableMedia.length > 0 ? { tools: [buildSendMediaTool(availableMedia)] } : {}),
+    tools,
   });
 
   const textBlock = response.content.find((block) => block.type === "text");
-  const toolUseBlock = response.content.find(
-    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use" && block.name === SEND_MEDIA_TOOL_NAME,
+  const toolUseBlocks = response.content.filter(
+    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
   );
+  const mediaBlock = toolUseBlocks.find((block) => block.name === SEND_MEDIA_TOOL_NAME);
+  const appointmentBlock = toolUseBlocks.find((block) => block.name === MARK_APPOINTMENT_TOOL_NAME);
 
   // A tool-use turn can come back with no text block at all (Claude decided
-  // the file speaks for itself) — that's fine as long as media is attached;
-  // only a genuinely empty reply (no text AND no media) is an error.
+  // the file speaks for itself, or the whole turn was just marking an
+  // appointment) — that's fine as long as some tool fired; only a genuinely
+  // empty reply (no text AND no tool call) is an error.
   const rawText = textBlock && textBlock.type === "text" ? textBlock.text : "";
-  if (!rawText && !toolUseBlock) {
+  if (!rawText && !mediaBlock && !appointmentBlock) {
     throw new Error("Claude did not return a text response");
   }
 
   const sendMediaId =
-    toolUseBlock && typeof toolUseBlock.input === "object" && toolUseBlock.input !== null
-      ? (toolUseBlock.input as { mediaId?: string }).mediaId
+    mediaBlock && typeof mediaBlock.input === "object" && mediaBlock.input !== null
+      ? (mediaBlock.input as { mediaId?: string }).mediaId
       : undefined;
+
+  let appointment: DetectedAppointment | undefined;
+  if (appointmentBlock && typeof appointmentBlock.input === "object" && appointmentBlock.input !== null) {
+    const input = appointmentBlock.input as { appointmentAt?: string; note?: string };
+    // A malformed date from the model shouldn't ever crash the whole reply —
+    // just silently skip recording it, the human can still fill it in by hand.
+    if (input.appointmentAt && input.note && !isNaN(new Date(input.appointmentAt).getTime())) {
+      appointment = { at: input.appointmentAt, note: input.note };
+    }
+  }
 
   return {
     text: stripGreetings(rawText, isFirstMessage),
     sendMediaId: sendMediaId && availableMedia.some((m) => m.id === sendMediaId) ? sendMediaId : undefined,
+    appointment,
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,

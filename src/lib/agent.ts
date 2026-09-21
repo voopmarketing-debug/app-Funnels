@@ -21,6 +21,18 @@ const MEDIA_TYPE_LABEL: Record<string, string> = {
 
 const HISTORY_LIMIT = 20;
 
+function formatAppointmentDate(date: Date): string {
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
 /**
  * Handles one inbound WhatsApp text message end to end: persists it, asks the
  * business's AI agent for a reply, sends that reply back over WhatsApp, and
@@ -220,6 +232,35 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     reply = result.text;
     usage = result.usage;
     sendMediaId = result.sendMediaId;
+
+    // The AI detected the customer confirming a concrete date/time for a
+    // meeting (see the mark_appointment tool in lib/ai.ts) — fill in the
+    // "Cita agendada" field in the lead's detail panel automatically instead
+    // of leaving it for the business owner to type in by hand, and let them
+    // know via the notification bell. Skipped if nothing actually changed
+    // (the AI can re-confirm the same appointment across several messages),
+    // so re-confirming an unchanged appointment doesn't spam a new notice.
+    if (result.appointment) {
+      const appointmentAt = new Date(result.appointment.at);
+      const changed =
+        conversation.appointmentAt?.getTime() !== appointmentAt.getTime() ||
+        conversation.appointmentNote !== result.appointment.note;
+      if (changed) {
+        await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { appointmentAt, appointmentNote: result.appointment.note },
+        });
+        const leadLabel = conversation.customerName || conversation.customerPhone;
+        await prisma.notification.create({
+          data: {
+            businessId: business.id,
+            conversationId: conversation.id,
+            type: "APPOINTMENT_SCHEDULED",
+            message: `${leadLabel} agendó una cita para ${formatAppointmentDate(appointmentAt)}`,
+          },
+        });
+      }
+    }
   } catch (err) {
     // Surface the failure straight into the conversation thread in the
     // dashboard — a plain, ASCII-only summary, since the raw error object

@@ -63,6 +63,7 @@ model Business {
   messageTemplates MessageTemplate[]
   websites       Website[]
   agentMedia     AgentMedia[]
+  notifications  Notification[]
 }
 
 // A photo or document (product shot, PDF catalog, etc.) the client uploads
@@ -220,19 +221,43 @@ model Conversation {
   // Manually-set summary of the lead shown in the detail panel — e.g. what
   // the AI agent picked up on, or a note the business owner typed in.
   notes       String?  @db.Text
-  // Manually recorded from the detail panel today (see updateConversationDetails
-  // in lib/actions.ts) — there's no live sync yet from the separate
-  // agenda.funnelslabs.app booking project, so this reflects what the
-  // business owner/agency entered, not a real-time calendar feed.
+  // Set either by hand from the detail panel (see updateConversationDetails
+  // in lib/actions.ts) or automatically by the AI agent when it detects the
+  // customer confirming a concrete date/time in the chat itself (see the
+  // mark_appointment tool in lib/ai.ts and lib/agent.ts) — a Notification
+  // row is created alongside an automatic update. Still no live sync from
+  // the separate agenda.funnelslabs.app booking project.
   appointmentAt   DateTime?
   appointmentNote String?
 
-  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  stage    PipelineStage @relation(fields: [stageId], references: [id])
-  messages Message[]
+  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stage         PipelineStage  @relation(fields: [stageId], references: [id])
+  messages      Message[]
+  notifications Notification[]
 
   @@unique([businessId, customerPhone])
   @@index([stageId])
+}
+
+// Surfaced in the dashboard header's notification bell (see NotificationBell)
+// — created automatically when the AI agent detects, from the conversation
+// itself, that a lead confirmed a concrete appointment (see the
+// mark_appointment tool in lib/ai.ts and its handling in lib/agent.ts).
+// Room to grow beyond appointments later (type is a plain string, not an
+// enum, on purpose) but only that one case exists today.
+model Notification {
+  id             String    @id @default(cuid())
+  businessId     String
+  conversationId String
+  type           String
+  message        String
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, readAt])
 }
 
 enum MessageRole {

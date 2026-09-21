@@ -123,7 +123,8 @@ export function LeadDetailPanel({
         </button>
         {!appointmentAt && !apptDate && (
           <p className="mt-1 text-[10px] text-ink-faint">
-            Se guarda aquí manualmente — todavía no hay sincronización automática con agenda.funnelslabs.app.
+            Se llena sola cuando la IA detecta que el cliente confirmó fecha y hora en el chat — también puedes
+            escribirla aquí a mano. Todavía no hay sincronización con agenda.funnelslabs.app.
           </p>
         )}
       </section>

@@ -1702,3 +1702,35 @@ export async function removeTeamMember(businessId: string, userId: string): Prom
   await prisma.membership.delete({ where: { userId_businessId: { userId, businessId } } });
   revalidatePath("/dashboard/account");
 }
+
+/** Marks one notification read — e.g. when the user clicks it to open the conversation it's about. */
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const notification = await prisma.notification.findUnique({
+    where: { id: notificationId },
+    select: { businessId: true },
+  });
+  if (!notification) return;
+  await requireBusinessMembership(session.user.id, notification.businessId);
+
+  await prisma.notification.update({ where: { id: notificationId }, data: { readAt: new Date() } });
+  revalidatePath("/dashboard");
+}
+
+/** "Marcar todas como leídas" in the notification bell — every unread notification across every business this user belongs to. */
+export async function markAllNotificationsRead(): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const businessIds = (
+    await prisma.membership.findMany({ where: { userId: session.user.id }, select: { businessId: true } })
+  ).map((m) => m.businessId);
+
+  await prisma.notification.updateMany({
+    where: { businessId: { in: businessIds }, readAt: null },
+    data: { readAt: new Date() },
+  });
+  revalidatePath("/dashboard");
+}
