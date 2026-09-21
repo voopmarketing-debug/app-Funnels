@@ -1565,6 +1565,26 @@ export async function deleteWebsitePage(businessId: string, websiteId: string): 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
 }
 
+/**
+ * Just the internal label shown on the page's card in the list (e.g. "Paso
+ * 2 — Agendar demo") — never the public URL/slug, which stays fixed once
+ * generated so an existing link never breaks from a rename. Lets a client
+ * with several pages tell them apart by which step of their funnel each one
+ * is, instead of being stuck with the auto-numbered "Página 2".
+ */
+export async function renameWebsitePage(businessId: string, websiteId: string, name: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("El nombre no puede estar vacío");
+
+  await prisma.website.update({ where: { id: websiteId, businessId }, data: { name: trimmed } });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website`);
+}
+
 // Photos/PDFs the AI agent can choose to send mid-conversation — see
 // lib/ai.ts's "send_media" tool. Only image/document are offered here (no
 // audio/video — an AI-initiated voice note or video doesn't make sense).

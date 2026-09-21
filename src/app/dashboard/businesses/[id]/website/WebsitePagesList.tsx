@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createWebsitePage, deleteWebsitePage } from "@/lib/actions";
+import { createWebsitePage, deleteWebsitePage, renameWebsitePage } from "@/lib/actions";
 
 type Page = {
   id: string;
@@ -186,10 +186,54 @@ function GlobeIcon() {
   );
 }
 
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="m16.5 3.5 4 4L8 20 3.5 20.5 4 16 16.5 3.5Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function PageCard({ businessId, page, publicUrl }: { businessId: string; page: Page; publicUrl: string }) {
   const router = useRouter();
   const [isDeleting, startTransition] = useTransition();
+  const [isRenaming, startRenaming] = useTransition();
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(page.name);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const editHref = `/dashboard/businesses/${businessId}/website/${page.id}`;
+
+  function startEditingName() {
+    setNameValue(page.name);
+    setRenameError(null);
+    setIsEditingName(true);
+    // Wait for the input to mount before focusing it.
+    setTimeout(() => nameInputRef.current?.select(), 0);
+  }
+
+  function saveName() {
+    const trimmed = nameValue.trim();
+    if (!trimmed || trimmed === page.name) {
+      setIsEditingName(false);
+      return;
+    }
+    startRenaming(async () => {
+      try {
+        await renameWebsitePage(businessId, page.id, trimmed);
+        setIsEditingName(false);
+        router.refresh();
+      } catch (err) {
+        setRenameError(err instanceof Error ? err.message : "No se pudo guardar el nombre");
+      }
+    });
+  }
 
   return (
     <div className="fl-card fl-card-hover group overflow-hidden">
@@ -215,8 +259,36 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
 
       <div className="space-y-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate font-semibold text-ink">{page.name}</p>
+          <div className="min-w-0 flex-1">
+            {isEditingName ? (
+              <input
+                ref={nameInputRef}
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onBlur={saveName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    saveName();
+                  }
+                  if (e.key === "Escape") setIsEditingName(false);
+                }}
+                disabled={isRenaming}
+                maxLength={60}
+                className="w-full rounded border border-accent bg-background px-1.5 py-0.5 font-semibold text-ink outline-none"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={startEditingName}
+                title="Renombrar esta página — por ejemplo, qué paso de tu embudo es"
+                className="group/name flex max-w-full items-center gap-1.5 text-left"
+              >
+                <span className="truncate font-semibold text-ink">{page.name}</span>
+                <PencilIcon className="flex-none text-ink-faint opacity-0 transition group-hover/name:opacity-100" />
+              </button>
+            )}
+            {renameError && <p className="mt-0.5 text-xs text-error">{renameError}</p>}
             {page.purpose && <p className="mt-0.5 truncate text-xs text-ink-muted">{page.purpose}</p>}
           </div>
           <button
@@ -267,9 +339,11 @@ type FormState = { error: string | null };
 const INITIAL_STATE: FormState = { error: null };
 
 // Only asks for what actually changes the generated copy (the page's
-// purpose) — no name field (auto-numbered, never something the client has
-// to invent) and no link field (that's editable afterward, in the page's
-// own editor, alongside everything else).
+// purpose) — no name field here (auto-numbered at creation so there's
+// nothing to invent up front; renaming it to something like "Paso 2 —
+// Agendar demo" happens afterward, straight from the card — see
+// PageCard's inline rename) and no link field (that's editable afterward,
+// in the page's own editor, alongside everything else).
 function NewPageForm({
   businessId,
   pageNumber,
