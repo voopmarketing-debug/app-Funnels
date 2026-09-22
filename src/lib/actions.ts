@@ -16,6 +16,8 @@ import {
   fetchWhatsAppTemplateStatus,
   fetchWhatsAppDisplayNumber,
   verifyWabaConnection,
+  uploadTemplateHeaderImage,
+  type TemplateButton,
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
@@ -413,6 +415,20 @@ export async function updateWabaCredentials(
 
 const TEMPLATE_CATEGORIES = new Set(["MARKETING", "UTILITY"]);
 
+/** Reads up to 2 CTA/URL buttons out of a template form (buttonNText/buttonNUrl pairs) — a slot only counts if both fields are filled. */
+function parseTemplateButtons(formData: FormData): TemplateButton[] {
+  const buttons: TemplateButton[] = [];
+  for (const n of [1, 2] as const) {
+    const text = String(formData.get(`button${n}Text`) ?? "").trim();
+    const url = String(formData.get(`button${n}Url`) ?? "").trim();
+    if (!text && !url) continue;
+    if (!text || !url) throw new Error(`El botón ${n} necesita tanto el texto como el enlace`);
+    if (!/^https?:\/\//i.test(url)) throw new Error(`El enlace del botón ${n} debe empezar con https://`);
+    buttons.push({ type: "URL", text, url });
+  }
+  return buttons;
+}
+
 /** Submits a new WhatsApp message template to Meta for approval — see lib/whatsapp.ts for the API call itself. */
 export async function createMessageTemplate(businessId: string, formData: FormData): Promise<void> {
   const session = await auth();
@@ -428,6 +444,7 @@ export async function createMessageTemplate(businessId: string, formData: FormDa
   const categoryRaw = String(formData.get("category") ?? "MARKETING");
   const category = TEMPLATE_CATEGORIES.has(categoryRaw) ? (categoryRaw as "MARKETING" | "UTILITY") : "MARKETING";
   const bodyText = String(formData.get("bodyText") ?? "").trim();
+  const buttons = parseTemplateButtons(formData);
 
   if (!name || !bodyText) throw new Error("El nombre y el texto de la plantilla son obligatorios");
 
@@ -435,14 +452,46 @@ export async function createMessageTemplate(businessId: string, formData: FormDa
   if (!business.wabaAccessToken || !business.wabaId) {
     throw new Error("Falta el WABA ID en las credenciales de WhatsApp de este negocio (ver sección de credenciales)");
   }
+  const accessToken = decryptSecret(business.wabaAccessToken);
+
+  // The header image is optional — when present it needs two separate
+  // uploads: one to our own storage (so the app can redisplay/reuse it when
+  // sending later) and one to Meta's own Resumable Upload API, which hands
+  // back the one-time "handle" Meta requires in a template's creation
+  // request (a plain URL isn't accepted there, unlike when *sending*).
+  const headerImageEntry = formData.get("headerImage");
+  const headerImageFile = headerImageEntry instanceof File && headerImageEntry.size > 0 ? headerImageEntry : null;
+  let headerImageUrl: string | null = null;
+  let headerImageHandle: string | undefined;
+  if (headerImageFile) {
+    if (resolveMediaType(headerImageFile.type) !== "image") {
+      throw new Error("El encabezado solo acepta imágenes (JPG o PNG)");
+    }
+    if (headerImageFile.size > MAX_ATTACHMENT_BYTES.image) {
+      throw new Error(`La imagen del encabezado supera el máximo permitido (${maxMbFor("image")} MB)`);
+    }
+    const appId = process.env.META_APP_ID;
+    if (!appId) {
+      throw new Error("Falta configurar META_APP_ID en el servidor para poder subir imágenes de encabezado a Meta");
+    }
+    const bytes = Buffer.from(await headerImageFile.arrayBuffer());
+    const [uploaded, metaUpload] = await Promise.all([
+      uploadAttachment({ bytes, filename: headerImageFile.name, contentType: headerImageFile.type }),
+      uploadTemplateHeaderImage({ appId, accessToken, bytes, contentType: headerImageFile.type }),
+    ]);
+    headerImageUrl = uploaded.url;
+    headerImageHandle = metaUpload.handle;
+  }
 
   const { id: metaTemplateId, status } = await createWhatsAppTemplate({
     wabaId: business.wabaId,
-    accessToken: decryptSecret(business.wabaAccessToken),
+    accessToken,
     name,
     language,
     category,
     bodyText,
+    headerImageHandle,
+    buttons,
   });
 
   await prisma.messageTemplate.create({
@@ -452,6 +501,8 @@ export async function createMessageTemplate(businessId: string, formData: FormDa
       language,
       category,
       bodyText,
+      headerImageUrl,
+      buttons: buttons.length > 0 ? buttons : undefined,
       metaTemplateId,
       status: status === "APPROVED" ? "APPROVED" : status === "REJECTED" ? "REJECTED" : "PENDING",
     },
@@ -605,10 +656,10 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
   // in the last 24h — Meta rejects the rest) or an approved template
   // (works anytime, but its body is fixed — see /templates). Exactly one
   // of these resolves per call. An attached image/document is only offered
-  // for the free-text path — an approved template's media header is a
-  // separate Meta feature this app doesn't manage yet.
+  // for the free-text path — a template's own image header (if any) is
+  // carried on `template.headerImageUrl` instead.
   let message: string;
-  let template: { name: string; language: string } | null = null;
+  let template: { name: string; language: string; headerImageUrl?: string } | null = null;
   let media: { url: string; type: "image" | "document"; filename?: string } | null = null;
   if (templateId) {
     const approvedTemplate = await prisma.messageTemplate.findFirst({
@@ -616,7 +667,11 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
     });
     if (!approvedTemplate) throw new Error("Plantilla no encontrada o todavía no está aprobada");
     message = approvedTemplate.bodyText;
-    template = { name: approvedTemplate.name, language: approvedTemplate.language };
+    template = {
+      name: approvedTemplate.name,
+      language: approvedTemplate.language,
+      headerImageUrl: approvedTemplate.headerImageUrl ?? undefined,
+    };
   } else {
     message = String(formData.get("message") ?? "").trim();
     const fileEntry = formData.get("file");
@@ -670,6 +725,7 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
               to: conv.customerPhone,
               templateName: template.name,
               language: template.language,
+              headerImageUrl: template.headerImageUrl,
             })
           : media
             ? await sendWhatsAppMediaMessage({

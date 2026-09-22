@@ -15,10 +15,14 @@ export default async function TemplatesPage({ params }: { params: Promise<{ id: 
   });
   if (!membership) notFound();
 
-  const templates = await prisma.messageTemplate.findMany({
+  const templateRows = await prisma.messageTemplate.findMany({
     where: { businessId: id },
     orderBy: { createdAt: "desc" },
   });
+  const templates = templateRows.map((t) => ({
+    ...t,
+    buttons: Array.isArray(t.buttons) ? (t.buttons as { type: "URL"; text: string; url: string }[]) : [],
+  }));
 
   return (
     <div className="space-y-6">

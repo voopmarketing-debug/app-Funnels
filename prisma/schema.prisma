@@ -418,6 +418,14 @@ model MessageTemplate {
   language   String // e.g. "es", "es_CO", "en_US"
   category   String // "MARKETING" | "UTILITY"
   bodyText   String   @db.Text
+  // Optional image shown above the body — stored here as our own hosted
+  // (Vercel Blob) URL, used both to redisplay it in the UI and to fill in
+  // the header when sending an approved template (see whatsapp.ts). Meta
+  // itself needs a separately-uploaded "handle" at creation time, not this
+  // URL — see uploadTemplateHeaderImage.
+  headerImageUrl String? @db.Text
+  // Up to 2 CTA/URL buttons: [{ type: "URL", text, url }, ...]
+  buttons        Json?
 
   status           TemplateStatus @default(PENDING)
   metaTemplateId   String? // id Meta assigns once created

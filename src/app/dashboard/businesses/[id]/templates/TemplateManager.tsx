@@ -3,12 +3,16 @@
 import { useActionState, useRef, useState, useTransition } from "react";
 import { createMessageTemplate, refreshTemplateStatus } from "@/lib/actions";
 
+type TemplateButton = { type: "URL"; text: string; url: string };
+
 type Template = {
   id: string;
   name: string;
   language: string;
   category: string;
   bodyText: string;
+  headerImageUrl: string | null;
+  buttons: TemplateButton[];
   status: "PENDING" | "APPROVED" | "REJECTED";
   rejectionReason: string | null;
   createdAt: Date;
@@ -106,7 +110,28 @@ function TemplateCard({ businessId, template }: { businessId: string; template: 
           </button>
         )}
       </div>
+      {template.headerImageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={template.headerImageUrl}
+          alt=""
+          className="h-32 w-full rounded-md border border-border object-cover"
+        />
+      )}
       <p className="whitespace-pre-wrap text-sm text-ink-muted">{template.bodyText}</p>
+      {template.buttons.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {template.buttons.map((btn, i) => (
+            <span
+              key={i}
+              className="rounded-md border border-accent/40 px-2.5 py-1 text-xs font-medium text-accent"
+              title={btn.url}
+            >
+              🔗 {btn.text}
+            </span>
+          ))}
+        </div>
+      )}
       {template.status === "REJECTED" && template.rejectionReason && (
         <p className="text-xs text-error">Motivo de Meta: {template.rejectionReason}</p>
       )}
@@ -220,6 +245,47 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
           placeholder="Hola, tenemos una promoción especial esta semana..."
           className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
         />
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor="headerImage" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+          Imagen de encabezado (opcional)
+        </label>
+        <p className="text-[11px] text-ink-faint">
+          Aparece arriba del mensaje, igual que en Kommo — no es obligatoria.
+        </p>
+        <input
+          id="headerImage"
+          name="headerImage"
+          type="file"
+          accept="image/jpeg,image/png"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none file:mr-3 file:rounded file:border-0 file:bg-accent/15 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent focus:border-accent"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+          Botones de llamado a la acción (opcional, hasta 2)
+        </label>
+        {[1, 2].map((n) => (
+          <div key={n} className="grid grid-cols-2 gap-2">
+            <input
+              name={`button${n}Text`}
+              placeholder={n === 1 ? "Ver oferta" : "Agenda tu cita"}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+            />
+            <input
+              name={`button${n}Url`}
+              type="url"
+              placeholder="https://tu-sitio.com/..."
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+            />
+          </div>
+        ))}
+        <p className="text-[11px] text-ink-faint">
+          Cada botón abre ese enlace cuando el cliente lo toca en WhatsApp. Llena texto y enlace juntos, o deja
+          ambos vacíos para no usar ese botón.
+        </p>
       </div>
 
       {state.error && <p className="text-sm text-error">{state.error}</p>}

@@ -178,6 +178,52 @@ export async function downloadWhatsAppMedia(params: { url: string; accessToken: 
 
 export type TemplateCategory = "MARKETING" | "UTILITY";
 
+export type TemplateButton = { type: "URL"; text: string; url: string };
+
+/**
+ * Uploads a file to Meta's Resumable Upload API and returns the "handle"
+ * a template's HEADER IMAGE component needs as its `example.header_handle`
+ * when submitted for approval (see createWhatsAppTemplate) — Meta doesn't
+ * accept a plain URL there, only this handle. This is a one-time step at
+ * creation; *sending* an already-approved template with an image header
+ * just needs a normal link (see sendWhatsAppTemplateMessage).
+ */
+export async function uploadTemplateHeaderImage(params: {
+  appId: string;
+  accessToken: string;
+  bytes: Buffer;
+  contentType: string;
+}): Promise<{ handle: string }> {
+  const { appId, accessToken, bytes, contentType } = params;
+
+  const sessionUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${appId}/uploads`);
+  sessionUrl.searchParams.set("file_length", String(bytes.length));
+  sessionUrl.searchParams.set("file_type", contentType);
+  sessionUrl.searchParams.set("access_token", accessToken);
+
+  const sessionResponse = await fetch(sessionUrl, { method: "POST" });
+  if (!sessionResponse.ok) {
+    const body = await sessionResponse.text();
+    throw new Error(`No se pudo iniciar la subida de la imagen a Meta (${sessionResponse.status}): ${body}`);
+  }
+  const session = (await sessionResponse.json()) as { id?: string };
+  if (!session.id) throw new Error("Meta no devolvió una sesión de subida válida para la imagen");
+
+  const uploadResponse = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${session.id}`, {
+    method: "POST",
+    headers: { Authorization: `OAuth ${accessToken}`, file_offset: "0" },
+    body: new Uint8Array(bytes),
+  });
+  if (!uploadResponse.ok) {
+    const body = await uploadResponse.text();
+    throw new Error(`No se pudo subir la imagen a Meta (${uploadResponse.status}): ${body}`);
+  }
+  const uploaded = (await uploadResponse.json()) as { h?: string };
+  if (!uploaded.h) throw new Error("Meta no devolvió un identificador para la imagen subida");
+
+  return { handle: uploaded.h };
+}
+
 /**
  * Submits a new message template to Meta for review. Templates are scoped
  * to the WhatsApp Business Account (wabaId), not the phone number — this is
@@ -192,8 +238,19 @@ export async function createWhatsAppTemplate(params: {
   language: string;
   category: TemplateCategory;
   bodyText: string;
+  headerImageHandle?: string;
+  buttons?: TemplateButton[];
 }): Promise<{ id: string; status: string }> {
-  const { wabaId, accessToken, name, language, category, bodyText } = params;
+  const { wabaId, accessToken, name, language, category, bodyText, headerImageHandle, buttons } = params;
+
+  const components: Record<string, unknown>[] = [];
+  if (headerImageHandle) {
+    components.push({ type: "HEADER", format: "IMAGE", example: { header_handle: [headerImageHandle] } });
+  }
+  components.push({ type: "BODY", text: bodyText });
+  if (buttons && buttons.length > 0) {
+    components.push({ type: "BUTTONS", buttons: buttons.map((b) => ({ type: b.type, text: b.text, url: b.url })) });
+  }
 
   const response = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${wabaId}/message_templates`, {
     method: "POST",
@@ -201,12 +258,7 @@ export async function createWhatsAppTemplate(params: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      name,
-      language,
-      category,
-      components: [{ type: "BODY", text: bodyText }],
-    }),
+    body: JSON.stringify({ name, language, category, components }),
   });
 
   if (!response.ok) {
@@ -248,8 +300,17 @@ export async function sendWhatsAppTemplateMessage(params: {
   to: string;
   templateName: string;
   language: string;
+  // Only needed when the approved template has an IMAGE header — Meta
+  // re-fetches this link on every send, same as a regular media message.
+  // Static URL buttons need nothing here: Meta already has the button's
+  // fixed url baked into the approved template.
+  headerImageUrl?: string;
 }): Promise<{ messageId: string }> {
-  const { phoneNumberId, accessToken, to, templateName, language } = params;
+  const { phoneNumberId, accessToken, to, templateName, language, headerImageUrl } = params;
+
+  const components = headerImageUrl
+    ? [{ type: "header", parameters: [{ type: "image", image: { link: headerImageUrl } }] }]
+    : undefined;
 
   const response = await fetch(
     `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
@@ -263,7 +324,7 @@ export async function sendWhatsAppTemplateMessage(params: {
         messaging_product: "whatsapp",
         to,
         type: "template",
-        template: { name: templateName, language: { code: language } },
+        template: { name: templateName, language: { code: language }, ...(components ? { components } : {}) },
       }),
     },
   );
