@@ -3,10 +3,17 @@ import { stageStyle } from "@/lib/crmStages";
 import { DownloadCsvButton } from "@/components/DownloadCsvButton";
 import type { CrmStage, CrmConversation } from "./CrmBoard";
 
+// Runs server-side (Vercel = UTC), so timeZone must be explicit or every
+// timestamp shows ~5h ahead of the real Bogotá time.
 function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(
-    new Date(iso),
-  );
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(iso));
 }
 
 export function ContactsTable({

@@ -8,10 +8,17 @@ import { BoltIcon, AlertIcon, FunnelIcon } from "./StatIcons";
 
 type InitialDiagnosis = { diagnosis: SalesDiagnosis; generatedAt: string } | null;
 
+// Runs server-side (Vercel = UTC), so timeZone must be explicit or the
+// timestamp shows ~5h ahead of the real Bogotá time.
 function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("es", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(
-    new Date(iso),
-  );
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(iso));
 }
 
 // Meter: fill carries severity, track is a lighter step of the same hue so

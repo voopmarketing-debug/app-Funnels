@@ -2,6 +2,29 @@ import { ManualMessageForm } from "./conversations/[conversationId]/ManualMessag
 import { StageSelector } from "./conversations/[conversationId]/StageSelector";
 import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
 
+// This renders server-side, where the runtime clock is UTC (Vercel), not
+// Bogotá — toLocaleTimeString() without a timeZone silently used that UTC
+// offset, showing every message ~5h ahead of when it actually happened.
+function formatMessageTime(date: Date): string {
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
+function formatMessageDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
 type ThreadMessage = {
   id: string;
   role: "AGENT" | "CUSTOMER";
@@ -64,7 +87,7 @@ export function ConversationThread({
                 className="mx-auto max-w-[90%] rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-center text-xs text-red-300"
               >
                 <p>{message.content}</p>
-                <p className="mt-1 opacity-70">{message.createdAt.toLocaleString()}</p>
+                <p className="mt-1 opacity-70">{formatMessageDateTime(message.createdAt)}</p>
               </div>
             );
           }
@@ -92,9 +115,7 @@ export function ConversationThread({
               {(!hasMedia || !isPlaceholderCaption) && message.content && (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               )}
-              <p className="mt-1 text-right text-[10px] opacity-60">
-                {message.createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </p>
+              <p className="mt-1 text-right text-[10px] opacity-60">{formatMessageTime(message.createdAt)}</p>
             </div>
           );
 
