@@ -9,6 +9,7 @@ import {
 } from "@/lib/whatsapp";
 import { uploadAttachment } from "@/lib/attachments";
 import { generateAgentReply, type AgentHistoryMessage, type AgentReplyUsage } from "@/lib/ai";
+import { synthesizeVoiceNote, transcribeVoiceNote } from "@/lib/tts";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS } from "@/lib/plans";
 
@@ -151,6 +152,10 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     mediaFilename?: string;
     mediaSizeBytes?: number;
   } = {};
+  // Drives whether the reply goes out as a voice note too (see below) — only
+  // when the customer actually spoke to the agent, not just because a voice
+  // note happens to exist somewhere earlier in the conversation.
+  let inboundWasVoiceNote = false;
 
   if (message.media) {
     try {
@@ -166,6 +171,18 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
           mediaFilename: message.media.filename,
           mediaSizeBytes: size,
         };
+
+        if (message.media.type === "audio") {
+          inboundWasVoiceNote = true;
+          // Meta never sends a caption for voice notes, so without this the
+          // AI would see an empty message and have no idea what was said.
+          try {
+            const transcript = await transcribeVoiceNote({ bytes, mimeType: meta.mimeType });
+            if (transcript) messageContent = transcript;
+          } catch (err) {
+            console.error("Failed to transcribe inbound voice note:", err);
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to fetch/store inbound WhatsApp media:", err);
@@ -225,7 +242,9 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       industry: business.industry,
       model: business.agent.model,
       history,
-      userMessage: message.text,
+      // For a voice note this is the transcript (see above) — message.text
+      // itself is always empty for audio, Meta never sends a caption on it.
+      userMessage: inboundWasVoiceNote ? messageContent : message.text,
       owner: ownerMembership?.user,
       availableMedia,
     });
@@ -271,31 +290,59 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   }
 
   try {
-    const media = sendMediaId ? await prisma.agentMedia.findUnique({ where: { id: sendMediaId } }) : null;
+    const toolMedia = sendMediaId ? await prisma.agentMedia.findUnique({ where: { id: sendMediaId } }) : null;
 
-    const { messageId } = media
+    // Only when the customer actually spoke (voice note in) and the AI isn't
+    // already sending a file via the send_media tool — a reply never carries
+    // both a tool attachment and a synthesized voice note at once. A TTS
+    // failure here just falls back to a normal text reply instead of losing
+    // the message entirely.
+    let voiceNote: { url: string; sizeBytes: number } | null = null;
+    if (!toolMedia && inboundWasVoiceNote && reply) {
+      try {
+        const audioBytes = await synthesizeVoiceNote(reply);
+        const { url, size } = await uploadAttachment({
+          bytes: audioBytes,
+          filename: `respuesta-${Date.now()}.ogg`,
+          contentType: "audio/ogg",
+        });
+        voiceNote = { url, sizeBytes: size };
+      } catch (err) {
+        console.error("Failed to synthesize outbound voice note, falling back to text:", err);
+      }
+    }
+
+    const { messageId } = toolMedia
       ? await sendWhatsAppMediaMessage({
           phoneNumberId: business.wabaPhoneNumberId!,
           accessToken,
           to: message.from,
-          type: media.mediaType as "image" | "document",
-          link: media.url,
+          type: toolMedia.mediaType as "image" | "document",
+          link: toolMedia.url,
           // Meta caps an image/document caption well under a plain text
           // message's limit — truncated so a "detallada" reply never gets
           // rejected outright when it's riding along with a file.
           caption: reply ? reply.slice(0, 900) : undefined,
-          filename: media.mediaType === "document" ? (media.filename ?? undefined) : undefined,
+          filename: toolMedia.mediaType === "document" ? (toolMedia.filename ?? undefined) : undefined,
         })
-      : await sendWhatsAppTextMessage({
-          phoneNumberId: business.wabaPhoneNumberId!,
-          accessToken,
-          to: message.from,
-          // Only reachable with an empty reply if Claude replied with just a
-          // tool call and the referenced media vanished between generation
-          // and send (deleted mid-flight) — an empty WhatsApp text send
-          // would otherwise fail outright.
-          text: reply || "Un momento, ya te cuento.",
-        });
+      : voiceNote
+        ? await sendWhatsAppMediaMessage({
+            phoneNumberId: business.wabaPhoneNumberId!,
+            accessToken,
+            to: message.from,
+            type: "audio",
+            link: voiceNote.url,
+          })
+        : await sendWhatsAppTextMessage({
+            phoneNumberId: business.wabaPhoneNumberId!,
+            accessToken,
+            to: message.from,
+            // Only reachable with an empty reply if Claude replied with just a
+            // tool call and the referenced media vanished between generation
+            // and send (deleted mid-flight) — an empty WhatsApp text send
+            // would otherwise fail outright.
+            text: reply || "Un momento, ya te cuento.",
+          });
 
     await prisma.message.create({
       data: {
@@ -308,11 +355,16 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
         outputTokens: usage.outputTokens,
         cacheCreationInputTokens: usage.cacheCreationInputTokens,
         cacheReadInputTokens: usage.cacheReadInputTokens,
-        ...(media && {
-          mediaUrl: media.url,
-          mediaType: media.mediaType,
-          mediaFilename: media.filename,
-          mediaSizeBytes: media.sizeBytes,
+        ...(toolMedia && {
+          mediaUrl: toolMedia.url,
+          mediaType: toolMedia.mediaType,
+          mediaFilename: toolMedia.filename,
+          mediaSizeBytes: toolMedia.sizeBytes,
+        }),
+        ...(voiceNote && {
+          mediaUrl: voiceNote.url,
+          mediaType: "audio",
+          mediaSizeBytes: voiceNote.sizeBytes,
         }),
       },
     });
