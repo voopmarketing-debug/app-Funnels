@@ -27,9 +27,10 @@ export default function ForgotPasswordPage() {
         </div>
 
         <div className="space-y-1">
-          <h1 className="text-xl font-bold">Recuperar contraseña</h1>
+          <h1 className="text-xl font-bold">Crear o recuperar tu contraseña</h1>
           <p className="text-sm text-ink-muted">
-            Escribe tu correo y te enviamos un enlace para elegir una nueva contraseña.
+            Escribe tu correo y te enviamos un enlace para elegir tu contraseña e iniciar sesión — sirve tanto si
+            acabas de comprar y aún no tienes una, como si olvidaste la tuya.
           </p>
         </div>
 

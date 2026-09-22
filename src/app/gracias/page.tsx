@@ -23,15 +23,27 @@ export default function GraciasPage() {
           </p>
         </div>
 
+        {/* Primary CTA: this is the actual "activate your account" step —
+            same one-time-link mechanism as "olvidé mi contraseña"
+            (requestPasswordReset in lib/actions.ts), reused here so someone
+            who just paid isn't stuck waiting on an email that might be
+            delayed or land in spam. */}
+        <Link
+          href="/forgot-password"
+          className="block w-full rounded-md bg-accent px-3 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover"
+        >
+          Crear mi contraseña y entrar
+        </Link>
+
         <Link
           href="/login"
-          className="block w-full rounded-md bg-accent px-3 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover"
+          className="block w-full rounded-md border border-border-strong px-3 py-2 font-medium text-ink transition hover:border-accent"
         >
           Ya tengo mi contraseña, iniciar sesión
         </Link>
 
         <p className="text-center text-sm text-ink-muted">
-          ¿No te llegó el correo?{" "}
+          ¿Nada de esto funciona?{" "}
           <a
             href={SUPPORT_WHATSAPP_LINK}
             target="_blank"
