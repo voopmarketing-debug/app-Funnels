@@ -1071,6 +1071,11 @@ export async function sendManualMessage(
   }
 
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+  // This composer is also embedded in the CRM's WhatsApp-Web-style split
+  // view (?tab=chat&conv=...), a different route — without revalidating it
+  // too, a message sent from there goes out fine but never appears on
+  // screen until a manual reload, looking exactly like a silent failure.
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
 }
 
 export type SalesDiagnosisResult =
