@@ -15,6 +15,7 @@ import {
   createWhatsAppTemplate,
   fetchWhatsAppTemplateStatus,
   fetchWhatsAppDisplayNumber,
+  verifyWabaConnection,
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
@@ -336,7 +337,14 @@ export async function createBusiness(formData: FormData): Promise<void> {
   redirect(`/dashboard/businesses/${business.id}`);
 }
 
-export async function updateWabaCredentials(businessId: string, formData: FormData): Promise<void> {
+export type UpdateWabaCredentialsResult =
+  | { verified: true; displayPhoneNumber: string | null }
+  | { verified: false; verifyError: string };
+
+export async function updateWabaCredentials(
+  businessId: string,
+  formData: FormData,
+): Promise<UpdateWabaCredentialsResult> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessOwnerOrAdmin(session.user.id, businessId);
@@ -377,6 +385,30 @@ export async function updateWabaCredentials(businessId: string, formData: FormDa
   }
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
+
+  // Saving to our DB always "succeeds" even with a wrong id or an expired
+  // token — the only way to know it actually works is to ask Meta directly,
+  // with the exact same credentials the agent will use to send/receive.
+  let tokenToVerify = wabaAccessToken;
+  if (!tokenToVerify) {
+    const stored = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { wabaAccessToken: true },
+    });
+    if (!stored.wabaAccessToken) {
+      return {
+        verified: false,
+        verifyError: "Todavía no hay ningún token guardado — pega el token de acceso que te dio Meta.",
+      };
+    }
+    tokenToVerify = decryptSecret(stored.wabaAccessToken);
+  }
+  const verification = await verifyWabaConnection({ phoneNumberId: wabaPhoneNumberId, accessToken: tokenToVerify });
+
+  if (!verification.ok) {
+    return { verified: false, verifyError: verification.error };
+  }
+  return { verified: true, displayPhoneNumber: verification.displayPhoneNumber };
 }
 
 const TEMPLATE_CATEGORIES = new Set(["MARKETING", "UTILITY"]);

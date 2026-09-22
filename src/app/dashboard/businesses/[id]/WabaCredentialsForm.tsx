@@ -10,7 +10,7 @@ import { WhatsAppSmallIcon } from "./analytics/StatIcons";
 // otherwise matches structurally.
 const WHATSAPP_GREEN = "37, 211, 102";
 
-type SaveState = { saved: boolean; error: string | null };
+type SaveState = { saved: boolean; error: string | null; connectedNumber: string | null };
 
 export function WabaCredentialsForm({
   businessId,
@@ -24,13 +24,24 @@ export function WabaCredentialsForm({
   const [state, formAction, isPending] = useActionState<SaveState, FormData>(
     async (_prevState, formData) => {
       try {
-        await updateWabaCredentials(businessId, formData);
-        return { saved: true, error: null };
+        const result = await updateWabaCredentials(businessId, formData);
+        if (!result.verified) {
+          return {
+            saved: false,
+            connectedNumber: null,
+            error: `Guardamos los datos, pero Meta los rechazó al verificarlos: ${result.verifyError}`,
+          };
+        }
+        return { saved: true, error: null, connectedNumber: result.displayPhoneNumber };
       } catch (err) {
-        return { saved: false, error: err instanceof Error ? err.message : "No se pudo guardar, intenta de nuevo" };
+        return {
+          saved: false,
+          connectedNumber: null,
+          error: err instanceof Error ? err.message : "No se pudo guardar, intenta de nuevo",
+        };
       }
     },
-    { saved: false, error: null },
+    { saved: false, error: null, connectedNumber: null },
   );
 
   return (
@@ -146,7 +157,9 @@ export function WabaCredentialsForm({
             {isPending ? "Guardando..." : "Guardar credenciales"}
           </button>
           {state.saved && !isPending && (
-            <span className="fl-mono text-xs text-accent">✓ Guardado</span>
+            <span className="fl-mono text-xs text-accent">
+              ✓ Verificado con Meta{state.connectedNumber ? ` — número ${state.connectedNumber}` : ""}
+            </span>
           )}
         </div>
         {state.error && <p className="text-sm text-error">{state.error}</p>}

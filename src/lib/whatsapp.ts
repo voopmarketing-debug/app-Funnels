@@ -54,6 +54,52 @@ export async function fetchWhatsAppDisplayNumber(params: {
   return data.display_phone_number ?? null;
 }
 
+/**
+ * Calls Meta's own API with the phoneNumberId + token exactly as saved, so
+ * "guardado" actually means "Meta accepted these credentials" instead of
+ * just "the database write succeeded". Used right after saving credentials
+ * so a wrong/expired token or mistyped id is caught immediately instead of
+ * surfacing later as a silent failure to send/receive messages.
+ */
+export async function verifyWabaConnection(params: {
+  phoneNumberId: string;
+  accessToken: string;
+}): Promise<{ ok: true; displayPhoneNumber: string | null; verifiedName: string | null } | { ok: false; error: string }> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.phoneNumberId}`);
+  url.searchParams.set("fields", "display_phone_number,verified_name");
+
+  let response: Response;
+  try {
+    response = await fetch(url, { headers: { Authorization: `Bearer ${params.accessToken}` } });
+  } catch {
+    return { ok: false, error: "No se pudo contactar a Meta para verificar — inténtalo de nuevo en un momento." };
+  }
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: { message?: string; code?: number } } | null;
+    const metaMessage = body?.error?.message;
+    if (response.status === 401 || body?.error?.code === 190) {
+      return { ok: false, error: "El token de acceso no es válido o venció. Genera uno nuevo en Meta y pégalo aquí." };
+    }
+    if (response.status === 404 || body?.error?.code === 100) {
+      return { ok: false, error: "Meta no reconoce ese Phone Number ID — revisa que lo copiaste completo y sin espacios." };
+    }
+    return {
+      ok: false,
+      error: metaMessage
+        ? `Meta rechazó estas credenciales: ${metaMessage}`
+        : "Meta rechazó estas credenciales — revisa el Phone Number ID y el token.",
+    };
+  }
+
+  const data = (await response.json()) as { display_phone_number?: string; verified_name?: string };
+  return {
+    ok: true,
+    displayPhoneNumber: data.display_phone_number ?? null,
+    verifiedName: data.verified_name ?? null,
+  };
+}
+
 export type OutboundMediaType = "image" | "document" | "audio" | "video";
 
 /** Sends a media message by public link — Meta fetches the file itself, no upload-to-Meta step needed. */
