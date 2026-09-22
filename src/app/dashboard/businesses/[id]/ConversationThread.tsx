@@ -1,6 +1,7 @@
 import { ManualMessageForm } from "./conversations/[conversationId]/ManualMessageForm";
 import { StageSelector } from "./conversations/[conversationId]/StageSelector";
 import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
+import { MessageScrollArea } from "./MessageScrollArea";
 
 // This renders server-side, where the runtime clock is UTC (Vercel), not
 // Bogotá — toLocaleTimeString() without a timeZone silently used that UTC
@@ -76,7 +77,7 @@ export function ConversationThread({
         <StageSelector businessId={businessId} conversationId={conversationId} stageId={stageId} stages={stages} />
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background px-4 py-4">
+      <MessageScrollArea messageCount={messages.length}>
         {messages.map((message) => {
           const isError = message.content.startsWith("[ERROR INTERNO");
 
@@ -146,7 +147,7 @@ export function ConversationThread({
         {messages.length === 0 && (
           <p className="text-center text-sm text-ink-muted">Aún no hay mensajes en esta conversación.</p>
         )}
-      </div>
+      </MessageScrollArea>
 
       <ManualMessageForm businessId={businessId} conversationId={conversationId} />
     </div>
