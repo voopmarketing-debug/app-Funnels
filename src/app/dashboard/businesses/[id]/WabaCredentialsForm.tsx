@@ -148,21 +148,44 @@ export function WabaCredentialsForm({
           />
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={isPending}
-            className="rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+        >
+          {isPending ? "Guardando..." : "Guardar credenciales"}
+        </button>
+
+        {state.saved && !isPending && (
+          <div
+            className="flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm font-medium"
+            style={{
+              borderColor: `rgba(${WHATSAPP_GREEN}, 0.4)`,
+              backgroundColor: `rgba(${WHATSAPP_GREEN}, 0.14)`,
+              color: `rgba(${WHATSAPP_GREEN}, 1)`,
+            }}
           >
-            {isPending ? "Guardando..." : "Guardar credenciales"}
-          </button>
-          {state.saved && !isPending && (
-            <span className="fl-mono text-xs text-accent">
-              ✓ Verificado con Meta{state.connectedNumber ? ` — número ${state.connectedNumber}` : ""}
+            <svg viewBox="0 0 20 20" fill="none" className="mt-0.5 h-4 w-4 flex-none">
+              <path
+                d="M4 10.5 8 14l8-8"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>
+              Guardado y verificado con Meta
+              {state.connectedNumber ? ` — quedó conectado al número ${state.connectedNumber}` : ""}.
             </span>
-          )}
-        </div>
-        {state.error && <p className="text-sm text-error">{state.error}</p>}
+          </div>
+        )}
+
+        {state.error && (
+          <div className="rounded-md border border-error/40 bg-error/10 px-3 py-2.5 text-sm text-error">
+            {state.error}
+          </div>
+        )}
       </form>
     </details>
   );
