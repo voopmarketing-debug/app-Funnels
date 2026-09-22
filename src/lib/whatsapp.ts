@@ -2,6 +2,19 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 const GRAPH_API_VERSION = "v21.0";
 
+/** Meta's error responses are JSON with the useful bit nested in error.message — this pulls that out so a failed send shows a human sentence instead of a raw JSON blob. */
+function parseMetaErrorMessage(status: number, rawBody: string): string {
+  try {
+    const parsed = JSON.parse(rawBody) as { error?: { message?: string; error_data?: { details?: string } } };
+    const details = parsed.error?.error_data?.details;
+    const message = parsed.error?.message;
+    if (message) return details ? `${message} (${details})` : message;
+  } catch {
+    // Not JSON — fall through to the raw body below.
+  }
+  return `Meta respondió con un error (${status}): ${rawBody}`;
+}
+
 export async function sendWhatsAppTextMessage(params: {
   phoneNumberId: string;
   accessToken: string;
@@ -29,7 +42,7 @@ export async function sendWhatsAppTextMessage(params: {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`WhatsApp API error (${response.status}): ${body}`);
+    throw new Error(parseMetaErrorMessage(response.status, body));
   }
 
   const data = (await response.json()) as { messages?: { id: string }[] };
@@ -138,7 +151,7 @@ export async function sendWhatsAppMediaMessage(params: {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`WhatsApp API error (${response.status}): ${body}`);
+    throw new Error(parseMetaErrorMessage(response.status, body));
   }
 
   const data = (await response.json()) as { messages?: { id: string }[] };
@@ -263,7 +276,7 @@ export async function createWhatsAppTemplate(params: {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`WhatsApp API error (${response.status}): ${body}`);
+    throw new Error(parseMetaErrorMessage(response.status, body));
   }
 
   const data = (await response.json()) as { id?: string; status?: string };
@@ -331,7 +344,7 @@ export async function sendWhatsAppTemplateMessage(params: {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`WhatsApp API error (${response.status}): ${body}`);
+    throw new Error(parseMetaErrorMessage(response.status, body));
   }
 
   const data = (await response.json()) as { messages?: { id: string }[] };

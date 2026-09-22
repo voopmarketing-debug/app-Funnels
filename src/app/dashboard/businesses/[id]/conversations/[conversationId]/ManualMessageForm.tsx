@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { sendManualMessage } from "@/lib/actions";
 
-type SendState = { sentCount: number };
+type SendState = { sentCount: number; error: string | null };
 
 const SIZE_HINT = "Imágenes hasta 5 MB · audio/video hasta 16 MB · documentos hasta 20 MB";
 
@@ -21,21 +21,32 @@ export function ManualMessageForm({
 
   const [state, formAction, isPending] = useActionState<SendState, FormData>(
     async (prevState, formData) => {
-      await sendManualMessage(businessId, conversationId, formData);
-      return { sentCount: prevState.sentCount + 1 };
+      try {
+        await sendManualMessage(businessId, conversationId, formData);
+        return { sentCount: prevState.sentCount + 1, error: null };
+      } catch (err) {
+        // Meta's own rejection reason (token vencido, número fuera de la
+        // ventana de 24h, credenciales mal puestas, etc.) — previously this
+        // threw uncaught and either vanished silently or crashed the whole
+        // page via error.tsx, with no way to tell what actually failed.
+        return {
+          sentCount: prevState.sentCount,
+          error: err instanceof Error ? err.message : "No se pudo enviar el mensaje",
+        };
+      }
     },
-    { sentCount: 0 },
+    { sentCount: 0, error: null },
   );
 
   const [isRecording, setIsRecording] = useState(false);
   const [pendingFileName, setPendingFileName] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isPending) {
+    if (!isPending && !state.error) {
       formRef.current?.reset();
       setPendingFileName(null);
     }
-  }, [isPending, state.sentCount]);
+  }, [isPending, state.sentCount, state.error]);
 
   function handleFilePicked() {
     const file = fileInputRef.current?.files?.[0];
@@ -125,9 +136,13 @@ export function ManualMessageForm({
           {isPending ? "..." : "Enviar"}
         </button>
       </div>
-      <p className="fl-mono pl-1 text-[10px] text-ink-faint">
-        {pendingFileName ? `Adjunto: ${pendingFileName}` : SIZE_HINT}
-      </p>
+      {state.error ? (
+        <p className="pl-1 text-xs font-medium text-error">⚠ No se pudo enviar: {state.error}</p>
+      ) : (
+        <p className="fl-mono pl-1 text-[10px] text-ink-faint">
+          {pendingFileName ? `Adjunto: ${pendingFileName}` : SIZE_HINT}
+        </p>
+      )}
     </form>
   );
 }
