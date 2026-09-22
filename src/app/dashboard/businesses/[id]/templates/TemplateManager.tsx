@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { createMessageTemplate, refreshTemplateStatus } from "@/lib/actions";
 
 type TemplateButton = { type: "URL"; text: string; url: string };
@@ -75,7 +75,7 @@ export function TemplateManager({
         onClick={(e) => {
           if (e.target === e.currentTarget) dialogRef.current?.close();
         }}
-        className="fl-card-hero max-h-[85vh] w-full max-w-md overflow-y-auto p-0"
+        className="fl-card-hero max-h-[85vh] w-full max-w-3xl overflow-y-auto p-0"
       >
         <NewTemplateForm key={formKey} businessId={businessId} onClose={() => dialogRef.current?.close()} />
       </dialog>
@@ -145,6 +145,50 @@ function TemplateCard({ businessId, template }: { businessId: string; template: 
   );
 }
 
+/** Mimics a WhatsApp message bubble (header image, body, CTA buttons) so the admin sees roughly what the client will receive — same idea as Kommo's template preview. Not pixel-perfect, just close enough to catch mistakes before sending to Meta. */
+function TemplateMessagePreview({
+  headerImageUrl,
+  bodyText,
+  buttons,
+}: {
+  headerImageUrl: string | null;
+  bodyText: string;
+  buttons: { text: string }[];
+}) {
+  return (
+    <div className="space-y-2 sm:sticky sm:top-16">
+      <p className="fl-mono text-xs tracking-wide text-ink-muted uppercase">Así se ve en WhatsApp</p>
+      <div className="rounded-xl p-4" style={{ background: "#0b141a" }}>
+        <div className="ml-auto max-w-[240px] overflow-hidden rounded-lg rounded-tr-sm shadow-sm" style={{ background: "#005c4b" }}>
+          {headerImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={headerImageUrl} alt="" className="h-28 w-full object-cover" />
+          )}
+          <div className="px-2.5 pt-2 pb-1.5">
+            <p className="whitespace-pre-wrap break-words text-[13px] leading-snug text-white">
+              {bodyText.trim() || "Escribe el mensaje para verlo aquí..."}
+            </p>
+            <p className="mt-1 text-right text-[10px] text-white/60">10:42 a. m. ✓✓</p>
+          </div>
+          {buttons.length > 0 && (
+            <div className="border-t border-white/15">
+              {buttons.map((btn, i) => (
+                <div
+                  key={i}
+                  className={`px-2 py-2 text-center text-[13px] font-medium ${i > 0 ? "border-t border-white/15" : ""}`}
+                  style={{ color: "#53bdeb" }}
+                >
+                  🔗 {btn.text}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type FormState = { error: string | null; done: boolean };
 const INITIAL_STATE: FormState = { error: null, done: false };
 
@@ -157,6 +201,21 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
       return { error: err instanceof Error ? err.message : "No se pudo crear la plantilla", done: false };
     }
   }, INITIAL_STATE);
+
+  // Mirrors just the fields the preview needs — everything else (name,
+  // language, category) stays an uncontrolled field submitted normally.
+  const [bodyText, setBodyText] = useState("");
+  const [headerImagePreviewUrl, setHeaderImagePreviewUrl] = useState<string | null>(null);
+  const [button1Text, setButton1Text] = useState("");
+  const [button2Text, setButton2Text] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (headerImagePreviewUrl) URL.revokeObjectURL(headerImagePreviewUrl);
+    };
+  }, [headerImagePreviewUrl]);
+
+  const previewButtons = [button1Text, button2Text].filter((t) => t.trim()).map((text) => ({ text: text.trim() }));
 
   if (state.done) {
     return (
@@ -202,107 +261,128 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
         destinatarios de la difusión.
       </p>
 
-      <div className="space-y-1">
-        <label htmlFor="name" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Nombre interno
-        </label>
-        <input
-          id="name"
-          name="name"
-          required
-          placeholder="promo_octubre"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
-        <p className="text-[11px] text-ink-faint">Solo minúsculas y guiones bajos — Meta lo exige así.</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label htmlFor="language" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            Idioma
-          </label>
-          <select
-            id="language"
-            name="language"
-            defaultValue="es"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          >
-            {LANGUAGE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="category" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            Categoría
-          </label>
-          <select
-            id="category"
-            name="category"
-            defaultValue="MARKETING"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          >
-            <option value="MARKETING">Marketing / promoción</option>
-            <option value="UTILITY">Informativa (no promocional)</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="bodyText" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Mensaje
-        </label>
-        <textarea
-          id="bodyText"
-          name="bodyText"
-          required
-          rows={4}
-          placeholder="Hola, tenemos una promoción especial esta semana..."
-          className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="headerImage" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Imagen de encabezado (opcional)
-        </label>
-        <p className="text-[11px] text-ink-faint">
-          Aparece arriba del mensaje, igual que en Kommo — no es obligatoria.
-        </p>
-        <input
-          id="headerImage"
-          name="headerImage"
-          type="file"
-          accept="image/jpeg,image/png"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none file:mr-3 file:rounded file:border-0 file:bg-accent/15 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent focus:border-accent"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <label className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Botones de llamado a la acción (opcional, hasta 2)
-        </label>
-        {[1, 2].map((n) => (
-          <div key={n} className="grid grid-cols-2 gap-2">
+      <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label htmlFor="name" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+              Nombre interno
+            </label>
             <input
-              name={`button${n}Text`}
-              placeholder={n === 1 ? "Ver oferta" : "Agenda tu cita"}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              id="name"
+              name="name"
+              required
+              placeholder="promo_octubre"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
             />
-            <input
-              name={`button${n}Url`}
-              type="url"
-              placeholder="https://tu-sitio.com/..."
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+            <p className="text-[11px] text-ink-faint">Solo minúsculas y guiones bajos — Meta lo exige así.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label htmlFor="language" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+                Idioma
+              </label>
+              <select
+                id="language"
+                name="language"
+                defaultValue="es"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+              >
+                {LANGUAGE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="category" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+                Categoría
+              </label>
+              <select
+                id="category"
+                name="category"
+                defaultValue="MARKETING"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+              >
+                <option value="MARKETING">Marketing / promoción</option>
+                <option value="UTILITY">Informativa (no promocional)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="bodyText" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+              Mensaje
+            </label>
+            <textarea
+              id="bodyText"
+              name="bodyText"
+              required
+              rows={4}
+              value={bodyText}
+              onChange={(e) => setBodyText(e.target.value)}
+              placeholder="Hola, tenemos una promoción especial esta semana..."
+              className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
             />
           </div>
-        ))}
-        <p className="text-[11px] text-ink-faint">
-          Cada botón abre ese enlace cuando el cliente lo toca en WhatsApp. Llena texto y enlace juntos, o deja
-          ambos vacíos para no usar ese botón.
-        </p>
+
+          <div className="space-y-1">
+            <label htmlFor="headerImage" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+              Imagen de encabezado (opcional)
+            </label>
+            <p className="text-[11px] text-ink-faint">
+              Aparece arriba del mensaje, igual que en Kommo — no es obligatoria.
+            </p>
+            <input
+              id="headerImage"
+              name="headerImage"
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                setHeaderImagePreviewUrl((prev) => {
+                  if (prev) URL.revokeObjectURL(prev);
+                  return file ? URL.createObjectURL(file) : null;
+                });
+              }}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none file:mr-3 file:rounded file:border-0 file:bg-accent/15 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent focus:border-accent"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+              Botones de llamado a la acción (opcional, hasta 2)
+            </label>
+            {[1, 2].map((n) => (
+              <div key={n} className="grid grid-cols-2 gap-2">
+                <input
+                  name={`button${n}Text`}
+                  value={n === 1 ? button1Text : button2Text}
+                  onChange={(e) => (n === 1 ? setButton1Text : setButton2Text)(e.target.value)}
+                  placeholder={n === 1 ? "Ver oferta" : "Agenda tu cita"}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                />
+                <input
+                  name={`button${n}Url`}
+                  type="url"
+                  placeholder="https://tu-sitio.com/..."
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                />
+              </div>
+            ))}
+            <p className="text-[11px] text-ink-faint">
+              Cada botón abre ese enlace cuando el cliente lo toca en WhatsApp. Llena texto y enlace juntos, o deja
+              ambos vacíos para no usar ese botón.
+            </p>
+          </div>
+        </div>
+
+        <TemplateMessagePreview
+          headerImageUrl={headerImagePreviewUrl}
+          bodyText={bodyText}
+          buttons={previewButtons}
+        />
       </div>
 
       {state.error && <p className="text-sm text-error">{state.error}</p>}
