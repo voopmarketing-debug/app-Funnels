@@ -70,7 +70,13 @@ export function TemplateManager({
         + Nueva plantilla
       </button>
 
-      <dialog ref={dialogRef} className="fl-card-hero w-full max-w-md p-0">
+      <dialog
+        ref={dialogRef}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) dialogRef.current?.close();
+        }}
+        className="fl-card-hero max-h-[85vh] w-full max-w-md overflow-y-auto p-0"
+      >
         <NewTemplateForm key={formKey} businessId={businessId} onClose={() => dialogRef.current?.close()} />
       </dialog>
 
@@ -177,13 +183,24 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
 
   return (
     <form action={formAction} className="space-y-4 p-6">
-      <div className="space-y-1">
+      <div className="sticky top-0 z-10 -mx-6 -mt-6 flex items-center justify-between gap-3 bg-surface px-6 py-3">
         <h2 className="text-lg font-bold text-ink">Nueva plantilla</h2>
-        <p className="text-sm text-ink-muted">
-          Por ahora solo texto fijo (sin variables como {"{{1}}"}) — el mismo mensaje le llega a todos los
-          destinatarios de la difusión.
-        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="flex-none rounded-md p-1 text-ink-muted transition hover:bg-background hover:text-ink"
+        >
+          <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5">
+            <path d="M5 5l10 10M15 5 5 15" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+          </svg>
+        </button>
       </div>
+
+      <p className="text-sm text-ink-muted">
+        Por ahora solo texto fijo (sin variables como {"{{1}}"}) — el mismo mensaje le llega a todos los
+        destinatarios de la difusión.
+      </p>
 
       <div className="space-y-1">
         <label htmlFor="name" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
