@@ -41,9 +41,17 @@ export const WebsiteContentSchema = z.object({
     heading: z.string().describe("Titular principal — la propuesta de valor del negocio, específica, no genérica."),
     subheading: z.string().describe("Una o dos frases que amplían el titular, con lo que realmente ofrece el negocio."),
     ctaLabel: z.string().describe('Texto del botón principal, ej. "Escríbenos por WhatsApp" o "Agenda tu demo".'),
+    // Empty string is accepted alongside a real http(s) URL and null —
+    // structured-output models often emit "" rather than null for "no
+    // value here" despite the field being nullable, and every call site
+    // that reads ctaUrl already treats "" the same as null via `||`
+    // fallbacks (see proxy.ts, sitio/[slug]/ir/route.ts), so this doesn't
+    // change behavior, it just stops that case from throwing at generation
+    // time — this broke "Generar sitio web" for any business right after
+    // this validation was added.
     ctaUrl: z
       .string()
-      .regex(/^https?:\/\//, "Debe empezar con http:// o https://")
+      .regex(/^$|^https?:\/\/.+/, "Debe empezar con http:// o https://")
       .nullable()
       .describe(
         "URL externa a la que debe ir el botón principal (ej. un link de agenda/reservas), o null para usar el WhatsApp del negocio por defecto.",
