@@ -14,6 +14,7 @@ export type CrmConversation = {
   customerPhone: string;
   stageId: string;
   lastMessageAt: string;
+  unreadCount: number;
 };
 
 export function CrmBoard({
@@ -93,7 +94,16 @@ export function CrmBoard({
                     href={`/dashboard/businesses/${businessId}/conversations/${c.id}`}
                     className="block hover:opacity-80"
                   >
-                    <p className="truncate text-sm font-medium">{c.customerName ?? c.customerPhone}</p>
+                    <p className="flex items-center gap-1.5">
+                      <span className={`truncate text-sm ${c.unreadCount > 0 ? "font-bold" : "font-medium"}`}>
+                        {c.customerName ?? c.customerPhone}
+                      </span>
+                      {c.unreadCount > 0 && (
+                        <span className="fl-mono flex h-4 min-w-4 flex-none items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink">
+                          {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                        </span>
+                      )}
+                    </p>
                     <p className="truncate text-xs text-ink-muted">{c.customerPhone}</p>
                   </Link>
                   <select

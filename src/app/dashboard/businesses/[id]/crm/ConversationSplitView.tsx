@@ -67,28 +67,38 @@ export function ConversationSplitView({
           const style = stage ? stageStyle(stage.position) : null;
           const initial = (c.customerName?.trim()[0] ?? c.customerPhone.slice(-2)).toUpperCase();
           const isActive = c.id === selectedConversationId;
+          const isUnread = c.unreadCount > 0;
 
           return (
             <Link
               key={c.id}
               href={`?tab=chat&conv=${c.id}`}
               className={`flex items-center gap-3 border-b border-border px-3 py-3 transition ${
-                isActive ? "bg-accent/10" : "hover:bg-surface-2"
+                isActive ? "bg-accent/10" : isUnread ? "bg-accent/5 hover:bg-surface-2" : "hover:bg-surface-2"
               }`}
             >
               <div className="fl-mono flex h-9 w-9 flex-none items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-bold text-ink-muted">
                 {initial.slice(0, 2)}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink">{c.customerName ?? c.customerPhone}</p>
+                <p className={`truncate text-sm ${isUnread ? "font-bold text-ink" : "font-medium text-ink"}`}>
+                  {c.customerName ?? c.customerPhone}
+                </p>
                 <p className="flex items-center gap-1.5 truncate text-xs text-ink-muted">
                   {style && <span className={`h-1.5 w-1.5 flex-none rounded-full ${style.dot}`} />}
                   {stage?.name ?? c.customerPhone}
                 </p>
               </div>
-              <span className="fl-mono flex-none text-[10px] text-ink-faint">
-                {formatRelativeTime(c.lastMessageAt)}
-              </span>
+              <div className="flex flex-none flex-col items-end gap-1">
+                <span className={`fl-mono text-[10px] ${isUnread ? "font-semibold text-accent" : "text-ink-faint"}`}>
+                  {formatRelativeTime(c.lastMessageAt)}
+                </span>
+                {isUnread && (
+                  <span className="fl-mono flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink">
+                    {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                  </span>
+                )}
+              </div>
             </Link>
           );
         })}

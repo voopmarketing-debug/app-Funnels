@@ -52,6 +52,7 @@ export default async function CrmPage({
       where: { businessId: id, stage: { pipelineId: selectedPipeline.id } },
       orderBy: { lastMessageAt: "desc" },
       take: 50,
+      select: { id: true, customerName: true, customerPhone: true, stageId: true, lastMessageAt: true, lastReadAt: true },
     }),
     prisma.membership.findMany({
       where: { userId: session.user.id },
@@ -66,12 +67,31 @@ export default async function CrmPage({
   ]);
   const stages = selectedPipeline.stages;
 
+  // WhatsApp-style unread badge: count each conversation's CUSTOMER
+  // messages newer than its lastReadAt (null = never opened, so everything
+  // counts). Bounded to the last 60 days — a chat nobody's opened in longer
+  // than that doesn't need an exact count, just "unread".
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  const recentCustomerMessages = await prisma.message.findMany({
+    where: { conversationId: { in: conversations.map((c) => c.id) }, role: "CUSTOMER", createdAt: { gte: sixtyDaysAgo } },
+    select: { conversationId: true, createdAt: true },
+  });
+  const unreadCountByConversation = new Map<string, number>();
+  for (const m of recentCustomerMessages) {
+    const conversation = conversations.find((c) => c.id === m.conversationId);
+    if (conversation && (!conversation.lastReadAt || m.createdAt > conversation.lastReadAt)) {
+      unreadCountByConversation.set(m.conversationId, (unreadCountByConversation.get(m.conversationId) ?? 0) + 1);
+    }
+  }
+
   const conversationSummaries = conversations.map((c) => ({
     id: c.id,
     customerName: c.customerName,
     customerPhone: c.customerPhone,
     stageId: c.stageId,
     lastMessageAt: c.lastMessageAt.toISOString(),
+    unreadCount: unreadCountByConversation.get(c.id) ?? 0,
   }));
 
   let selectedConversation = null;
@@ -92,6 +112,14 @@ export default async function CrmPage({
         appointmentNote: full.appointmentNote,
         messages: full.messages,
       };
+
+      // Opening the chat is what "read" means here — matches WhatsApp: the
+      // badge/highlight clears the moment you look at the conversation, not
+      // when you reply to it. Zero it in the already-computed map too, so
+      // this same render doesn't still show the stale badge for the chat
+      // that's open right now.
+      await prisma.conversation.update({ where: { id: full.id }, data: { lastReadAt: new Date() } });
+      unreadCountByConversation.delete(full.id);
     }
   }
 

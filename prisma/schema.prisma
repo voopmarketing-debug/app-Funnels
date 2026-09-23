@@ -213,6 +213,11 @@ model Conversation {
   aiPaused       Boolean  @default(false)
   lastMessageAt  DateTime @default(now())
   createdAt      DateTime @default(now())
+  // Null = nobody on the team has opened this conversation yet, so every
+  // customer message counts as unread (see crm/page.tsx, which bumps this
+  // to now() whenever someone opens the chat) — powers the WhatsApp-style
+  // unread badge/highlight on the conversation list.
+  lastReadAt     DateTime?
 
   // Freeform labels the business/agency sets on this lead (e.g. "Empresa",
   // "Cotización") — shown as chips in the lead detail panel. Not tied to
