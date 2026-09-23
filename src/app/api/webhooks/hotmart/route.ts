@@ -1,14 +1,7 @@
-import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { parseHotmartPurchase } from "@/lib/hotmart";
 import { provisionClientFromPurchase } from "@/lib/provisioning";
-
-/** Constant-time string comparison — a plain !== short-circuits on the first differing byte, which is a (low-value, but free to close) timing side-channel for a shared secret. */
-function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
-}
+import { safeEqual } from "@/lib/crypto";
 
 // Hotmart sends a shared "Hottok" value on every webhook call (set once
 // when you configure the webhook in Hotmart's dashboard) instead of a

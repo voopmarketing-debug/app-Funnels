@@ -43,6 +43,7 @@ export const WebsiteContentSchema = z.object({
     ctaLabel: z.string().describe('Texto del botón principal, ej. "Escríbenos por WhatsApp" o "Agenda tu demo".'),
     ctaUrl: z
       .string()
+      .regex(/^https?:\/\//, "Debe empezar con http:// o https://")
       .nullable()
       .describe(
         "URL externa a la que debe ir el botón principal (ej. un link de agenda/reservas), o null para usar el WhatsApp del negocio por defecto.",

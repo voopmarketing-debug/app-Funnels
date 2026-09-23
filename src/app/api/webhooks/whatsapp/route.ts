@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseInboundMessages, verifyWebhookSignature } from "@/lib/whatsapp";
 import { handleIncomingMessage } from "@/lib/agent";
+import { safeEqual } from "@/lib/crypto";
 
 // One-time handshake Meta performs when you save the webhook URL in the App Dashboard.
 export async function GET(req: NextRequest) {
@@ -8,8 +9,9 @@ export async function GET(req: NextRequest) {
   const mode = params.get("hub.mode");
   const token = params.get("hub.verify_token");
   const challenge = params.get("hub.challenge");
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
-  if (mode === "subscribe" && challenge && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+  if (mode === "subscribe" && challenge && token && verifyToken && safeEqual(token, verifyToken)) {
     return new NextResponse(challenge, { status: 200 });
   }
 

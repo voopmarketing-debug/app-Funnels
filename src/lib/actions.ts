@@ -909,7 +909,7 @@ export async function deletePipelineStage(businessId: string, pipelineId: string
   await requireBusinessMembership(session.user.id, businessId);
 
   const stages = await prisma.pipelineStage.findMany({
-    where: { pipelineId },
+    where: { pipelineId, businessId },
     orderBy: { position: "asc" },
   });
 
@@ -929,7 +929,7 @@ export async function deletePipelineStage(businessId: string, pipelineId: string
       where: { businessId, stageId },
       data: { stageId: fallback.id },
     }),
-    prisma.pipelineStage.delete({ where: { id: stageId } }),
+    prisma.pipelineStage.delete({ where: { id: stageId, businessId } }),
   ]);
 
   revalidatePath(`/dashboard/businesses/${businessId}/crm`);

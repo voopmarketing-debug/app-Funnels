@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     select: { id: true, content: true, whatsappNumber: true, business: { select: { name: true } } },
   });
   if (!website) {
-    return new NextResponse("Sitio no encontrado", { status: 404 });
+    return new NextResponse("Sitio no encontrado", { status: 404, headers: siteSecurityHeaders() });
   }
 
   try {

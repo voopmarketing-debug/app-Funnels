@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -39,4 +39,11 @@ export function decryptSecret(payload: string): string {
 
   const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
   return decrypted.toString("utf8");
+}
+
+/** Constant-time string comparison for shared secrets (webhook tokens, cron secrets, etc.) — a plain !== short-circuits on the first differing byte, a theoretical timing side-channel. */
+export function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
 }

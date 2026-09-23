@@ -22,8 +22,29 @@ export const SECURITY_HEADERS: { key: string; value: string }[] = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
-export function siteSecurityHeaders(): Record<string, string> {
+// Same set, minus `includeSubDomains`/`preload` on HSTS — used for requests
+// on a CLIENT'S OWN connected domain (see proxy.ts's customDomain lookup).
+// `includeSubDomains` would force HTTPS on every subdomain of that client's
+// domain, not just the one they pointed here (e.g. their mail server or an
+// unrelated internal tool on another subdomain) — an opt-in they never
+// made. A plain max-age still HSTS-protects exactly the hostname they
+// connected, without reaching into subdomains this app has no say over.
+const CUSTOM_DOMAIN_HEADERS: { key: string; value: string }[] = SECURITY_HEADERS.map((h) =>
+  h.key === "Strict-Transport-Security" ? { key: h.key, value: "max-age=31536000" } : h,
+);
+
+function buildHeaders(list: { key: string; value: string }[]): Record<string, string> {
   const headers: Record<string, string> = { "Content-Security-Policy": SITE_CSP };
-  for (const h of SECURITY_HEADERS) headers[h.key] = h.value;
+  for (const h of list) headers[h.key] = h.value;
   return headers;
+}
+
+/** For the app's own domain (e.g. /sitio/[slug] on agente.funnelslabs.app). */
+export function siteSecurityHeaders(): Record<string, string> {
+  return buildHeaders(SECURITY_HEADERS);
+}
+
+/** For a client's connected custom domain — same policy, scoped-down HSTS (see CUSTOM_DOMAIN_HEADERS above). */
+export function customDomainSecurityHeaders(): Record<string, string> {
+  return buildHeaders(CUSTOM_DOMAIN_HEADERS);
 }
