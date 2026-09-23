@@ -24,18 +24,26 @@ export const FONT_OPTIONS = [
 // interpolated directly into a <style> block in lib/websiteTemplate.ts, so
 // this format check is also what keeps that CSS context from being broken
 // out of (a stored-XSS vector: the theme editor has a free-text color
-// input, not just a color picker).
-const hexColor = z
-  .string()
-  .regex(/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/, "Debe ser un color hex válido, ej. #1f6feb");
+// input, not just a color picker). `.catch(fallback)` means a single
+// malformed value from the AI degrades to a safe default instead of
+// failing the ENTIRE generation — before this, one bad field anywhere in
+// the response threw a validation error that Next.js's Server Action
+// boundary couldn't serialize cleanly, surfacing to the client as an
+// opaque "Minified React error #441" instead of anything actionable.
+function hexColorField(fallback: string) {
+  return z
+    .string()
+    .regex(/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/, "Debe ser un color hex válido, ej. #1f6feb")
+    .catch(fallback);
+}
 
 export const WebsiteContentSchema = z.object({
   theme: z.object({
-    primaryColor: hexColor.describe("Color principal en hex para botones y acentos, ej. #1f6feb — elegido a propósito para el rubro, no un genérico de IA."),
-    backgroundColor: hexColor.describe("Color de fondo del sitio en hex."),
-    textColor: hexColor.describe("Color del texto principal en hex, con buen contraste sobre backgroundColor."),
-    headingFont: z.enum(FONT_OPTIONS).describe("Fuente para títulos."),
-    bodyFont: z.enum(FONT_OPTIONS).describe("Fuente para texto de párrafo."),
+    primaryColor: hexColorField("#1f6feb").describe("Color principal en hex para botones y acentos, ej. #1f6feb — elegido a propósito para el rubro, no un genérico de IA."),
+    backgroundColor: hexColorField("#ffffff").describe("Color de fondo del sitio en hex."),
+    textColor: hexColorField("#0a0a0a").describe("Color del texto principal en hex, con buen contraste sobre backgroundColor."),
+    headingFont: z.enum(FONT_OPTIONS).catch("Inter").describe("Fuente para títulos."),
+    bodyFont: z.enum(FONT_OPTIONS).catch("Inter").describe("Fuente para texto de párrafo."),
   }),
   hero: z.object({
     heading: z.string().describe("Titular principal — la propuesta de valor del negocio, específica, no genérica."),
@@ -53,6 +61,7 @@ export const WebsiteContentSchema = z.object({
       .string()
       .regex(/^$|^https?:\/\/.+/, "Debe empezar con http:// o https://")
       .nullable()
+      .catch(null)
       .describe(
         "URL externa a la que debe ir el botón principal (ej. un link de agenda/reservas), o null para usar el WhatsApp del negocio por defecto.",
       ),

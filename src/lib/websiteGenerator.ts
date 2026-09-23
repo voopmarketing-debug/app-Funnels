@@ -3,6 +3,34 @@ import { anthropic } from "@/lib/anthropicClient";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 
+// The Anthropic SDK's structured-output parser throws its own error class
+// (AnthropicError) when the model's response doesn't validate against the
+// zod schema — a rich object, not a plain string. Thrown as-is across a
+// Next.js Server Action boundary, that class doesn't always serialize
+// cleanly back to the client; instead of the real message, the browser
+// shows an opaque "Minified React error #441" with no way to tell what
+// actually went wrong. Re-throwing as a plain Error here guarantees the
+// real message reaches the caller either way.
+async function parseWebsiteContent(prompt: string): Promise<WebsiteContent> {
+  let response;
+  try {
+    response = await anthropic.messages.parse({
+      model: "claude-sonnet-5",
+      max_tokens: 2200,
+      output_config: { format: zodOutputFormat(WebsiteContentSchema), effort: "low" },
+      messages: [{ role: "user", content: prompt }],
+    });
+  } catch (err) {
+    console.error("generateWebsiteContent: Anthropic structured-output call failed:", err);
+    throw new Error(err instanceof Error ? err.message : "Falló la generación del sitio con IA");
+  }
+
+  if (!response.parsed_output) {
+    throw new Error("Claude no devolvió el contenido del sitio");
+  }
+  return response.parsed_output;
+}
+
 const INDUSTRY_LABELS: Record<string, string> = Object.fromEntries(
   INDUSTRY_OPTIONS.map((option) => [option.value, option.label]),
 );
@@ -94,18 +122,7 @@ Reglas:
 4. videoUrl: siempre null — no gastes esfuerzo en esto, el cliente lo agrega después si quiere.
 5. El botón principal (hero.ctaLabel) y el texto de contacto deben reflejar el objetivo específico de la página si se dio uno arriba.`;
 
-  const response = await anthropic.messages.parse({
-    model: "claude-sonnet-5",
-    max_tokens: 2200,
-    output_config: { format: zodOutputFormat(WebsiteContentSchema), effort: "low" },
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  if (!response.parsed_output) {
-    throw new Error("Claude no devolvió el contenido del sitio");
-  }
-
-  const content = response.parsed_output;
+  const content = await parseWebsiteContent(prompt);
   // ctaUrl is caller-controlled (e.g. an agenda link), not something the
   // model should invent — only fill it in when the caller actually gave one.
   if (ctx.ctaUrl) content.hero.ctaUrl = ctx.ctaUrl;
@@ -130,16 +147,5 @@ El dueño del negocio pidió este cambio: "${instruction}"
 
 Devuelve el contenido COMPLETO de la página (mismo formato) aplicando ese cambio. Todo lo que no tenga que ver con el pedido debe quedar EXACTAMENTE igual — no reescribas ni "mejores" texto que no te pidieron cambiar.`;
 
-  const response = await anthropic.messages.parse({
-    model: "claude-sonnet-5",
-    max_tokens: 2200,
-    output_config: { format: zodOutputFormat(WebsiteContentSchema), effort: "low" },
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  if (!response.parsed_output) {
-    throw new Error("Claude no devolvió el contenido actualizado");
-  }
-
-  return response.parsed_output;
+  return parseWebsiteContent(prompt);
 }
