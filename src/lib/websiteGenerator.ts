@@ -31,14 +31,15 @@ async function parseWebsiteContent(prompt: string): Promise<WebsiteContent> {
   return response.parsed_output;
 }
 
-const INDUSTRY_LABELS: Record<string, string> = Object.fromEntries(
+export const INDUSTRY_LABELS: Record<string, string> = Object.fromEntries(
   INDUSTRY_OPTIONS.map((option) => [option.value, option.label]),
 );
 
 // Per-niche direction so pages don't converge on the same generic AI look —
 // a clinic and a real-estate agency shouldn't read as the same layout with
-// different words swapped in.
-const INDUSTRY_DIRECTION: Record<string, string> = {
+// different words swapped in. Exported so lib/websiteHeroImage.ts can reuse
+// the same curated direction for its image prompt instead of duplicating it.
+export const INDUSTRY_DIRECTION: Record<string, string> = {
   coaching: "Cálido y aspiracional, con foco en la transformación del cliente y prueba social — no corporativo ni frío.",
   clinica: "Limpio, confiable y calmado — transmite higiene y profesionalismo médico sin sentirse una web genérica de plantilla.",
   saas: "Moderno y directo al beneficio del producto, con jerarquía visual clara — el visitante entiende qué hace el producto en 3 segundos.",

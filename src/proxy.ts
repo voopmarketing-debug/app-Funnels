@@ -31,6 +31,7 @@ export async function proxy(request: NextRequest) {
       content: true,
       whatsappNumber: true,
       businessId: true,
+      aiImageUrl: true,
       business: { select: { name: true, industry: true } },
     },
   });
@@ -84,7 +85,11 @@ export async function proxy(request: NextRequest) {
     console.error("Failed to log website view event:", err);
   }
 
-  const { eyebrow, heroImageUrl } = await getWebsiteHeroContext(website.businessId, website.business.industry);
+  const { eyebrow, heroImageUrl } = await getWebsiteHeroContext(
+    website.businessId,
+    website.business.industry,
+    website.aiImageUrl,
+  );
 
   const html = renderWebsiteHtml(content, {
     businessName: website.business.name,

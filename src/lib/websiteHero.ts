@@ -3,21 +3,23 @@ import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
 /**
  * The small "eyebrow" label above the hero heading (see
- * lib/websiteTemplate.ts) and, when the business has uploaded one, a real
- * photo for the hero — both computed server-side at render time, not by the
- * AI, so they cost nothing extra and always reflect the business's current
- * state (a newly uploaded photo shows up on the next page load, no
- * regeneration needed).
+ * lib/websiteTemplate.ts) and the photo for the hero — both computed
+ * server-side at render time, not by the AI, so the eyebrow costs nothing
+ * extra and the image never needs a live API call on every page view.
  *
- * heroImageUrl deliberately never falls back to a generic stock photo: this
- * app generates pages for many paying clients, and a shared stock image
- * would mean every "clínica" (say) shows the identical photo — worse than
- * no photo. The hero just stays text-only (same as funnelslabs.app's own
- * hero) until the client uploads something real via "Multimedia".
+ * Image priority: (1) a real photo the business uploaded themselves
+ * (AgentMedia) — always wins, since an authentic photo of the actual
+ * business beats a generated one; (2) aiImageUrl, the one-time AI-generated
+ * photo made for this specific page at creation/regeneration time (see
+ * lib/websiteHeroImage.ts and actions.ts) — never a shared stock photo, so
+ * two businesses in the same industry don't end up with the same image;
+ * (3) no image — the hero just stays text-only, same as funnelslabs.app's
+ * own hero, until either of the above exists.
  */
 export async function getWebsiteHeroContext(
   businessId: string,
   industry: string,
+  aiImageUrl?: string | null,
 ): Promise<{ eyebrow: string | null; heroImageUrl: string | null }> {
   const eyebrow = INDUSTRY_OPTIONS.find((o) => o.value === industry)?.label ?? null;
   const photo = await prisma.agentMedia.findFirst({
@@ -26,5 +28,5 @@ export async function getWebsiteHeroContext(
     select: { url: true },
   });
 
-  return { eyebrow, heroImageUrl: photo?.url ?? null };
+  return { eyebrow, heroImageUrl: photo?.url ?? aiImageUrl ?? null };
 }

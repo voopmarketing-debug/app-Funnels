@@ -20,6 +20,7 @@ import {
   type TemplateButton,
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
+import { generateHeroImage } from "@/lib/websiteHeroImage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import {
@@ -1548,20 +1549,27 @@ export async function createWebsitePage(
       buildSalesContext(businessId, business.agent?.diagnosisReport),
     ]);
 
-    const content = await generateWebsiteContent({
-      businessName: business.name,
-      industry: business.industry,
-      description: business.agent?.systemPrompt ?? "",
-      whatsappNumber: displayNumber,
-      city: ownerMembership?.user.city,
-      country: ownerMembership?.user.country,
-      instagram: ownerMembership?.user.instagram,
-      facebook: ownerMembership?.user.facebook,
-      tiktok: ownerMembership?.user.tiktok,
-      purpose: input.purpose,
-      ctaUrl: input.ctaUrl,
-      salesContext,
-    });
+    const [content, aiImageUrl] = await Promise.all([
+      generateWebsiteContent({
+        businessName: business.name,
+        industry: business.industry,
+        description: business.agent?.systemPrompt ?? "",
+        whatsappNumber: displayNumber,
+        city: ownerMembership?.user.city,
+        country: ownerMembership?.user.country,
+        instagram: ownerMembership?.user.instagram,
+        facebook: ownerMembership?.user.facebook,
+        tiktok: ownerMembership?.user.tiktok,
+        purpose: input.purpose,
+        ctaUrl: input.ctaUrl,
+        salesContext,
+      }),
+      generateHeroImage({
+        businessName: business.name,
+        industry: business.industry,
+        description: business.agent?.systemPrompt ?? "",
+      }),
+    ]);
     await recordWebsiteGeneration(businessId);
 
     const slug = await generateUniqueWebsiteSlug(business.name, name, existingCount === 0);
@@ -1573,6 +1581,7 @@ export async function createWebsitePage(
         purpose: input.purpose || null,
         slug,
         content,
+        aiImageUrl,
         whatsappNumber: displayNumber,
         model: "claude-sonnet-5",
       },
@@ -1610,25 +1619,35 @@ export async function regenerateWebsitePage(businessId: string, websiteId: strin
     ]);
     const existingContent = WebsiteContentSchema.safeParse(website.content);
 
-    const content = await generateWebsiteContent({
-      businessName: business.name,
-      industry: business.industry,
-      description: business.agent?.systemPrompt ?? "",
-      whatsappNumber: displayNumber,
-      city: ownerMembership?.user.city,
-      country: ownerMembership?.user.country,
-      instagram: ownerMembership?.user.instagram,
-      facebook: ownerMembership?.user.facebook,
-      tiktok: ownerMembership?.user.tiktok,
-      purpose: website.purpose,
-      ctaUrl: (existingContent.success ? existingContent.data.hero.ctaUrl : null) ?? undefined,
-      salesContext,
-    });
+    const [content, aiImageUrl] = await Promise.all([
+      generateWebsiteContent({
+        businessName: business.name,
+        industry: business.industry,
+        description: business.agent?.systemPrompt ?? "",
+        whatsappNumber: displayNumber,
+        city: ownerMembership?.user.city,
+        country: ownerMembership?.user.country,
+        instagram: ownerMembership?.user.instagram,
+        facebook: ownerMembership?.user.facebook,
+        tiktok: ownerMembership?.user.tiktok,
+        purpose: website.purpose,
+        ctaUrl: (existingContent.success ? existingContent.data.hero.ctaUrl : null) ?? undefined,
+        salesContext,
+      }),
+      generateHeroImage({
+        businessName: business.name,
+        industry: business.industry,
+        description: business.agent?.systemPrompt ?? "",
+      }),
+    ]);
     await recordWebsiteGeneration(businessId);
 
     await prisma.website.update({
       where: { id: websiteId },
-      data: { content, whatsappNumber: displayNumber, model: "claude-sonnet-5" },
+      // Keep the previous image if this regeneration's image call failed
+      // (API hiccup, content-policy refusal) — a transient failure
+      // shouldn't cost the client an image that was already working.
+      data: { content, aiImageUrl: aiImageUrl ?? website.aiImageUrl, whatsappNumber: displayNumber, model: "claude-sonnet-5" },
     });
 
     revalidatePath(`/dashboard/businesses/${businessId}/website`);
