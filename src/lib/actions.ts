@@ -20,6 +20,7 @@ import {
   type TemplateButton,
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
+import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import {
   resolveMediaType,
@@ -1523,6 +1524,8 @@ export async function createWebsitePage(
   // re-thrown as a plain Error — plain strings always reach the client
   // intact; richer error objects don't reliably survive the Server Action
   // boundary and show up as an opaque "Minified React error #441" instead.
+  await assertWebsiteGenerationAllowed(businessId);
+
   try {
     const [business, ownerMembership, existingCount] = await Promise.all([
       prisma.business.findUniqueOrThrow({ where: { id: businessId }, include: { agent: true } }),
@@ -1559,6 +1562,7 @@ export async function createWebsitePage(
       ctaUrl: input.ctaUrl,
       salesContext,
     });
+    await recordWebsiteGeneration(businessId);
 
     const slug = await generateUniqueWebsiteSlug(business.name, name, existingCount === 0);
 
@@ -1587,6 +1591,7 @@ export async function regenerateWebsitePage(businessId: string, websiteId: strin
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
+  await assertWebsiteGenerationAllowed(businessId);
 
   // Same safety net as createWebsitePage above — see its comment.
   try {
@@ -1619,6 +1624,7 @@ export async function regenerateWebsitePage(businessId: string, websiteId: strin
       ctaUrl: (existingContent.success ? existingContent.data.hero.ctaUrl : null) ?? undefined,
       salesContext,
     });
+    await recordWebsiteGeneration(businessId);
 
     await prisma.website.update({
       where: { id: websiteId },
@@ -1667,6 +1673,7 @@ export async function applyWebsitePrompt(
 
   const trimmed = instruction.trim();
   if (!trimmed) throw new Error("Escribe qué cambio quieres");
+  await assertWebsiteGenerationAllowed(businessId);
 
   // Same safety net as createWebsitePage — see its comment.
   try {
@@ -1674,6 +1681,7 @@ export async function applyWebsitePrompt(
     const currentContent = WebsiteContentSchema.parse(website.content);
 
     const updated = await applyWebsiteEdit(currentContent, trimmed);
+    await recordWebsiteGeneration(businessId);
 
     await prisma.website.update({
       where: { id: websiteId },
