@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { renderWebsiteHtml } from "@/lib/websiteTemplate";
+import { getWebsiteHeroContext } from "@/lib/websiteHero";
 import { captureWebsiteLead } from "@/lib/websiteLeads";
 import { customDomainSecurityHeaders } from "@/lib/securityHeaders";
 
@@ -25,7 +26,13 @@ export async function proxy(request: NextRequest) {
 
   const website = await prisma.website.findUnique({
     where: { customDomain: hostname },
-    select: { id: true, content: true, whatsappNumber: true, business: { select: { name: true } } },
+    select: {
+      id: true,
+      content: true,
+      whatsappNumber: true,
+      businessId: true,
+      business: { select: { name: true, industry: true } },
+    },
   });
 
   if (!website) {
@@ -77,11 +84,15 @@ export async function proxy(request: NextRequest) {
     console.error("Failed to log website view event:", err);
   }
 
+  const { eyebrow, heroImageUrl } = await getWebsiteHeroContext(website.businessId, website.business.industry);
+
   const html = renderWebsiteHtml(content, {
     businessName: website.business.name,
     whatsappNumber: website.whatsappNumber,
     trackingBasePath: "",
     leadSubmitted: request.nextUrl.searchParams.get("registrado") === "1",
+    eyebrow,
+    heroImageUrl,
   });
 
   return new NextResponse(html, {

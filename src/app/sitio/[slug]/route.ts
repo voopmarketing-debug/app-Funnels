@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { renderWebsiteHtml } from "@/lib/websiteTemplate";
+import { getWebsiteHeroContext } from "@/lib/websiteHero";
 import { siteSecurityHeaders } from "@/lib/securityHeaders";
 
 // Publicly serves one business page — no auth, meant to be shared/indexed
@@ -19,7 +20,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
   const website = await prisma.website.findUnique({
     where: { slug },
-    select: { id: true, content: true, whatsappNumber: true, business: { select: { name: true } } },
+    select: {
+      id: true,
+      content: true,
+      whatsappNumber: true,
+      businessId: true,
+      business: { select: { name: true, industry: true } },
+    },
   });
   if (!website) {
     return new NextResponse("Sitio no encontrado", { status: 404, headers: siteSecurityHeaders() });
@@ -43,12 +50,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     );
   }
 
+  const { eyebrow, heroImageUrl } = await getWebsiteHeroContext(website.businessId, website.business.industry);
+
   const html = renderWebsiteHtml(parsedContent.data, {
     businessName: website.business.name,
     whatsappNumber: website.whatsappNumber,
     trackingBasePath: `/sitio/${slug}`,
     leadSubmitted,
     preview,
+    eyebrow,
+    heroImageUrl,
   });
 
   return new NextResponse(html, {
