@@ -72,7 +72,7 @@ export function WebsiteEditor({
         setPromptText("");
         setPromptApplied(true);
         setPreviewKey((k) => k + 1);
-        setTimeout(() => setPromptApplied(false), 2500);
+        setTimeout(() => setPromptApplied(false), 6000);
       } catch (err) {
         setPromptError(err instanceof Error ? err.message : "No se pudo aplicar el cambio");
       }
@@ -86,8 +86,15 @@ export function WebsiteEditor({
           <h2 className="text-sm font-semibold text-ink">✨ Pide cambios con IA</h2>
           <p className="text-xs text-ink-muted">
             Escribe qué quieres cambiar, como si le hablaras a un diseñador — ej. "pon el botón principal en azul",
-            "agrega una sección de preguntas frecuentes", "hazlo sonar más formal". La IA hace el cambio directo en
-            la página.
+            "hazlo sonar más formal", "cambia el título del hero". La IA reescribe textos, colores y fuentes de las
+            secciones que ya existen en la página.
+          </p>
+          <p className="rounded-md border border-border bg-background px-3 py-2 text-xs text-ink-muted">
+            <strong className="text-ink">Esto no lo puede hacer todavía:</strong> agregar un bloque nuevo que no esté
+            en la lista de abajo (Encabezado, Oferta, Cómo funciona, Por qué elegirnos, Objeciones, Contacto),
+            animaciones, ni funciones interactivas como un calendario de citas propio. Para que la gente agende
+            directamente, pon tu link de Calendly, Google Calendar o similar en &quot;Link del botón&quot; (sección
+            Encabezado) — el botón principal los manda ahí.
           </p>
           <textarea
             value={promptText}
@@ -110,11 +117,19 @@ export function WebsiteEditor({
               disabled={isApplyingPrompt || !promptText.trim()}
               className="rounded-md bg-accent-secondary px-4 py-2 text-sm font-semibold text-accent-ink transition hover:opacity-90 disabled:opacity-50"
             >
-              {isApplyingPrompt ? "Aplicando..." : "Aplicar cambio"}
+              {isApplyingPrompt ? "Aplicando... (puede tardar un minuto)" : "Aplicar cambio"}
             </button>
-            {promptApplied && <span className="fl-mono text-xs text-accent">✓ Cambio aplicado y guardado</span>}
-            {promptError && <span className="text-xs text-error">{promptError}</span>}
           </div>
+          {promptApplied && (
+            <p className="fl-mono rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent">
+              ✓ Cambio aplicado y guardado — ya está en tu página, revisa la vista previa a la derecha
+            </p>
+          )}
+          {promptError && (
+            <p className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-xs font-semibold text-error">
+              ✕ {promptError}
+            </p>
+          )}
         </div>
 
         <div className="fl-card flex flex-wrap items-center gap-3 p-4">
@@ -574,7 +589,15 @@ export function WebsiteEditor({
             Última versión: {generatedAt.toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
           </p>
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
-            <code className="fl-mono flex-1 truncate text-xs text-accent">{publicUrl}</code>
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="fl-mono flex-1 truncate text-xs text-accent underline-offset-2 hover:underline"
+              title="Abrir el sitio real en una pestaña nueva"
+            >
+              {publicUrl}
+            </a>
             <button
               type="button"
               onClick={() => {
