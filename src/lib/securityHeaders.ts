@@ -22,6 +22,14 @@ export const SECURITY_HEADERS: { key: string; value: string }[] = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
+// The authenticated app itself (dashboard) needs the microphone for the
+// voice-note button in ManualMessageForm — `microphone=()` there made
+// getUserMedia fail outright. Only this app's own origin gets it; the public
+// business websites above keep it fully disabled.
+export const APP_SECURITY_HEADERS: { key: string; value: string }[] = SECURITY_HEADERS.map((h) =>
+  h.key === "Permissions-Policy" ? { key: h.key, value: "camera=(), microphone=(self), geolocation=()" } : h,
+);
+
 // Same set, minus `includeSubDomains`/`preload` on HSTS — used for requests
 // on a CLIENT'S OWN connected domain (see proxy.ts's customDomain lookup).
 // `includeSubDomains` would force HTTPS on every subdomain of that client's

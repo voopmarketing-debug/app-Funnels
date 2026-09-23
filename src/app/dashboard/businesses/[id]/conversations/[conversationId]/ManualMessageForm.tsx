@@ -40,13 +40,28 @@ export function ManualMessageForm({
 
   const [isRecording, setIsRecording] = useState(false);
   const [pendingFileName, setPendingFileName] = useState<string | null>(null);
+  // A finished recording waits here so it can be listened to before it goes
+  // out — sending is the owner's call, not automatic on "stop".
+  const [recordingPreviewUrl, setRecordingPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isPending && !state.error) {
       formRef.current?.reset();
       setPendingFileName(null);
+      setRecordingPreviewUrl(null);
     }
   }, [isPending, state.sentCount, state.error]);
+
+  useEffect(() => {
+    if (!recordingPreviewUrl) return;
+    return () => URL.revokeObjectURL(recordingPreviewUrl);
+  }, [recordingPreviewUrl]);
+
+  function discardRecording() {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setRecordingPreviewUrl(null);
+    setPendingFileName(null);
+  }
 
   function handleFilePicked() {
     const file = fileInputRef.current?.files?.[0];
@@ -75,24 +90,49 @@ export function ManualMessageForm({
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size === 0 || !fileInputRef.current) return;
 
+        // Safari/iOS records audio/mp4, Chrome audio/webm, Firefox audio/ogg —
+        // the server transcodes all of them to Ogg/Opus for WhatsApp.
+        const extension = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
         const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(new File([blob], "nota-de-voz.webm", { type: blob.type }));
+        dataTransfer.items.add(new File([blob], `nota-de-voz.${extension}`, { type: blob.type }));
         fileInputRef.current.files = dataTransfer.files;
         setPendingFileName("Nota de voz");
-        formRef.current?.requestSubmit();
+        setRecordingPreviewUrl(URL.createObjectURL(blob));
       };
 
       mediaRecorderRef.current = recorder;
       recorder.start();
       setIsRecording(true);
     } catch {
-      alert("No se pudo acceder al micrófono. Revisa los permisos del navegador.");
+      alert(
+        "No se pudo acceder al micrófono de este dispositivo. Permite el micrófono para este sitio en el navegador, o adjunta un audio con 📎.",
+      );
     }
   }
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-1.5 border-t border-border bg-surface p-3">
       <input ref={fileInputRef} type="file" name="file" hidden onChange={handleFilePicked} />
+      {recordingPreviewUrl && (
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
+          <audio controls src={recordingPreviewUrl} className="h-9 min-w-0 flex-1" />
+          <button
+            type="button"
+            onClick={discardRecording}
+            disabled={isPending}
+            className="rounded-full border border-border px-3 py-1.5 text-xs text-ink-muted transition hover:border-error hover:text-error disabled:opacity-60"
+          >
+            Descartar
+          </button>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+          >
+            {isPending ? "Enviando..." : "Enviar nota"}
+          </button>
+        </div>
+      )}
       <div className="flex items-end gap-2">
         <button
           type="button"
@@ -106,7 +146,7 @@ export function ManualMessageForm({
         <button
           type="button"
           onClick={toggleRecording}
-          disabled={isPending}
+          disabled={isPending || !!recordingPreviewUrl}
           title={isRecording ? "Detener grabación" : "Grabar nota de voz"}
           className={`flex h-9 w-9 flex-none items-center justify-center rounded-full border transition ${
             isRecording
