@@ -10,6 +10,9 @@ import { WebsiteContentSchema } from "@/lib/websiteContent";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const label = req.nextUrl.searchParams.get("label") ?? "unknown";
+  // See the matching comment in ../route.ts — set only when this click came
+  // from the dashboard's own "Vista previa" iframe, not a real visitor.
+  const preview = req.nextUrl.searchParams.get("preview") === "1";
 
   const website = await prisma.website.findUnique({
     where: { slug },
@@ -24,10 +27,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const destination = ctaUrl ? "agenda" : "whatsapp";
   const target = ctaUrl || `https://wa.me/${website.whatsappNumber.replace(/[^0-9]/g, "")}`;
 
-  try {
-    await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "cta_click", label, destination } });
-  } catch (err) {
-    console.error("Failed to log website click event:", err);
+  if (!preview) {
+    try {
+      await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "cta_click", label, destination } });
+    } catch (err) {
+      console.error("Failed to log website click event:", err);
+    }
   }
 
   return NextResponse.redirect(target, { status: 302 });

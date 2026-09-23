@@ -11,6 +11,11 @@ import { siteSecurityHeaders } from "@/lib/securityHeaders";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const leadSubmitted = req.nextUrl.searchParams.get("registrado") === "1";
+  // Set only by the dashboard's own "Vista previa" iframe (see
+  // WebsiteEditor.tsx) — the owner opening their editor, or saving a
+  // change and triggering a preview reload, isn't a real visitor and
+  // shouldn't inflate their own view count.
+  const preview = req.nextUrl.searchParams.get("preview") === "1";
 
   const website = await prisma.website.findUnique({
     where: { slug },
@@ -20,10 +25,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     return new NextResponse("Sitio no encontrado", { status: 404, headers: siteSecurityHeaders() });
   }
 
-  try {
-    await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "view" } });
-  } catch (err) {
-    console.error("Failed to log website view event:", err);
+  if (!preview) {
+    try {
+      await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "view" } });
+    } catch (err) {
+      console.error("Failed to log website view event:", err);
+    }
   }
 
   const parsedContent = WebsiteContentSchema.safeParse(website.content);
@@ -41,6 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     whatsappNumber: website.whatsappNumber,
     trackingBasePath: `/sitio/${slug}`,
     leadSubmitted,
+    preview,
   });
 
   return new NextResponse(html, {

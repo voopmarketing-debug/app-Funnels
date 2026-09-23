@@ -7,6 +7,10 @@ import { captureWebsiteLead } from "@/lib/websiteLeads";
 // refresh doesn't resubmit the form.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  // See the matching comment in ../route.ts — set only when this form
+  // submission came from the dashboard's own "Vista previa" iframe, not a
+  // real visitor, so testing the form doesn't create a fake lead.
+  const preview = req.nextUrl.searchParams.get("preview") === "1";
 
   const website = await prisma.website.findUnique({ where: { slug }, select: { id: true } });
   if (!website) {
@@ -14,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   const formData = await req.formData();
-  const ok = await captureWebsiteLead(website.id, formData);
+  const ok = preview ? true : await captureWebsiteLead(website.id, formData);
 
   const url = new URL(`/sitio/${slug}`, req.url);
   if (ok) url.searchParams.set("registrado", "1");

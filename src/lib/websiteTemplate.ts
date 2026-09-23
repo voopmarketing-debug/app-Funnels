@@ -67,10 +67,18 @@ export function renderWebsiteHtml(
   // logged (see app/sitio/[slug]/ir/route.ts) before redirecting to the
   // real target, which is resolved server-side there (never trusts a
   // client-supplied URL, so this can't be abused as an open redirect).
-  ctx: { businessName: string; whatsappNumber: string; trackingBasePath: string; leadSubmitted?: boolean },
+  // preview: true when this render is for the dashboard's own "Vista
+  // previa" iframe (see WebsiteEditor.tsx), not a real visitor — carried
+  // through every tracked link/form on the page so the owner opening their
+  // own editor, or saving a change and triggering a preview reload, never
+  // inflates their own view/click/lead counts. See the ?preview=1 check in
+  // route.ts, ir/route.ts and registro/route.ts.
+  ctx: { businessName: string; whatsappNumber: string; trackingBasePath: string; leadSubmitted?: boolean; preview?: boolean },
 ): string {
   const embedUrl = content.videoUrl ? toEmbedUrl(content.videoUrl) : null;
-  const trackedHref = (label: string) => `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(label)}`;
+  const previewParam = ctx.preview ? "&preview=1" : "";
+  const trackedHref = (label: string) => `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(label)}${previewParam}`;
+  const registroAction = `${ctx.trackingBasePath}/registro${ctx.preview ? "?preview=1" : ""}`;
   const fonts = Array.from(new Set([content.theme.headingFont, content.theme.bodyFont]));
   const primary = sanitizeHexColor(content.theme.primaryColor, "#1f6feb");
   const btnText = readableTextColor(primary);
@@ -209,7 +217,7 @@ ${fontLink(fonts)}
         ctx.leadSubmitted
           ? `<p class="lead-thanks">¡Listo! Ya tenemos tus datos, te contactamos muy pronto.</p>`
           : `<p>Te escribimos apenas los recibamos.</p>
-      <form class="lead-form" method="POST" action="${escapeHtml(`${ctx.trackingBasePath}/registro`)}">
+      <form class="lead-form" method="POST" action="${escapeHtml(registroAction)}">
         <input type="text" name="name" placeholder="Tu nombre" maxlength="120" required>
         <input type="text" name="contact" placeholder="Tu WhatsApp o teléfono" maxlength="120" required>
         <textarea name="message" placeholder="Cuéntanos qué necesitas (opcional)" rows="2" maxlength="500"></textarea>

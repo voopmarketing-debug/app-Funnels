@@ -230,10 +230,13 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
       <Link href={editHref} className="block">
         {/* Live scaled-down render of the real page — no screenshot service
             needed: the iframe renders at 4x the box size then is scaled to
-            25%, so it always fills the box exactly regardless of card width. */}
+            25%, so it always fills the box exactly regardless of card width.
+            ?preview=1 keeps this thumbnail from counting as a real visit
+            every time the owner opens this list — see the matching check in
+            app/sitio/[slug]/route.ts. */}
         <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-border bg-background">
           <iframe
-            src={publicUrl}
+            src={`${publicUrl}?preview=1`}
             loading="lazy"
             tabIndex={-1}
             title={page.name}

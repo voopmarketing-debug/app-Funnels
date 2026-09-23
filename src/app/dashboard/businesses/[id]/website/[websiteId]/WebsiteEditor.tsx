@@ -440,7 +440,12 @@ export function WebsiteEditor({
           <div className="border-b border-border bg-surface-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
             Vista previa {isSaving ? "(guardando...)" : ""}
           </div>
-          <iframe key={previewKey} src={publicUrl} className="h-[70vh] w-full" title="Vista previa del sitio" />
+          <iframe
+            key={previewKey}
+            src={`${publicUrl}?preview=1`}
+            className="h-[70vh] w-full"
+            title="Vista previa del sitio"
+          />
         </div>
       </div>
     </div>
