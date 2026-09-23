@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 const SEGMENTS = [
   {
@@ -40,8 +41,6 @@ const FAQ = [
     a: "No. Puedes pausar la IA en cualquier conversación y responder tú mismo cuando quieras — el agente nunca actúa a tus espaldas.",
   },
 ];
-
-const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
 
 const PLANS = [
   {

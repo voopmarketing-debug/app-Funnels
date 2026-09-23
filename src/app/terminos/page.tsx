@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
-const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
 const LAST_UPDATED = "22 de septiembre de 2026";
 
 export const metadata = {

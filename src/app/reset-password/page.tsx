@@ -1,8 +1,7 @@
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ResetPasswordForm } from "./ResetPasswordForm";
-
-const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 export default async function ResetPasswordPage({
   searchParams,

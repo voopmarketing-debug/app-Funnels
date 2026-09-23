@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import type { PlanTier } from "@prisma/client";
 import { PLAN_LABELS } from "@/lib/plans";
-
-const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 const BUTTON_CLASS =
   "rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover";

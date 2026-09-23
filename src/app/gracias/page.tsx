@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
-
-const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 export default function GraciasPage() {
   return (

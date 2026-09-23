@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 function HomeIcon() {
   return (
@@ -96,8 +97,6 @@ function LogoutIcon() {
   );
 }
 
-const SUPPORT_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
-
 export function DashboardSidebar({
   isAgencyAdmin,
   primaryBusinessId,
@@ -181,7 +180,7 @@ export function DashboardSidebar({
 
       <div className="flex flex-col gap-1 border-t border-border px-3 pt-3">
         <ThemeToggle className="fl-nav-item" showLabel />
-        <a href={SUPPORT_LINK} target="_blank" rel="noopener noreferrer" className="fl-nav-item">
+        <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="fl-nav-item">
           <WhatsAppIcon />
           Soporte
         </a>

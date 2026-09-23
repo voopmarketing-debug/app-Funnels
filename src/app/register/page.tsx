@@ -6,8 +6,7 @@ import { registerBusiness, type RegisterState } from "@/lib/actions";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
-
-const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState<RegisterState, FormData>(

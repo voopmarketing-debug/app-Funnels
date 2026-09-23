@@ -5,8 +5,7 @@ import Link from "next/link";
 import { requestPasswordReset, type ForgotPasswordState } from "@/lib/actions";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
-
-const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 export default function ForgotPasswordPage() {
   const [state, formAction, isPending] = useActionState<ForgotPasswordState, FormData>(

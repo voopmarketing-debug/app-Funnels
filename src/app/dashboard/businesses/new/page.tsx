@@ -3,9 +3,8 @@ import { auth } from "@/auth";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { getAccountLineStatus } from "@/lib/lineLimits";
 import { PLAN_LABELS } from "@/lib/plans";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { NewBusinessForm } from "./NewBusinessForm";
-
-const SUPPORT_WHATSAPP_LINK = "https://wa.me/message/F2RWC3YUI7EYM1";
 
 export default async function NewBusinessPage() {
   const session = await auth();
