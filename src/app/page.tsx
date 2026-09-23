@@ -17,8 +17,27 @@ const SEGMENTS = [
     text: "Soporte y seguimiento de pedidos 24/7, sin que un cliente se quede esperando de un día para otro.",
   },
   {
-    title: "Clientes de Funnels Labs",
-    text: "Suma un agente de IA a tu embudo y tu pauta — el mismo equipo que ya te lleva el growth.",
+    title: "Inmobiliarias",
+    text: "Agenda visitas a propiedades, responde disponibilidad y precios al instante, y filtra compradores serios antes de que tu asesor pierda tiempo.",
+  },
+];
+
+const FAQ = [
+  {
+    q: "¿Puedo cancelar cuando quiera?",
+    a: "Sí. Cancelas cuando quieras y tu acceso sigue activo hasta el final del periodo que ya pagaste — sin penalización.",
+  },
+  {
+    q: "¿Qué pasa con los datos de mis clientes?",
+    a: "Nunca usamos tus conversaciones para entrenar modelos de IA ni las vendemos a terceros. Solo se usan para que tu agente responda y para tu propio panel de métricas.",
+  },
+  {
+    q: "¿Qué implica la llamada para conectar mi WhatsApp?",
+    a: "Dura 30-45 minutos. Te guiamos paso a paso para conectar tu número real a la API oficial de Meta — nada más.",
+  },
+  {
+    q: "¿Pierdo el control de las respuestas?",
+    a: "No. Puedes pausar la IA en cualquier conversación y responder tú mismo cuando quieras — el agente nunca actúa a tus espaldas.",
   },
 ];
 
@@ -29,10 +48,11 @@ const PLANS = [
     name: "Starter",
     badge: "Oferta de lanzamiento",
     price: "$150",
-    priceSuffix: "USD todo el trimestre",
+    priceSuffix: "USD / trimestre",
     strikePrice: "$450",
-    billingNote:
-      "El plan normal es $150 USD/mes. Por el lanzamiento del software te lo dejamos en $150 USD por los 3 meses completos — pago único, sin mensualidades en ese periodo. Se cobra automático cada trimestre (vía Hotmart).",
+    billingNote: "Se cobra automáticamente cada trimestre (vía Hotmart) — no es un pago único.",
+    billingDetail:
+      "El plan normal es $150 USD/mes ($450 USD por trimestre). Por el lanzamiento del software, tu trimestre completo queda en $150 USD en vez de $450 USD, y ese precio se mantiene en cada cobro automático mientras la oferta esté activa.",
     contacts: "Hasta 400 contactos activos/mes",
     features: [
       "1 línea de WhatsApp (un negocio)",
@@ -43,7 +63,7 @@ const PLANS = [
       "Sesión de onboarding y acompañamiento",
     ],
     highlight: true,
-    ctaLabel: "Empezar",
+    ctaLabel: "Crear mi cuenta",
     ctaHref: "/register",
   },
   {
@@ -51,6 +71,7 @@ const PLANS = [
     price: "Llave en mano",
     priceSuffix: "",
     billingNote: "Agenda una llamada y nosotros implementamos todo por ti, de principio a fin.",
+    billingDetail: "",
     contacts: "Contactos y líneas de WhatsApp a la medida de tu volumen",
     features: [
       "Todo lo del plan Starter, sin límite de contactos ni de líneas",
@@ -92,7 +113,7 @@ export default async function Home() {
             href="/register"
             className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
           >
-            Crear cuenta
+            Crear mi cuenta
           </Link>
         </div>
       </header>
@@ -182,12 +203,35 @@ export default async function Home() {
 
               <div className="mt-2 flex flex-wrap items-baseline gap-2">
                 <p className="text-3xl font-bold">{plan.price}</p>
-                {plan.strikePrice && (
-                  <span className="text-base text-ink-faint line-through">{plan.strikePrice}</span>
-                )}
+                {plan.priceSuffix && <p className="text-base font-semibold text-ink-muted">{plan.priceSuffix}</p>}
               </div>
-              {plan.priceSuffix && <p className="text-sm text-ink-muted">{plan.priceSuffix}</p>}
-              <p className="mt-1 text-xs text-ink-muted">{plan.billingNote}</p>
+              {plan.strikePrice && (
+                <p className="mt-1 text-sm text-ink-muted">
+                  Antes <span className="line-through">{plan.strikePrice}</span> — precio de lanzamiento
+                </p>
+              )}
+              <p className="mt-1 text-sm text-ink-muted">{plan.billingNote}</p>
+              {plan.billingDetail && (
+                <details className="group mt-1">
+                  <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-ink-faint transition hover:text-ink-muted [&::-webkit-details-marker]:hidden">
+                    ¿Por qué {plan.strikePrice ? "no " + plan.strikePrice : "así"}?
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      className="h-3 w-3 flex-none transition-transform group-open:rotate-180"
+                    >
+                      <path
+                        d="M5 7.5 10 12.5 15 7.5"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </summary>
+                  <p className="mt-1 text-xs text-ink-muted">{plan.billingDetail}</p>
+                </details>
+              )}
 
               <p className="mt-4 rounded-md bg-background px-3 py-2 text-sm font-medium text-ink">
                 {plan.contacts}
@@ -220,6 +264,20 @@ export default async function Home() {
           </a>{" "}
           y lo ajustamos sin cortar tu servicio.
         </p>
+      </section>
+
+      <section className="relative mx-auto max-w-3xl px-6 py-12">
+        <h2 className="text-center text-sm font-semibold uppercase tracking-wide text-ink-muted">
+          Preguntas frecuentes
+        </h2>
+        <div className="mt-6 grid gap-x-8 gap-y-6 sm:grid-cols-2">
+          {FAQ.map((item) => (
+            <div key={item.q} className="border-t border-border pt-3">
+              <p className="font-semibold">{item.q}</p>
+              <p className="mt-1 text-sm text-ink-muted">{item.a}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <footer className="relative border-t border-border px-6 py-8 text-center text-sm text-ink-muted">
