@@ -19,7 +19,11 @@ export const SECURITY_HEADERS: { key: string; value: string }[] = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  // microphone=(self) — NOT microphone=() — the CRM's "grabar nota de voz"
+  // button (see ManualMessageForm.tsx) needs getUserMedia({ audio: true })
+  // from this exact origin. Blocking it entirely broke voice-note recording
+  // for every business on the dashboard.
+  { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
 ];
 
 // Same set, minus `includeSubDomains`/`preload` on HSTS — used for requests
