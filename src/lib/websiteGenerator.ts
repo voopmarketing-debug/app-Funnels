@@ -117,10 +117,11 @@ DIRECCIÓN VISUAL PARA ESTE RUBRO: ${direction}
 
 Reglas:
 1. Contenido 100% real y específico a este negocio — nada de "Lorem ipsum" ni placeholders genéricos. Si falta un dato (precios, horarios), redáctalo de forma creíble sin inventar cifras falsas.
-2. Colores (hex) y tipografías elegidos a propósito para este rubro — nada del look genérico de IA. Buen contraste entre textColor y backgroundColor.
+2. Colores (hex) y tipografías elegidos a propósito para este rubro — nada del look genérico de IA: evita el degradado morado/azul por defecto, evita el combo trillado "beige cálido + terracota/bronce", evita negro puro #000000 o blanco puro #ffffff como texto/fondo. Un solo color de acento (primaryColor) usado con intención, buen contraste entre textColor y backgroundColor.
 3. El bloque "objections" es el más importante: usa el contexto de conversaciones reales dado arriba (si lo hay) para identificar 2-4 dudas u objeciones DE VERDAD que frenan la venta de este negocio, y respóndelas de forma directa y convincente — no pongas preguntas frecuentes genéricas tipo "¿cómo los contacto?". Si no hay contexto de conversaciones, infiere las objeciones típicas más realistas para este rubro específico.
 4. videoUrl: siempre null — no gastes esfuerzo en esto, el cliente lo agrega después si quiere.
-5. El botón principal (hero.ctaLabel) y el texto de contacto deben reflejar el objetivo específico de la página si se dio uno arriba.`;
+5. El botón principal (hero.ctaLabel) y el texto de contacto deben reflejar el objetivo específico de la página si se dio uno arriba.
+6. Copy sin relleno de IA: evita frases hechas tipo "revoluciona", "desbloquea tu potencial", "lleva tu negocio al siguiente nivel", "en la era digital", "transforma tu vida". Sé concreto y directo, como lo diría el dueño del negocio. No uses guion largo (—); usa punto o coma.`;
 
   const content = await parseWebsiteContent(prompt);
   // ctaUrl is caller-controlled (e.g. an agenda link), not something the
@@ -145,7 +146,7 @@ ${JSON.stringify(currentContent, null, 2)}
 
 El dueño del negocio pidió este cambio: "${instruction}"
 
-Devuelve el contenido COMPLETO de la página (mismo formato) aplicando ese cambio. Todo lo que no tenga que ver con el pedido debe quedar EXACTAMENTE igual — no reescribas ni "mejores" texto que no te pidieron cambiar.`;
+Devuelve el contenido COMPLETO de la página (mismo formato) aplicando ese cambio. Todo lo que no tenga que ver con el pedido debe quedar EXACTAMENTE igual — no reescribas ni "mejores" texto que no te pidieron cambiar. Si agregas texto nuevo, evita frases de relleno tipo IA y guion largo (—); usa punto o coma.`;
 
   return parseWebsiteContent(prompt);
 }
