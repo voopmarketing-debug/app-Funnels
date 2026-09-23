@@ -35,7 +35,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
     prisma.websiteLead.count({ where: { website: { businessId: id } } }),
   ]);
   const pages = websites.map((w) => ({ ...w, viewCount: w._count.events, leadCount: w._count.leads }));
-  const appHost = process.env.APP_HOST ?? "funnelslabs.app";
+  const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
 
   return (
     <div className="space-y-6">

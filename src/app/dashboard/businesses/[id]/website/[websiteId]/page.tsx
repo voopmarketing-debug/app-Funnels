@@ -25,7 +25,7 @@ export default async function WebsiteEditorPage({
   if (!website) notFound();
 
   const parsedContent = WebsiteContentSchema.safeParse(website.content);
-  const appHost = process.env.APP_HOST ?? "funnelslabs.app";
+  const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
 
   if (!parsedContent.success) {
     return (

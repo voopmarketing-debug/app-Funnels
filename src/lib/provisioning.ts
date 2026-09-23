@@ -123,7 +123,7 @@ export async function provisionClientFromPurchase(input: {
     return business.id;
   });
 
-  const activationUrl = `https://${process.env.APP_HOST ?? "funnelslabs.app"}/reset-password?token=${rawToken}`;
+  const activationUrl = `https://${process.env.APP_HOST ?? "agente.funnelslabs.app"}/reset-password?token=${rawToken}`;
 
   await sendEmail({
     to: email,
