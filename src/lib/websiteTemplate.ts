@@ -122,6 +122,30 @@ export function renderWebsiteHtml(
     )
     .join("");
 
+  const stepsHtml = content.howItWorks.items
+    .map(
+      (s, i) => `
+      <div class="step">
+        <div class="step-num">${i + 1}</div>
+        <h3>${escapeHtml(s.title)}</h3>
+        <p>${escapeHtml(s.description)}</p>
+      </div>`,
+    )
+    .join("");
+
+  const whyUsHtml = content.whyUs.items
+    .map(
+      (w) => `
+      <div class="why-item">
+        <span class="why-check" aria-hidden="true">✓</span>
+        <div>
+          <h3>${escapeHtml(w.title)}</h3>
+          <p>${escapeHtml(w.description)}</p>
+        </div>
+      </div>`,
+    )
+    .join("");
+
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -183,6 +207,15 @@ ${fontLink(fonts)}
   .card:hover { border-color: color-mix(in srgb, var(--primary) 35%, transparent); transform: translateY(-2px); box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--primary) 25%, transparent); }
   .card h3 { font-size: 18px; }
   .card p { opacity: 0.8; margin-bottom: 0; }
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 28px; margin-top: 24px; }
+  .step-num { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; background: var(--primary); color: var(--btn-text); font-weight: 700; font-size: 14px; margin-bottom: 12px; font-family: var(--body-font); }
+  .step h3 { font-size: 16px; }
+  .step p { opacity: 0.8; margin-bottom: 0; font-size: 14px; }
+  .why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; margin-top: 24px; }
+  .why-item { display: flex; gap: 14px; align-items: flex-start; }
+  .why-check { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 999px; background: color-mix(in srgb, var(--primary) 15%, transparent); color: var(--primary); font-weight: 700; font-size: 13px; }
+  .why-item h3 { font-size: 16px; }
+  .why-item p { opacity: 0.8; margin-bottom: 0; font-size: 14px; }
   .video-wrap { position: relative; padding-top: 56.25%; border-radius: 14px; overflow: hidden; margin-top: 16px; box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 12%, transparent); }
   .video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .objection-card { border-left: 3px solid var(--primary); padding: 4px 0 4px 20px; }
@@ -236,29 +269,65 @@ ${fontLink(fonts)}
       : ""
   }
 
-  <section>
+  ${
+    content.visibleSections.offer
+      ? `<section>
     <div class="wrap">
       <p class="kicker">Lo que ofrecemos</p>
       <h2>${escapeHtml(content.offer.heading)}</h2>
       <div class="grid">${offerHtml}</div>
     </div>
-  </section>
+  </section>`
+      : ""
+  }
 
-  <section>
+  ${
+    content.visibleSections.howItWorks
+      ? `<section>
+    <div class="wrap">
+      <p class="kicker">Cómo funciona</p>
+      <h2>${escapeHtml(content.howItWorks.heading)}</h2>
+      <div class="steps">${stepsHtml}</div>
+    </div>
+  </section>`
+      : ""
+  }
+
+  ${
+    content.visibleSections.whyUs
+      ? `<section>
+    <div class="wrap">
+      <p class="kicker">Por qué elegirnos</p>
+      <h2>${escapeHtml(content.whyUs.heading)}</h2>
+      <div class="why-grid">${whyUsHtml}</div>
+    </div>
+  </section>`
+      : ""
+  }
+
+  ${
+    content.visibleSections.objections
+      ? `<section>
     <div class="wrap">
       <p class="kicker">Antes de escribirnos</p>
       <h2>${escapeHtml(content.objections.heading)}</h2>
       <div class="grid">${objectionsHtml}</div>
     </div>
-  </section>
+  </section>`
+      : ""
+  }
 
-  <section>
+  ${
+    content.visibleSections.contact
+      ? `<section>
     <div class="wrap" style="text-align:center;">
       <h2>${escapeHtml(content.contact.heading)}</h2>
       <p>${escapeHtml(content.contact.body)}</p>
       <a class="btn" href="${escapeHtml(trackedHref("contact"))}" target="_blank" rel="noopener noreferrer">${escapeHtml(content.hero.ctaLabel)}</a>
     </div>
-  </section>
+  </section>`
+      : ""
+  }
 
   <section class="lead-section">
     <div class="wrap">

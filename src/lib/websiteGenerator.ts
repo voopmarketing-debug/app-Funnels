@@ -1,7 +1,24 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { anthropic } from "@/lib/anthropicClient";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
-import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
+import { WebsiteContentSchema, type WebsiteContent, type VisibleSections } from "@/lib/websiteContent";
+
+// What the AI actually generates — everything in WebsiteContentSchema
+// except visibleSections, which is business-owner UI state (see its
+// comment in websiteContent.ts), not something worth spending output
+// tokens asking the model to decide. generateWebsiteContent/applyWebsiteEdit
+// merge a visibleSections value back in below before returning the full,
+// storage-shaped WebsiteContent.
+const AiWebsiteContentSchema = WebsiteContentSchema.omit({ visibleSections: true });
+type AiWebsiteContent = ReturnType<typeof AiWebsiteContentSchema.parse>;
+
+const ALL_SECTIONS_VISIBLE: VisibleSections = {
+  offer: true,
+  howItWorks: true,
+  whyUs: true,
+  objections: true,
+  contact: true,
+};
 
 // The Anthropic SDK's structured-output parser throws its own error class
 // (AnthropicError) when the model's response doesn't validate against the
@@ -11,13 +28,13 @@ import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent"
 // shows an opaque "Minified React error #441" with no way to tell what
 // actually went wrong. Re-throwing as a plain Error here guarantees the
 // real message reaches the caller either way.
-async function parseWebsiteContent(prompt: string): Promise<WebsiteContent> {
+async function parseWebsiteContent(prompt: string): Promise<AiWebsiteContent> {
   let response;
   try {
     response = await anthropic.messages.parse({
       model: "claude-sonnet-5",
-      max_tokens: 2200,
-      output_config: { format: zodOutputFormat(WebsiteContentSchema), effort: "low" },
+      max_tokens: 2600,
+      output_config: { format: zodOutputFormat(AiWebsiteContentSchema), effort: "low" },
       messages: [{ role: "user", content: prompt }],
     });
   } catch (err) {
@@ -86,11 +103,12 @@ export type WebsiteGenerationContext = {
  * structured result is rendered deterministically by lib/websiteTemplate.ts
  * and can be edited field-by-field afterward — see WebsiteEditor.
  *
- * Kept to exactly 4 content blocks (hero/offer/objections/contact — see
- * WebsiteContentSchema) and run at low reasoning effort with a smaller
- * output budget than a general-purpose generation call would use: this is
- * "write focused copy from given inputs," not open-ended reasoning, and it
- * runs on every "Generar sitio web" click, so cost matters.
+ * Kept to exactly 6 content blocks (hero/offer/how it works/why us/
+ * objections/contact — see WebsiteContentSchema) and run at low reasoning
+ * effort with a smaller output budget than a general-purpose generation
+ * call would use: this is "write focused copy from given inputs," not
+ * open-ended reasoning, and it runs on every "Generar sitio web" click, so
+ * cost matters.
  */
 export async function generateWebsiteContent(ctx: WebsiteGenerationContext): Promise<WebsiteContent> {
   const industryLabel = INDUSTRY_LABELS[ctx.industry] ?? INDUSTRY_LABELS.otro;
@@ -104,7 +122,7 @@ export async function generateWebsiteContent(ctx: WebsiteGenerationContext): Pro
     .filter((s): s is string => !!s)
     .join(", ");
 
-  const prompt = `Eres un copywriter y diseñador web senior. Genera el contenido de una landing page de 4 bloques (hero, oferta, objeciones, contacto) para este negocio real:
+  const prompt = `Eres un copywriter y diseñador web senior. Genera el contenido de una landing page de 6 bloques (hero, oferta, cómo funciona, por qué elegirnos, objeciones, contacto) para este negocio real:
 
 - Nombre: ${ctx.businessName}
 - Rubro: ${industryLabel}
@@ -120,16 +138,21 @@ Reglas:
 1. Contenido 100% real y específico a este negocio — nada de "Lorem ipsum" ni placeholders genéricos. Si falta un dato (precios, horarios), redáctalo de forma creíble sin inventar cifras falsas.
 2. Colores (hex) y tipografías elegidos a propósito para este rubro — nada del look genérico de IA: evita el degradado morado/azul por defecto, evita el combo trillado "beige cálido + terracota/bronce", evita negro puro #000000 o blanco puro #ffffff como texto/fondo. Un solo color de acento (primaryColor) usado con intención, buen contraste entre textColor y backgroundColor.
 3. El bloque "objections" es el más importante: usa el contexto de conversaciones reales dado arriba (si lo hay) para identificar 2-4 dudas u objeciones DE VERDAD que frenan la venta de este negocio, y respóndelas de forma directa y convincente — no pongas preguntas frecuentes genéricas tipo "¿cómo los contacto?". Si no hay contexto de conversaciones, infiere las objeciones típicas más realistas para este rubro específico.
-4. videoUrl: siempre null — no gastes esfuerzo en esto, el cliente lo agrega después si quiere.
-5. El botón principal (hero.ctaLabel) y el texto de contacto deben reflejar el objetivo específico de la página si se dio uno arriba.
-6. Copy sin relleno de IA: evita frases hechas tipo "revoluciona", "desbloquea tu potencial", "lleva tu negocio al siguiente nivel", "en la era digital", "transforma tu vida". Sé concreto y directo, como lo diría el dueño del negocio. No uses guion largo (—); usa punto o coma.`;
+4. "howItWorks": el proceso REAL para convertirse en cliente de este negocio (ej. escribir por WhatsApp, agendar, primera sesión), en orden, no un genérico "Paso 1, Paso 2, Paso 3".
+5. "whyUs": diferenciadores CONCRETOS y específicos de este negocio, nunca frases vacías como "calidad y confianza" o "años de experiencia" a menos que sea un dato real dado arriba.
+6. videoUrl: siempre null — no gastes esfuerzo en esto, el cliente lo agrega después si quiere.
+7. El botón principal (hero.ctaLabel) y el texto de contacto deben reflejar el objetivo específico de la página si se dio uno arriba.
+8. Copy sin relleno de IA: evita frases hechas tipo "revoluciona", "desbloquea tu potencial", "lleva tu negocio al siguiente nivel", "en la era digital", "transforma tu vida". Sé concreto y directo, como lo diría el dueño del negocio. No uses guion largo (—); usa punto o coma.`;
 
   const content = await parseWebsiteContent(prompt);
   // ctaUrl is caller-controlled (e.g. an agenda link), not something the
   // model should invent — only fill it in when the caller actually gave one.
   if (ctx.ctaUrl) content.hero.ctaUrl = ctx.ctaUrl;
 
-  return content;
+  // New page: every section starts visible — the owner turns any off later
+  // from the editor if this business doesn't need it (see visibleSections'
+  // own comment in websiteContent.ts for why the AI never decides this).
+  return { ...content, visibleSections: ALL_SECTIONS_VISIBLE };
 }
 
 /**
@@ -149,5 +172,9 @@ El dueño del negocio pidió este cambio: "${instruction}"
 
 Devuelve el contenido COMPLETO de la página (mismo formato) aplicando ese cambio. Todo lo que no tenga que ver con el pedido debe quedar EXACTAMENTE igual — no reescribas ni "mejores" texto que no te pidieron cambiar. Si agregas texto nuevo, evita frases de relleno tipo IA y guion largo (—); usa punto o coma.`;
 
-  return parseWebsiteContent(prompt);
+  const updated = await parseWebsiteContent(prompt);
+  // Which sections are on/off is the owner's own toggle choice (see
+  // visibleSections' comment in websiteContent.ts) — a free-text AI edit
+  // never touches it, so it survives exactly as it was before this edit.
+  return { ...updated, visibleSections: currentContent.visibleSections };
 }

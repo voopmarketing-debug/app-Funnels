@@ -14,12 +14,14 @@ export const FONT_OPTIONS = [
   "Work Sans",
 ] as const;
 
-// Kept to exactly 4 content blocks (hero, offer, objections, contact) on
-// purpose — fewer blocks means less to generate (cheaper) and less to edit
-// (simpler). "Objections" replaces a generic about/services/testimonials
-// split: it's where the page actually earns its keep, preempting the real
-// doubts this business's customers raise in WhatsApp (see
-// lib/websiteGenerator.ts's sales-context gathering).
+// 6 content blocks (hero, offer, how it works, why us, objections, contact)
+// — deliberately no "testimonios" block: the AI has no real reviews to draw
+// on, and inventing fake customer quotes for a real business's public page
+// is the kind of fabricated-social-proof pattern that damages trust the
+// moment a visitor notices. "Objections" instead of a generic FAQ: it's
+// where the page actually earns its keep, preempting the real doubts this
+// business's customers raise in WhatsApp (see lib/websiteGenerator.ts's
+// sales-context gathering).
 // Hex-only (#rgb / #rrggbb / #rrggbbaa) — these three values get
 // interpolated directly into a <style> block in lib/websiteTemplate.ts, so
 // this format check is also what keeps that CSS context from being broken
@@ -74,6 +76,26 @@ export const WebsiteContentSchema = z.object({
       .max(4)
       .describe("3 a 4 servicios/productos concretos que ofrece el negocio, con datos reales, no relleno genérico."),
   }),
+  howItWorks: z.object({
+    heading: z.string().describe('Ej. "Cómo funciona" o "Así trabajamos contigo".'),
+    items: z
+      .array(z.object({ title: z.string(), description: z.string() }))
+      .min(3)
+      .max(4)
+      .describe(
+        "3 a 4 pasos concretos del proceso real para convertirse en cliente de este negocio (ej. 'Escríbenos' -> 'Agendamos una llamada' -> 'Empezamos'), en orden. Título corto tipo verbo + descripción de una frase.",
+      ),
+  }),
+  whyUs: z.object({
+    heading: z.string().describe('Ej. "Por qué elegirnos" — nunca un genérico "Sobre nosotros".'),
+    items: z
+      .array(z.object({ title: z.string(), description: z.string() }))
+      .min(3)
+      .max(4)
+      .describe(
+        "3 a 4 razones CONCRETAS y específicas de este negocio para elegirlo sobre la competencia — nunca genéricas tipo 'calidad y confianza' o 'años de experiencia' salvo que sea un dato real dado en la descripción del negocio.",
+      ),
+  }),
   objections: z.object({
     heading: z.string().describe('Ej. "Antes de escribirnos, resolvemos tus dudas" — no un genérico "Preguntas frecuentes".'),
     items: z
@@ -91,6 +113,28 @@ export const WebsiteContentSchema = z.object({
   // Always null when generated — never something the model spends tokens
   // deciding on. The client adds one later, if they want, from the editor.
   videoUrl: z.string().nullable().describe("Siempre null al generar — el cliente lo agrega después si quiere."),
+
+  // Which of the optional sections actually render — set by the business
+  // owner in the editor (see WebsiteEditor.tsx), never by the AI: this is
+  // UI state, not content, so it's deliberately excluded from the schema
+  // handed to zodOutputFormat in lib/websiteGenerator.ts (see
+  // AiWebsiteContentSchema there) — asking the model to decide it would
+  // just burn output tokens on something that should default to "show
+  // everything". Each flag (and the object itself) falls back to `true`
+  // via .catch() so older saved pages without this field, or a
+  // partially-malformed one, still render every section instead of
+  // silently going blank. hero and the lead-capture form are never
+  // optional — always shown.
+  visibleSections: z
+    .object({
+      offer: z.boolean().catch(true),
+      howItWorks: z.boolean().catch(true),
+      whyUs: z.boolean().catch(true),
+      objections: z.boolean().catch(true),
+      contact: z.boolean().catch(true),
+    })
+    .catch({ offer: true, howItWorks: true, whyUs: true, objections: true, contact: true }),
 });
 
 export type WebsiteContent = z.infer<typeof WebsiteContentSchema>;
+export type VisibleSections = WebsiteContent["visibleSections"];

@@ -195,7 +195,12 @@ export function WebsiteEditor({
           />
         </Section>
 
-        <Section title={`Oferta (${content.offer.items.length})`} defaultOpen>
+        <Section
+          title={`Oferta (${content.offer.items.length})`}
+          defaultOpen
+          visible={content.visibleSections.offer}
+          onToggleVisible={(v) => setContent((c) => ({ ...c, visibleSections: { ...c.visibleSections, offer: v } }))}
+        >
           <TextField
             label="Título de la sección"
             value={content.offer.heading}
@@ -254,7 +259,150 @@ export function WebsiteEditor({
           </div>
         </Section>
 
-        <Section title={`Objeciones (${content.objections.items.length})`} defaultOpen>
+        <Section
+          title={`Cómo funciona (${content.howItWorks.items.length})`}
+          visible={content.visibleSections.howItWorks}
+          onToggleVisible={(v) => setContent((c) => ({ ...c, visibleSections: { ...c.visibleSections, howItWorks: v } }))}
+        >
+          <TextField
+            label="Título de la sección"
+            value={content.howItWorks.heading}
+            onChange={(v) => setContent((c) => ({ ...c, howItWorks: { ...c.howItWorks, heading: v } }))}
+          />
+          <div className="space-y-3">
+            {content.howItWorks.items.map((item, i) => (
+              <div key={i} className="space-y-2 rounded-md border border-border p-3">
+                <div className="flex items-center justify-between">
+                  <span className="fl-mono text-[10px] uppercase text-ink-faint">Paso {i + 1}</span>
+                  {content.howItWorks.items.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setContent((c) => ({
+                          ...c,
+                          howItWorks: { ...c.howItWorks, items: c.howItWorks.items.filter((_, idx) => idx !== i) },
+                        }))
+                      }
+                      className="text-xs text-ink-faint hover:text-error"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+                <TextField
+                  label="Título"
+                  value={item.title}
+                  onChange={(v) =>
+                    setContent((c) => ({
+                      ...c,
+                      howItWorks: {
+                        ...c.howItWorks,
+                        items: c.howItWorks.items.map((s, idx) => (idx === i ? { ...s, title: v } : s)),
+                      },
+                    }))
+                  }
+                />
+                <TextAreaField
+                  label="Descripción"
+                  value={item.description}
+                  onChange={(v) =>
+                    setContent((c) => ({
+                      ...c,
+                      howItWorks: {
+                        ...c.howItWorks,
+                        items: c.howItWorks.items.map((s, idx) => (idx === i ? { ...s, description: v } : s)),
+                      },
+                    }))
+                  }
+                />
+              </div>
+            ))}
+            {content.howItWorks.items.length < 4 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setContent((c) => ({
+                    ...c,
+                    howItWorks: { ...c.howItWorks, items: [...c.howItWorks.items, { title: "", description: "" }] },
+                  }))
+                }
+                className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-ink-muted transition hover:border-accent hover:text-accent"
+              >
+                + Agregar paso
+              </button>
+            )}
+          </div>
+        </Section>
+
+        <Section
+          title={`Por qué elegirnos (${content.whyUs.items.length})`}
+          visible={content.visibleSections.whyUs}
+          onToggleVisible={(v) => setContent((c) => ({ ...c, visibleSections: { ...c.visibleSections, whyUs: v } }))}
+        >
+          <TextField
+            label="Título de la sección"
+            value={content.whyUs.heading}
+            onChange={(v) => setContent((c) => ({ ...c, whyUs: { ...c.whyUs, heading: v } }))}
+          />
+          <div className="space-y-3">
+            {content.whyUs.items.map((item, i) => (
+              <div key={i} className="space-y-2 rounded-md border border-border p-3">
+                <div className="flex items-center justify-between">
+                  <span className="fl-mono text-[10px] uppercase text-ink-faint">Razón {i + 1}</span>
+                  {content.whyUs.items.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setContent((c) => ({ ...c, whyUs: { ...c.whyUs, items: c.whyUs.items.filter((_, idx) => idx !== i) } }))
+                      }
+                      className="text-xs text-ink-faint hover:text-error"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+                <TextField
+                  label="Título"
+                  value={item.title}
+                  onChange={(v) =>
+                    setContent((c) => ({
+                      ...c,
+                      whyUs: { ...c.whyUs, items: c.whyUs.items.map((s, idx) => (idx === i ? { ...s, title: v } : s)) },
+                    }))
+                  }
+                />
+                <TextAreaField
+                  label="Descripción"
+                  value={item.description}
+                  onChange={(v) =>
+                    setContent((c) => ({
+                      ...c,
+                      whyUs: { ...c.whyUs, items: c.whyUs.items.map((s, idx) => (idx === i ? { ...s, description: v } : s)) },
+                    }))
+                  }
+                />
+              </div>
+            ))}
+            {content.whyUs.items.length < 4 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setContent((c) => ({ ...c, whyUs: { ...c.whyUs, items: [...c.whyUs.items, { title: "", description: "" }] } }))
+                }
+                className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-ink-muted transition hover:border-accent hover:text-accent"
+              >
+                + Agregar razón
+              </button>
+            )}
+          </div>
+        </Section>
+
+        <Section
+          title={`Objeciones (${content.objections.items.length})`}
+          defaultOpen
+          visible={content.visibleSections.objections}
+          onToggleVisible={(v) => setContent((c) => ({ ...c, visibleSections: { ...c.visibleSections, objections: v } }))}
+        >
           <p className="text-xs text-ink-muted">
             Las dudas reales que frenan la venta de este negocio, respondidas directamente — generadas a partir de
             conversaciones reales cuando hay datos suficientes.
@@ -338,7 +486,11 @@ export function WebsiteEditor({
           />
         </Section>
 
-        <Section title="Contacto">
+        <Section
+          title="Contacto"
+          visible={content.visibleSections.contact}
+          onToggleVisible={(v) => setContent((c) => ({ ...c, visibleSections: { ...c.visibleSections, contact: v } }))}
+        >
           <TextField
             label="Título"
             value={content.contact.heading}
@@ -452,11 +604,42 @@ export function WebsiteEditor({
   );
 }
 
-function Section({ title, defaultOpen, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+function Section({
+  title,
+  defaultOpen,
+  visible,
+  onToggleVisible,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  // Omitted for sections that always render (hero, colors, video, domain) —
+  // only the optional page sections (offer, howItWorks, whyUs, objections,
+  // contact) pass these, showing a "Mostrar en el sitio" checkbox next to
+  // the title so the owner can turn a section off without deleting its
+  // content (see WebsiteContent.visibleSections).
+  visible?: boolean;
+  onToggleVisible?: (v: boolean) => void;
+  children: React.ReactNode;
+}) {
   return (
     <details open={defaultOpen} className="fl-card group p-4">
-      <summary className="cursor-pointer list-none text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden">
-        {title}
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        {onToggleVisible && (
+          <label
+            className="flex flex-none items-center gap-1.5 text-xs font-normal text-ink-muted"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={visible}
+              onChange={(e) => onToggleVisible(e.target.checked)}
+              className="h-3.5 w-3.5 cursor-pointer accent-accent"
+            />
+            Mostrar en el sitio
+          </label>
+        )}
       </summary>
       <div className="mt-3 space-y-3">{children}</div>
     </details>
