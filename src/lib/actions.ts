@@ -28,6 +28,7 @@ import {
   maxMbFor,
   MAX_AGENT_MEDIA_PER_BUSINESS,
 } from "@/lib/attachments";
+import { convertToOggOpus } from "@/lib/audioConvert";
 import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
@@ -1026,8 +1027,21 @@ export async function sendManualMessage(
       throw new Error(`El archivo supera el máximo permitido (${maxMbFor(mediaType)} MB)`);
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const { url } = await uploadAttachment({ bytes, filename: file.name, contentType: file.type });
+    let bytes: Buffer = Buffer.from(await file.arrayBuffer());
+    let filename = file.name;
+    let contentType = file.type;
+
+    // WhatsApp only accepts/plays voice notes in Ogg/Opus — a browser
+    // recording (see the mic button in ManualMessageForm) comes out as
+    // WebM/Opus, which Meta silently rejects, so it's normalized here
+    // before upload. Covers any other audio format someone attaches too.
+    if (mediaType === "audio" && contentType !== "audio/ogg") {
+      bytes = await convertToOggOpus(bytes);
+      filename = filename.replace(/\.[^.]+$/, "") + ".ogg";
+      contentType = "audio/ogg";
+    }
+
+    const { url } = await uploadAttachment({ bytes, filename, contentType });
 
     // Meta doesn't support a caption on audio messages — if there's text
     // alongside a voice note, it goes out as its own follow-up message.
@@ -1039,7 +1053,7 @@ export async function sendManualMessage(
       type: mediaType,
       link: url,
       caption: supportsCaption && text ? text : undefined,
-      filename: mediaType === "document" ? file.name : undefined,
+      filename: mediaType === "document" ? filename : undefined,
     });
 
     await prisma.message.create({
@@ -1051,9 +1065,9 @@ export async function sendManualMessage(
         sentByHuman: true,
         mediaUrl: url,
         mediaType,
-        mediaMimeType: file.type,
-        mediaFilename: file.name,
-        mediaSizeBytes: file.size,
+        mediaMimeType: contentType,
+        mediaFilename: filename,
+        mediaSizeBytes: bytes.byteLength,
       },
     });
 
