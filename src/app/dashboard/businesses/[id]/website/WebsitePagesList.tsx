@@ -27,22 +27,12 @@ export function WebsitePagesList({
   publicUrlBase: string;
   stats: { totalViews: number; totalClicksWhatsapp: number; totalClicksAgenda: number; totalLeads: number };
 }) {
-  const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [formKey, setFormKey] = useState(0);
-  const [isGenerating, startGenerating] = useTransition();
-  const [generateError, setGenerateError] = useState<string | null>(null);
 
-  function generateFirstSite() {
-    setGenerateError(null);
-    startGenerating(async () => {
-      try {
-        const { id } = await createWebsitePage(businessId, {});
-        router.push(`/dashboard/businesses/${businessId}/website/${id}`);
-      } catch (err) {
-        setGenerateError(err instanceof Error ? err.message : "No se pudo generar el sitio");
-      }
-    });
+  function openNewPageDialog() {
+    setFormKey((k) => k + 1);
+    dialogRef.current?.showModal();
   }
 
   return (
@@ -90,10 +80,7 @@ export function WebsitePagesList({
 
           <button
             type="button"
-            onClick={() => {
-              setFormKey((k) => k + 1);
-              dialogRef.current?.showModal();
-            }}
+            onClick={openNewPageDialog}
             className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover disabled:opacity-50"
           >
             + Nueva página
@@ -102,7 +89,13 @@ export function WebsitePagesList({
       )}
 
       <dialog ref={dialogRef} className="fl-card-hero w-full max-w-md p-0">
-        <NewPageForm key={formKey} businessId={businessId} pageNumber={pages.length + 1} onClose={() => dialogRef.current?.close()} />
+        <NewPageForm
+          key={formKey}
+          businessId={businessId}
+          pageNumber={pages.length + 1}
+          isFirstPage={pages.length === 0}
+          onClose={() => dialogRef.current?.close()}
+        />
       </dialog>
 
       {pages.length > 0 && (
@@ -121,19 +114,17 @@ export function WebsitePagesList({
           <div>
             <p className="text-sm font-medium text-ink">Este negocio todavía no tiene sitio web</p>
             <p className="mx-auto mt-1 max-w-xs text-xs text-ink-muted">
-              Un clic y la IA arma la página completa — después puedes editar todo (textos, colores, link) o pedirle
-              cambios con IA.
+              Cuéntale a la IA cómo quieres tu página y la arma completa — después puedes editar todo (textos,
+              colores, link) o pedirle cambios con IA.
             </p>
           </div>
           <button
             type="button"
-            onClick={generateFirstSite}
-            disabled={isGenerating}
+            onClick={openNewPageDialog}
             className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover disabled:opacity-50"
           >
-            {isGenerating ? "Generando... (puede tardar un minuto)" : "✨ Generar sitio web"}
+            ✨ Generar sitio web
           </button>
-          {generateError && <p className="text-xs text-error">{generateError}</p>}
         </div>
       )}
     </div>
@@ -331,19 +322,22 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
 type FormState = { error: string | null };
 const INITIAL_STATE: FormState = { error: null };
 
-// Only asks for what actually changes the generated copy (the page's
-// purpose) — no name field here (auto-numbered at creation so there's
-// nothing to invent up front; renaming it to something like "Paso 2 —
-// Agendar demo" happens afterward, straight from the card — see
-// PageCard's inline rename) and no link field (that's editable afterward,
-// in the page's own editor, alongside everything else).
+// Only asks for what actually changes the generated copy (the client's own
+// design brief, and — for additional pages — the page's purpose) — no name
+// field here (auto-numbered at creation so there's nothing to invent up
+// front; renaming it to something like "Paso 2 — Agendar demo" happens
+// afterward, straight from the card — see PageCard's inline rename) and no
+// link field (that's editable afterward, in the page's own editor,
+// alongside everything else).
 function NewPageForm({
   businessId,
   pageNumber,
+  isFirstPage,
   onClose,
 }: {
   businessId: string;
   pageNumber: number;
+  isFirstPage: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -352,10 +346,14 @@ function NewPageForm({
 
   function handleSubmit(formData: FormData) {
     const purpose = String(formData.get("purpose") ?? "").trim();
+    const designPrompt = String(formData.get("designPrompt") ?? "").trim();
 
     startTransition(async () => {
       try {
-        const { id } = await createWebsitePage(businessId, { purpose: purpose || undefined });
+        const { id } = await createWebsitePage(businessId, {
+          purpose: purpose || undefined,
+          designPrompt: designPrompt || undefined,
+        });
         onClose();
         router.push(`/dashboard/businesses/${businessId}/website/${id}`);
       } catch (err) {
@@ -367,25 +365,47 @@ function NewPageForm({
   return (
     <form action={handleSubmit} className="space-y-4 p-6">
       <div className="space-y-1">
-        <h2 className="text-lg font-bold text-ink">Nueva página (Página {pageNumber})</h2>
+        <h2 className="text-lg font-bold text-ink">
+          {isFirstPage ? "Genera tu sitio web con IA" : `Nueva página (Página ${pageNumber})`}
+        </h2>
         <p className="text-sm text-ink-muted">
-          Para qué es esta página además de la principal — por ejemplo, que el visitante agende una demo, o una
-          oferta puntual. La IA ajusta el texto y el botón a eso.
+          {isFirstPage
+            ? "Cuéntale a la IA cómo quieres tu página abajo — si la dejas en blanco, la armamos igual con la información de tu perfil de negocio, pero mientras más detalles le des, mejor queda."
+            : "Para qué es esta página además de la principal — por ejemplo, que el visitante agende una demo, o una oferta puntual. La IA ajusta el texto y el botón a eso."}
         </p>
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="purpose" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Objetivo de esta página (opcional)
+        <label htmlFor="designPrompt" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+          ✍️ Pega aquí el prompt de cómo quieres tu página web
         </label>
         <textarea
-          id="purpose"
-          name="purpose"
-          rows={2}
-          placeholder="Ej: que el visitante agende una demo con nosotros"
+          id="designPrompt"
+          name="designPrompt"
+          rows={4}
+          placeholder={'Ej: "Estilo minimalista en tonos verdes, que resalte que somos los únicos con entrega el mismo día, tono profesional pero cercano"'}
           className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
         />
+        <p className="text-xs text-ink-faint">
+          Describe estilo, colores, qué debe destacar o cualquier dato que no pueda faltar — la IA lo prioriza al
+          diseñar tu página. Es opcional, pero recomendado.
+        </p>
       </div>
+
+      {!isFirstPage && (
+        <div className="space-y-1">
+          <label htmlFor="purpose" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+            Objetivo de esta página (opcional)
+          </label>
+          <textarea
+            id="purpose"
+            name="purpose"
+            rows={2}
+            placeholder="Ej: que el visitante agende una demo con nosotros"
+            className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          />
+        </div>
+      )}
 
       {state.error && <p className="text-sm text-error">{state.error}</p>}
 

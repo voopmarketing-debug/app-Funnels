@@ -332,6 +332,14 @@ model Website {
   // intent instead of losing it.
   purpose String?
 
+  // The client's own free-text brief for how they want this page to look
+  // and read ("quiero algo minimalista, en tonos verdes, que hable de
+  // nuestros 10 años de experiencia...") — fed into the generation prompt
+  // (see lib/websiteGenerator.ts) with priority over the generic per-
+  // industry defaults. Stored (not just used once) so "Regenerar todo con
+  // IA" reuses the same brief instead of losing it, same as `purpose`.
+  designPrompt String?
+
   // Human-readable, derived from the business + page name — this stays
   // clean so people can recognize/search the site, with a short numeric
   // suffix appended only on an actual collision.

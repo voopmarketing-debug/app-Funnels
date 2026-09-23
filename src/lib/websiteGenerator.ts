@@ -82,6 +82,13 @@ export type WebsiteGenerationContext = {
   // a conocer el negocio en general"), same as Funnels Labs' own funnel
   // (funnelslabs.app + a dedicated agenda page). Null/empty = general site.
   purpose?: string | null;
+  // The client's own free-text brief for how they want the page to look
+  // and read — written in the "Nueva página" dialog (see
+  // WebsitePagesList.tsx), stored on Website.designPrompt so "Regenerar
+  // todo con IA" reuses it. Given priority over the generic per-industry
+  // direction below when the two would conflict. Null/empty when the
+  // client skipped it — the generic direction still produces a real page.
+  designPrompt?: string | null;
   // When the page's goal is to send visitors somewhere other than
   // WhatsApp (e.g. a booking/agenda link) — becomes hero.ctaUrl.
   ctaUrl?: string | null;
@@ -133,6 +140,11 @@ ${ctx.purpose ? `- OBJETIVO ESPECÍFICO DE ESTA PÁGINA (ajusta el copy y el bot
 ${ctx.salesContext ? `\n${ctx.salesContext}\n` : ""}
 
 DIRECCIÓN VISUAL PARA ESTE RUBRO: ${direction}
+${
+  ctx.designPrompt
+    ? `\nINSTRUCCIONES DEL DUEÑO DEL NEGOCIO PARA ESTA PÁGINA (esto tiene prioridad sobre la dirección visual genérica de arriba cuando haya conflicto — es lo que el cliente pidió explícitamente): "${ctx.designPrompt}"\n`
+    : ""
+}
 
 Reglas:
 1. Contenido 100% real y específico a este negocio — nada de "Lorem ipsum" ni placeholders genéricos. Si falta un dato (precios, horarios), redáctalo de forma creíble sin inventar cifras falsas.

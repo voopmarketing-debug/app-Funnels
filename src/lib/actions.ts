@@ -1513,7 +1513,7 @@ async function buildSalesContext(businessId: string, diagnosisReport: unknown): 
  */
 export async function createWebsitePage(
   businessId: string,
-  input: { name?: string; purpose?: string; ctaUrl?: string },
+  input: { name?: string; purpose?: string; ctaUrl?: string; designPrompt?: string },
 ): Promise<{ id: string }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
@@ -1562,6 +1562,7 @@ export async function createWebsitePage(
         tiktok: ownerMembership?.user.tiktok,
         purpose: input.purpose,
         ctaUrl: input.ctaUrl,
+        designPrompt: input.designPrompt,
         salesContext,
       }),
       generateHeroImage({
@@ -1579,6 +1580,7 @@ export async function createWebsitePage(
         businessId,
         name,
         purpose: input.purpose || null,
+        designPrompt: input.designPrompt || null,
         slug,
         content,
         aiImageUrl,
@@ -1595,7 +1597,7 @@ export async function createWebsitePage(
   }
 }
 
-/** Regenerates one page's content from scratch, reusing its stored name/purpose. */
+/** Regenerates one page's content from scratch, reusing its stored name/purpose/design brief. */
 export async function regenerateWebsitePage(businessId: string, websiteId: string): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
@@ -1632,6 +1634,7 @@ export async function regenerateWebsitePage(businessId: string, websiteId: strin
         tiktok: ownerMembership?.user.tiktok,
         purpose: website.purpose,
         ctaUrl: (existingContent.success ? existingContent.data.hero.ctaUrl : null) ?? undefined,
+        designPrompt: website.designPrompt,
         salesContext,
       }),
       generateHeroImage({
