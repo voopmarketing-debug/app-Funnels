@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { renderWebsiteHtml } from "@/lib/websiteTemplate";
 import { captureWebsiteLead } from "@/lib/websiteLeads";
+import { siteSecurityHeaders } from "@/lib/securityHeaders";
 
 // Hosts this app already answers for on purpose — everything else that
 // reaches this deployment has been manually connected in Vercel as a
@@ -39,7 +40,7 @@ export async function proxy(request: NextRequest) {
     // owner to regenerate rather than showing a raw error to visitors.
     return new NextResponse(
       "Esta página necesita actualizarse — pide al dueño del negocio que entre a su panel y le dé 'Regenerar todo con IA'.",
-      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", ...siteSecurityHeaders() } },
     );
   }
   const content = parsedContent.data;
@@ -84,7 +85,7 @@ export async function proxy(request: NextRequest) {
   });
 
   return new NextResponse(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },
   });
 }
 

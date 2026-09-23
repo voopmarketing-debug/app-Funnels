@@ -29,6 +29,7 @@ import {
   MAX_AGENT_MEDIA_PER_BUSINESS,
 } from "@/lib/attachments";
 import { convertToOggOpus } from "@/lib/audioConvert";
+import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
@@ -40,6 +41,8 @@ import { sendEmail } from "@/lib/email";
 import { Prisma, type PlanTier } from "@prisma/client";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const RESET_REQUEST_MAX = 3;
+const RESET_REQUEST_WINDOW_MS = 15 * 60 * 1000;
 
 function slugify(name: string): string {
   return name
@@ -98,7 +101,7 @@ export async function registerBusiness(
     return { error: "Ya existe una cuenta con ese correo" };
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
   const industryLabel = INDUSTRY_OPTIONS.find((option) => option.value === industry)?.label ?? "negocio";
 
   // AGENCY_ADMIN_EMAIL (optional): if set to Funnels Labs' own account,
@@ -211,7 +214,7 @@ export async function createClientAccount(
   }
 
   const newPassword = crypto.randomBytes(6).toString("base64url");
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, 12);
 
   // Same auto-grant as registerBusiness, so the agency's shared inbox also
   // sees this client even if a different admin account created it.
@@ -1226,6 +1229,15 @@ export async function requestPasswordReset(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
   if (email) {
+    const rateLimitKey = `reset:${email}`;
+    // Same generic { submitted: true } either way — surfacing "too many
+    // requests" here would itself leak whether the email exists faster than
+    // just waiting the window out.
+    if (await isRateLimited(rateLimitKey, RESET_REQUEST_MAX, RESET_REQUEST_WINDOW_MS)) {
+      return { submitted: true };
+    }
+    await recordRateLimitEvent(rateLimitKey);
+
     const user = await prisma.user.findUnique({ where: { email } });
     if (user) {
       const rawToken = crypto.randomBytes(32).toString("hex");
@@ -1275,7 +1287,7 @@ export async function resetPassword(
     return { error: "El enlace venció o ya se usó. Solicita uno nuevo." };
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
   await prisma.user.update({
     where: { id: user.id },
     data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
@@ -1357,7 +1369,7 @@ export async function changeOwnPassword(
     return { error: "La contraseña actual no es correcta", saved: false };
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, 12);
   await prisma.user.update({
     where: { id: session.user.id },
     data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
@@ -1393,7 +1405,7 @@ export async function adminResetUserPassword(targetUserId: string): Promise<{ pa
   }
 
   const newPassword = crypto.randomBytes(6).toString("base64url");
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, 12);
 
   await prisma.user.update({
     where: { id: targetUserId },
@@ -1814,7 +1826,7 @@ export async function inviteTeamMember(businessId: string, formData: FormData): 
 
   if (password.length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres");
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
 
   await prisma.user.create({
     data: {

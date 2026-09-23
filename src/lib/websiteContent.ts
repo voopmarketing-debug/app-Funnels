@@ -20,11 +20,20 @@ export const FONT_OPTIONS = [
 // split: it's where the page actually earns its keep, preempting the real
 // doubts this business's customers raise in WhatsApp (see
 // lib/websiteGenerator.ts's sales-context gathering).
+// Hex-only (#rgb / #rrggbb / #rrggbbaa) — these three values get
+// interpolated directly into a <style> block in lib/websiteTemplate.ts, so
+// this format check is also what keeps that CSS context from being broken
+// out of (a stored-XSS vector: the theme editor has a free-text color
+// input, not just a color picker).
+const hexColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/, "Debe ser un color hex válido, ej. #1f6feb");
+
 export const WebsiteContentSchema = z.object({
   theme: z.object({
-    primaryColor: z.string().describe("Color principal en hex para botones y acentos, ej. #1f6feb — elegido a propósito para el rubro, no un genérico de IA."),
-    backgroundColor: z.string().describe("Color de fondo del sitio en hex."),
-    textColor: z.string().describe("Color del texto principal en hex, con buen contraste sobre backgroundColor."),
+    primaryColor: hexColor.describe("Color principal en hex para botones y acentos, ej. #1f6feb — elegido a propósito para el rubro, no un genérico de IA."),
+    backgroundColor: hexColor.describe("Color de fondo del sitio en hex."),
+    textColor: hexColor.describe("Color del texto principal en hex, con buen contraste sobre backgroundColor."),
     headingFont: z.enum(FONT_OPTIONS).describe("Fuente para títulos."),
     bodyFont: z.enum(FONT_OPTIONS).describe("Fuente para texto de párrafo."),
   }),

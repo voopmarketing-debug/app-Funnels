@@ -8,6 +8,16 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// theme.{primaryColor,backgroundColor,textColor} go straight into a <style>
+// block below with no other escaping — WebsiteContentSchema already
+// enforces this hex format, but re-checking here means a row saved under an
+// older, looser schema (or any future caller) can't break out of the CSS
+// context, which was a stored-XSS vector reachable from the theme editor's
+// free-text color input.
+function sanitizeHexColor(value: string, fallback: string): string {
+  return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/.test(value) ? value : fallback;
+}
+
 /** Turns a YouTube/Vimeo watch/share URL into its embeddable iframe src — accepts whatever format a client pastes. */
 function toEmbedUrl(url: string): string | null {
   try {
@@ -78,9 +88,9 @@ export function renderWebsiteHtml(
 ${fontLink(fonts)}
 <style>
   :root {
-    --primary: ${content.theme.primaryColor};
-    --bg: ${content.theme.backgroundColor};
-    --text: ${content.theme.textColor};
+    --primary: ${sanitizeHexColor(content.theme.primaryColor, "#1f6feb")};
+    --bg: ${sanitizeHexColor(content.theme.backgroundColor, "#ffffff")};
+    --text: ${sanitizeHexColor(content.theme.textColor, "#0a0a0a")};
     --heading-font: "${content.theme.headingFont}", sans-serif;
     --body-font: "${content.theme.bodyFont}", sans-serif;
   }

@@ -467,3 +467,17 @@ model Broadcast {
 
   @@index([businessId, createdAt])
 }
+
+// A generic "N events for this key in the last window" counter — used to
+// rate-limit login attempts and password-reset requests (see auth.ts and
+// actions.ts's requestPasswordReset) without adding an external dependency
+// like Redis. Rows are cheap and short-lived; nothing prunes them yet since
+// volume is low, but a cron sweep could delete rows older than the longest
+// window in use if that ever becomes worth doing.
+model RateLimitAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}

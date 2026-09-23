@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { renderWebsiteHtml } from "@/lib/websiteTemplate";
+import { siteSecurityHeaders } from "@/lib/securityHeaders";
 
 // Publicly serves one business page — no auth, meant to be shared/indexed
 // like any regular website. Rendered fresh from the structured content on
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     // owner to regenerate rather than showing a raw 500 to visitors.
     return new NextResponse(
       "Esta página necesita actualizarse — pide al dueño del negocio que entre a su panel y le dé 'Regenerar todo con IA'.",
-      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", ...siteSecurityHeaders() } },
     );
   }
 
@@ -43,6 +44,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   });
 
   return new NextResponse(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },
   });
 }

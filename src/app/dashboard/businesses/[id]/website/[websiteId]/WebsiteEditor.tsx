@@ -505,6 +505,9 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          maxLength={9}
+          placeholder="#1f6feb"
+          title="Color en formato hex, ej. #1f6feb"
           className="fl-mono min-w-0 flex-1 bg-transparent text-xs text-ink outline-none"
         />
       </div>
