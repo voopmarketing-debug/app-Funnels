@@ -7,8 +7,14 @@ import { SECURITY_HEADERS, SITE_CSP } from "./src/lib/securityHeaders";
 // it still blocks loading any *external* script, which is what actually
 // matters here since there's no dangerouslySetInnerHTML anywhere in the
 // dashboard (see the cyber-neo audit).
+// media-src explicitly set (not left to fall back to default-src 'self')
+// because voice notes, image, and video attachments are all hosted on
+// Vercel Blob's own domain, not this app's origin — without this, the
+// <audio>/<video> players in the CRM's chat thread silently refuse to
+// load anything, which is exactly what broke playback of sent/received
+// voice notes right after this CSP first shipped.
 const APP_CSP =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
 const nextConfig: NextConfig = {
   // ffmpeg-static ships a native binary (voice-note conversion, see
