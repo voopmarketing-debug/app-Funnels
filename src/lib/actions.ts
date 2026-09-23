@@ -1411,17 +1411,33 @@ async function generateUniqueWebsiteSlug(businessName: string, pageName: string,
   return `${base}-${Date.now()}`;
 }
 
-async function resolveWhatsappNumberForBusiness(businessId: string): Promise<{ accessToken: string; displayNumber: string }> {
+// Creating a website page never depends on WhatsApp being connected — the
+// two are independent features. When the real WABA number is available, use
+// it; otherwise fall back to the owner's personal phone from "Mi perfil" so
+// the site (and its WhatsApp CTA button) can still be created. Once
+// WhatsApp connects, regenerating the page (see regenerateWebsitePage)
+// naturally picks up the real API number instead.
+async function resolveWhatsappNumberForBusiness(businessId: string): Promise<{ displayNumber: string }> {
   const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
-  if (!business.wabaAccessToken || !business.wabaPhoneNumberId) {
-    throw new Error("Conecta primero las credenciales de WhatsApp de este negocio (Phone Number ID y token)");
+
+  if (business.wabaAccessToken && business.wabaPhoneNumberId) {
+    const accessToken = decryptSecret(business.wabaAccessToken);
+    const displayNumber = await fetchWhatsAppDisplayNumber({ phoneNumberId: business.wabaPhoneNumberId, accessToken });
+    if (displayNumber) return { displayNumber };
+    // Meta lookup failed (expired token, etc.) — fall through to the
+    // owner's phone below instead of blocking site creation over it.
   }
-  const accessToken = decryptSecret(business.wabaAccessToken);
-  const displayNumber = await fetchWhatsAppDisplayNumber({ phoneNumberId: business.wabaPhoneNumberId, accessToken });
-  if (!displayNumber) {
-    throw new Error("No se pudo obtener el número de WhatsApp desde Meta — revisa que el token siga vigente");
-  }
-  return { accessToken, displayNumber };
+
+  const ownerMembership = await prisma.membership.findFirst({
+    where: { businessId, role: "OWNER" },
+    include: { user: { select: { phone: true } } },
+  });
+  const fallbackPhone = ownerMembership?.user.phone?.trim();
+  if (fallbackPhone) return { displayNumber: fallbackPhone };
+
+  throw new Error(
+    "Agrega un número de WhatsApp en Mi perfil, o conecta las credenciales de WhatsApp de este negocio, para poder crear la página.",
+  );
 }
 
 /**
@@ -1846,4 +1862,44 @@ export async function markAllNotificationsRead(): Promise<void> {
     data: { readAt: new Date() },
   });
   revalidatePath("/dashboard");
+}
+
+/**
+ * A cheap "has anything changed" fingerprint for a business's conversations
+ * — polled client-side (see CrmLivePoller) so the CRM's chat list and open
+ * thread update live instead of needing a manual page reload. Just a count +
+ * a max timestamp, not the actual data, so polling it every few seconds is
+ * inexpensive; the client only re-fetches the real data (via router.refresh)
+ * when this signature actually changes.
+ */
+export async function getConversationActivitySignature(businessId: string): Promise<string> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const result = await prisma.conversation.aggregate({
+    where: { businessId },
+    _max: { lastMessageAt: true },
+    _count: { _all: true },
+  });
+  return `${result._count._all}:${result._max.lastMessageAt?.getTime() ?? 0}`;
+}
+
+/**
+ * Cheap unread-notification count across every business this user belongs
+ * to — polled client-side (see NotificationSoundPoller) so a sound alert can
+ * fire the moment a new customer message/appointment notification lands,
+ * without needing WebSockets. Just a count, not the notifications
+ * themselves, so polling it every few seconds is inexpensive.
+ */
+export async function getUnreadNotificationCount(): Promise<number> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+
+  const businessIds = (
+    await prisma.membership.findMany({ where: { userId: session.user.id }, select: { businessId: true } })
+  ).map((m) => m.businessId);
+  if (businessIds.length === 0) return 0;
+
+  return prisma.notification.count({ where: { businessId: { in: businessIds }, readAt: null } });
 }

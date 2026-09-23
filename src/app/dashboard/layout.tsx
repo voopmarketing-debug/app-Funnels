@@ -3,6 +3,7 @@ import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { NotificationBell, type NotificationItem } from "./NotificationBell";
+import { NotificationSoundPoller } from "./NotificationSoundPoller";
 
 function formatNotificationDate(date: Date): string {
   return new Intl.DateTimeFormat("es-CO", {
@@ -82,6 +83,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-screen">
       <div className="fl-ambient-bg" />
+      <NotificationSoundPoller />
       <DashboardSidebar
         isAgencyAdmin={isAgencyAdmin}
         primaryBusinessId={primaryBusiness?.businessId ?? null}

@@ -11,7 +11,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
 
   const membership = await prisma.membership.findUnique({
     where: { userId_businessId: { userId: session.user.id, businessId: id } },
-    include: { business: { select: { name: true, wabaPhoneNumberId: true } } },
+    include: { business: { select: { name: true } } },
   });
   if (!membership) notFound();
 
@@ -53,7 +53,6 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
 
       <WebsitePagesList
         businessId={id}
-        hasWabaCredentials={!!membership.business.wabaPhoneNumberId}
         pages={pages}
         publicUrlBase={`https://${appHost}/sitio`}
         stats={{ totalViews, totalClicksWhatsapp, totalClicksAgenda, totalLeads }}

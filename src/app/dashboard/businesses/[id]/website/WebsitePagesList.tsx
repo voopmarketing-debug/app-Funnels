@@ -18,13 +18,11 @@ type Page = {
 
 export function WebsitePagesList({
   businessId,
-  hasWabaCredentials,
   pages,
   publicUrlBase,
   stats,
 }: {
   businessId: string;
-  hasWabaCredentials: boolean;
   pages: Page[];
   publicUrlBase: string;
   stats: { totalViews: number; totalClicksWhatsapp: number; totalClicksAgenda: number; totalLeads: number };
@@ -96,18 +94,10 @@ export function WebsitePagesList({
               setFormKey((k) => k + 1);
               dialogRef.current?.showModal();
             }}
-            disabled={!hasWabaCredentials}
             className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover disabled:opacity-50"
           >
             + Nueva página
           </button>
-        </div>
-      )}
-
-      {!hasWabaCredentials && (
-        <div className="rounded-md border-2 border-[#fab219]/50 bg-surface p-4 text-sm text-ink">
-          Conecta primero las credenciales de WhatsApp de este negocio (página del negocio) — cada página usa ese
-          número real para el botón de contacto.
         </div>
       )}
 
@@ -123,7 +113,7 @@ export function WebsitePagesList({
         </div>
       )}
 
-      {pages.length === 0 && hasWabaCredentials && (
+      {pages.length === 0 && (
         <div className="fl-card flex flex-col items-center gap-3 p-10 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent">
             <GlobeIcon />

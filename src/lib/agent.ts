@@ -56,6 +56,22 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     return;
   }
 
+  // Meta's webhook delivery is "at least once" — if our processing (Claude
+  // call + WhatsApp send) takes long enough that Meta doesn't get its ack in
+  // time, it retries the same message, which would otherwise run the entire
+  // pipeline twice (duplicate AI reply, duplicate appointment notification,
+  // etc.). Bail out early if we've already stored this exact message.
+  if (message.whatsappMsgId) {
+    const alreadyProcessed = await prisma.message.findFirst({
+      where: { whatsappMsgId: message.whatsappMsgId },
+      select: { id: true },
+    });
+    if (alreadyProcessed) {
+      console.warn(`Skipping duplicate webhook delivery for whatsappMsgId ${message.whatsappMsgId}`);
+      return;
+    }
+  }
+
   // Decrypted once and reused for both the inbound media download below and
   // the outbound reply send further down.
   const accessToken = decryptSecret(business.wabaAccessToken);
@@ -204,6 +220,23 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       ...mediaFields,
     },
   });
+
+  // Fires on every inbound customer message, independent of whether the AI
+  // ends up replying (paused conversation, over plan limit, etc.) — those
+  // are exactly the cases where a human most needs to know someone wrote in,
+  // since the agent won't respond on its own.
+  {
+    const leadLabel = conversation.customerName || conversation.customerPhone;
+    const excerpt = messageContent.length > 80 ? `${messageContent.slice(0, 80)}...` : messageContent;
+    await prisma.notification.create({
+      data: {
+        businessId: business.id,
+        conversationId: conversation.id,
+        type: "NEW_MESSAGE",
+        message: `${leadLabel} te escribió: "${excerpt}"`,
+      },
+    });
+  }
 
   if (conversation.aiPaused) {
     // A human already took over this specific conversation — the message is

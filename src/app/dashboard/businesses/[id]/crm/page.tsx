@@ -10,6 +10,7 @@ import { PipelineSwitcher } from "./PipelineSwitcher";
 import { ConversationSplitView } from "./ConversationSplitView";
 import { BroadcastDialog } from "./BroadcastDialog";
 import { AgentSwitcher } from "../AgentSwitcher";
+import { CrmLivePoller } from "./CrmLivePoller";
 
 export default async function CrmPage({
   params,
@@ -96,6 +97,7 @@ export default async function CrmPage({
 
   return (
     <div className="space-y-6">
+      <CrmLivePoller businessId={id} />
       <div>
         <Link href={`/dashboard/businesses/${id}`} className="text-sm text-ink-muted underline hover:text-ink">
           ← {business.name}
