@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { updateConversationDetails } from "@/lib/actions";
 
 const TAG_SUGGESTIONS = ["Lead calificado", "Cliente potencial", "Cotización enviada", "Urgente"];
@@ -33,6 +33,30 @@ export function LeadDetailPanel({
   appointmentNote: string | null;
 }) {
   const [, startTransition] = useTransition();
+  // Remembered per-browser (not per-lead) — collapsing it once to read a
+  // long conversation shouldn't need repeating on every contact clicked
+  // afterward. Defaults open since the panel's own data (appointment,
+  // notes, tags) is useful at a glance, not just on demand.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("funnels-lead-panel-collapsed") === "1");
+    } catch {
+      // Private browsing or storage disabled — stays expanded.
+    }
+  }, []);
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("funnels-lead-panel-collapsed", next ? "1" : "0");
+      } catch {
+        // Storage disabled — the choice just won't persist across reloads.
+      }
+      return next;
+    });
+  }
+
   const [tagList, setTagList] = useState(tags);
   const [tagInput, setTagInput] = useState("");
   const [notesValue, setNotesValue] = useState(notes ?? "");
@@ -83,8 +107,29 @@ export function LeadDetailPanel({
     });
   }
 
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        title="Mostrar panel del lead (contacto, cita, notas, tags)"
+        className="flex w-7 flex-none flex-col items-center justify-center gap-2 border-l border-border bg-surface text-ink-faint transition hover:text-ink"
+      >
+        <span aria-hidden="true">‹</span>
+      </button>
+    );
+  }
+
   return (
     <div className="flex w-72 flex-none flex-col gap-5 overflow-y-auto border-l border-border bg-surface p-4">
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        title="Ocultar este panel para darle más espacio a la conversación"
+        className="self-start rounded-md border border-border px-1.5 py-1 text-xs text-ink-faint transition hover:border-accent hover:text-ink"
+      >
+        › Ocultar
+      </button>
       <section>
         <h3 className="fl-mono mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Contacto</h3>
         <a
