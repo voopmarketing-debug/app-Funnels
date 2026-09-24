@@ -477,6 +477,11 @@ model Appointment {
   status         String   @default("confirmed") // "confirmed" | "cancelled"
   createdAt      DateTime @default(now())
 
+  // Set once the "1 hour before" reminder (WhatsApp + email to the lead) has
+  // gone out — see lib/agendaReminders.ts. Null means not sent yet, the only
+  // state the reminder cron's WHERE clause looks for; never cleared once set.
+  reminderSentAt DateTime?
+
   website      Website       @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   professional Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
 
@@ -492,6 +497,7 @@ model Appointment {
   // not here. Don't add `prisma migrate dev`/`db push` on this model without
   // checking that index still exists afterwards.
   @@index([websiteId, professionalId, startsAt])
+  @@index([status, reminderSentAt, startsAt])
 }
 
 // Someone who filled the page's own lead-capture form (name + WhatsApp/phone
