@@ -113,9 +113,14 @@ export function LeadDetailPanel({
         type="button"
         onClick={toggleCollapsed}
         title="Mostrar panel del lead (contacto, cita, notas, tags)"
-        className="flex w-7 flex-none flex-col items-center justify-center gap-2 border-l border-border bg-surface text-ink-faint transition hover:text-ink"
+        className="group flex w-9 flex-none flex-col items-center justify-center border-l border-border bg-surface text-ink-faint transition hover:bg-accent/10"
       >
-        <span aria-hidden="true">‹</span>
+        <span
+          aria-hidden="true"
+          className="text-2xl font-bold leading-none text-ink-faint transition group-hover:scale-125 group-hover:text-accent"
+        >
+          ‹
+        </span>
       </button>
     );
   }
