@@ -67,16 +67,27 @@ export async function submitAgendaBooking(params: {
     ? (params.professionals.find((p) => p.id === result.professionalId) ?? null)
     : null;
 
+  const dateLabel = formatDateLabel(dateStr);
+  const withProfessional = assignedProfessional ? ` con ${escapeHtml(assignedProfessional.name)}` : "";
+
   // So this lead shows up in the CRM ("Nuevo" stage) and can be messaged or
   // included in a broadcast — a booking is a real contact left behind, same
   // as the lead-capture form (see lib/websiteLeads.ts's captureWebsiteLead).
   // Awaited, unlike the emails below — this is core data (the lead's actual
   // CRM record), not a best-effort notification safe to drop if the
   // function's execution gets cut short right after responding.
-  await upsertLeadConversation({ websiteId: params.websiteId, name, contact });
-
-  const dateLabel = formatDateLabel(dateStr);
-  const withProfessional = assignedProfessional ? ` con ${escapeHtml(assignedProfessional.name)}` : "";
+  //
+  // Also fills "Cita agendada" in the chat panel with this same booking —
+  // plain text (not the HTML-escaped withProfessional above), so the
+  // business sees the real date/time/professional without re-typing it.
+  const professionalNote = assignedProfessional ? ` con ${assignedProfessional.name}` : "";
+  await upsertLeadConversation({
+    websiteId: params.websiteId,
+    name,
+    contact,
+    appointmentAt: result.startsAt,
+    appointmentNote: `Agendó desde la página — ${dateLabel} a las ${timeStr}${professionalNote}`,
+  });
 
   // Attached to every notification below so the appointment lands straight
   // on the recipient's own calendar app (Google Calendar, Outlook, Apple

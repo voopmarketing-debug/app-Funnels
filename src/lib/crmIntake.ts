@@ -18,7 +18,21 @@ import { prisma } from "@/lib/prisma";
  * the bare-digits form — without normalizing, the same real person would
  * silently create a second conversation instead of being recognized.
  */
-export async function upsertLeadConversation(params: { websiteId: string; name: string; contact: string }): Promise<void> {
+export async function upsertLeadConversation(params: {
+  websiteId: string;
+  name: string;
+  contact: string;
+  // Only set by lib/agendaBooking.ts, when this lead's entry point WAS a
+  // real booking — fills the same "Cita agendada" field the AI's own
+  // mark_appointment tool writes (see lib/ai.ts), so a booking made from
+  // the public page shows up in the chat panel without anyone re-typing it
+  // by hand. Left undefined for the plain lead-capture form (websiteLeads.ts
+  // has no appointment to report), which must never blank out an existing
+  // appointment set some other way — so it's only included in the write
+  // when actually provided.
+  appointmentAt?: Date;
+  appointmentNote?: string;
+}): Promise<void> {
   const phone = params.contact.replace(/[^0-9]/g, "");
   const name = params.name.trim();
   if (!phone || !name) return;
@@ -32,14 +46,19 @@ export async function upsertLeadConversation(params: { websiteId: string; name: 
   });
   if (!firstStage) return;
 
+  const appointmentFields = params.appointmentAt
+    ? { appointmentAt: params.appointmentAt, appointmentNote: params.appointmentNote ?? null }
+    : {};
+
   await prisma.conversation.upsert({
     where: { businessId_customerPhone: { businessId: website.businessId, customerPhone: phone } },
-    update: { customerName: name },
+    update: { customerName: name, ...appointmentFields },
     create: {
       businessId: website.businessId,
       customerPhone: phone,
       customerName: name,
       stageId: firstStage.id,
+      ...appointmentFields,
     },
   });
 }
