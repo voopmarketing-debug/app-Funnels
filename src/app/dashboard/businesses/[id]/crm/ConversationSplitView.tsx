@@ -58,7 +58,7 @@ export function ConversationSplitView({
 
   return (
     <div className="fl-card flex h-[calc(100vh-14rem)] min-h-[28rem] overflow-hidden">
-      <div className="flex w-72 flex-none flex-col overflow-y-auto border-r border-border">
+      <div className="flex w-64 flex-none flex-col overflow-y-auto border-r border-border">
         {conversations.length === 0 && (
           <p className="p-4 text-center text-xs text-ink-muted">Aún no hay conversaciones.</p>
         )}

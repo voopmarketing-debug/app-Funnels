@@ -84,7 +84,7 @@ export function LeadDetailPanel({
   }
 
   return (
-    <div className="flex w-80 flex-none flex-col gap-5 overflow-y-auto border-l border-border bg-surface p-4">
+    <div className="flex w-72 flex-none flex-col gap-5 overflow-y-auto border-l border-border bg-surface p-4">
       <section>
         <h3 className="fl-mono mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Contacto</h3>
         <a
