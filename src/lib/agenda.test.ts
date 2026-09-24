@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDayAvailability, getUpcomingAvailableDates, DEFAULT_AVAILABILITY, AvailabilitySchema } from "@/lib/agenda";
+import { getDayAvailability, getUpcomingAvailableDates, DEFAULT_AVAILABILITY, AvailabilitySchema, shiftMonthStr } from "@/lib/agenda";
 
 describe("getDayAvailability", () => {
   it("maps a date string to the correct weekday regardless of timezone (2026-09-23 is a Wednesday)", () => {
@@ -33,6 +33,20 @@ describe("getUpcomingAvailableDates", () => {
       Object.entries(DEFAULT_AVAILABILITY).map(([k, v]) => [k, { ...v, enabled: false }]),
     ) as typeof DEFAULT_AVAILABILITY;
     expect(getUpcomingAvailableDates(noneEnabled, "America/Bogota", 5)).toEqual([]);
+  });
+});
+
+describe("shiftMonthStr", () => {
+  it("moves forward a month within the same year", () => {
+    expect(shiftMonthStr("2026-09", 1)).toBe("2026-10");
+  });
+
+  it("rolls over into the next year", () => {
+    expect(shiftMonthStr("2026-12", 1)).toBe("2027-01");
+  });
+
+  it("rolls back into the previous year", () => {
+    expect(shiftMonthStr("2026-01", -1)).toBe("2025-12");
   });
 });
 

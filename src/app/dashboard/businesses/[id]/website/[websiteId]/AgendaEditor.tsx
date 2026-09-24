@@ -1,9 +1,36 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { updateAgendaConfig } from "@/lib/actions";
-import type { Availability } from "@/lib/agenda";
+import { shiftMonthStr, type Availability } from "@/lib/agendaAvailability";
+import { formatDateInZone } from "@/lib/timezone";
 import { DomainSection } from "./WebsiteEditor";
+
+type Appointment = { id: string; name: string; contact: string; startsAt: Date };
+
+const MONTH_DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+/** 42 "YYYY-MM-DD" cells (6 full Monday-start weeks) covering `monthStr` plus its leading/trailing days from adjacent months. */
+function getMonthGridDates(monthStr: string): string[] {
+  const [year, month] = monthStr.split("-").map(Number); // month is 1-indexed here
+  const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
+  const offsetToMonday = (firstOfMonth.getUTCDay() + 6) % 7;
+  const gridStart = new Date(Date.UTC(year, month - 1, 1 - offsetToMonday));
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(gridStart);
+    d.setUTCDate(d.getUTCDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+function formatMonthLabel(monthStr: string): string {
+  const [year, month] = monthStr.split("-").map(Number);
+  const label = new Intl.DateTimeFormat("es-CO", { month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(Date.UTC(year, month - 1, 1)),
+  );
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 type DayKey = keyof Availability;
 const DAY_ORDER: DayKey[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
@@ -37,6 +64,8 @@ export function AgendaEditor({
   customDomain,
   totalAppointments,
   upcomingAppointments,
+  monthStr,
+  monthAppointments,
 }: {
   businessId: string;
   websiteId: string;
@@ -45,7 +74,9 @@ export function AgendaEditor({
   generatedAt: Date;
   customDomain: string | null;
   totalAppointments: number;
-  upcomingAppointments: { id: string; name: string; contact: string; startsAt: Date }[];
+  upcomingAppointments: Appointment[];
+  monthStr: string;
+  monthAppointments: Appointment[];
 }) {
   const [config, setConfig] = useState(initialConfig);
   const [isSaving, startSaving] = useTransition();
@@ -53,6 +84,22 @@ export function AgendaEditor({
   const [saved, setSaved] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const gridDates = useMemo(() => getMonthGridDates(monthStr), [monthStr]);
+  const appointmentsByDate = useMemo(() => {
+    const map = new Map<string, Appointment[]>();
+    for (const a of monthAppointments) {
+      const key = formatDateInZone(a.startsAt, config.timezone);
+      const list = map.get(key);
+      if (list) list.push(a);
+      else map.set(key, [a]);
+    }
+    return map;
+  }, [monthAppointments, config.timezone]);
+  const todayStr = formatDateInZone(new Date(), config.timezone);
+  const selectedAppointments = selectedDate ? (appointmentsByDate.get(selectedDate) ?? []) : [];
+  const editorBaseUrl = `/dashboard/businesses/${businessId}/website/${websiteId}`;
 
   function setDay(day: DayKey, patch: Partial<Availability[DayKey]>) {
     setConfig((c) => ({ ...c, availability: { ...c.availability, [day]: { ...c.availability[day], ...patch } } }));
@@ -94,6 +141,93 @@ export function AgendaEditor({
             <span className="rounded-md border border-error/40 bg-error/10 px-3 py-1.5 text-xs font-semibold text-error">
               ✕ {saveError}
             </span>
+          )}
+        </div>
+
+        <div className="fl-card space-y-3 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-ink">{formatMonthLabel(monthStr)}</h2>
+            <div className="flex items-center gap-1">
+              <Link
+                href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, -1)}`}
+                className="rounded-md border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
+                aria-label="Mes anterior"
+              >
+                ‹
+              </Link>
+              <Link
+                href={editorBaseUrl}
+                className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-ink-muted transition hover:border-accent hover:text-ink"
+              >
+                Hoy
+              </Link>
+              <Link
+                href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, 1)}`}
+                className="rounded-md border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
+                aria-label="Mes siguiente"
+              >
+                ›
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {MONTH_DAY_LABELS.map((d) => (
+              <div key={d} className="fl-mono py-1 text-center text-[10px] uppercase tracking-wide text-ink-faint">
+                {d}
+              </div>
+            ))}
+            {gridDates.map((date) => {
+              const inMonth = date.startsWith(monthStr);
+              const appts = appointmentsByDate.get(date) ?? [];
+              const isToday = date === todayStr;
+              const isSelected = date === selectedDate;
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => setSelectedDate(isSelected ? null : date)}
+                  disabled={appts.length === 0}
+                  className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border text-sm transition ${
+                    isSelected
+                      ? "border-accent bg-accent/10"
+                      : isToday
+                        ? "border-accent/50"
+                        : "border-transparent hover:border-border"
+                  } ${!inMonth ? "opacity-30" : ""} ${appts.length === 0 ? "cursor-default" : "cursor-pointer"}`}
+                >
+                  <span className={isToday ? "font-bold text-accent" : "text-ink"}>{Number(date.slice(8, 10))}</span>
+                  {appts.length > 0 && (
+                    <span className="fl-mono rounded-full bg-accent px-1 text-[9px] font-bold leading-tight text-accent-ink">
+                      {appts.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedDate && (
+            <div className="space-y-2 border-t border-border pt-3">
+              <p className="text-xs font-semibold text-ink">
+                Citas del {new Date(`${selectedDate}T00:00:00Z`).toLocaleDateString("es-CO", { day: "numeric", month: "long", timeZone: "UTC" })}
+              </p>
+              {selectedAppointments.length === 0 ? (
+                <p className="text-xs text-ink-faint">No hay citas este día.</p>
+              ) : (
+                selectedAppointments.map((a) => (
+                  <div key={a.id} className="rounded-md border border-border bg-background p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium text-ink">{a.name}</p>
+                      <p className="fl-mono flex-none text-xs text-accent">
+                        {a.startsAt.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: config.timezone })}
+                      </p>
+                    </div>
+                    <p className="fl-mono text-xs text-ink-muted">{a.contact}</p>
+                  </div>
+                ))
+              )}
+            </div>
           )}
         </div>
 

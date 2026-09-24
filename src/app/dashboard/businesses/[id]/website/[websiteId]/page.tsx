@@ -3,17 +3,20 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
-import { AvailabilitySchema, DEFAULT_AVAILABILITY } from "@/lib/agenda";
+import { AvailabilitySchema, DEFAULT_AVAILABILITY, parseMonthStr, getCurrentMonthStr } from "@/lib/agenda";
 import { WebsiteEditor } from "./WebsiteEditor";
 import { AgendaEditor } from "./AgendaEditor";
 import { RegenerateOldPageButton } from "./RegenerateOldPageButton";
 
 export default async function WebsiteEditorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; websiteId: string }>;
+  searchParams: Promise<{ month?: string }>;
 }) {
   const { id, websiteId } = await params;
+  const { month: monthParam } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -29,12 +32,25 @@ export default async function WebsiteEditorPage({
   const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
 
   if (website.pageType === "agenda") {
-    const [totalAppointments, upcomingAppointments] = await Promise.all([
+    const monthStr = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : getCurrentMonthStr();
+    const { year, month } = parseMonthStr(monthStr);
+    // Padded a day on each side so a booking near the month's edge in the
+    // business's own timezone (which can differ from this query's UTC
+    // boundaries) never gets silently dropped from the calendar.
+    const monthQueryStart = new Date(Date.UTC(year, month, 1) - 24 * 60 * 60 * 1000);
+    const monthQueryEnd = new Date(Date.UTC(year, month + 1, 1) + 24 * 60 * 60 * 1000);
+
+    const [totalAppointments, upcomingAppointments, monthAppointments] = await Promise.all([
       prisma.appointment.count({ where: { websiteId, status: "confirmed" } }),
       prisma.appointment.findMany({
         where: { websiteId, status: "confirmed" },
         orderBy: { startsAt: "asc" },
         take: 20,
+        select: { id: true, name: true, contact: true, startsAt: true },
+      }),
+      prisma.appointment.findMany({
+        where: { websiteId, status: "confirmed", startsAt: { gte: monthQueryStart, lt: monthQueryEnd } },
+        orderBy: { startsAt: "asc" },
         select: { id: true, name: true, contact: true, startsAt: true },
       }),
     ]);
@@ -66,6 +82,8 @@ export default async function WebsiteEditorPage({
           publicUrl={`https://${appHost}/sitio/${website.slug}`}
           totalAppointments={totalAppointments}
           upcomingAppointments={upcomingAppointments}
+          monthStr={monthStr}
+          monthAppointments={monthAppointments}
         />
       </div>
     );
