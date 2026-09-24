@@ -10,6 +10,23 @@ export function formatDateLabel(dateStr: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+/**
+ * Short form ("Mié 23 sept") for the day-picker grid tiles, so each one
+ * fits on a single line — the confirmation step and emails still use the
+ * full formatDateLabel(). Built from two separate Intl calls instead of
+ * one combined weekday+day+month format, which in es-CO inserts a comma
+ * and "de" ("mié, 23 de sept") that made the short label barely shorter
+ * than the long one.
+ */
+function formatDateLabelShort(dateStr: string): string {
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  const weekday = new Intl.DateTimeFormat("es-CO", { weekday: "short", timeZone: "UTC" }).format(date).replace(/\./g, "");
+  const month = new Intl.DateTimeFormat("es-CO", { month: "short", timeZone: "UTC" }).format(date).replace(/\./g, "");
+  const day = date.getUTCDate();
+  const label = `${weekday} ${day} ${month}`;
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 function fontLink(): string {
   return `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">`;
 }
@@ -78,7 +95,7 @@ export function renderAgendaHtml(params: {
     stepHtml =
       params.upcomingDates.length === 0
         ? `<p class="muted">Este negocio no tiene horarios disponibles configurados por ahora.</p>`
-        : `<div class="days">${params.upcomingDates.map((d) => `<a class="day" href="${escapeHtml(dayHref(d))}">${formatDateLabel(d)}</a>`).join("")}</div>`;
+        : `<div class="days">${params.upcomingDates.map((d) => `<a class="day" href="${escapeHtml(dayHref(d))}">${formatDateLabelShort(d)}</a>`).join("")}</div>`;
   }
 
   return `<!doctype html>
@@ -108,8 +125,8 @@ ${fontLink()}
   a { color: inherit; }
   .back { display: inline-block; margin-bottom: 20px; font-size: 13px; color: color-mix(in srgb, var(--text) 65%, transparent); text-decoration: none; }
   .back:hover { text-decoration: underline; }
-  .days { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-  .day { display: block; padding: 16px 14px; text-align: center; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 12px; text-decoration: none; font-weight: 600; transition: border-color 0.15s ease, background 0.15s ease; }
+  .days { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+  .day { display: block; padding: 14px 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 12px; text-decoration: none; font-weight: 600; transition: border-color 0.15s ease, background 0.15s ease; }
   .day:hover { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, transparent); }
   .selected-day, .selected-slot { font-weight: 700; font-size: 18px; margin: 0 0 16px; }
   .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
