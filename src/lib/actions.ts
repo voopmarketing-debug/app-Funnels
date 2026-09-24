@@ -1041,10 +1041,15 @@ export async function sendManualMessage(
     // recording (see the mic button in ManualMessageForm) comes out as
     // WebM/Opus, which Meta silently rejects, so it's normalized here
     // before upload. Covers any other audio format someone attaches too.
-    if (mediaType === "audio" && contentType !== "audio/ogg") {
+    if (mediaType === "audio" && contentType !== "audio/ogg; codecs=opus") {
       bytes = await convertToOggOpus(bytes);
       filename = filename.replace(/\.[^.]+$/, "") + ".ogg";
-      contentType = "audio/ogg";
+      // Meta reads the Content-Type Meta's crawler fetches from our blob URL
+      // to decide the media's format — plain "audio/ogg" (no codecs param)
+      // is accepted at send time but then fails to play on the recipient's
+      // phone ("this audio is no longer available"). The codecs parameter
+      // is required, not optional, for WhatsApp to treat it as real Opus.
+      contentType = "audio/ogg; codecs=opus";
     }
 
     const { url } = await uploadAttachment({ bytes, filename, contentType });

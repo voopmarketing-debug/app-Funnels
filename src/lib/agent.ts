@@ -337,7 +337,10 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
         const { url, size } = await uploadAttachment({
           bytes: audioBytes,
           filename: `respuesta-${Date.now()}.ogg`,
-          contentType: "audio/ogg",
+          // Must include the codecs param — see the matching comment in
+          // actions.ts's sendManualMessage — or WhatsApp accepts the send
+          // but the recipient's phone can't play it back.
+          contentType: "audio/ogg; codecs=opus",
         });
         voiceNote = { url, sizeBytes: size };
       } catch (err) {

@@ -23,7 +23,11 @@ export async function convertToOggOpus(bytes: Buffer): Promise<Buffer> {
   try {
     await writeFile(inputPath, bytes);
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn(ffmpegBinary, ["-y", "-i", inputPath, "-c:a", "libopus", "-b:a", "32k", "-vn", outputPath]);
+      // -ac 1 forces mono — WhatsApp's voice-note player expects a single
+      // channel; a stereo/multi-channel Ogg/Opus file (some mics record
+      // stereo by default) is another way this silently fails to play on
+      // the recipient's phone even though it decodes fine everywhere else.
+      const proc = spawn(ffmpegBinary, ["-y", "-i", inputPath, "-c:a", "libopus", "-ac", "1", "-b:a", "32k", "-vn", outputPath]);
       let stderr = "";
       proc.stderr.on("data", (chunk) => {
         stderr += chunk;
