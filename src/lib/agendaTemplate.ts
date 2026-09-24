@@ -97,7 +97,7 @@ ${fontLink()}
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: "Inter", sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; }
-  .wrap { max-width: 560px; margin: 0 auto; padding: 0 24px; }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 0 24px; }
   header.top { padding: 20px 0; border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent); }
   .brand { font-weight: 700; font-size: 16px; }
   main { padding: 48px 0 64px; }
@@ -108,8 +108,8 @@ ${fontLink()}
   a { color: inherit; }
   .back { display: inline-block; margin-bottom: 20px; font-size: 13px; color: color-mix(in srgb, var(--text) 65%, transparent); text-decoration: none; }
   .back:hover { text-decoration: underline; }
-  .days { display: flex; flex-direction: column; gap: 10px; }
-  .day { display: block; padding: 14px 18px; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 12px; text-decoration: none; font-weight: 600; transition: border-color 0.15s ease, background 0.15s ease; }
+  .days { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .day { display: block; padding: 16px 14px; text-align: center; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 12px; text-decoration: none; font-weight: 600; transition: border-color 0.15s ease, background 0.15s ease; }
   .day:hover { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, transparent); }
   .selected-day, .selected-slot { font-weight: 700; font-size: 18px; margin: 0 0 16px; }
   .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }

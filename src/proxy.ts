@@ -97,7 +97,7 @@ export async function proxy(request: NextRequest) {
     const confirmedTime = request.nextUrl.searchParams.get("reservado_hora");
     const bookingError = request.nextUrl.searchParams.get("error");
 
-    const upcomingDates = dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 14);
+    const upcomingDates = dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 10);
     const availableSlots =
       dateStr && !timeStr
         ? await getAvailableSlotsForDate({

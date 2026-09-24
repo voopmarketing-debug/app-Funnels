@@ -62,7 +62,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     const confirmedTime = req.nextUrl.searchParams.get("reservado_hora");
     const bookingError = req.nextUrl.searchParams.get("error");
 
-    const upcomingDates = dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 14);
+    const upcomingDates = dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 10);
     const availableSlots =
       dateStr && !timeStr
         ? await getAvailableSlotsForDate({
