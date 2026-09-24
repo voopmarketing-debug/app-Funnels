@@ -5,7 +5,18 @@ import Link from "next/link";
 import { updateAgendaConfig } from "@/lib/actions";
 import { shiftMonthStr, type Availability } from "@/lib/agendaAvailability";
 import { formatDateInZone } from "@/lib/timezone";
+import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
 import { DomainSection } from "./WebsiteEditor";
+
+/** `#RRGGBB` + a 2-digit hex alpha (e.g. "26" ≈ 15%) — used to tint the calendar with the clinic's own primary color without a CSS color-mix dependency. */
+function withAlpha(hex: string, alpha: string): string {
+  return `${hex}${alpha}`;
+}
+
+function waLink(contact: string): string | null {
+  const digits = contact.replace(/[^0-9]/g, "");
+  return digits.length >= 8 ? `https://wa.me/${digits}` : null;
+}
 
 type Appointment = { id: string; name: string; contact: string; startsAt: Date };
 
@@ -98,8 +109,14 @@ export function AgendaEditor({
     return map;
   }, [monthAppointments, config.timezone]);
   const todayStr = formatDateInZone(new Date(), config.timezone);
-  const selectedAppointments = selectedDate ? (appointmentsByDate.get(selectedDate) ?? []) : [];
+  // Defaults to today so the day panel already shows something useful with
+  // zero clicks — clicking any day (not just ones with appointments, so the
+  // calendar behaves like a real one) just switches which day it shows.
+  const activeDate = selectedDate ?? todayStr;
+  const activeAppointments = appointmentsByDate.get(activeDate) ?? [];
   const editorBaseUrl = `/dashboard/businesses/${businessId}/website/${websiteId}`;
+  const accent = sanitizeHexColor(config.primaryColor, "#1f6feb");
+  const accentText = readableTextColor(accent);
 
   function setDay(day: DayKey, patch: Partial<Availability[DayKey]>) {
     setConfig((c) => ({ ...c, availability: { ...c.availability, [day]: { ...c.availability[day], ...patch } } }));
@@ -144,91 +161,124 @@ export function AgendaEditor({
           )}
         </div>
 
-        <div className="fl-card space-y-3 p-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-ink">{formatMonthLabel(monthStr)}</h2>
-            <div className="flex items-center gap-1">
-              <Link
-                href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, -1)}`}
-                className="rounded-md border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
-                aria-label="Mes anterior"
-              >
-                ‹
-              </Link>
-              <Link
-                href={editorBaseUrl}
-                className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-ink-muted transition hover:border-accent hover:text-ink"
-              >
-                Hoy
-              </Link>
-              <Link
-                href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, 1)}`}
-                className="rounded-md border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
-                aria-label="Mes siguiente"
-              >
-                ›
-              </Link>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {MONTH_DAY_LABELS.map((d) => (
-              <div key={d} className="fl-mono py-1 text-center text-[10px] uppercase tracking-wide text-ink-faint">
-                {d}
+        <div className="fl-card overflow-hidden p-0">
+          <div className="grid md:grid-cols-[minmax(0,1fr)_240px]">
+            <div className="space-y-3 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-ink">{formatMonthLabel(monthStr)}</h2>
+                <div className="flex items-center gap-1">
+                  <Link
+                    href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, -1)}`}
+                    className="rounded-full border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
+                    aria-label="Mes anterior"
+                  >
+                    ‹
+                  </Link>
+                  <Link
+                    href={editorBaseUrl}
+                    className="rounded-full border border-border px-3 py-1 text-xs font-medium text-ink-muted transition hover:border-accent hover:text-ink"
+                  >
+                    Hoy
+                  </Link>
+                  <Link
+                    href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, 1)}`}
+                    className="rounded-full border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
+                    aria-label="Mes siguiente"
+                  >
+                    ›
+                  </Link>
+                </div>
               </div>
-            ))}
-            {gridDates.map((date) => {
-              const inMonth = date.startsWith(monthStr);
-              const appts = appointmentsByDate.get(date) ?? [];
-              const isToday = date === todayStr;
-              const isSelected = date === selectedDate;
-              return (
-                <button
-                  key={date}
-                  type="button"
-                  onClick={() => setSelectedDate(isSelected ? null : date)}
-                  disabled={appts.length === 0}
-                  className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border text-sm transition ${
-                    isSelected
-                      ? "border-accent bg-accent/10"
-                      : isToday
-                        ? "border-accent/50"
-                        : "border-transparent hover:border-border"
-                  } ${!inMonth ? "opacity-30" : ""} ${appts.length === 0 ? "cursor-default" : "cursor-pointer"}`}
-                >
-                  <span className={isToday ? "font-bold text-accent" : "text-ink"}>{Number(date.slice(8, 10))}</span>
-                  {appts.length > 0 && (
-                    <span className="fl-mono rounded-full bg-accent px-1 text-[9px] font-bold leading-tight text-accent-ink">
-                      {appts.length}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
 
-          {selectedDate && (
-            <div className="space-y-2 border-t border-border pt-3">
+              <div className="grid grid-cols-7 gap-1">
+                {MONTH_DAY_LABELS.map((d) => (
+                  <div key={d} className="fl-mono py-1 text-center text-[10px] uppercase tracking-wide text-ink-faint">
+                    {d}
+                  </div>
+                ))}
+                {gridDates.map((date) => {
+                  const inMonth = date.startsWith(monthStr);
+                  const appts = appointmentsByDate.get(date) ?? [];
+                  const isToday = date === todayStr;
+                  const isSelected = date === activeDate;
+                  return (
+                    <button
+                      key={date}
+                      type="button"
+                      onClick={() => setSelectedDate(date)}
+                      className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-full text-sm transition ${
+                        !inMonth ? "opacity-30" : ""
+                      } ${isSelected ? "" : "hover:bg-surface-2"}`}
+                      style={
+                        isSelected
+                          ? { backgroundColor: accent, color: accentText }
+                          : isToday
+                            ? { boxShadow: `inset 0 0 0 1.5px ${accent}`, color: accent, fontWeight: 700 }
+                            : undefined
+                      }
+                    >
+                      <span>{Number(date.slice(8, 10))}</span>
+                      {appts.length > 0 && (
+                        <span
+                          className="h-1 w-1 rounded-full"
+                          style={{ backgroundColor: isSelected ? accentText : accent }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t border-border p-4 md:border-l md:border-t-0" style={{ backgroundColor: withAlpha(accent, "0a") }}>
               <p className="text-xs font-semibold text-ink">
-                Citas del {new Date(`${selectedDate}T00:00:00Z`).toLocaleDateString("es-CO", { day: "numeric", month: "long", timeZone: "UTC" })}
+                {activeDate === todayStr
+                  ? "Hoy"
+                  : new Date(`${activeDate}T00:00:00Z`).toLocaleDateString("es-CO", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      timeZone: "UTC",
+                    })}
               </p>
-              {selectedAppointments.length === 0 ? (
+              {activeAppointments.length === 0 ? (
                 <p className="text-xs text-ink-faint">No hay citas este día.</p>
               ) : (
-                selectedAppointments.map((a) => (
-                  <div key={a.id} className="rounded-md border border-border bg-background p-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-medium text-ink">{a.name}</p>
-                      <p className="fl-mono flex-none text-xs text-accent">
-                        {a.startsAt.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: config.timezone })}
-                      </p>
-                    </div>
-                    <p className="fl-mono text-xs text-ink-muted">{a.contact}</p>
-                  </div>
-                ))
+                <div className="space-y-2">
+                  {activeAppointments.map((a) => {
+                    const wa = waLink(a.contact);
+                    return (
+                      <div key={a.id} className="rounded-md border border-border bg-background p-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p
+                              className="fl-mono text-xs font-bold"
+                              style={{ color: accent }}
+                            >
+                              {a.startsAt.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: config.timezone })}
+                            </p>
+                            <p className="truncate text-sm font-medium text-ink">{a.name}</p>
+                            <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
+                          </div>
+                          {wa && (
+                            <a
+                              href={wa}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Escribir por WhatsApp"
+                              className="flex-none rounded-full border border-border p-1.5 text-ink-muted transition hover:border-accent hover:text-accent"
+                            >
+                              💬
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         <Section title="Notificaciones y zona horaria" defaultOpen>
@@ -353,17 +403,31 @@ export function AgendaEditor({
           <div className="fl-card space-y-2 p-4">
             <h2 className="text-sm font-semibold text-ink">Próximas citas</h2>
             <div className="max-h-64 space-y-2 overflow-y-auto">
-              {upcomingAppointments.map((a) => (
-                <div key={a.id} className="rounded-md border border-border bg-background p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-ink">{a.name}</p>
-                    <p className="fl-mono flex-none text-[10px] text-ink-faint">
-                      {a.startsAt.toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </p>
+              {upcomingAppointments.map((a) => {
+                const wa = waLink(a.contact);
+                return (
+                  <div key={a.id} className="flex items-start justify-between gap-2 rounded-md border border-border bg-background p-3">
+                    <div className="min-w-0">
+                      <p className="fl-mono text-[10px] font-bold" style={{ color: accent }}>
+                        {a.startsAt.toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                      <p className="truncate text-sm font-medium text-ink">{a.name}</p>
+                      <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
+                    </div>
+                    {wa && (
+                      <a
+                        href={wa}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Escribir por WhatsApp"
+                        className="flex-none rounded-full border border-border p-1.5 text-ink-muted transition hover:border-accent hover:text-accent"
+                      >
+                        💬
+                      </a>
+                    )}
                   </div>
-                  <p className="fl-mono text-xs text-accent">{a.contact}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
