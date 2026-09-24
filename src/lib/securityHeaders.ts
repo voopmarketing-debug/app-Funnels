@@ -11,11 +11,23 @@
 // for the stored-XSS fix in lib/websiteContent.ts: even if a malicious
 // <script> ever slipped past schema validation again, the browser would
 // refuse to run it here.
+//
+// frame-ancestors 'self' (not 'none') — the dashboard's own page-card and
+// editor "Vista previa" panels (see WebsitePagesList.tsx, WebsiteEditor.tsx,
+// AgendaEditor.tsx) embed this exact URL in an <iframe> to show a live
+// thumbnail; 'none' silently blocked that too, so every thumbnail rendered
+// blank. 'self' still blocks every third-party site from framing a client's
+// page (the actual clickjacking risk this header defends against) — it only
+// allows same-origin embeds, which is this app's own dashboard.
 export const SITE_CSP =
-  "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.youtube.com https://player.vimeo.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+  "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.youtube.com https://player.vimeo.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'";
 
 export const SECURITY_HEADERS: { key: string; value: string }[] = [
-  { key: "X-Frame-Options", value: "DENY" },
+  // SAMEORIGIN, not DENY — see the frame-ancestors comment on SITE_CSP above;
+  // modern browsers honor the CSP directive over this one when both are
+  // present, but older ones only understand this header, so both need to
+  // agree or thumbnails break there too.
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
