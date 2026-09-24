@@ -784,6 +784,18 @@ function SelectField({
   );
 }
 
+// A subdomain's CNAME target is the same no matter which domain a client
+// picks — every hostname on this Vercel project points here — so the DNS
+// record can be shown the instant they save, with no Vercel API call and
+// no waiting on the agency. The label is everything before the root domain's
+// two parts (e.g. "pagina" out of "pagina.minegocio.com"); good enough for
+// ordinary TLDs, see the label-count caveat on updateWebsiteCustomDomain.
+const VERCEL_CNAME_TARGET = "cname.vercel-dns.com";
+
+function cnameLabelFor(hostname: string): string {
+  return hostname.split(".").slice(0, -2).join(".");
+}
+
 export function DomainSection({
   businessId,
   websiteId,
@@ -794,28 +806,33 @@ export function DomainSection({
   customDomain: string | null;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedDomain, setSavedDomain] = useState<string | null>(customDomain);
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
-      await updateWebsiteCustomDomain(businessId, websiteId, formData);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      const result = await updateWebsiteCustomDomain(businessId, websiteId, formData);
+      if (result.ok) {
+        setError(null);
+        setSavedDomain(String(formData.get("customDomain") ?? "").trim().toLowerCase() || null);
+      } else {
+        setError(result.error);
+      }
     });
   }
 
   return (
     <Section title="Dominio propio (opcional)">
       <p className="text-xs text-ink-muted">
-        ¿Quieres que esta página se vea en tu propio dominio (como minegocio.com) o en un subdominio dedicado (como
-        minegocio.funnelslabs.app)? Escríbelo abajo — es un paso de DNS que conectamos nosotros manualmente y te
-        avisamos por WhatsApp cuando quede activo.
+        ¿Quieres que esta página se vea en un subdominio tuyo (ej: pagina.tunegocio.com)? Escríbelo abajo — debe ser
+        un subdominio, no tu dominio principal solo (así tu sitio actual nunca corre riesgo). Al guardar te
+        mostramos el registro DNS para que lo crees tú mismo cuando quieras.
       </p>
       <form action={handleSubmit} className="flex flex-wrap items-center gap-2">
         <input
           name="customDomain"
           defaultValue={customDomain ?? ""}
-          placeholder="minegocio.com"
+          placeholder="pagina.tunegocio.com"
           className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
         />
         <button
@@ -825,8 +842,27 @@ export function DomainSection({
         >
           {isPending ? "Guardando..." : "Solicitar"}
         </button>
-        {saved && !isPending && <span className="fl-mono text-xs text-accent">✓ Guardado</span>}
       </form>
+      {error && <p className="text-xs font-medium text-error">⚠ {error}</p>}
+      {!error && savedDomain && (
+        <div className="space-y-2 rounded-md border border-accent/30 bg-accent/5 p-3">
+          <p className="text-xs font-semibold text-ink">
+            Crea este registro en el proveedor donde compraste el dominio (GoDaddy, Namecheap, etc.):
+          </p>
+          <div className="fl-mono grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-ink">
+            <span className="text-ink-muted">Tipo</span>
+            <span>CNAME</span>
+            <span className="text-ink-muted">Nombre / Host</span>
+            <span>{cnameLabelFor(savedDomain) || "@"}</span>
+            <span className="text-ink-muted">Valor</span>
+            <span>{VERCEL_CNAME_TARGET}</span>
+          </div>
+          <p className="text-xs text-ink-muted">
+            Puede tardar unas horas en activarse. Avísanos por WhatsApp cuando lo hayas creado para conectarlo de
+            nuestro lado — sin ese paso, el registro solo no activa la página.
+          </p>
+        </div>
+      )}
     </Section>
   );
 }

@@ -1724,13 +1724,30 @@ export async function applyWebsitePrompt(
   }
 }
 
+export type UpdateCustomDomainResult = { ok: true } | { ok: false; error: string };
+
 /**
  * Records the custom domain a client wants pointed at this specific page.
- * There's no automated DNS/Vercel-domain wiring here — this just saves the
- * request so the agency can connect it manually (same DNS process used for
- * agente.funnelslabs.app) and confirm with the client once it's live.
+ * There's no automated Vercel-domain wiring here — the agency still has to
+ * add the domain in the Vercel project dashboard once — but the DNS record
+ * itself never depends on that step: it's shown to the client immediately
+ * in DomainSection, computed straight from the hostname they typed, because
+ * a subdomain's CNAME target (cname.vercel-dns.com) is the same for every
+ * domain on this project.
+ *
+ * Only subdomains are accepted on purpose (agency policy: never point a
+ * client's bare root domain here, so a mistake on our side can never take
+ * down their main website) — enforced here, not just in the UI's copy, so
+ * a request can't slip through. This is a simple label-count heuristic, not
+ * a real public-suffix check, so it can't tell a true subdomain (x.example.com)
+ * from a root domain under a two-part TLD (example.com.co) — good enough for
+ * a soft guardrail, not a substitute for a human glancing at the request.
  */
-export async function updateWebsiteCustomDomain(businessId: string, websiteId: string, formData: FormData): Promise<void> {
+export async function updateWebsiteCustomDomain(
+  businessId: string,
+  websiteId: string,
+  formData: FormData,
+): Promise<UpdateCustomDomainResult> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
@@ -1741,12 +1758,20 @@ export async function updateWebsiteCustomDomain(businessId: string, websiteId: s
     .replace(/^https?:\/\//, "")
     .replace(/\/$/, "");
 
+  if (customDomain && customDomain.split(".").length < 3) {
+    return {
+      ok: false,
+      error: "Pide un subdominio, no el dominio completo solo — ej: pagina.tunegocio.com, no tunegocio.com.",
+    };
+  }
+
   await prisma.website.update({
     where: { id: websiteId, businessId },
     data: { customDomain: customDomain || null },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
+  return { ok: true };
 }
 
 export async function deleteWebsitePage(businessId: string, websiteId: string): Promise<void> {
