@@ -32,8 +32,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   const formData = await req.formData();
-  const professionalId = String(formData.get("professional") ?? "");
-  const professional = website.agendaConfig.professionals.find((p) => p.id === professionalId) ?? null;
 
   const outcome = preview
     ? previewAgendaBookingOutcome(formData)
@@ -43,12 +41,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         notificationEmail: website.agendaConfig.notificationEmail,
         formData,
         slotMinutes: website.agendaConfig.slotMinutes,
-        professional,
+        professionals: website.agendaConfig.professionals,
       });
 
   const url = new URL(`/sitio/${slug}`, req.url);
   if (preview) url.searchParams.set("preview", "1");
-  if (professional) url.searchParams.set("professional", professional.id);
+  if (outcome.ok && outcome.professionalId) url.searchParams.set("professional", outcome.professionalId);
   if (outcome.ok) {
     url.searchParams.set("reservado_fecha", outcome.dateStr);
     url.searchParams.set("reservado_hora", outcome.timeStr);

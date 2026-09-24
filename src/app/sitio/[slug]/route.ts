@@ -4,7 +4,15 @@ import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { renderWebsiteHtml } from "@/lib/websiteTemplate";
 import { getWebsiteHeroContext } from "@/lib/websiteHero";
 import { renderAgendaHtml } from "@/lib/agendaTemplate";
-import { AvailabilitySchema, DEFAULT_AVAILABILITY, getUpcomingAvailableDates, getAvailableSlotsForDate } from "@/lib/agenda";
+import {
+  AvailabilitySchema,
+  DEFAULT_AVAILABILITY,
+  ANY_PROFESSIONAL_ID,
+  mergeAvailabilities,
+  getUpcomingAvailableDates,
+  getAvailableSlotsForDate,
+  getAvailableSlotsForAnyProfessional,
+} from "@/lib/agenda";
 import { siteSecurityHeaders } from "@/lib/securityHeaders";
 
 // Publicly serves one business page — no auth, meant to be shared/indexed
@@ -70,10 +78,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     const professionals = website.agendaConfig.professionals;
     const professionalParam = req.nextUrl.searchParams.get("professional");
     const selectedProfessional = professionals.find((p) => p.id === professionalParam) ?? null;
-    const needsProfessionalPick = professionals.length > 0 && !selectedProfessional;
-    const availability = AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(
-      selectedProfessional ? selectedProfessional.availability : website.agendaConfig.availability,
-    );
+    const isAnyProfessional = professionalParam === ANY_PROFESSIONAL_ID;
+    const needsProfessionalPick = professionals.length > 0 && !selectedProfessional && !isAnyProfessional;
+    const parsedProfessionalAvailabilities = professionals.map((p) => AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(p.availability));
+    const availability = selectedProfessional
+      ? AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(selectedProfessional.availability)
+      : isAnyProfessional
+        ? mergeAvailabilities(parsedProfessionalAvailabilities)
+        : AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(website.agendaConfig.availability);
     const dateStr = req.nextUrl.searchParams.get("date");
     const timeStr = req.nextUrl.searchParams.get("time");
     const confirmedDate = req.nextUrl.searchParams.get("reservado_fecha");
@@ -83,23 +95,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     const upcomingDates =
       needsProfessionalPick || dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 10);
     const availableSlots =
-      !needsProfessionalPick && dateStr && !timeStr
-        ? await getAvailableSlotsForDate({
-            websiteId: website.id,
-            dateStr,
-            availability,
-            slotMinutes: website.agendaConfig.slotMinutes,
-            timezone: website.agendaConfig.timezone,
-            professionalId: selectedProfessional?.id ?? null,
-          })
-        : [];
+      needsProfessionalPick || !dateStr || timeStr
+        ? []
+        : isAnyProfessional
+          ? await getAvailableSlotsForAnyProfessional({
+              websiteId: website.id,
+              dateStr,
+              professionals: professionals.map((p) => ({ id: p.id, availability: p.availability })),
+              slotMinutes: website.agendaConfig.slotMinutes,
+              timezone: website.agendaConfig.timezone,
+            })
+          : await getAvailableSlotsForDate({
+              websiteId: website.id,
+              dateStr,
+              availability,
+              slotMinutes: website.agendaConfig.slotMinutes,
+              timezone: website.agendaConfig.timezone,
+              professionalId: selectedProfessional?.id ?? null,
+            });
 
     const html = renderAgendaHtml({
       businessName: website.business.name,
       primaryColor: website.agendaConfig.primaryColor,
       trackingBasePath: `/sitio/${slug}`,
       professionals: professionals.map((p) => ({ id: p.id, name: p.name, title: p.title })),
-      professionalId: selectedProfessional?.id ?? null,
+      professionalId: professionalParam,
       upcomingDates,
       dateStr,
       availableSlots,

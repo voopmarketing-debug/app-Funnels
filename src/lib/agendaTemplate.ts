@@ -1,4 +1,5 @@
 import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
+import { ANY_PROFESSIONAL_ID } from "@/lib/agendaAvailability";
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -66,17 +67,23 @@ export function renderAgendaHtml(params: {
   const btnText = readableTextColor(primary);
   const previewParam = params.preview ? "1" : undefined;
   const selectedProfessional = params.professionals.find((p) => p.id === params.professionalId) ?? null;
-  const needsProfessional = params.professionals.length > 0 && !selectedProfessional;
+  // "any" resolves who actually gets the booking only at submission time
+  // (see lib/agenda.ts's assignAnyProfessional) — until then there's no
+  // name to show, just a chosen PATH through the picker, so it still needs
+  // to carry through every link/hidden field like a real selection would.
+  const isAnyProfessional = params.professionalId === ANY_PROFESSIONAL_ID;
+  const effectiveProfessionalId = isAnyProfessional ? ANY_PROFESSIONAL_ID : selectedProfessional?.id;
+  const needsProfessional = params.professionals.length > 0 && !selectedProfessional && !isAnyProfessional;
 
   const professionalHref = (id: string) =>
     `${params.trackingBasePath}${buildQuery({ professional: id, preview: previewParam })}`;
   const dayHref = (d: string) =>
-    `${params.trackingBasePath}${buildQuery({ professional: selectedProfessional?.id, date: d, preview: previewParam })}`;
+    `${params.trackingBasePath}${buildQuery({ professional: effectiveProfessionalId, date: d, preview: previewParam })}`;
   const slotHref = (t: string) =>
-    `${params.trackingBasePath}${buildQuery({ professional: selectedProfessional?.id, date: params.dateStr ?? undefined, time: t, preview: previewParam })}`;
+    `${params.trackingBasePath}${buildQuery({ professional: effectiveProfessionalId, date: params.dateStr ?? undefined, time: t, preview: previewParam })}`;
   const backToProfessionalsHref = `${params.trackingBasePath}${buildQuery({ preview: previewParam })}`;
-  const backToDaysHref = `${params.trackingBasePath}${buildQuery({ professional: selectedProfessional?.id, preview: previewParam })}`;
-  const backToSlotsHref = `${params.trackingBasePath}${buildQuery({ professional: selectedProfessional?.id, date: params.dateStr ?? undefined, preview: previewParam })}`;
+  const backToDaysHref = `${params.trackingBasePath}${buildQuery({ professional: effectiveProfessionalId, preview: previewParam })}`;
+  const backToSlotsHref = `${params.trackingBasePath}${buildQuery({ professional: effectiveProfessionalId, date: params.dateStr ?? undefined, preview: previewParam })}`;
   const formAction = `${params.trackingBasePath}/reservar${buildQuery({ preview: previewParam })}`;
   const withProfessional = selectedProfessional ? ` con ${escapeHtml(selectedProfessional.name)}` : "";
 
@@ -98,7 +105,7 @@ export function renderAgendaHtml(params: {
       <form class="booking-form" method="POST" action="${escapeHtml(formAction)}">
         <input type="hidden" name="date" value="${escapeHtml(params.dateStr)}">
         <input type="hidden" name="time" value="${escapeHtml(params.timeStr)}">
-        ${selectedProfessional ? `<input type="hidden" name="professional" value="${escapeHtml(selectedProfessional.id)}">` : ""}
+        ${effectiveProfessionalId ? `<input type="hidden" name="professional" value="${escapeHtml(effectiveProfessionalId)}">` : ""}
         <input type="text" name="name" placeholder="Tu nombre" maxlength="120" required>
         <input type="text" name="contact" placeholder="Tu WhatsApp o teléfono" maxlength="120" required>
         <input type="email" name="email" placeholder="Tu correo (opcional, para tu confirmación)" maxlength="180">
@@ -114,15 +121,18 @@ export function renderAgendaHtml(params: {
           : `<div class="slots">${params.availableSlots.map((t) => `<a class="slot" href="${escapeHtml(slotHref(t))}">${escapeHtml(t)}</a>`).join("")}</div>`
       }`;
   } else if (needsProfessional) {
-    stepHtml = `<div class="days">${params.professionals
-      .map(
-        (p) =>
-          `<a class="day professional" href="${escapeHtml(professionalHref(p.id))}">${escapeHtml(p.name)}${p.title ? `<span class="professional-title">${escapeHtml(p.title)}</span>` : ""}</a>`,
-      )
-      .join("")}</div>`;
+    stepHtml = `<div class="days">
+      <a class="day professional professional-any" href="${escapeHtml(professionalHref(ANY_PROFESSIONAL_ID))}">Cualquiera disponible<span class="professional-title">Te asignamos con quien tengas cupo más pronto</span></a>
+      ${params.professionals
+        .map(
+          (p) =>
+            `<a class="day professional" href="${escapeHtml(professionalHref(p.id))}">${escapeHtml(p.name)}${p.title ? `<span class="professional-title">${escapeHtml(p.title)}</span>` : ""}</a>`,
+        )
+        .join("")}
+    </div>`;
   } else {
     stepHtml = `
-      ${selectedProfessional ? `<a class="back" href="${escapeHtml(backToProfessionalsHref)}">‹ Elegir otro profesional</a>` : ""}
+      ${effectiveProfessionalId ? `<a class="back" href="${escapeHtml(backToProfessionalsHref)}">‹ Elegir otro profesional</a>` : ""}
       ${
         params.upcomingDates.length === 0
           ? `<p class="muted">Este negocio no tiene horarios disponibles configurados por ahora.</p>`
@@ -162,6 +172,7 @@ ${fontLink()}
   .day:hover { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, transparent); }
   .professional { display: flex; flex-direction: column; gap: 2px; padding: 18px 14px; white-space: normal; }
   .professional-title { display: block; font-weight: 400; font-size: 12px; opacity: 0.65; white-space: normal; }
+  .professional-any { border-style: dashed; }
   .selected-day, .selected-slot { font-weight: 700; font-size: 18px; margin: 0 0 16px; }
   .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
   .slot { display: block; padding: 10px 6px; text-align: center; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; transition: border-color 0.15s ease, background 0.15s ease; }

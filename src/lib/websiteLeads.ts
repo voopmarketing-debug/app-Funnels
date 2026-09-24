@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { upsertLeadConversation } from "@/lib/crmIntake";
 
 // Shared by app/sitio/[slug]/registro/route.ts and proxy.ts's "/registro"
 // branch (custom domains) — both just forward the submitted FormData here.
@@ -9,5 +10,9 @@ export async function captureWebsiteLead(websiteId: string, formData: FormData):
   if (!name || !contact) return false;
 
   await prisma.websiteLead.create({ data: { websiteId, name, contact, message: message || null } });
+  // So this lead shows up in the CRM ("Nuevo" stage) and can be messaged or
+  // included in a broadcast, instead of only existing as a row on this
+  // page's own "Últimos registros" list.
+  await upsertLeadConversation({ websiteId, name, contact });
   return true;
 }

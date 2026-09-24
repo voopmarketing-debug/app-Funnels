@@ -15,7 +15,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
   });
   if (!membership) notFound();
 
-  const [websites, totalViews, totalClicksWhatsapp, totalClicksAgenda, totalLeads] = await Promise.all([
+  const [websites, totalViews, totalClicksWhatsapp, totalClicksAgenda, totalLeads, totalAppointments] = await Promise.all([
     prisma.website.findMany({
       where: { businessId: id },
       orderBy: { generatedAt: "asc" },
@@ -27,15 +27,25 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
         slug: true,
         generatedAt: true,
         customDomain: true,
-        _count: { select: { events: { where: { type: "view" } }, leads: true } },
+        _count: {
+          select: {
+            events: { where: { type: "view" } },
+            leads: true,
+            // An agenda-type page has no WebsiteLead rows of its own (its
+            // "registro" is a booking, not the lead-capture form) — counted
+            // here so its card shows real engagement instead of always 0.
+            appointments: { where: { status: "confirmed" } },
+          },
+        },
       },
     }),
     prisma.websiteEvent.count({ where: { type: "view", website: { businessId: id } } }),
     prisma.websiteEvent.count({ where: { type: "cta_click", destination: "whatsapp", website: { businessId: id } } }),
     prisma.websiteEvent.count({ where: { type: "cta_click", destination: "agenda", website: { businessId: id } } }),
     prisma.websiteLead.count({ where: { website: { businessId: id } } }),
+    prisma.appointment.count({ where: { status: "confirmed", website: { businessId: id } } }),
   ]);
-  const pages = websites.map((w) => ({ ...w, viewCount: w._count.events, leadCount: w._count.leads }));
+  const pages = websites.map((w) => ({ ...w, viewCount: w._count.events, leadCount: w._count.leads + w._count.appointments }));
   const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
 
   return (
@@ -56,7 +66,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
         businessId={id}
         pages={pages}
         publicUrlBase={`https://${appHost}/sitio`}
-        stats={{ totalViews, totalClicksWhatsapp, totalClicksAgenda, totalLeads }}
+        stats={{ totalViews, totalClicksWhatsapp, totalClicksAgenda, totalLeads: totalLeads + totalAppointments }}
       />
     </div>
   );

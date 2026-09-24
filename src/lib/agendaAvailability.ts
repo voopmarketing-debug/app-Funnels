@@ -67,6 +67,38 @@ export function getDayAvailability(availability: Availability, dateStr: string) 
   return availability[DAY_KEYS[weekday]];
 }
 
+// Sentinel professional id for "no preference — assign whoever's free" in
+// the public picker (see agendaTemplate.ts) — never a real Professional.id
+// (those are cuids, this never collides). lib/agenda.ts's bookAppointment
+// picks the actual professional at booking time, spreading load evenly
+// instead of favoring whichever one happens to sort first.
+export const ANY_PROFESSIONAL_ID = "any";
+
+/**
+ * Coarse day-level union of several professionals' schedules — enabled on a
+ * day if ANY of them work that day, spanning from the earliest start to the
+ * latest end among those who do. Used only to decide which CALENDAR DAYS to
+ * show as clickable for the "no preference" option (getUpcomingAvailableDates);
+ * the real per-slot union (which exact times are free) is computed
+ * separately in lib/agenda.ts, since that needs each professional's actual
+ * bookings, not just their configured hours.
+ */
+export function mergeAvailabilities(list: Availability[]): Availability {
+  const merged = {} as Availability;
+  for (const day of Object.keys(DEFAULT_AVAILABILITY) as (keyof Availability)[]) {
+    const enabledOnes = list.map((a) => a[day]).filter((d) => d.enabled);
+    merged[day] =
+      enabledOnes.length === 0
+        ? { enabled: false, start: "09:00", end: "17:00" }
+        : {
+            enabled: true,
+            start: minutesToTimeStr(Math.min(...enabledOnes.map((d) => timeStrToMinutes(d.start)))),
+            end: minutesToTimeStr(Math.max(...enabledOnes.map((d) => timeStrToMinutes(d.end)))),
+          };
+  }
+  return merged;
+}
+
 // "YYYY-MM" month-navigation helpers for the owner's calendar view (see
 // AgendaEditor.tsx) — pure date math, no timezone involved: a "month" here
 // just names which appointments to fetch, the same way the URL's own
