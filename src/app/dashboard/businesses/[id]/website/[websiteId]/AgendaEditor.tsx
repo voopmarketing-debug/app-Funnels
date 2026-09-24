@@ -28,7 +28,10 @@ type ProfessionalData = {
   email: string | null;
   active: boolean;
   availability: Availability;
+  pipelineId: string | null;
 };
+
+type PipelineOption = { id: string; name: string };
 
 const MONTH_DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -88,6 +91,7 @@ export function AgendaEditor({
   monthStr,
   monthAppointments,
   professionals,
+  pipelines,
 }: {
   businessId: string;
   websiteId: string;
@@ -100,6 +104,7 @@ export function AgendaEditor({
   monthStr: string;
   monthAppointments: Appointment[];
   professionals: ProfessionalData[];
+  pipelines: PipelineOption[];
 }) {
   const [config, setConfig] = useState(initialConfig);
   const [isSaving, startSaving] = useTransition();
@@ -375,7 +380,7 @@ export function AgendaEditor({
             profesional solo muestra sus propias horas libres. Sin ninguno, la agenda funciona como hasta ahora.
           </p>
           {professionals.map((p) => (
-            <ProfessionalRow key={p.id} businessId={businessId} professional={p} />
+            <ProfessionalRow key={p.id} businessId={businessId} professional={p} pipelines={pipelines} />
           ))}
           <NewProfessionalForm businessId={businessId} websiteId={websiteId} />
         </Section>
@@ -520,9 +525,11 @@ function HoursGrid({ availability, onChange }: { availability: Availability; onC
 function ProfessionalRow({
   businessId,
   professional,
+  pipelines,
 }: {
   businessId: string;
   professional: ProfessionalData;
+  pipelines: PipelineOption[];
 }) {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -531,6 +538,7 @@ function ProfessionalRow({
     email: professional.email ?? "",
     active: professional.active,
     availability: professional.availability,
+    pipelineId: professional.pipelineId,
   });
   const [isSaving, startSaving] = useTransition();
   const [isDeleting, startDeleting] = useTransition();
@@ -596,6 +604,27 @@ function ProfessionalRow({
         placeholder="Correo del profesional (opcional — le llega aviso cuando le agenden)"
         className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
       />
+      {pipelines.length > 1 && (
+        <div className="space-y-1">
+          <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">Su embudo (CRM)</label>
+          <select
+            value={form.pipelineId ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, pipelineId: e.target.value || null }))}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+          >
+            <option value="">Embudo por defecto del negocio</option>
+            {pipelines.map((pl) => (
+              <option key={pl.id} value={pl.id}>
+                {pl.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-ink-faint">
+            Cuando alguien agende con {form.name || "este profesional"}, el contacto cae directo en este embudo del
+            CRM en vez del general.
+          </p>
+        </div>
+      )}
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}

@@ -40,7 +40,7 @@ export default async function WebsiteEditorPage({
     const monthQueryStart = new Date(Date.UTC(year, month, 1) - 24 * 60 * 60 * 1000);
     const monthQueryEnd = new Date(Date.UTC(year, month + 1, 1) + 24 * 60 * 60 * 1000);
 
-    const [totalAppointments, upcomingAppointments, monthAppointments, professionals] = await Promise.all([
+    const [totalAppointments, upcomingAppointments, monthAppointments, professionals, pipelines] = await Promise.all([
       prisma.appointment.count({ where: { websiteId, status: "confirmed" } }),
       prisma.appointment.findMany({
         where: { websiteId, status: "confirmed" },
@@ -56,6 +56,7 @@ export default async function WebsiteEditorPage({
       website.agendaConfig
         ? prisma.professional.findMany({ where: { agendaConfigId: website.agendaConfig.id }, orderBy: { position: "asc" } })
         : Promise.resolve([]),
+      prisma.pipeline.findMany({ where: { businessId: id }, orderBy: { position: "asc" }, select: { id: true, name: true } }),
     ]);
     const availability = website.agendaConfig
       ? AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(website.agendaConfig.availability)
@@ -94,7 +95,9 @@ export default async function WebsiteEditorPage({
             email: p.email,
             active: p.active,
             availability: AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(p.availability),
+            pipelineId: p.pipelineId,
           }))}
+          pipelines={pipelines}
         />
       </div>
     );

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         select: {
           notificationEmail: true,
           slotMinutes: true,
-          professionals: { select: { id: true, name: true, email: true } },
+          professionals: { select: { id: true, name: true, email: true, pipelineId: true } },
         },
       },
     },

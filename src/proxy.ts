@@ -55,7 +55,7 @@ export async function proxy(request: NextRequest) {
           professionals: {
             where: { active: true },
             orderBy: { position: "asc" },
-            select: { id: true, name: true, title: true, email: true, availability: true },
+            select: { id: true, name: true, title: true, email: true, availability: true, pipelineId: true },
           },
         },
       },

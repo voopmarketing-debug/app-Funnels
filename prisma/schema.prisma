@@ -172,8 +172,9 @@ model Pipeline {
   isDefault  Boolean  @default(false)
   createdAt  DateTime @default(now())
 
-  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  stages   PipelineStage[]
+  business      Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stages        PipelineStage[]
+  professionals Professional[]
 
   @@unique([businessId, position])
 }
@@ -448,13 +449,22 @@ model Professional {
   availability   Json
   active         Boolean @default(true) // soft-hide from the picker without losing their appointment history
   position       Int     @default(0)
+  // When set, a booking made with THIS professional routes the CRM
+  // conversation into this pipeline's first stage instead of the business's
+  // default one (see upsertLeadConversation) — lets each salesperson work
+  // their own embudo. SetNull (not Cascade) so deleting a pipeline just
+  // drops the assignment, never the professional or their appointment
+  // history.
+  pipelineId String?
 
   createdAt DateTime @default(now())
 
   agendaConfig AgendaConfig  @relation(fields: [agendaConfigId], references: [id], onDelete: Cascade)
+  pipeline     Pipeline?     @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
   appointments Appointment[]
 
   @@index([agendaConfigId])
+  @@index([pipelineId])
 }
 
 // A confirmed booking made through an agenda-type Website's public page —

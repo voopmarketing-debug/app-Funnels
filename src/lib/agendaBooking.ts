@@ -31,14 +31,15 @@ export async function submitAgendaBooking(params: {
   // invite's DTEND (see lib/ics.ts); the caller already has this from
   // AgendaConfig.slotMinutes for the slot-picking step, no extra query.
   slotMinutes: number;
-  // Every professional on this agenda (id/name/email) — passed in by the
-  // caller (route.ts/proxy.ts, which already fetched this for the picker),
-  // so this function doesn't need its own extra query. Which one actually
-  // gets the booking isn't known until AFTER bookAppointment returns — the
-  // visitor may have requested "no preference" (see ANY_PROFESSIONAL_ID),
-  // in which case it picks whoever's least busy — so this list is looked
-  // up by the RESULT's professionalId, not the form's requested one.
-  professionals: { id: string; name: string; email: string | null }[];
+  // Every professional on this agenda (id/name/email/pipelineId) — passed
+  // in by the caller (route.ts/proxy.ts, which already fetched this for the
+  // picker), so this function doesn't need its own extra query. Which one
+  // actually gets the booking isn't known until AFTER bookAppointment
+  // returns — the visitor may have requested "no preference" (see
+  // ANY_PROFESSIONAL_ID), in which case it picks whoever's least busy — so
+  // this list is looked up by the RESULT's professionalId, not the form's
+  // requested one.
+  professionals: { id: string; name: string; email: string | null; pipelineId: string | null }[];
 }): Promise<AgendaBookingOutcome> {
   const dateStr = String(params.formData.get("date") ?? "");
   const timeStr = String(params.formData.get("time") ?? "");
@@ -87,6 +88,7 @@ export async function submitAgendaBooking(params: {
     contact,
     appointmentAt: result.startsAt,
     appointmentNote: `Agendó desde la página — ${dateLabel} a las ${timeStr}${professionalNote}`,
+    pipelineId: assignedProfessional?.pipelineId ?? undefined,
   });
 
   // Attached to every notification below so the appointment lands straight

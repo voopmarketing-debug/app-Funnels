@@ -32,6 +32,13 @@ export async function upsertLeadConversation(params: {
   // when actually provided.
   appointmentAt?: Date;
   appointmentNote?: string;
+  // Set by lib/agendaBooking.ts when the booking was made with a
+  // professional who has their own pipeline configured (Professional.pipelineId)
+  // — routes the conversation into THEIR embudo instead of the business's
+  // default one, so each salesperson works their own board. Undefined for
+  // every other caller (plain lead-capture form, or a professional with no
+  // pipeline set), which keeps today's default-pipeline behavior.
+  pipelineId?: string;
 }): Promise<void> {
   const phone = params.contact.replace(/[^0-9]/g, "");
   const name = params.name.trim();
@@ -40,24 +47,33 @@ export async function upsertLeadConversation(params: {
   const website = await prisma.website.findUnique({ where: { id: params.websiteId }, select: { businessId: true } });
   if (!website) return;
 
-  const firstStage = await prisma.pipelineStage.findFirst({
-    where: { businessId: website.businessId, pipeline: { isDefault: true } },
+  const targetStage = await prisma.pipelineStage.findFirst({
+    where: {
+      businessId: website.businessId,
+      pipeline: params.pipelineId ? { id: params.pipelineId } : { isDefault: true },
+    },
     orderBy: { position: "asc" },
   });
-  if (!firstStage) return;
+  if (!targetStage) return;
 
   const appointmentFields = params.appointmentAt
     ? { appointmentAt: params.appointmentAt, appointmentNote: params.appointmentNote ?? null }
     : {};
+  // Only move an ALREADY-EXISTING conversation's stage when there's a
+  // specific pipeline to route it to (a professional's own embudo) — the
+  // plain lead-capture form (no pipelineId) must never yank a conversation
+  // back to stage one after a rep has already moved it further down their
+  // board.
+  const stageFields = params.pipelineId ? { stageId: targetStage.id } : {};
 
   await prisma.conversation.upsert({
     where: { businessId_customerPhone: { businessId: website.businessId, customerPhone: phone } },
-    update: { customerName: name, ...appointmentFields },
+    update: { customerName: name, ...stageFields, ...appointmentFields },
     create: {
       businessId: website.businessId,
       customerPhone: phone,
       customerName: name,
-      stageId: firstStage.id,
+      stageId: targetStage.id,
       ...appointmentFields,
     },
   });

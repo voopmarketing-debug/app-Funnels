@@ -1998,7 +1998,7 @@ export async function createProfessional(
 export async function updateProfessional(
   businessId: string,
   professionalId: string,
-  input: { name: string; title: string; email: string; availability: Availability; active: boolean },
+  input: { name: string; title: string; email: string; availability: Availability; active: boolean; pipelineId: string | null },
 ): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
@@ -2014,10 +2014,16 @@ export async function updateProfessional(
   const title = input.title.trim().slice(0, 80);
   const email = input.email.trim().slice(0, 180);
   const availability = AvailabilitySchema.parse(input.availability);
+  // Trust the FK, not the input — a stale/forged pipelineId from a different
+  // business would otherwise silently succeed (Prisma only checks the FK
+  // exists, not that it's this business's own).
+  const pipelineId = input.pipelineId
+    ? (await prisma.pipeline.findFirst({ where: { id: input.pipelineId, businessId }, select: { id: true } }))?.id ?? null
+    : null;
 
   await prisma.professional.update({
     where: { id: professionalId },
-    data: { name, title: title || null, email: email || null, availability, active: input.active },
+    data: { name, title: title || null, email: email || null, availability, active: input.active, pipelineId },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website/${professional.agendaConfig.websiteId}`);
