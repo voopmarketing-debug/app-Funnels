@@ -1765,10 +1765,31 @@ export async function updateWebsiteCustomDomain(
     };
   }
 
+  const before = await prisma.website.findUniqueOrThrow({
+    where: { id: websiteId, businessId },
+    select: { name: true, customDomain: true },
+  });
+
   await prisma.website.update({
     where: { id: websiteId, businessId },
     data: { customDomain: customDomain || null },
   });
+
+  // Notifies whoever has access to this business (the agency included, same
+  // as any other notification here) that a manual step is waiting — the DNS
+  // record itself doesn't need us (see DomainSection), but activating it
+  // still means someone adds the domain in Vercel → Settings → Domains.
+  // Only fires on a genuinely new request, not a re-save of the same value
+  // or a clear, so it can't spam the bell every time the editor autosaves.
+  if (customDomain && customDomain !== before.customDomain) {
+    await prisma.notification.create({
+      data: {
+        businessId,
+        type: "DOMAIN_REQUEST",
+        message: `Piden conectar el dominio "${customDomain}" en "${before.name}" — agrégalo en Vercel → Settings → Domains.`,
+      },
+    });
+  }
 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
   return { ok: true };

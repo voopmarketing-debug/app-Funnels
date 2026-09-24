@@ -95,11 +95,8 @@ export function WebsiteEditor({
             secciones que ya existen en la página.
           </p>
           <p className="rounded-md border border-border bg-background px-3 py-2 text-xs text-ink-muted">
-            <strong className="text-ink">Esto no lo puede hacer todavía:</strong> agregar un bloque nuevo que no esté
-            en la lista de abajo (Encabezado, Oferta, Cómo funciona, Por qué elegirnos, Objeciones, Contacto),
-            animaciones, ni funciones interactivas como un calendario de citas propio. Para que la gente agende
-            directamente, pon tu link de Calendly, Google Calendar o similar en &quot;Link del botón&quot; (sección
-            Encabezado) — el botón principal los manda ahí.
+            No agrega bloques nuevos ni animaciones — para que agenden, crea una página de Agenda y apúntale el
+            botón ahí.
           </p>
           <textarea
             value={promptText}
