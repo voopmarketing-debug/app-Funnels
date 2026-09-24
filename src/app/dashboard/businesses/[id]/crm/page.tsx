@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isReplyWindowOpen } from "@/lib/messageWindow";
 import { PipelineManager } from "../PipelineManager";
 import { CrmBoard } from "../CrmBoard";
 import { ContactsTable } from "../ContactsTable";
@@ -118,6 +119,7 @@ export default async function CrmPage({
         appointmentAt: full.appointmentAt,
         appointmentNote: full.appointmentNote,
         messages: full.messages,
+        windowOpen: isReplyWindowOpen(full.messages),
       };
 
       // Opening the chat is what "read" means here — matches WhatsApp: the
@@ -175,6 +177,7 @@ export default async function CrmPage({
             conversations={conversationSummaries}
             selectedConversationId={conv ?? null}
             selectedConversation={selectedConversation}
+            templates={approvedTemplates}
           />
         )}
       </div>

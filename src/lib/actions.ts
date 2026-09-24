@@ -1103,6 +1103,62 @@ export async function sendManualMessage(
   revalidatePath(`/dashboard/businesses/${businessId}/crm`);
 }
 
+/**
+ * Sends an approved template message inside one specific conversation — the
+ * only way to reach a customer once Meta's 24h free-form window has closed
+ * (see ManualMessageForm's error copy). Same idea as a Kommo-style "activar
+ * conversación": available from any chat, not just closed ones, since a
+ * business owner may want to kick off a fresh topic with a pre-approved
+ * opener even while the window is still open.
+ */
+export async function sendTemplateMessage(
+  businessId: string,
+  conversationId: string,
+  formData: FormData,
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const templateId = String(formData.get("templateId") ?? "").trim();
+  if (!templateId) throw new Error("Selecciona una plantilla");
+
+  const [business, conversation, template] = await Promise.all([
+    prisma.business.findUniqueOrThrow({ where: { id: businessId } }),
+    prisma.conversation.findFirstOrThrow({ where: { id: conversationId, businessId } }),
+    prisma.messageTemplate.findFirst({ where: { id: templateId, businessId, status: "APPROVED" } }),
+  ]);
+  if (!template) throw new Error("Plantilla no encontrada o todavía no está aprobada");
+
+  if (!business.wabaAccessToken || !business.wabaPhoneNumberId) {
+    throw new Error("This business has no WhatsApp credentials configured");
+  }
+  const accessToken = decryptSecret(business.wabaAccessToken);
+  const phoneNumberId = business.wabaPhoneNumberId;
+
+  const { messageId } = await sendWhatsAppTemplateMessage({
+    phoneNumberId,
+    accessToken,
+    to: conversation.customerPhone,
+    templateName: template.name,
+    language: template.language,
+    headerImageUrl: template.headerImageUrl ?? undefined,
+  });
+
+  await prisma.message.create({
+    data: {
+      conversationId,
+      role: "AGENT",
+      content: template.bodyText,
+      whatsappMsgId: messageId,
+      sentByHuman: true,
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+}
+
 export type SalesDiagnosisResult =
   | { status: "insufficient_data" }
   | { status: "ok"; diagnosis: SalesDiagnosis; generatedAt: string }

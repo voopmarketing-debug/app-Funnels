@@ -27,17 +27,20 @@ export function ConversationSplitView({
   conversations,
   selectedConversationId,
   selectedConversation,
+  templates,
 }: {
   businessId: string;
   businessName: string;
   stages: CrmStage[];
   conversations: CrmConversation[];
   selectedConversationId: string | null;
+  templates: { id: string; name: string; bodyText: string }[];
   selectedConversation: {
     customerName: string | null;
     customerPhone: string;
     aiPaused: boolean;
     stageId: string;
+    windowOpen: boolean;
     tags: string[];
     notes: string | null;
     appointmentAt: Date | null;
@@ -116,6 +119,8 @@ export function ConversationSplitView({
             stageId={selectedConversation.stageId}
             stages={stages}
             messages={selectedConversation.messages}
+            templates={templates}
+            windowOpen={selectedConversation.windowOpen}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-ink-muted">

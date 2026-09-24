@@ -1,6 +1,7 @@
 import { ManualMessageForm } from "./conversations/[conversationId]/ManualMessageForm";
 import { StageSelector } from "./conversations/[conversationId]/StageSelector";
 import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
+import { TemplateSendButton } from "./conversations/[conversationId]/TemplateSendButton";
 import { MessageScrollArea } from "./MessageScrollArea";
 
 // This renders server-side, where the runtime clock is UTC (Vercel), not
@@ -51,6 +52,8 @@ export function ConversationThread({
   stageId,
   stages,
   messages,
+  templates,
+  windowOpen,
 }: {
   businessId: string;
   conversationId: string;
@@ -61,6 +64,8 @@ export function ConversationThread({
   stageId: string;
   stages: { id: string; name: string; pipelineName?: string }[];
   messages: ThreadMessage[];
+  templates: { id: string; name: string; bodyText: string }[];
+  windowOpen: boolean;
 }) {
   const customerInitial = (customerName?.trim()[0] ?? customerPhone.slice(-2)).toUpperCase();
   const businessInitial = businessName.trim()[0]?.toUpperCase() ?? "F";
@@ -73,6 +78,12 @@ export function ConversationThread({
           <h2 className="truncate text-lg font-bold">{customerName ?? customerPhone}</h2>
           <p className="fl-mono text-xs tracking-wide text-ink-muted">{customerPhone}</p>
         </div>
+        <TemplateSendButton
+          businessId={businessId}
+          conversationId={conversationId}
+          templates={templates}
+          windowOpen={windowOpen}
+        />
         <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} />
         <StageSelector businessId={businessId} conversationId={conversationId} stageId={stageId} stages={stages} />
       </div>
@@ -149,7 +160,7 @@ export function ConversationThread({
         )}
       </MessageScrollArea>
 
-      <ManualMessageForm businessId={businessId} conversationId={conversationId} />
+      <ManualMessageForm businessId={businessId} conversationId={conversationId} windowOpen={windowOpen} />
     </div>
   );
 }

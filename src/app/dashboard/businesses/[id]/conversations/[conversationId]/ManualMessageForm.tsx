@@ -16,9 +16,11 @@ function formatSeconds(totalSeconds: number): string {
 export function ManualMessageForm({
   businessId,
   conversationId,
+  windowOpen,
 }: {
   businessId: string;
   conversationId: string;
+  windowOpen: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,6 +171,12 @@ export function ManualMessageForm({
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-1.5 border-t border-border bg-surface p-3">
+      {!windowOpen && (
+        <p className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-[11px] text-accent">
+          Pasaron más de 24h desde el último mensaje del cliente — usa el botón{" "}
+          <span className="font-semibold">📋 Plantilla</span> de arriba para reabrir la conversación.
+        </p>
+      )}
       <input ref={fileInputRef} type="file" name="file" hidden onChange={handleFilePicked} />
       <div className="flex items-end gap-2">
         <button

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isReplyWindowOpen } from "@/lib/messageWindow";
 import { ConversationThread } from "../../ConversationThread";
 import { LeadDetailPanel } from "../../LeadDetailPanel";
 
@@ -24,12 +25,17 @@ export default async function ConversationPage({
   });
   if (!conversation) notFound();
 
-  const [business, stagesRaw] = await Promise.all([
+  const [business, stagesRaw, approvedTemplates] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
     prisma.pipelineStage.findMany({
       where: { businessId: id },
       orderBy: [{ pipeline: { position: "asc" } }, { position: "asc" }],
       include: { pipeline: { select: { name: true } } },
+    }),
+    prisma.messageTemplate.findMany({
+      where: { businessId: id, status: "APPROVED" },
+      select: { id: true, name: true, bodyText: true },
+      orderBy: { name: "asc" },
     }),
   ]);
   // Every stage across every embudo (funnel) this business has — grouped by
@@ -50,6 +56,8 @@ export default async function ConversationPage({
           stageId={conversation.stageId}
           stages={stages}
           messages={conversation.messages}
+          templates={approvedTemplates}
+          windowOpen={isReplyWindowOpen(conversation.messages)}
         />
       </div>
       <LeadDetailPanel
