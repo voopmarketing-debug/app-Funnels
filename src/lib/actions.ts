@@ -1907,6 +1907,84 @@ export async function updateAgendaConfig(
   revalidatePath(`/dashboard/businesses/${businessId}/website/${websiteId}`);
 }
 
+/**
+ * Adds a staff member to an agenda — the moment there's at least one, the
+ * public booking page adds a "choose your professional" step and each one's
+ * own hours (starting from a copy of the agenda's current ones, not the
+ * empty DEFAULT_AVAILABILITY, so a new hire's schedule starts from
+ * something reasonable) govern their bookable slots instead of the
+ * agenda-level ones. See lib/agenda.ts's bookAppointment/getAvailableSlotsForDate.
+ */
+export async function createProfessional(
+  businessId: string,
+  websiteId: string,
+  input: { name: string },
+): Promise<{ id: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const name = input.name.trim().slice(0, 80);
+  if (!name) throw new Error("Falta el nombre");
+
+  const agendaConfig = await prisma.agendaConfig.findFirstOrThrow({ where: { websiteId, website: { businessId } } });
+  const position = await prisma.professional.count({ where: { agendaConfigId: agendaConfig.id } });
+  const availability = AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(agendaConfig.availability);
+
+  const professional = await prisma.professional.create({
+    data: { agendaConfigId: agendaConfig.id, name, availability, position },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website/${websiteId}`);
+  return { id: professional.id };
+}
+
+export async function updateProfessional(
+  businessId: string,
+  professionalId: string,
+  input: { name: string; title: string; email: string; availability: Availability; active: boolean },
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const professional = await prisma.professional.findFirstOrThrow({
+    where: { id: professionalId, agendaConfig: { website: { businessId } } },
+    select: { agendaConfig: { select: { websiteId: true } } },
+  });
+
+  const name = input.name.trim().slice(0, 80);
+  if (!name) throw new Error("Falta el nombre");
+  const title = input.title.trim().slice(0, 80);
+  const email = input.email.trim().slice(0, 180);
+  const availability = AvailabilitySchema.parse(input.availability);
+
+  await prisma.professional.update({
+    where: { id: professionalId },
+    data: { name, title: title || null, email: email || null, availability, active: input.active },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website/${professional.agendaConfig.websiteId}`);
+}
+
+export async function deleteProfessional(businessId: string, professionalId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const professional = await prisma.professional.findFirstOrThrow({
+    where: { id: professionalId, agendaConfig: { website: { businessId } } },
+    select: { agendaConfig: { select: { websiteId: true } } },
+  });
+
+  // Past appointments keep their history — Appointment.professionalId just
+  // goes null on delete (onDelete: SetNull in schema.prisma), same as any
+  // other agenda that never had professionals.
+  await prisma.professional.delete({ where: { id: professionalId } });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website/${professional.agendaConfig.websiteId}`);
+}
+
 // Photos/PDFs the AI agent can choose to send mid-conversation — see
 // lib/ai.ts's "send_media" tool. Only image/document are offered here (no
 // audio/video — an AI-initiated voice note or video doesn't make sense).

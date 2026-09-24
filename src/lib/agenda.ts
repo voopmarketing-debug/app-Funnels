@@ -19,13 +19,21 @@ import {
 // bundle if a client component reaches it even transitively.
 export * from "@/lib/agendaAvailability";
 
-/** Free "HH:mm" slots on `dateStr` — the day's configured range, minus already-booked times, minus times already past when `dateStr` is today. */
+/**
+ * Free "HH:mm" slots on `dateStr` — the day's configured range, minus
+ * already-booked times, minus times already past when `dateStr` is today.
+ * `professionalId` scopes both which hours apply (the caller passes that
+ * professional's own `availability`, or the agenda-level one when there are
+ * no professionals) and which existing bookings count as "taken" — a slot
+ * another professional holds at the same clock time is still free here.
+ */
 export async function getAvailableSlotsForDate(params: {
   websiteId: string;
   dateStr: string;
   availability: Availability;
   slotMinutes: number;
   timezone: string;
+  professionalId?: string | null;
 }): Promise<string[]> {
   const day = getDayAvailability(params.availability, params.dateStr);
   if (!day.enabled) return [];
@@ -41,7 +49,12 @@ export async function getAvailableSlotsForDate(params: {
   const dayStart = zonedTimeToUtc(params.dateStr, "00:00", params.timezone);
   const dayEnd = zonedTimeToUtc(params.dateStr, "23:59", params.timezone);
   const booked = await prisma.appointment.findMany({
-    where: { websiteId: params.websiteId, status: "confirmed", startsAt: { gte: dayStart, lte: dayEnd } },
+    where: {
+      websiteId: params.websiteId,
+      status: "confirmed",
+      professionalId: params.professionalId ?? null,
+      startsAt: { gte: dayStart, lte: dayEnd },
+    },
     select: { startsAt: true },
   });
   const bookedTimes = new Set(booked.map((b) => formatTimeInZone(b.startsAt, params.timezone)));
@@ -59,10 +72,15 @@ export type BookAppointmentResult =
 
 /**
  * Books one slot — re-validates it's still within the configured hours and
- * not already taken before inserting, then relies on the DB's own
- * (websiteId, startsAt) unique constraint as the real defense against two
- * people booking the same instant at once (the pre-check alone can't close
- * that race; the constraint can).
+ * not already taken before inserting, then relies on the DB's own unique
+ * constraint (see the comment on the Appointment model in schema.prisma) as
+ * the real defense against two people booking the same instant at once (the
+ * pre-check alone can't close that race; the constraint can).
+ *
+ * When the agenda has professionals, `professionalId` is required and hours
+ * are validated against that professional's own `availability` instead of
+ * the agenda-level one — enforced here, not just left to the caller, so a
+ * booking can't slip through against the wrong schedule.
  */
 export async function bookAppointment(params: {
   websiteId: string;
@@ -71,11 +89,22 @@ export async function bookAppointment(params: {
   name: string;
   contact: string;
   email?: string | null;
+  professionalId?: string | null;
 }): Promise<BookAppointmentResult> {
-  const config = await prisma.agendaConfig.findUnique({ where: { websiteId: params.websiteId } });
+  const config = await prisma.agendaConfig.findUnique({
+    where: { websiteId: params.websiteId },
+    include: { professionals: { where: { active: true } } },
+  });
   if (!config) return { ok: false, error: "Esta página no tiene una agenda configurada." };
 
-  const availability = AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(config.availability);
+  let availabilitySource: unknown = config.availability;
+  if (config.professionals.length > 0) {
+    const professional = config.professionals.find((p) => p.id === params.professionalId);
+    if (!professional) return { ok: false, error: "Elige con quién quieres agendar." };
+    availabilitySource = professional.availability;
+  }
+
+  const availability = AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(availabilitySource);
   const day = getDayAvailability(availability, params.dateStr);
   const requestedMin = timeStrToMinutes(params.timeStr);
   const startMin = timeStrToMinutes(day.start);
@@ -90,7 +119,14 @@ export async function bookAppointment(params: {
 
   try {
     const appointment = await prisma.appointment.create({
-      data: { websiteId: params.websiteId, name: params.name, contact: params.contact, email: params.email || null, startsAt },
+      data: {
+        websiteId: params.websiteId,
+        professionalId: config.professionals.length > 0 ? params.professionalId : null,
+        name: params.name,
+        contact: params.contact,
+        email: params.email || null,
+        startsAt,
+      },
     });
     return { ok: true, appointmentId: appointment.id, startsAt: appointment.startsAt };
   } catch (err) {

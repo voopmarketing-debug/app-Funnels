@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { updateAgendaConfig } from "@/lib/actions";
+import { useRouter } from "next/navigation";
+import { updateAgendaConfig, createProfessional, updateProfessional, deleteProfessional } from "@/lib/actions";
 import { shiftMonthStr, type Availability } from "@/lib/agendaAvailability";
 import { formatDateInZone } from "@/lib/timezone";
 import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
@@ -18,7 +19,16 @@ function waLink(contact: string): string | null {
   return digits.length >= 8 ? `https://wa.me/${digits}` : null;
 }
 
-type Appointment = { id: string; name: string; contact: string; startsAt: Date };
+type Appointment = { id: string; name: string; contact: string; startsAt: Date; professional?: { name: string } | null };
+
+type ProfessionalData = {
+  id: string;
+  name: string;
+  title: string | null;
+  email: string | null;
+  active: boolean;
+  availability: Availability;
+};
 
 const MONTH_DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -77,6 +87,7 @@ export function AgendaEditor({
   upcomingAppointments,
   monthStr,
   monthAppointments,
+  professionals,
 }: {
   businessId: string;
   websiteId: string;
@@ -88,6 +99,7 @@ export function AgendaEditor({
   upcomingAppointments: Appointment[];
   monthStr: string;
   monthAppointments: Appointment[];
+  professionals: ProfessionalData[];
 }) {
   const [config, setConfig] = useState(initialConfig);
   const [isSaving, startSaving] = useTransition();
@@ -259,6 +271,7 @@ export function AgendaEditor({
                             </p>
                             <p className="truncate text-sm font-medium text-ink">{a.name}</p>
                             <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
+                            {a.professional && <p className="truncate text-[11px] text-ink-faint">{a.professional.name}</p>}
                           </div>
                           {wa && (
                             <a
@@ -351,40 +364,20 @@ export function AgendaEditor({
           <p className="text-xs text-ink-muted">
             Un solo rango por día por ahora (sin descanso de almuerzo separado) — si necesitas algo más detallado,
             dinos y lo ajustamos.
+            {professionals.length > 0 && " Estos horarios generales ya no aplican — cada profesional tiene los suyos abajo."}
           </p>
-          <div className="space-y-2">
-            {DAY_ORDER.map((day) => {
-              const d = config.availability[day];
-              return (
-                <div key={day} className="flex flex-wrap items-center gap-3 rounded-md border border-border p-3">
-                  <label className="flex w-28 flex-none items-center gap-2 text-sm font-medium text-ink">
-                    <input
-                      type="checkbox"
-                      checked={d.enabled}
-                      onChange={(e) => setDay(day, { enabled: e.target.checked })}
-                      className="h-4 w-4 cursor-pointer accent-accent"
-                    />
-                    {DAY_LABELS[day]}
-                  </label>
-                  <input
-                    type="time"
-                    value={d.start}
-                    disabled={!d.enabled}
-                    onChange={(e) => setDay(day, { start: e.target.value })}
-                    className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-ink outline-none focus:border-accent disabled:opacity-40"
-                  />
-                  <span className="text-xs text-ink-faint">a</span>
-                  <input
-                    type="time"
-                    value={d.end}
-                    disabled={!d.enabled}
-                    onChange={(e) => setDay(day, { end: e.target.value })}
-                    className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-ink outline-none focus:border-accent disabled:opacity-40"
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <HoursGrid availability={config.availability} onChange={setDay} />
+        </Section>
+
+        <Section title={`Profesionales (${professionals.length})`} defaultOpen={professionals.length > 0}>
+          <p className="text-xs text-ink-muted">
+            Si agregas al menos uno, el visitante elige con quién quiere atenderse antes de ver los horarios — y cada
+            profesional solo muestra sus propias horas libres. Sin ninguno, la agenda funciona como hasta ahora.
+          </p>
+          {professionals.map((p) => (
+            <ProfessionalRow key={p.id} businessId={businessId} professional={p} />
+          ))}
+          <NewProfessionalForm businessId={businessId} websiteId={websiteId} />
         </Section>
 
         <DomainSection businessId={businessId} websiteId={websiteId} customDomain={customDomain} />
@@ -413,6 +406,7 @@ export function AgendaEditor({
                       </p>
                       <p className="truncate text-sm font-medium text-ink">{a.name}</p>
                       <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
+                      {a.professional && <p className="truncate text-[11px] text-ink-faint">{a.professional.name}</p>}
                     </div>
                     {wa && (
                       <a
@@ -481,5 +475,202 @@ function Section({ title, defaultOpen, children }: { title: string; defaultOpen?
       </summary>
       <div className="mt-3 space-y-3">{children}</div>
     </details>
+  );
+}
+
+/** The weekly hours grid — shared by the agenda-level "Horarios disponibles" section and each ProfessionalRow's own schedule. */
+function HoursGrid({ availability, onChange }: { availability: Availability; onChange: (day: DayKey, patch: Partial<Availability[DayKey]>) => void }) {
+  return (
+    <div className="space-y-2">
+      {DAY_ORDER.map((day) => {
+        const d = availability[day];
+        return (
+          <div key={day} className="flex flex-wrap items-center gap-3 rounded-md border border-border p-3">
+            <label className="flex w-28 flex-none items-center gap-2 text-sm font-medium text-ink">
+              <input
+                type="checkbox"
+                checked={d.enabled}
+                onChange={(e) => onChange(day, { enabled: e.target.checked })}
+                className="h-4 w-4 cursor-pointer accent-accent"
+              />
+              {DAY_LABELS[day]}
+            </label>
+            <input
+              type="time"
+              value={d.start}
+              disabled={!d.enabled}
+              onChange={(e) => onChange(day, { start: e.target.value })}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-ink outline-none focus:border-accent disabled:opacity-40"
+            />
+            <span className="text-xs text-ink-faint">a</span>
+            <input
+              type="time"
+              value={d.end}
+              disabled={!d.enabled}
+              onChange={(e) => onChange(day, { end: e.target.value })}
+              className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-ink outline-none focus:border-accent disabled:opacity-40"
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProfessionalRow({
+  businessId,
+  professional,
+}: {
+  businessId: string;
+  professional: ProfessionalData;
+}) {
+  const router = useRouter();
+  const [form, setForm] = useState({
+    name: professional.name,
+    title: professional.title ?? "",
+    email: professional.email ?? "",
+    active: professional.active,
+    availability: professional.availability,
+  });
+  const [isSaving, startSaving] = useTransition();
+  const [isDeleting, startDeleting] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  function setDay(day: DayKey, patch: Partial<Availability[DayKey]>) {
+    setForm((f) => ({ ...f, availability: { ...f.availability, [day]: { ...f.availability[day], ...patch } } }));
+  }
+
+  function save() {
+    setError(null);
+    startSaving(async () => {
+      try {
+        await updateProfessional(businessId, professional.id, form);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo guardar");
+      }
+    });
+  }
+
+  function remove() {
+    if (!confirm(`¿Quitar a "${professional.name}"? Sus citas ya agendadas se conservan.`)) return;
+    startDeleting(async () => {
+      await deleteProfessional(businessId, professional.id);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          placeholder="Nombre"
+          className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-accent"
+        />
+        <input
+          value={form.title}
+          onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+          placeholder="Especialidad (opcional)"
+          className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+        />
+        <label className="flex flex-none items-center gap-1.5 text-xs text-ink-muted">
+          <input
+            type="checkbox"
+            checked={form.active}
+            onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
+            className="h-4 w-4 cursor-pointer accent-accent"
+          />
+          Visible
+        </label>
+      </div>
+      <input
+        type="email"
+        value={form.email}
+        onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+        placeholder="Correo del profesional (opcional — le llega aviso cuando le agenden)"
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+      />
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="text-xs font-medium text-accent hover:underline"
+      >
+        {expanded ? "Ocultar horario" : "Editar horario"}
+      </button>
+      {expanded && <HoursGrid availability={form.availability} onChange={setDay} />}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={save}
+          disabled={isSaving}
+          className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent disabled:opacity-50"
+        >
+          {isSaving ? "Guardando..." : "Guardar"}
+        </button>
+        <button
+          type="button"
+          onClick={remove}
+          disabled={isDeleting}
+          className="text-xs font-medium text-error hover:underline disabled:opacity-50"
+        >
+          {isDeleting ? "Quitando..." : "Quitar"}
+        </button>
+        {saved && <span className="fl-mono text-xs text-accent">✓ Guardado</span>}
+        {error && <span className="text-xs font-medium text-error">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+function NewProfessionalForm({ businessId, websiteId }: { businessId: string; websiteId: string }) {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function submit() {
+    if (!name.trim()) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await createProfessional(businessId, websiteId, { name });
+        setName("");
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo agregar");
+      }
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        placeholder="Nombre del nuevo profesional"
+        className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={isPending || !name.trim()}
+        className="rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent disabled:opacity-50"
+      >
+        {isPending ? "Agregando..." : "+ Agregar profesional"}
+      </button>
+      {error && <span className="text-xs font-medium text-error">{error}</span>}
+    </div>
   );
 }

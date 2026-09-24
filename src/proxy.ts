@@ -37,7 +37,20 @@ export async function proxy(request: NextRequest) {
       businessId: true,
       aiImageUrl: true,
       business: { select: { name: true, industry: true } },
-      agendaConfig: { select: { notificationEmail: true, timezone: true, slotMinutes: true, availability: true, primaryColor: true } },
+      agendaConfig: {
+        select: {
+          notificationEmail: true,
+          timezone: true,
+          slotMinutes: true,
+          availability: true,
+          primaryColor: true,
+          professionals: {
+            where: { active: true },
+            orderBy: { position: "asc" },
+            select: { id: true, name: true, title: true, email: true, availability: true },
+          },
+        },
+      },
     },
   });
 
@@ -61,6 +74,9 @@ export async function proxy(request: NextRequest) {
     // root-relative "/reservar" action since a custom domain has no slug.
     if (request.nextUrl.pathname === "/reservar" && request.method === "POST") {
       const formData = await request.formData();
+      const professionalId = String(formData.get("professional") ?? "");
+      const professional = website.agendaConfig.professionals.find((p) => p.id === professionalId) ?? null;
+
       const outcome = preview
         ? previewAgendaBookingOutcome(formData)
         : await submitAgendaBooking({
@@ -68,10 +84,12 @@ export async function proxy(request: NextRequest) {
             businessName: website.business.name,
             notificationEmail: website.agendaConfig.notificationEmail,
             formData,
+            professional,
           });
 
       const url = new URL("/", request.url);
       if (preview) url.searchParams.set("preview", "1");
+      if (professional) url.searchParams.set("professional", professional.id);
       if (outcome.ok) {
         url.searchParams.set("reservado_fecha", outcome.dateStr);
         url.searchParams.set("reservado_hora", outcome.timeStr);
@@ -90,22 +108,30 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    const availability = AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(website.agendaConfig.availability);
+    const professionals = website.agendaConfig.professionals;
+    const professionalParam = request.nextUrl.searchParams.get("professional");
+    const selectedProfessional = professionals.find((p) => p.id === professionalParam) ?? null;
+    const needsProfessionalPick = professionals.length > 0 && !selectedProfessional;
+    const availability = AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(
+      selectedProfessional ? selectedProfessional.availability : website.agendaConfig.availability,
+    );
     const dateStr = request.nextUrl.searchParams.get("date");
     const timeStr = request.nextUrl.searchParams.get("time");
     const confirmedDate = request.nextUrl.searchParams.get("reservado_fecha");
     const confirmedTime = request.nextUrl.searchParams.get("reservado_hora");
     const bookingError = request.nextUrl.searchParams.get("error");
 
-    const upcomingDates = dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 10);
+    const upcomingDates =
+      needsProfessionalPick || dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 10);
     const availableSlots =
-      dateStr && !timeStr
+      !needsProfessionalPick && dateStr && !timeStr
         ? await getAvailableSlotsForDate({
             websiteId: website.id,
             dateStr,
             availability,
             slotMinutes: website.agendaConfig.slotMinutes,
             timezone: website.agendaConfig.timezone,
+            professionalId: selectedProfessional?.id ?? null,
           })
         : [];
 
@@ -113,6 +139,8 @@ export async function proxy(request: NextRequest) {
       businessName: website.business.name,
       primaryColor: website.agendaConfig.primaryColor,
       trackingBasePath: "",
+      professionals: professionals.map((p) => ({ id: p.id, name: p.name, title: p.title })),
+      professionalId: selectedProfessional?.id ?? null,
       upcomingDates,
       dateStr,
       availableSlots,

@@ -39,10 +39,21 @@ function fontLink(): string {
  * visitor is on, driven entirely by query params so it works with zero
  * client-side JS, same as the rest of this app's generated pages.
  */
+function buildQuery(paramsObj: Record<string, string | undefined>): string {
+  const pairs = Object.entries(paramsObj)
+    .filter((entry): entry is [string, string] => Boolean(entry[1]))
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`);
+  return pairs.length > 0 ? `?${pairs.join("&")}` : "";
+}
+
 export function renderAgendaHtml(params: {
   businessName: string;
   primaryColor: string;
   trackingBasePath: string; // "/sitio/{slug}" or "" on a connected custom domain
+  // Staff a visitor can pick to book with — empty on a single-provider
+  // agenda, which skips the picker step entirely (unchanged behavior).
+  professionals: { id: string; name: string; title: string | null }[];
+  professionalId: string | null; // picked professional, once chosen
   upcomingDates: string[]; // shown when no date is selected yet
   dateStr: string | null; // selected date ("YYYY-MM-DD"), once picked
   availableSlots: string[]; // this date's free "HH:mm" slots, shown when a date but no time is selected
@@ -53,11 +64,21 @@ export function renderAgendaHtml(params: {
 }): string {
   const primary = sanitizeHexColor(params.primaryColor, "#1f6feb");
   const btnText = readableTextColor(primary);
-  const previewParam = params.preview ? "&preview=1" : "";
-  const dayHref = (d: string) => `${params.trackingBasePath}?date=${d}${previewParam}`;
-  const slotHref = (t: string) => `${params.trackingBasePath}?date=${params.dateStr}&time=${encodeURIComponent(t)}${previewParam}`;
-  const backToDaysHref = `${params.trackingBasePath}${previewParam ? `?${previewParam.slice(1)}` : ""}`;
-  const backToSlotsHref = `${params.trackingBasePath}?date=${params.dateStr}${previewParam}`;
+  const previewParam = params.preview ? "1" : undefined;
+  const selectedProfessional = params.professionals.find((p) => p.id === params.professionalId) ?? null;
+  const needsProfessional = params.professionals.length > 0 && !selectedProfessional;
+
+  const professionalHref = (id: string) =>
+    `${params.trackingBasePath}${buildQuery({ professional: id, preview: previewParam })}`;
+  const dayHref = (d: string) =>
+    `${params.trackingBasePath}${buildQuery({ professional: selectedProfessional?.id, date: d, preview: previewParam })}`;
+  const slotHref = (t: string) =>
+    `${params.trackingBasePath}${buildQuery({ professional: selectedProfessional?.id, date: params.dateStr ?? undefined, time: t, preview: previewParam })}`;
+  const backToProfessionalsHref = `${params.trackingBasePath}${buildQuery({ preview: previewParam })}`;
+  const backToDaysHref = `${params.trackingBasePath}${buildQuery({ professional: selectedProfessional?.id, preview: previewParam })}`;
+  const backToSlotsHref = `${params.trackingBasePath}${buildQuery({ professional: selectedProfessional?.id, date: params.dateStr ?? undefined, preview: previewParam })}`;
+  const formAction = `${params.trackingBasePath}/reservar${buildQuery({ preview: previewParam })}`;
+  const withProfessional = selectedProfessional ? ` con ${escapeHtml(selectedProfessional.name)}` : "";
 
   let stepHtml: string;
 
@@ -66,17 +87,18 @@ export function renderAgendaHtml(params: {
       <div class="confirm">
         <div class="confirm-check" aria-hidden="true">✓</div>
         <h2>¡Listo, tu cita quedó confirmada!</h2>
-        <p>${formatDateLabel(params.confirmed.dateStr)} a las ${escapeHtml(params.confirmed.timeStr)}</p>
+        <p>${formatDateLabel(params.confirmed.dateStr)} a las ${escapeHtml(params.confirmed.timeStr)}${withProfessional}</p>
         <p class="muted">Te escribimos para confirmar. Si necesitas cambiarla, contáctanos.</p>
       </div>`;
   } else if (params.dateStr && params.timeStr) {
     stepHtml = `
       <a class="back" href="${escapeHtml(backToSlotsHref)}">‹ Elegir otro horario</a>
-      <p class="selected-slot">${formatDateLabel(params.dateStr)} a las ${escapeHtml(params.timeStr)}</p>
+      <p class="selected-slot">${formatDateLabel(params.dateStr)} a las ${escapeHtml(params.timeStr)}${withProfessional}</p>
       ${params.bookingError ? `<p class="booking-error">${escapeHtml(params.bookingError)}</p>` : ""}
-      <form class="booking-form" method="POST" action="${escapeHtml(`${params.trackingBasePath}/reservar${previewParam ? `?${previewParam.slice(1)}` : ""}`)}">
+      <form class="booking-form" method="POST" action="${escapeHtml(formAction)}">
         <input type="hidden" name="date" value="${escapeHtml(params.dateStr)}">
         <input type="hidden" name="time" value="${escapeHtml(params.timeStr)}">
+        ${selectedProfessional ? `<input type="hidden" name="professional" value="${escapeHtml(selectedProfessional.id)}">` : ""}
         <input type="text" name="name" placeholder="Tu nombre" maxlength="120" required>
         <input type="text" name="contact" placeholder="Tu WhatsApp o teléfono" maxlength="120" required>
         <input type="email" name="email" placeholder="Tu correo (opcional, para tu confirmación)" maxlength="180">
@@ -85,17 +107,27 @@ export function renderAgendaHtml(params: {
   } else if (params.dateStr) {
     stepHtml = `
       <a class="back" href="${escapeHtml(backToDaysHref)}">‹ Elegir otro día</a>
-      <p class="selected-day">${formatDateLabel(params.dateStr)}</p>
+      <p class="selected-day">${formatDateLabel(params.dateStr)}${withProfessional}</p>
       ${
         params.availableSlots.length === 0
           ? `<p class="muted">No quedan horarios libres este día — elige otro.</p>`
           : `<div class="slots">${params.availableSlots.map((t) => `<a class="slot" href="${escapeHtml(slotHref(t))}">${escapeHtml(t)}</a>`).join("")}</div>`
       }`;
+  } else if (needsProfessional) {
+    stepHtml = `<div class="days">${params.professionals
+      .map(
+        (p) =>
+          `<a class="day professional" href="${escapeHtml(professionalHref(p.id))}">${escapeHtml(p.name)}${p.title ? `<span class="professional-title">${escapeHtml(p.title)}</span>` : ""}</a>`,
+      )
+      .join("")}</div>`;
   } else {
-    stepHtml =
-      params.upcomingDates.length === 0
-        ? `<p class="muted">Este negocio no tiene horarios disponibles configurados por ahora.</p>`
-        : `<div class="days">${params.upcomingDates.map((d) => `<a class="day" href="${escapeHtml(dayHref(d))}">${formatDateLabelShort(d)}</a>`).join("")}</div>`;
+    stepHtml = `
+      ${selectedProfessional ? `<a class="back" href="${escapeHtml(backToProfessionalsHref)}">‹ Elegir otro profesional</a>` : ""}
+      ${
+        params.upcomingDates.length === 0
+          ? `<p class="muted">Este negocio no tiene horarios disponibles configurados por ahora.</p>`
+          : `<div class="days">${params.upcomingDates.map((d) => `<a class="day" href="${escapeHtml(dayHref(d))}">${formatDateLabelShort(d)}</a>`).join("")}</div>`
+      }`;
   }
 
   return `<!doctype html>
@@ -128,6 +160,8 @@ ${fontLink()}
   .days { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
   .day { display: block; padding: 14px 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 12px; text-decoration: none; font-weight: 600; transition: border-color 0.15s ease, background 0.15s ease; }
   .day:hover { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, transparent); }
+  .professional { display: flex; flex-direction: column; gap: 2px; padding: 18px 14px; white-space: normal; }
+  .professional-title { display: block; font-weight: 400; font-size: 12px; opacity: 0.65; white-space: normal; }
   .selected-day, .selected-slot { font-weight: 700; font-size: 18px; margin: 0 0 16px; }
   .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
   .slot { display: block; padding: 10px 6px; text-align: center; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; transition: border-color 0.15s ease, background 0.15s ease; }
@@ -149,7 +183,7 @@ ${fontLink()}
   <main>
     <div class="wrap">
       <h1>Agenda tu cita</h1>
-      <p class="subheading">Elige el día y la hora que mejor te queden.</p>
+      <p class="subheading">${needsProfessional ? "Elige con quién te quieres atender." : "Elige el día y la hora que mejor te queden."}</p>
       ${stepHtml}
     </div>
   </main>

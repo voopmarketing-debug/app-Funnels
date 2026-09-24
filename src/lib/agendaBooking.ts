@@ -25,6 +25,11 @@ export async function submitAgendaBooking(params: {
   businessName: string;
   notificationEmail: string;
   formData: FormData;
+  // The already-loaded professional the visitor picked (or null on a
+  // single-provider agenda) — passed in by the caller (route.ts/proxy.ts,
+  // which already fetched the professionals list to render the picker) so
+  // this function doesn't need its own extra query just for their name/email.
+  professional?: { id: string; name: string; email: string | null } | null;
 }): Promise<AgendaBookingOutcome> {
   const dateStr = String(params.formData.get("date") ?? "");
   const timeStr = String(params.formData.get("time") ?? "");
@@ -36,17 +41,26 @@ export async function submitAgendaBooking(params: {
     return { ok: false, dateStr, error: "Faltan datos — completa nombre y contacto." };
   }
 
-  const result = await bookAppointment({ websiteId: params.websiteId, dateStr, timeStr, name, contact, email: email || null });
+  const result = await bookAppointment({
+    websiteId: params.websiteId,
+    dateStr,
+    timeStr,
+    name,
+    contact,
+    email: email || null,
+    professionalId: params.professional?.id ?? null,
+  });
   if (!result.ok) {
     return { ok: false, dateStr, error: result.error };
   }
 
   const dateLabel = formatDateLabel(dateStr);
+  const withProfessional = params.professional ? ` con ${escapeHtml(params.professional.name)}` : "";
   void sendEmail({
     to: params.notificationEmail,
     subject: `Nueva cita agendada: ${name}`,
     html: `
-      <p>Tienes una nueva cita agendada desde tu página web.</p>
+      <p>Tienes una nueva cita agendada${withProfessional} desde tu página web.</p>
       <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
       <p>Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}</p>
     `,
@@ -56,9 +70,24 @@ export async function submitAgendaBooking(params: {
       to: email,
       subject: `Tu cita con ${params.businessName} está confirmada`,
       html: `
-        <p>¡Listo! Tu cita con <strong>${escapeHtml(params.businessName)}</strong> quedó confirmada.</p>
+        <p>¡Listo! Tu cita con <strong>${escapeHtml(params.businessName)}</strong>${withProfessional} quedó confirmada.</p>
         <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
         <p>Si necesitas cambiarla, contáctanos directamente.</p>
+      `,
+    });
+  }
+  // The professional gets their own heads-up too, so they have it on their
+  // radar without needing to check the dashboard — separate from the
+  // business's notificationEmail, which might go to a front-desk inbox
+  // instead of the specific person doing the appointment.
+  if (params.professional?.email) {
+    void sendEmail({
+      to: params.professional.email,
+      subject: `Nueva cita: ${name} — ${dateLabel} a las ${timeStr}`,
+      html: `
+        <p>Te agendaron una cita en ${escapeHtml(params.businessName)}.</p>
+        <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
+        <p>Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}</p>
       `,
     });
   }

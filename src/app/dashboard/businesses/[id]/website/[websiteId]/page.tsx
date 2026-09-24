@@ -40,19 +40,22 @@ export default async function WebsiteEditorPage({
     const monthQueryStart = new Date(Date.UTC(year, month, 1) - 24 * 60 * 60 * 1000);
     const monthQueryEnd = new Date(Date.UTC(year, month + 1, 1) + 24 * 60 * 60 * 1000);
 
-    const [totalAppointments, upcomingAppointments, monthAppointments] = await Promise.all([
+    const [totalAppointments, upcomingAppointments, monthAppointments, professionals] = await Promise.all([
       prisma.appointment.count({ where: { websiteId, status: "confirmed" } }),
       prisma.appointment.findMany({
         where: { websiteId, status: "confirmed" },
         orderBy: { startsAt: "asc" },
         take: 20,
-        select: { id: true, name: true, contact: true, startsAt: true },
+        select: { id: true, name: true, contact: true, startsAt: true, professional: { select: { name: true } } },
       }),
       prisma.appointment.findMany({
         where: { websiteId, status: "confirmed", startsAt: { gte: monthQueryStart, lt: monthQueryEnd } },
         orderBy: { startsAt: "asc" },
-        select: { id: true, name: true, contact: true, startsAt: true },
+        select: { id: true, name: true, contact: true, startsAt: true, professional: { select: { name: true } } },
       }),
+      website.agendaConfig
+        ? prisma.professional.findMany({ where: { agendaConfigId: website.agendaConfig.id }, orderBy: { position: "asc" } })
+        : Promise.resolve([]),
     ]);
     const availability = website.agendaConfig
       ? AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(website.agendaConfig.availability)
@@ -84,6 +87,14 @@ export default async function WebsiteEditorPage({
           upcomingAppointments={upcomingAppointments}
           monthStr={monthStr}
           monthAppointments={monthAppointments}
+          professionals={professionals.map((p) => ({
+            id: p.id,
+            name: p.name,
+            title: p.title,
+            email: p.email,
+            active: p.active,
+            availability: AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(p.availability),
+          }))}
         />
       </div>
     );

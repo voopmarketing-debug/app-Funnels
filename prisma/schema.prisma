@@ -427,7 +427,34 @@ model AgendaConfig {
   // used everywhere else a page has no chosen accent yet.
   primaryColor String @default("#1f6feb")
 
-  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  website       Website        @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  professionals Professional[]
+}
+
+// A staff member a visitor can pick to book with (e.g. "Dra. Gómez —
+// Ortodoncista") — optional: an agenda with zero rows here behaves exactly
+// like a single-provider business always has (AgendaConfig's own
+// availability/notificationEmail, no picker step). Once at least one exists,
+// the public page adds a "choose your professional" step before the day
+// picker, and each one's own `availability` (same shape as
+// AgendaConfig.availability) governs their bookable hours instead of the
+// agenda-level one.
+model Professional {
+  id             String  @id @default(cuid())
+  agendaConfigId String
+  name           String
+  title          String? // optional role/specialty shown to visitors, e.g. "Ortodoncista"
+  email          String? // gets their own notification email when someone books with them
+  availability   Json
+  active         Boolean @default(true) // soft-hide from the picker without losing their appointment history
+  position       Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  agendaConfig AgendaConfig  @relation(fields: [agendaConfigId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([agendaConfigId])
 }
 
 // A confirmed booking made through an agenda-type Website's public page —
@@ -436,23 +463,35 @@ model AgendaConfig {
 // lib/timezone.ts) so it sorts and compares correctly regardless of the
 // business's configured timezone.
 model Appointment {
-  id        String   @id @default(cuid())
-  websiteId String
-  name      String
-  contact   String // phone/WhatsApp, shown to the business
-  email     String? // optional — only present when given, used for the visitor's own confirmation email
-  startsAt  DateTime
-  status    String   @default("confirmed") // "confirmed" | "cancelled"
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  websiteId      String
+  // Null when the agenda has no Professionals at all (the common
+  // single-provider case) or, in principle, a slot booked before this field
+  // existed. Never null once the agenda has professionals — the public flow
+  // requires picking one first.
+  professionalId String?
+  name           String
+  contact        String // phone/WhatsApp, shown to the business
+  email          String? // optional — only present when given, used for the visitor's own confirmation email
+  startsAt       DateTime
+  status         String   @default("confirmed") // "confirmed" | "cancelled"
+  createdAt      DateTime @default(now())
 
-  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  website      Website       @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  professional Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
 
-  // Database-enforced: even two people submitting the exact same slot at
-  // the same instant can't both end up "confirmed" — the second insert
-  // fails the constraint and lib/agenda.ts's bookAppointment reports it as
-  // "just got taken" instead of silently double-booking.
-  @@unique([websiteId, startsAt])
-  @@index([websiteId, startsAt])
+  // Database-enforced double-booking guard — but NOT expressed as a normal
+  // Prisma @@unique: two different professionals must be allowed to hold the
+  // same clock time, while the same professional (or, when there are no
+  // professionals, the business as a whole) still can't be double-booked.
+  // Postgres can only express "same slot, treating a null professional as
+  // one shared bucket" with an expression index over
+  // COALESCE(professionalId, ''), which Prisma's schema language can't
+  // declare — so this constraint exists ONLY in
+  // prisma/migrations/20260924100000_add_agenda_professionals/migration.sql,
+  // not here. Don't add `prisma migrate dev`/`db push` on this model without
+  // checking that index still exists afterwards.
+  @@index([websiteId, professionalId, startsAt])
 }
 
 // Someone who filled the page's own lead-capture form (name + WhatsApp/phone
