@@ -21,6 +21,7 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
       orderBy: { generatedAt: "asc" },
       select: {
         id: true,
+        pageType: true,
         name: true,
         purpose: true,
         slug: true,

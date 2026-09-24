@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { renderWebsiteHtml } from "@/lib/websiteTemplate";
 import { getWebsiteHeroContext } from "@/lib/websiteHero";
+import { renderAgendaHtml } from "@/lib/agendaTemplate";
+import { AvailabilitySchema, DEFAULT_AVAILABILITY, getUpcomingAvailableDates, getAvailableSlotsForDate } from "@/lib/agenda";
+import { submitAgendaBooking, previewAgendaBookingOutcome } from "@/lib/agendaBooking";
 import { captureWebsiteLead } from "@/lib/websiteLeads";
 import { customDomainSecurityHeaders } from "@/lib/securityHeaders";
 
@@ -28,11 +31,13 @@ export async function proxy(request: NextRequest) {
     where: { customDomain: hostname },
     select: {
       id: true,
+      pageType: true,
       content: true,
       whatsappNumber: true,
       businessId: true,
       aiImageUrl: true,
       business: { select: { name: true, industry: true } },
+      agendaConfig: { select: { notificationEmail: true, timezone: true, slotMinutes: true, availability: true, primaryColor: true } },
     },
   });
 
@@ -40,6 +45,86 @@ export async function proxy(request: NextRequest) {
     // Unknown host with nothing connected — fall through to normal routing
     // (will 404 through the app like any unmatched request).
     return NextResponse.next();
+  }
+
+  const preview = request.nextUrl.searchParams.get("preview") === "1";
+
+  if (website.pageType === "agenda") {
+    if (!website.agendaConfig) {
+      return new NextResponse(
+        "Esta agenda todavía no está configurada — pide al dueño del negocio que entre a su panel y termine de configurarla.",
+        { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", ...customDomainSecurityHeaders() } },
+      );
+    }
+
+    // Same booking-form POST as /sitio/[slug]/reservar, reached here as a
+    // root-relative "/reservar" action since a custom domain has no slug.
+    if (request.nextUrl.pathname === "/reservar" && request.method === "POST") {
+      const formData = await request.formData();
+      const outcome = preview
+        ? previewAgendaBookingOutcome(formData)
+        : await submitAgendaBooking({
+            websiteId: website.id,
+            businessName: website.business.name,
+            notificationEmail: website.agendaConfig.notificationEmail,
+            formData,
+          });
+
+      const url = new URL("/", request.url);
+      if (preview) url.searchParams.set("preview", "1");
+      if (outcome.ok) {
+        url.searchParams.set("reservado_fecha", outcome.dateStr);
+        url.searchParams.set("reservado_hora", outcome.timeStr);
+      } else {
+        url.searchParams.set("date", outcome.dateStr);
+        url.searchParams.set("error", outcome.error);
+      }
+      return NextResponse.redirect(url, { status: 303 });
+    }
+
+    if (!preview) {
+      try {
+        await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "view" } });
+      } catch (err) {
+        console.error("Failed to log website view event:", err);
+      }
+    }
+
+    const availability = AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(website.agendaConfig.availability);
+    const dateStr = request.nextUrl.searchParams.get("date");
+    const timeStr = request.nextUrl.searchParams.get("time");
+    const confirmedDate = request.nextUrl.searchParams.get("reservado_fecha");
+    const confirmedTime = request.nextUrl.searchParams.get("reservado_hora");
+    const bookingError = request.nextUrl.searchParams.get("error");
+
+    const upcomingDates = dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 14);
+    const availableSlots =
+      dateStr && !timeStr
+        ? await getAvailableSlotsForDate({
+            websiteId: website.id,
+            dateStr,
+            availability,
+            slotMinutes: website.agendaConfig.slotMinutes,
+            timezone: website.agendaConfig.timezone,
+          })
+        : [];
+
+    const html = renderAgendaHtml({
+      businessName: website.business.name,
+      primaryColor: website.agendaConfig.primaryColor,
+      trackingBasePath: "",
+      upcomingDates,
+      dateStr,
+      availableSlots,
+      timeStr,
+      confirmed: confirmedDate && confirmedTime ? { dateStr: confirmedDate, timeStr: confirmedTime } : null,
+      bookingError,
+      preview,
+    });
+
+    return new NextResponse(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...customDomainSecurityHeaders() },
+    });
   }
 
   const parsedContent = WebsiteContentSchema.safeParse(website.content);

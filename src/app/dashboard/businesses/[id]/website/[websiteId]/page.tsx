@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
+import { AvailabilitySchema, DEFAULT_AVAILABILITY } from "@/lib/agenda";
 import { WebsiteEditor } from "./WebsiteEditor";
+import { AgendaEditor } from "./AgendaEditor";
 import { RegenerateOldPageButton } from "./RegenerateOldPageButton";
 
 export default async function WebsiteEditorPage({
@@ -21,11 +23,55 @@ export default async function WebsiteEditorPage({
   });
   if (!membership) notFound();
 
-  const website = await prisma.website.findFirst({ where: { id: websiteId, businessId: id } });
+  const website = await prisma.website.findFirst({ where: { id: websiteId, businessId: id }, include: { agendaConfig: true } });
   if (!website) notFound();
 
-  const parsedContent = WebsiteContentSchema.safeParse(website.content);
   const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
+
+  if (website.pageType === "agenda") {
+    const [totalAppointments, upcomingAppointments] = await Promise.all([
+      prisma.appointment.count({ where: { websiteId, status: "confirmed" } }),
+      prisma.appointment.findMany({
+        where: { websiteId, status: "confirmed" },
+        orderBy: { startsAt: "asc" },
+        take: 20,
+        select: { id: true, name: true, contact: true, startsAt: true },
+      }),
+    ]);
+    const availability = website.agendaConfig
+      ? AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(website.agendaConfig.availability)
+      : DEFAULT_AVAILABILITY;
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <Link href={`/dashboard/businesses/${id}/website`} className="text-sm text-ink-muted underline hover:text-ink">
+            ← Sitios web
+          </Link>
+          <h1 className="mt-1 text-xl font-bold">{website.name}</h1>
+        </div>
+
+        <AgendaEditor
+          businessId={id}
+          websiteId={websiteId}
+          initialConfig={{
+            notificationEmail: website.agendaConfig?.notificationEmail ?? session.user.email ?? "",
+            timezone: website.agendaConfig?.timezone ?? "America/Bogota",
+            slotMinutes: website.agendaConfig?.slotMinutes ?? 30,
+            availability,
+            primaryColor: website.agendaConfig?.primaryColor ?? "#1f6feb",
+          }}
+          customDomain={website.customDomain}
+          generatedAt={website.updatedAt}
+          publicUrl={`https://${appHost}/sitio/${website.slug}`}
+          totalAppointments={totalAppointments}
+          upcomingAppointments={upcomingAppointments}
+        />
+      </div>
+    );
+  }
+
+  const parsedContent = WebsiteContentSchema.safeParse(website.content);
 
   if (!parsedContent.success) {
     return (
@@ -44,7 +90,7 @@ export default async function WebsiteEditorPage({
     );
   }
 
-  const [totalViews, clicksWhatsapp, clicksAgenda, leads] = await Promise.all([
+  const [totalViews, clicksWhatsapp, clicksAgenda, leads, otherPages] = await Promise.all([
     prisma.websiteEvent.count({ where: { websiteId, type: "view" } }),
     prisma.websiteEvent.count({ where: { websiteId, type: "cta_click", destination: "whatsapp" } }),
     prisma.websiteEvent.count({ where: { websiteId, type: "cta_click", destination: "agenda" } }),
@@ -52,6 +98,13 @@ export default async function WebsiteEditorPage({
       where: { websiteId },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, contact: true, message: true, createdAt: true },
+    }),
+    // Lets the hero CTA link straight to another of this business's own
+    // pages (typically its agenda page) instead of copy-pasting a URL.
+    prisma.website.findMany({
+      where: { businessId: id, id: { not: websiteId } },
+      orderBy: { generatedAt: "asc" },
+      select: { name: true, slug: true, pageType: true },
     }),
   ]);
 
@@ -77,6 +130,7 @@ export default async function WebsiteEditorPage({
         publicUrl={`https://${appHost}/sitio/${website.slug}`}
         stats={{ totalViews, clicksWhatsapp, clicksAgenda }}
         leads={leads}
+        otherPages={otherPages.map((p) => ({ name: p.name, pageType: p.pageType, publicUrl: `https://${appHost}/sitio/${p.slug}` }))}
       />
     </div>
   );

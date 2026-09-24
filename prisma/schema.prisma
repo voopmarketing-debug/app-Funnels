@@ -321,6 +321,14 @@ model Website {
   id         String @id @default(cuid())
   businessId String
 
+  // "landing" (default): an AI-generated content page, rendered from
+  // `content` by lib/websiteTemplate.ts. "agenda": a real booking-calendar
+  // page instead — no AI content, rendered from its linked AgendaConfig by
+  // lib/agendaTemplate.ts. Lets a business chain pages into a funnel (an
+  // offer page whose button points at its own agenda page's URL) entirely
+  // within this app, no external scheduling tool required.
+  pageType String @default("landing")
+
   // Client-facing label to tell pages apart in the list, e.g. "Sitio
   // principal", "Página para agendar demo".
   name String
@@ -370,11 +378,81 @@ model Website {
   generatedAt  DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  events   WebsiteEvent[]
-  leads    WebsiteLead[]
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  events       WebsiteEvent[]
+  leads        WebsiteLead[]
+  agendaConfig AgendaConfig?
+  appointments Appointment[]
 
   @@index([businessId])
+}
+
+// One per agenda-type Website — its availability and where booking
+// notifications go. Kept as its own table (instead of columns on Website)
+// since it's meaningless for a "landing" page and this keeps that model
+// from growing fields most pages never use.
+model AgendaConfig {
+  id        String @id @default(cuid())
+  websiteId String @unique
+
+  // Who gets emailed when someone books — defaults to the owner's own
+  // login email at creation (see actions.ts's createAgendaPage), but kept
+  // editable separately since a clinic might want bookings to go to a
+  // front-desk inbox instead. The lead who books gets their own
+  // confirmation email too (see lib/agenda.ts's bookAppointment) — this
+  // field is only for the business side of that notification.
+  notificationEmail String
+
+  // IANA zone (e.g. "America/Bogota") — every slot is computed and shown
+  // in this zone regardless of a visitor's own browser locale, since the
+  // business's real-world hours are what matters for a booking.
+  timezone String @default("America/Bogota")
+
+  // Appointment length in minutes — also the spacing between slots
+  // (see lib/agenda.ts's getAvailableSlotsForDate). No back-to-back
+  // double-booking risk since slots are generated at exactly this
+  // interval and checked against existing Appointments.
+  slotMinutes Int @default(30)
+
+  // Weekly recurring hours, one simple range per day (no split
+  // lunch-break ranges in this first version — a real gap, but rare
+  // enough for a v1 that it's a documented simplification rather than
+  // silently wrong). Shape: { monday: { enabled, start: "09:00", end:
+  // "17:00" }, ... } for all 7 days — see lib/agenda.ts's zod schema.
+  availability Json
+
+  // Accent color for the public booking page (see lib/agendaTemplate.ts)
+  // — agenda pages have no AI-generated `theme` to draw from, so this is
+  // the one visual choice the owner makes, defaulting to the same blue
+  // used everywhere else a page has no chosen accent yet.
+  primaryColor String @default("#1f6feb")
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+}
+
+// A confirmed booking made through an agenda-type Website's public page —
+// see app/sitio/[slug]/reservar/route.ts. `startsAt` is always stored in
+// UTC (converted from the visitor's selected wall-clock slot via
+// lib/timezone.ts) so it sorts and compares correctly regardless of the
+// business's configured timezone.
+model Appointment {
+  id        String   @id @default(cuid())
+  websiteId String
+  name      String
+  contact   String // phone/WhatsApp, shown to the business
+  email     String? // optional — only present when given, used for the visitor's own confirmation email
+  startsAt  DateTime
+  status    String   @default("confirmed") // "confirmed" | "cancelled"
+  createdAt DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  // Database-enforced: even two people submitting the exact same slot at
+  // the same instant can't both end up "confirmed" — the second insert
+  // fails the constraint and lib/agenda.ts's bookAppointment reports it as
+  // "just got taken" instead of silently double-booking.
+  @@unique([websiteId, startsAt])
+  @@index([websiteId, startsAt])
 }
 
 // Someone who filled the page's own lead-capture form (name + WhatsApp/phone

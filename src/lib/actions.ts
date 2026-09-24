@@ -23,6 +23,7 @@ import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator
 import { generateHeroImage } from "@/lib/websiteHeroImage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
+import { AvailabilitySchema, DEFAULT_AVAILABILITY, type Availability } from "@/lib/agenda";
 import {
   resolveMediaType,
   uploadAttachment,
@@ -1771,6 +1772,88 @@ export async function renameWebsitePage(businessId: string, websiteId: string, n
   await prisma.website.update({ where: { id: websiteId, businessId }, data: { name: trimmed } });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
+}
+
+/**
+ * Creates a real booking-calendar page (Website.pageType = "agenda") — no
+ * AI content generation at all (nothing here calls Anthropic, so it
+ * doesn't touch the daily generation cap), just a page backed by
+ * AgendaConfig and served by lib/agendaTemplate.ts. Lets a business chain
+ * an offer page's button straight into a "página 2" that handles real
+ * scheduling, entirely inside this app — no external tool required.
+ * notificationEmail defaults to the owner's own login email so bookings
+ * are never silently unreachable; editable afterward from the agenda's own
+ * settings panel (see updateAgendaConfig below).
+ */
+export async function createAgendaPage(businessId: string, input: { name?: string }): Promise<{ id: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  try {
+    const [business, existingCount] = await Promise.all([
+      prisma.business.findUniqueOrThrow({ where: { id: businessId } }),
+      prisma.website.count({ where: { businessId } }),
+    ]);
+    const name = input.name?.trim() || `Agenda ${existingCount + 1}`;
+    const [{ displayNumber }, slug] = await Promise.all([
+      resolveWhatsappNumberForBusiness(businessId),
+      generateUniqueWebsiteSlug(business.name, name, existingCount === 0),
+    ]);
+
+    const website = await prisma.website.create({
+      data: {
+        businessId,
+        pageType: "agenda",
+        name,
+        slug,
+        content: {},
+        whatsappNumber: displayNumber,
+        agendaConfig: {
+          create: {
+            notificationEmail: session.user.email ?? "",
+            timezone: "America/Bogota",
+            slotMinutes: 30,
+            availability: DEFAULT_AVAILABILITY,
+          },
+        },
+      },
+    });
+
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { id: website.id };
+  } catch (err) {
+    console.error(`createAgendaPage failed for business ${businessId}:`, err);
+    throw new Error(err instanceof Error ? err.message : "No se pudo crear la agenda");
+  }
+}
+
+/** Saves an agenda page's settings (hours, slot length, notification email, timezone, accent color) — live immediately, same as updateWebsiteContent. */
+export async function updateAgendaConfig(
+  businessId: string,
+  websiteId: string,
+  input: { notificationEmail: string; timezone: string; slotMinutes: number; availability: Availability; primaryColor: string },
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+  if (website.pageType !== "agenda") throw new Error("Esta página no es una agenda");
+
+  const notificationEmail = input.notificationEmail.trim();
+  if (!notificationEmail) throw new Error("Falta el correo de notificaciones");
+  const availability = AvailabilitySchema.parse(input.availability);
+  const slotMinutes = Math.max(5, Math.min(240, Math.round(input.slotMinutes) || 30));
+  const primaryColor = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/.test(input.primaryColor) ? input.primaryColor : "#1f6feb";
+
+  await prisma.agendaConfig.upsert({
+    where: { websiteId },
+    create: { websiteId, notificationEmail, timezone: input.timezone, slotMinutes, availability, primaryColor },
+    update: { notificationEmail, timezone: input.timezone, slotMinutes, availability, primaryColor },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/website/${websiteId}`);
 }
 
 // Photos/PDFs the AI agent can choose to send mid-conversation — see

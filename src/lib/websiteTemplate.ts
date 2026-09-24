@@ -14,7 +14,7 @@ function escapeHtml(text: string): string {
 // older, looser schema (or any future caller) can't break out of the CSS
 // context, which was a stored-XSS vector reachable from the theme editor's
 // free-text color input.
-function sanitizeHexColor(value: string, fallback: string): string {
+export function sanitizeHexColor(value: string, fallback: string): string {
   return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/.test(value) ? value : fallback;
 }
 
@@ -24,7 +24,7 @@ function sanitizeHexColor(value: string, fallback: string): string {
 // Computing readable button text from the accent's actual luminance
 // guarantees WCAG-safe contrast regardless of what the AI chose, for free
 // (no extra tokens, applies to every generated page).
-function readableTextColor(hex: string): "#ffffff" | "#0a0a0a" {
+export function readableTextColor(hex: string): "#ffffff" | "#0a0a0a" {
   const full = hex.length === 4 ? hex.slice(1).split("").map((c) => c + c).join("") : hex.slice(1, 7);
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255);
   const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));

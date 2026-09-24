@@ -15,6 +15,7 @@ export function WebsiteEditor({
   publicUrl,
   stats,
   leads,
+  otherPages,
 }: {
   businessId: string;
   websiteId: string;
@@ -24,6 +25,10 @@ export function WebsiteEditor({
   publicUrl: string;
   stats: { totalViews: number; clicksWhatsapp: number; clicksAgenda: number };
   leads: { id: string; name: string; contact: string; message: string | null; createdAt: Date }[];
+  // This business's other pages (landing or agenda) — lets the hero CTA
+  // link straight to one of them (typically an agenda page) via a picker
+  // instead of the owner having to copy-paste its URL by hand.
+  otherPages: { name: string; pageType: string; publicUrl: string }[];
 }) {
   const router = useRouter();
   const [content, setContent] = useState<WebsiteContent>(initialContent);
@@ -208,6 +213,30 @@ export function WebsiteEditor({
             value={content.hero.ctaUrl ?? ""}
             onChange={(v) => setContent((c) => ({ ...c, hero: { ...c.hero, ctaUrl: v || null } }))}
           />
+          {otherPages.length > 0 && (
+            <div className="space-y-1">
+              <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">
+                O llévalo a otra de tus páginas
+              </label>
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  setContent((c) => ({ ...c, hero: { ...c.hero, ctaUrl: e.target.value } }));
+                  e.target.value = "";
+                }}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              >
+                <option value="">Elegir página...</option>
+                {otherPages.map((p) => (
+                  <option key={p.publicUrl} value={p.publicUrl}>
+                    {p.pageType === "agenda" ? "📅 " : ""}
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </Section>
 
         <Section
@@ -755,7 +784,7 @@ function SelectField({
   );
 }
 
-function DomainSection({
+export function DomainSection({
   businessId,
   websiteId,
   customDomain,
