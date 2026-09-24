@@ -81,7 +81,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex min-h-screen">
+    // flex-col on mobile stacks the sidebar's top bar above the page content
+    // (see DashboardSidebar) instead of squeezing them side by side; md:
+    // flex-row restores today's row layout unchanged on desktop.
+    <div className="flex min-h-screen flex-col md:flex-row">
       <div className="fl-ambient-bg" />
       <NotificationSoundPoller />
       <DashboardSidebar

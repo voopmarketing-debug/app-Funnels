@@ -59,9 +59,18 @@ export function ConversationSplitView({
 }) {
   const stageById = new Map(stages.map((s) => [s.id, s]));
 
+  // On mobile there's only room for one of {list, thread} at a time — which
+  // one shows is driven by whether a conversation is selected (the same
+  // `conv` URL param that already decides selectedConversation), so no
+  // extra client state is needed. md: always shows both side by side,
+  // exactly like before this change.
+  const showListOnMobile = !selectedConversationId;
+
   return (
     <div className="fl-card flex h-[calc(100vh-14rem)] min-h-[28rem] overflow-hidden">
-      <div className="flex w-64 flex-none flex-col overflow-y-auto border-r border-border">
+      <div
+        className={`${showListOnMobile ? "flex" : "hidden md:flex"} w-full flex-col overflow-y-auto border-r border-border md:w-64 md:flex-none`}
+      >
         {conversations.length === 0 && (
           <p className="p-4 text-center text-xs text-ink-muted">Aún no hay conversaciones.</p>
         )}
@@ -107,7 +116,7 @@ export function ConversationSplitView({
         })}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className={`${showListOnMobile ? "hidden md:flex" : "flex"} min-w-0 flex-1 flex-col`}>
         {selectedConversation && selectedConversationId ? (
           <ConversationThread
             businessId={businessId}
@@ -121,6 +130,7 @@ export function ConversationSplitView({
             messages={selectedConversation.messages}
             templates={templates}
             windowOpen={selectedConversation.windowOpen}
+            mobileBackHref="?tab=chat"
           />
         ) : (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-ink-muted">
@@ -132,15 +142,20 @@ export function ConversationSplitView({
       </div>
 
       {selectedConversation && selectedConversationId && (
-        <LeadDetailPanel
-          businessId={businessId}
-          conversationId={selectedConversationId}
-          customerPhone={selectedConversation.customerPhone}
-          tags={selectedConversation.tags}
-          notes={selectedConversation.notes}
-          appointmentAt={selectedConversation.appointmentAt}
-          appointmentNote={selectedConversation.appointmentNote}
-        />
+        // Desktop-only third column for now — on mobile the thread already
+        // fills the screen (see above), and stacking a third full-width
+        // panel under it would bury the chat itself.
+        <div className="hidden md:block">
+          <LeadDetailPanel
+            businessId={businessId}
+            conversationId={selectedConversationId}
+            customerPhone={selectedConversation.customerPhone}
+            tags={selectedConversation.tags}
+            notes={selectedConversation.notes}
+            appointmentAt={selectedConversation.appointmentAt}
+            appointmentNote={selectedConversation.appointmentNote}
+          />
+        </div>
       )}
     </div>
   );

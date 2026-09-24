@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
@@ -97,26 +98,40 @@ function LogoutIcon() {
   );
 }
 
-export function DashboardSidebar({
+function MenuIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// The link list, shared by the always-visible desktop <aside> and the
+// slide-in mobile drawer below — kept in one place so the two never drift
+// out of sync with each other.
+function NavLinks({
   isAgencyAdmin,
   primaryBusinessId,
+  pathname,
   onSignOut,
 }: {
   isAgencyAdmin: boolean;
   primaryBusinessId: string | null;
+  pathname: string;
   onSignOut: () => Promise<void>;
 }) {
-  const pathname = usePathname();
-
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href));
 
   return (
-    <aside className="flex min-h-screen w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5">
-      <Link href="/dashboard" className="mb-4 flex items-center gap-2.5 px-4">
-        <FunnelsLogoMark className="h-6 w-6 flex-none" />
-        <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
-      </Link>
-
+    <>
       <nav className="flex flex-1 flex-col gap-1 px-3">
         <Link
           href="/dashboard"
@@ -191,6 +206,82 @@ export function DashboardSidebar({
           </button>
         </form>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function DashboardSidebar({
+  isAgencyAdmin,
+  primaryBusinessId,
+  onSignOut,
+}: {
+  isAgencyAdmin: boolean;
+  primaryBusinessId: string | null;
+  onSignOut: () => Promise<void>;
+}) {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Closes the drawer automatically after tapping a link (route changes),
+  // instead of leaving it open over the newly-navigated page.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  return (
+    <>
+      {/* Mobile-only top bar — hidden entirely on md+ (md:hidden), so it
+          never appears alongside or instead of the desktop sidebar below. */}
+      <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3 md:hidden">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          <FunnelsLogoMark className="h-6 w-6 flex-none" />
+          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Abrir menú"
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-ink-muted transition hover:border-accent hover:text-accent"
+        >
+          <MenuIcon />
+        </button>
+      </div>
+
+      {/* Mobile slide-in drawer — position:fixed takes it out of the page's
+          normal flow entirely, so it never affects layout on any screen
+          size, desktop included, whether open or not. */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+          <aside className="relative flex h-full w-64 flex-col gap-2 bg-surface py-5 shadow-xl">
+            <div className="mb-2 flex items-center justify-between px-4">
+              <Link href="/dashboard" className="flex items-center gap-2.5">
+                <FunnelsLogoMark className="h-6 w-6 flex-none" />
+                <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                aria-label="Cerrar menú"
+                className="text-ink-muted transition hover:text-ink"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <NavLinks isAgencyAdmin={isAgencyAdmin} primaryBusinessId={primaryBusinessId} pathname={pathname} onSignOut={onSignOut} />
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop sidebar — identical to before, just now explicitly hidden
+          below md so it doesn't fight the mobile top bar above for space. */}
+      <aside className="hidden min-h-screen w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5 md:flex">
+        <Link href="/dashboard" className="mb-4 flex items-center gap-2.5 px-4">
+          <FunnelsLogoMark className="h-6 w-6 flex-none" />
+          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
+        </Link>
+        <NavLinks isAgencyAdmin={isAgencyAdmin} primaryBusinessId={primaryBusinessId} pathname={pathname} onSignOut={onSignOut} />
+      </aside>
+    </>
   );
 }

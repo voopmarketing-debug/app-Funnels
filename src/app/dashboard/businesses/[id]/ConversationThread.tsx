@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ManualMessageForm } from "./conversations/[conversationId]/ManualMessageForm";
 import { StageSelector } from "./conversations/[conversationId]/StageSelector";
 import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
@@ -54,6 +55,7 @@ export function ConversationThread({
   messages,
   templates,
   windowOpen,
+  mobileBackHref,
 }: {
   businessId: string;
   conversationId: string;
@@ -66,6 +68,12 @@ export function ConversationThread({
   messages: ThreadMessage[];
   templates: { id: string; name: string; bodyText: string }[];
   windowOpen: boolean;
+  // Set only by the CRM split view (see ConversationSplitView.tsx), whose
+  // narrow-screen layout shows either the conversation list or this thread,
+  // never both — this link is how you get back to the list on mobile. Left
+  // unset on the standalone /conversations/[conversationId] page, which has
+  // its own breadcrumb already.
+  mobileBackHref?: string;
 }) {
   const customerInitial = (customerName?.trim()[0] ?? customerPhone.slice(-2)).toUpperCase();
   const businessInitial = businessName.trim()[0]?.toUpperCase() ?? "F";
@@ -73,6 +81,15 @@ export function ConversationThread({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
+        {mobileBackHref && (
+          <Link
+            href={mobileBackHref}
+            aria-label="Volver a las conversaciones"
+            className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ink-muted transition hover:text-ink md:hidden"
+          >
+            ‹
+          </Link>
+        )}
         <Avatar initial={customerInitial} variant="customer" />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-lg font-bold">{customerName ?? customerPhone}</h2>
