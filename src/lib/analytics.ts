@@ -28,6 +28,11 @@ export type BusinessAnalytics = {
   totalConversations: number;
   newConversations: number;
   totalMessages: number;
+  // The three components that make up totalMessages — split out because a
+  // single combined number reads as suspiciously high to a business owner
+  // who only sent a handful of messages themselves; this shows the AI's
+  // share (usually the biggest one) instead of leaving them to guess.
+  messagesByRole: { cliente: number; ia: number; humano: number };
   automationRate: number | null;
   errorRate: number | null;
   responseTime: ResponseTimeStats;
@@ -197,6 +202,7 @@ export async function getBusinessAnalytics(
 
   const messagesByDay = new Map(dayKeys.map((k) => [k, { cliente: 0, ia: 0, humano: 0 }]));
   const byConversation = new Map<string, typeof recentMessages>();
+  let clienteCount = 0;
   let iaCount = 0;
   let humanoCount = 0;
   let errorCount = 0;
@@ -212,6 +218,8 @@ export async function getBusinessAnalytics(
 
     const systemNotice = isSystemNotice(m.role, m.content);
     const bucket = messagesByDay.get(dayKey(m.createdAt));
+    if (m.role === "CUSTOMER") clienteCount += 1;
+
     if (bucket) {
       if (m.role === "CUSTOMER") bucket.cliente += 1;
       else if (!systemNotice) {
@@ -277,6 +285,7 @@ export async function getBusinessAnalytics(
     totalConversations,
     newConversations,
     totalMessages: recentMessages.length,
+    messagesByRole: { cliente: clienteCount, ia: iaCount, humano: humanoCount },
     automationRate,
     errorRate,
     responseTime: { avgMinutes, medianMinutes, sampleSize: responseSamplesMs.length },

@@ -201,7 +201,8 @@ export default async function AnalyticsPage({
         <StatTile
           label={`Mensajes (${RANGE_NOUN_PHRASE[rangeKey]})`}
           value={String(analytics.totalMessages)}
-          description="Cuántos mensajes se intercambiaron en el período seleccionado — los que mandaron tus clientes y los que respondiste tú (IA o humano)."
+          sublabel={`${analytics.messagesByRole.cliente} cliente · ${analytics.messagesByRole.ia} IA · ${analytics.messagesByRole.humano} tú`}
+          description="Cuántos mensajes se intercambiaron en el período seleccionado, sumando las tres líneas: los que mandó el cliente, los que contestó la IA sola y los que escribiste tú a mano. El total suele parecer alto porque cuenta cada mensaje del ida y vuelta, no solo los tuyos."
           tone="blue"
           icon={<MessageIcon />}
         />
