@@ -84,6 +84,7 @@ export async function proxy(request: NextRequest) {
             businessName: website.business.name,
             notificationEmail: website.agendaConfig.notificationEmail,
             formData,
+            slotMinutes: website.agendaConfig.slotMinutes,
             professional,
           });
 

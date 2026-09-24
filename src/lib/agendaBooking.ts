@@ -1,6 +1,7 @@
 import { bookAppointment } from "@/lib/agenda";
 import { formatDateLabel } from "@/lib/agendaTemplate";
 import { sendEmail } from "@/lib/email";
+import { buildIcsEvent } from "@/lib/ics";
 
 // The name/contact/email fields below come straight from a public,
 // unauthenticated form — interpolated raw into an HTML email body, they'd
@@ -25,6 +26,10 @@ export async function submitAgendaBooking(params: {
   businessName: string;
   notificationEmail: string;
   formData: FormData;
+  // Appointment length, minutes — needed only to compute the calendar
+  // invite's DTEND (see lib/ics.ts); the caller already has this from
+  // AgendaConfig.slotMinutes for the slot-picking step, no extra query.
+  slotMinutes: number;
   // The already-loaded professional the visitor picked (or null on a
   // single-provider agenda) — passed in by the caller (route.ts/proxy.ts,
   // which already fetched the professionals list to render the picker) so
@@ -56,6 +61,20 @@ export async function submitAgendaBooking(params: {
 
   const dateLabel = formatDateLabel(dateStr);
   const withProfessional = params.professional ? ` con ${escapeHtml(params.professional.name)}` : "";
+
+  // Attached to every notification below so the appointment lands straight
+  // on the recipient's own calendar app (Google Calendar, Outlook, Apple
+  // Calendar) without anyone opening Funnels Labs — see lib/ics.ts.
+  const endsAt = new Date(result.startsAt.getTime() + params.slotMinutes * 60 * 1000);
+  const icsContent = buildIcsEvent({
+    uid: `${result.appointmentId}@funnelslabs.app`,
+    summary: `Cita: ${name}${withProfessional ? ` con ${params.professional!.name}` : ""} — ${params.businessName}`,
+    description: `Nombre: ${name}\nContacto: ${contact}${email ? `\nCorreo: ${email}` : ""}`,
+    startsAt: result.startsAt,
+    endsAt,
+  });
+  const icsFilename = "cita.ics";
+
   void sendEmail({
     to: params.notificationEmail,
     subject: `Nueva cita agendada: ${name}`,
@@ -64,6 +83,8 @@ export async function submitAgendaBooking(params: {
       <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
       <p>Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}</p>
     `,
+    icsContent,
+    icsFilename,
   });
   if (email) {
     void sendEmail({
@@ -74,6 +95,8 @@ export async function submitAgendaBooking(params: {
         <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
         <p>Si necesitas cambiarla, contáctanos directamente.</p>
       `,
+      icsContent,
+      icsFilename,
     });
   }
   // The professional gets their own heads-up too, so they have it on their
@@ -89,6 +112,8 @@ export async function submitAgendaBooking(params: {
         <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
         <p>Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}</p>
       `,
+      icsContent,
+      icsFilename,
     });
   }
 

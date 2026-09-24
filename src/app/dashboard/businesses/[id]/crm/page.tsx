@@ -46,7 +46,7 @@ export default async function CrmPage({
   const selectedPipeline =
     allPipelines.find((p) => p.id === pipelineParam) ?? allPipelines.find((p) => p.isDefault) ?? allPipelines[0];
 
-  const [business, conversations, accessibleBusinesses, approvedTemplates] = await Promise.all([
+  const [business, conversations, accessibleBusinesses, approvedTemplates, stageCounts, totalConversations] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
     prisma.conversation.findMany({
       where: { businessId: id, stage: { pipelineId: selectedPipeline.id } },
@@ -64,8 +64,15 @@ export default async function CrmPage({
       select: { id: true, name: true, bodyText: true },
       orderBy: { name: "asc" },
     }),
+    // How many contacts a broadcast would actually reach per stage — same
+    // scope sendBroadcast itself queries (businessId + stageId, no pipeline
+    // filter — "Todo el pipeline" in BroadcastDialog really means every
+    // conversation on this business, matching that action's own behavior).
+    prisma.conversation.groupBy({ by: ["stageId"], where: { businessId: id }, _count: { _all: true } }),
+    prisma.conversation.count({ where: { businessId: id } }),
   ]);
   const stages = selectedPipeline.stages;
+  const stageCountMap = Object.fromEntries(stageCounts.map((s) => [s.stageId, s._count._all]));
 
   // WhatsApp-style unread badge: count each conversation's CUSTOMER
   // messages newer than its lastReadAt (null = never opened, so everything
@@ -149,7 +156,13 @@ export default async function CrmPage({
               />
             )}
           </div>
-          <BroadcastDialog businessId={id} stages={stages} templates={approvedTemplates} />
+          <BroadcastDialog
+            businessId={id}
+            stages={stages}
+            templates={approvedTemplates}
+            stageCounts={stageCountMap}
+            totalConversations={totalConversations}
+          />
         </div>
 
         {tab === "board" && <CrmBoard businessId={id} stages={stages} conversations={conversationSummaries} />}

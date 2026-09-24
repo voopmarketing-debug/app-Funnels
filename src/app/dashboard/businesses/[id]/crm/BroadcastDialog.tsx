@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { sendBroadcast, type BroadcastResult } from "@/lib/actions";
+import { WHATSAPP_MARKETING_MESSAGE_COST_USD } from "@/lib/constants";
 
 type DialogState = { error: string | null; result: BroadcastResult | null };
 const INITIAL_STATE: DialogState = { error: null, result: null };
@@ -14,10 +15,14 @@ export function BroadcastDialog({
   businessId,
   stages,
   templates,
+  stageCounts,
+  totalConversations,
 }: {
   businessId: string;
   stages: { id: string; name: string }[];
   templates: BroadcastTemplate[];
+  stageCounts: Record<string, number>;
+  totalConversations: number;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [formKey, setFormKey] = useState(0);
@@ -41,6 +46,8 @@ export function BroadcastDialog({
           businessId={businessId}
           stages={stages}
           templates={templates}
+          stageCounts={stageCounts}
+          totalConversations={totalConversations}
           onClose={() => dialogRef.current?.close()}
         />
       </dialog>
@@ -52,15 +59,22 @@ function BroadcastDialogContent({
   businessId,
   stages,
   templates,
+  stageCounts,
+  totalConversations,
   onClose,
 }: {
   businessId: string;
   stages: { id: string; name: string }[];
   templates: BroadcastTemplate[];
+  stageCounts: Record<string, number>;
+  totalConversations: number;
   onClose: () => void;
 }) {
   const [mode, setMode] = useState<"free" | "template">("free");
   const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id);
+  const [stageId, setStageId] = useState("all");
+  const recipientCount = stageId === "all" ? totalConversations : (stageCounts[stageId] ?? 0);
+  const estimatedCost = recipientCount * WHATSAPP_MARKETING_MESSAGE_COST_USD;
   const [state, formAction, isPending] = useActionState<DialogState, FormData>(async (_prev, formData) => {
     try {
       const result = await sendBroadcast(businessId, formData);
@@ -117,16 +131,23 @@ function BroadcastDialogContent({
         <select
           id="stageId"
           name="stageId"
-          defaultValue="all"
+          value={stageId}
+          onChange={(e) => setStageId(e.target.value)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
         >
-          <option value="all">Todo el pipeline</option>
+          <option value="all">Todo el pipeline ({totalConversations})</option>
           {stages.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name}
+              {s.name} ({stageCounts[s.id] ?? 0})
             </option>
           ))}
         </select>
+        <p className="text-[11px] text-ink-faint">
+          {recipientCount} {recipientCount === 1 ? "destinatario" : "destinatarios"}
+          {mode === "template" &&
+            recipientCount > 0 &&
+            ` — costo estimado de Meta: ~$${estimatedCost.toFixed(2)} USD ($${WHATSAPP_MARKETING_MESSAGE_COST_USD} USD/mensaje, tarifa de plantillas de marketing en Colombia — puede variar según tu cuenta).`}
+        </p>
       </div>
 
       <div className="space-y-1">

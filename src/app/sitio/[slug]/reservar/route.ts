@@ -21,6 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       agendaConfig: {
         select: {
           notificationEmail: true,
+          slotMinutes: true,
           professionals: { select: { id: true, name: true, email: true } },
         },
       },
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         businessName: website.business.name,
         notificationEmail: website.agendaConfig.notificationEmail,
         formData,
+        slotMinutes: website.agendaConfig.slotMinutes,
         professional,
       });
 
