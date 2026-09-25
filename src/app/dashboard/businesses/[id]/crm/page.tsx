@@ -10,6 +10,7 @@ import { CrmTabs } from "./CrmTabs";
 import { PipelineSwitcher } from "./PipelineSwitcher";
 import { ConversationSplitView } from "./ConversationSplitView";
 import { BroadcastDialog } from "./BroadcastDialog";
+import { BroadcastHistory } from "./BroadcastHistory";
 import { AgentSwitcher } from "../AgentSwitcher";
 import { CrmLivePoller } from "./CrmLivePoller";
 
@@ -23,8 +24,9 @@ export default async function CrmPage({
   const { id } = await params;
   const { tab: tabParam, conv, pipeline: pipelineParam } = await searchParams;
   // Conversaciones is the default landing view — it's what an agency opens
-  // CRM for day to day; Tablero/Lista are reached via their own ?tab= link.
-  const tab = tabParam === "board" || tabParam === "list" ? tabParam : "chat";
+  // CRM for day to day; Tablero/Lista/Difusiones are reached via their own
+  // ?tab= link.
+  const tab = tabParam === "board" || tabParam === "list" || tabParam === "broadcasts" ? tabParam : "chat";
 
   const session = await auth();
   if (!session?.user?.id) return null;
@@ -102,6 +104,75 @@ export default async function CrmPage({
     unreadCount: unreadCountByConversation.get(c.id) ?? 0,
   }));
 
+  // Only queried when the Difusiones tab is actually open — every other tab
+  // doesn't need this, so it stays out of the main Promise.all above.
+  let broadcastsView: {
+    id: string;
+    message: string;
+    stageName: string | null;
+    totalRecipients: number;
+    sentCount: number;
+    failedCount: number;
+    delivered: number;
+    read: number;
+    failedAfterSend: number;
+    ctaUrl: string | null;
+    clickCount: number;
+    createdAt: Date;
+  }[] = [];
+  if (tab === "broadcasts") {
+    const stageNameById = new Map(allPipelines.flatMap((p) => p.stages).map((s) => [s.id, s.name]));
+    const broadcasts = await prisma.broadcast.findMany({
+      where: { businessId: id },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: {
+        id: true,
+        message: true,
+        stageId: true,
+        totalRecipients: true,
+        sentCount: true,
+        failedCount: true,
+        ctaUrl: true,
+        clickCount: true,
+        createdAt: true,
+      },
+    });
+    const deliveryStats = await prisma.message.groupBy({
+      by: ["broadcastId", "deliveryStatus"],
+      where: { broadcastId: { in: broadcasts.map((b) => b.id) } },
+      _count: { _all: true },
+    });
+    const deliveryByBroadcast = new Map(broadcasts.map((b) => [b.id, { delivered: 0, read: 0, failedAfterSend: 0 }]));
+    for (const row of deliveryStats) {
+      const bucket = row.broadcastId ? deliveryByBroadcast.get(row.broadcastId) : undefined;
+      if (!bucket) continue;
+      const count = row._count._all;
+      // "Entregados" is cumulative (read implies it was delivered first),
+      // same convention WhatsApp's own double-check marks use.
+      if (row.deliveryStatus === "read") {
+        bucket.read += count;
+        bucket.delivered += count;
+      } else if (row.deliveryStatus === "delivered") {
+        bucket.delivered += count;
+      } else if (row.deliveryStatus === "failed") {
+        bucket.failedAfterSend += count;
+      }
+    }
+    broadcastsView = broadcasts.map((b) => ({
+      id: b.id,
+      message: b.message,
+      stageName: b.stageId ? (stageNameById.get(b.stageId) ?? null) : null,
+      totalRecipients: b.totalRecipients,
+      sentCount: b.sentCount,
+      failedCount: b.failedCount,
+      ...(deliveryByBroadcast.get(b.id) ?? { delivered: 0, read: 0, failedAfterSend: 0 }),
+      ctaUrl: b.ctaUrl,
+      clickCount: b.clickCount,
+      createdAt: b.createdAt,
+    }));
+  }
+
   let selectedConversation = null;
   if (tab === "chat" && conv) {
     const full = await prisma.conversation.findFirst({
@@ -169,6 +240,7 @@ export default async function CrmPage({
 
         {tab === "board" && <CrmBoard businessId={id} stages={stages} conversations={conversationSummaries} />}
         {tab === "list" && <ContactsTable businessId={id} stages={stages} conversations={conversationSummaries} />}
+        {tab === "broadcasts" && <BroadcastHistory broadcasts={broadcastsView} />}
         {tab === "chat" && (
           <ConversationSplitView
             businessId={id}

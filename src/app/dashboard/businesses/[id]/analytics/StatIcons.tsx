@@ -47,6 +47,15 @@ export function BoltIcon() {
   );
 }
 
+export function BroadcastIcon() {
+  return (
+    <IconBase>
+      <path d="M4 10v4a2 2 0 0 0 2 2h1l5 4V6L7 10H6a2 2 0 0 0-2 2Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M16 9c1 1 1.5 2 1.5 3s-.5 2-1.5 3M19 6.5c1.8 1.6 2.8 3.4 2.8 5.5s-1 3.9-2.8 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </IconBase>
+  );
+}
+
 export function ClockIcon() {
   return (
     <IconBase>

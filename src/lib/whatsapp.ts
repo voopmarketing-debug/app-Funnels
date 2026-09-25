@@ -450,6 +450,53 @@ export function parseInboundMessages(payload: unknown): WhatsAppInboundMessage[]
   return messages;
 }
 
+export type WhatsAppStatusUpdate = {
+  whatsappMsgId: string;
+  status: "sent" | "delivered" | "read" | "failed";
+  timestamp: number; // unix seconds, from Meta
+  errorMessage?: string;
+};
+
+const KNOWN_STATUSES = new Set(["sent", "delivered", "read", "failed"]);
+
+/**
+ * Parses the "statuses" array Meta's webhook carries alongside (or instead
+ * of) inbound messages — one per outbound message as it moves through
+ * sent → delivered → read (or → failed). Used to power delivery/read KPIs
+ * for broadcasts and regular replies alike (see lib/deliveryTracking.ts).
+ */
+export function parseStatusUpdates(payload: unknown): WhatsAppStatusUpdate[] {
+  const updates: WhatsAppStatusUpdate[] = [];
+
+  const entries = isRecord(payload) && Array.isArray(payload.entry) ? payload.entry : [];
+  for (const entry of entries) {
+    const changes = isRecord(entry) && Array.isArray(entry.changes) ? entry.changes : [];
+    for (const change of changes) {
+      const value = isRecord(change) ? change.value : undefined;
+      if (!isRecord(value)) continue;
+
+      const statuses = Array.isArray(value.statuses) ? value.statuses : [];
+      for (const s of statuses) {
+        if (!isRecord(s)) continue;
+        const whatsappMsgId = typeof s.id === "string" ? s.id : undefined;
+        const status = typeof s.status === "string" ? s.status : undefined;
+        if (!whatsappMsgId || !status || !KNOWN_STATUSES.has(status)) continue;
+
+        const timestampRaw = typeof s.timestamp === "string" ? parseInt(s.timestamp, 10) : Number(s.timestamp);
+        const timestamp = Number.isFinite(timestampRaw) ? timestampRaw : Math.floor(Date.now() / 1000);
+
+        const errors = Array.isArray(s.errors) ? s.errors : [];
+        const errorMessage =
+          isRecord(errors[0]) && typeof errors[0].title === "string" ? errors[0].title : undefined;
+
+        updates.push({ whatsappMsgId, status: status as WhatsAppStatusUpdate["status"], timestamp, errorMessage });
+      }
+    }
+  }
+
+  return updates;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }

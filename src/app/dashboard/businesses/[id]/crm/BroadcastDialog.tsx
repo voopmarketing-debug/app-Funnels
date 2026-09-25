@@ -208,6 +208,22 @@ function BroadcastDialogContent({
               Se manda como foto/documento con el mensaje de arriba como pie de foto. Fotos hasta 5 MB, PDFs hasta 20 MB.
             </p>
           </div>
+          <div className="space-y-1">
+            <label htmlFor="ctaUrl" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+              Link a medir (opcional)
+            </label>
+            <input
+              id="ctaUrl"
+              name="ctaUrl"
+              type="text"
+              placeholder="https://tu-sitio.com/promo"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+            <p className="text-[11px] text-ink-faint">
+              Si lo pones, se agrega al final del mensaje como un link propio — así sabrás cuántos y quiénes le dieron
+              clic (lo ves en la pestaña Difusiones).
+            </p>
+          </div>
         </div>
       ) : templates.length === 0 ? (
         <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-ink-muted">

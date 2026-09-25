@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
+import { buildTrackedLink } from "@/lib/broadcastTracking";
 import {
   sendWhatsAppTextMessage,
   sendWhatsAppMediaMessage,
@@ -668,6 +669,10 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
   let message: string;
   let template: { name: string; language: string; headerImageUrl?: string } | null = null;
   let media: { url: string; type: "image" | "document"; filename?: string } | null = null;
+  // Only offered on the free-text path — an approved template's body is
+  // fixed by Meta, so a link can't be appended into it. See
+  // buildTrackedLink below for how this gets turned into a real link.
+  let ctaUrl: string | null = null;
   if (templateId) {
     const approvedTemplate = await prisma.messageTemplate.findFirst({
       where: { id: templateId, businessId, status: "APPROVED" },
@@ -684,6 +689,9 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
     const fileEntry = formData.get("file");
     const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
     if (!message && !file) throw new Error("message is required");
+
+    const ctaUrlRaw = String(formData.get("ctaUrl") ?? "").trim();
+    if (ctaUrlRaw) ctaUrl = /^https?:\/\//i.test(ctaUrlRaw) ? ctaUrlRaw : `https://${ctaUrlRaw}`;
 
     if (file) {
       const mediaType = resolveMediaType(file.type);
@@ -714,6 +722,7 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
       mediaFilename: media?.filename,
       createdByUserId: session.user.id,
       totalRecipients: conversations.length,
+      ctaUrl,
     },
   });
 
@@ -725,6 +734,13 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
     const batch = conversations.slice(i, i + BATCH_SIZE);
     const outcomes = await Promise.allSettled(
       batch.map(async (conv) => {
+        // A per-recipient tracked link, appended below whatever message
+        // text actually goes out — lets a click be attributed back to this
+        // exact conversation (see lib/broadcastTracking.ts). Only possible
+        // outside template mode; ctaUrl is always null there already.
+        const trackedLink = ctaUrl ? buildTrackedLink(broadcast.id, conv.id) : null;
+        const textForRecipient = trackedLink ? `${message}\n\n${trackedLink}` : message;
+
         const { messageId } = template
           ? await sendWhatsAppTemplateMessage({
               phoneNumberId,
@@ -741,17 +757,18 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
                 to: conv.customerPhone,
                 type: media.type,
                 link: media.url,
-                caption: message || undefined,
+                caption: textForRecipient || undefined,
                 filename: media.type === "document" ? media.filename : undefined,
               })
-            : await sendWhatsAppTextMessage({ phoneNumberId, accessToken, to: conv.customerPhone, text: message });
+            : await sendWhatsAppTextMessage({ phoneNumberId, accessToken, to: conv.customerPhone, text: textForRecipient });
         await prisma.message.create({
           data: {
             conversationId: conv.id,
             role: "AGENT",
-            content: message,
+            content: template ? message : textForRecipient,
             whatsappMsgId: messageId,
             sentByHuman: true,
+            broadcastId: broadcast.id,
             ...(media && {
               mediaUrl: media.url,
               mediaType: media.type,

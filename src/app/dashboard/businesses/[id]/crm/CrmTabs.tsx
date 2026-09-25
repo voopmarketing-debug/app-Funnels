@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChatIcon, LayersIcon, ListIcon } from "../analytics/StatIcons";
+import { ChatIcon, LayersIcon, ListIcon, BroadcastIcon } from "../analytics/StatIcons";
 
 // Conversaciones first — it's what an agency actually opens CRM for day to
 // day; Tablero and Lista are the less-frequent "manage the whole pipeline"
 // views. "chat" is also the default tab (see crm/page.tsx), so its link is
-// the bare pathname — Tablero and Lista carry the ?tab= param instead.
+// the bare pathname — the rest carry the ?tab= param instead.
 const TABS = [
   { key: "chat", label: "Conversaciones", icon: ChatIcon, glowVar: "--glow-accent" },
   { key: "board", label: "Tablero", icon: LayersIcon, glowVar: "--glow-secondary" },
   { key: "list", label: "Lista", icon: ListIcon, glowVar: "--glow-blue" },
+  { key: "broadcasts", label: "Difusiones", icon: BroadcastIcon, glowVar: "--glow-amber" },
 ] as const;
 
 export function CrmTabs({ activeTab }: { activeTab: string }) {

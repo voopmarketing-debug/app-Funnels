@@ -236,10 +236,11 @@ model Conversation {
   appointmentAt   DateTime?
   appointmentNote String?
 
-  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  stage         PipelineStage  @relation(fields: [stageId], references: [id])
-  messages      Message[]
-  notifications Notification[]
+  business       Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stage          PipelineStage    @relation(fields: [stageId], references: [id])
+  messages       Message[]
+  notifications  Notification[]
+  broadcastClicks BroadcastClick[]
 
   @@unique([businessId, customerPhone])
   @@index([stageId])
@@ -306,9 +307,27 @@ model Message {
   mediaFilename String?
   mediaSizeBytes Int?
 
+  // Set only on a message created by lib/actions.ts's sendBroadcast — lets a
+  // Broadcast's KPI view (see BroadcastHistory.tsx) roll up delivery/read
+  // stats for exactly the messages it sent, without guessing from timing.
+  broadcastId String?
+
+  // Meta's async delivery receipt for THIS message (matched back by
+  // whatsappMsgId — see lib/deliveryTracking.ts, fed by the "statuses"
+  // array in the WhatsApp webhook). Null until the first receipt arrives;
+  // "sent" itself is also a receipt (API acceptance is separate — see
+  // Broadcast.sentCount). Covers every outbound message, not just
+  // broadcasts, so the same tracking works for AI/human replies too.
+  deliveryStatus   String? // "sent" | "delivered" | "read" | "failed"
+  deliveryStatusAt DateTime?
+  deliveryError    String?   @db.Text
+
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  broadcast    Broadcast?   @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, createdAt])
+  @@index([whatsappMsgId])
+  @@index([broadcastId])
 }
 
 // An AI-generated marketing page for a business — served publicly at
@@ -617,9 +636,38 @@ model Broadcast {
   createdAt       DateTime  @default(now())
   completedAt     DateTime?
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // Optional link offered on the "Mensaje libre" send (not available for
+  // template broadcasts, whose body is fixed by Meta) — when set, every
+  // recipient's message carries a per-person tracked link instead of the
+  // raw URL (see lib/broadcastTracking.ts's buildTrackedLink), so clicking
+  // it can be attributed back to who clicked (see BroadcastClick below)
+  // before redirecting to this real destination.
+  ctaUrl     String? @db.Text
+  clickCount Int     @default(0)
+
+  business Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  messages Message[]
+  clicks   BroadcastClick[]
 
   @@index([businessId, createdAt])
+}
+
+// One person (conversation) clicking a broadcast's tracked link — see
+// Broadcast.ctaUrl. Deduped per (broadcast, conversation): a second click by
+// the same person doesn't add a second row, so "quién le dio clic" stays a
+// clean list of distinct people, while Broadcast.clickCount (incremented on
+// every visit, not deduped) is the raw total-clicks figure.
+model BroadcastClick {
+  id             String   @id @default(cuid())
+  broadcastId    String
+  conversationId String
+  clickedAt      DateTime @default(now())
+
+  broadcast    Broadcast    @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, conversationId])
+  @@index([broadcastId])
 }
 
 // A generic "N events for this key in the last window" counter — used to
