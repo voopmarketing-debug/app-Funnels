@@ -155,14 +155,25 @@ export async function runMetricAlerts(): Promise<{ businessesChecked: number; al
   const now = new Date();
   const weekAgo = new Date(now.getTime() - WEEK_MS);
 
+  // Batched, not one business at a time — a fully sequential loop over
+  // hundreds/thousands of businesses would run well past this cron's
+  // execution time limit before finishing, silently leaving the later
+  // businesses unchecked every single day. BATCH_SIZE mirrors the same
+  // bounded-concurrency pattern sendBroadcast uses in lib/actions.ts.
+  const BATCH_SIZE = 20;
   let alertsCreated = 0;
-  for (const business of businesses) {
-    const results = await Promise.all([
-      checkAutomationRate(business.id, now, weekAgo),
-      checkResponseTime(business.id, now, weekAgo),
-      checkPlanUsage(business.id, business.planTier),
-    ]);
-    alertsCreated += results.filter(Boolean).length;
+  for (let i = 0; i < businesses.length; i += BATCH_SIZE) {
+    const batch = businesses.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map((business) =>
+        Promise.all([
+          checkAutomationRate(business.id, now, weekAgo),
+          checkResponseTime(business.id, now, weekAgo),
+          checkPlanUsage(business.id, business.planTier),
+        ]),
+      ),
+    );
+    alertsCreated += batchResults.flat().filter(Boolean).length;
   }
 
   return { businessesChecked: businesses.length, alertsCreated };
