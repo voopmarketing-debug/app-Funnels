@@ -8,7 +8,14 @@
 // garbling them — Sheets/Numbers ignore the BOM harmlessly.
 function toCsv(headers: string[], rows: (string | number)[][]): string {
   const escapeCell = (value: string | number): string => {
-    const text = String(value ?? "");
+    let text = String(value ?? "");
+    // Neutralizes CSV/formula injection: a cell starting with =, +, -, @, or
+    // a tab is interpreted as a formula by Excel/Sheets when the file is
+    // opened — dangerous here because some columns (e.g. a WhatsApp
+    // contact's own display name) come straight from an unauthenticated
+    // lead, not from the business itself. A leading apostrophe forces
+    // spreadsheet apps to treat the cell as plain text.
+    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   const lines = [headers, ...rows].map((row) => row.map(escapeCell).join(","));

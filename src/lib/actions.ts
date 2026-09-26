@@ -3,7 +3,6 @@
 import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -1329,8 +1328,13 @@ export async function requestPasswordReset(
         data: { resetTokenHash, resetTokenExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
       });
 
-      const host = (await headers()).get("host");
-      const resetUrl = `https://${host}/reset-password?token=${rawToken}`;
+      // A fixed, server-controlled host — NOT the request's Host header.
+      // Trusting the incoming Host here would let a spoofed/alternate host
+      // redirect this email's reset link (and its token) to attacker
+      // infrastructure. Same APP_HOST constant used everywhere else an
+      // absolute URL is built (lib/provisioning.ts, lib/broadcastTracking.ts).
+      const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
+      const resetUrl = `https://${appHost}/reset-password?token=${rawToken}`;
 
       await sendEmail({
         to: email,
