@@ -168,16 +168,16 @@ export function SalesDiagnosisPanel({
       {current && (
         <details open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)} className="group mt-4">
           <summary
-            className="flex cursor-pointer list-none items-center gap-4 rounded-lg border border-border-strong bg-surface-2 px-4 py-3 transition hover:border-accent hover:bg-border [&::-webkit-details-marker]:hidden"
+            className="flex cursor-pointer list-none flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-border-strong bg-surface-2 px-4 py-3 transition hover:border-accent hover:bg-border md:flex-nowrap [&::-webkit-details-marker]:hidden"
           >
             <ScoreMeter score={current.diagnosis.puntuacion} />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-40">
               <p className="fl-mono text-[11px] tracking-wide text-ink-faint">
                 Generado el {formatDate(current.generatedAt)}
               </p>
               <p className="truncate text-sm text-ink-muted">{current.diagnosis.resumen}</p>
             </div>
-            <span className="flex flex-none items-center gap-1.5 text-sm font-semibold text-accent">
+            <span className="flex w-full flex-none items-center justify-center gap-1.5 border-t border-border pt-3 text-sm font-semibold text-accent md:w-auto md:border-0 md:pt-0">
               <span className="hidden group-open:inline">Ocultar</span>
               <span className="group-open:hidden">Ver diagnóstico completo</span>
               <svg
