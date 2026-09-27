@@ -176,3 +176,61 @@ describe("generateAgentReply — mark_appointment tool", () => {
     expect(requestArg.tools[0].name).toBe("mark_appointment");
   });
 });
+
+describe("generateAgentReply — photos and empty content", () => {
+  const okResponse = {
+    content: [{ type: "text", text: "¡Qué linda foto! ¿En qué te puedo ayudar?" }],
+    usage: { input_tokens: 10, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+  };
+  type SentMessage = { role: string; content: string | { type: string; text?: string; source?: { data: string } }[] };
+
+  it("never sends an empty turn for a caption-less photo (the API rejects it with a 400)", async () => {
+    createMock.mockResolvedValueOnce(okResponse);
+
+    await generateAgentReply({
+      systemPrompt: "Eres el agente de una agencia.",
+      tone: "cercano",
+      replyLength: "breve",
+      industry: "otro",
+      model: "claude-sonnet-5",
+      history: [
+        { role: "user", content: "Hola" },
+        { role: "assistant", content: "" }, // e.g. a media-only reply stored with no caption
+      ],
+      userMessage: "",
+      userImages: [{ mediaType: "image/jpeg", data: "BASE64DATA" }],
+    });
+
+    const { messages } = createMock.mock.calls.at(-1)![0] as { messages: SentMessage[] };
+    for (const m of messages) {
+      const text = typeof m.content === "string" ? m.content : m.content.map((b) => b.text ?? b.source?.data ?? "").join("");
+      expect(text.trim()).not.toBe("");
+    }
+
+    const last = messages.at(-1)!;
+    expect(Array.isArray(last.content)).toBe(true);
+    const blocks = last.content as { type: string; text?: string; source?: { data: string } }[];
+    expect(blocks[0]).toMatchObject({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: "BASE64DATA" } });
+    expect(blocks[1].type).toBe("text");
+    expect(blocks[1].text).toContain("imagen");
+  });
+
+  it("keeps a real caption as the text next to the photo", async () => {
+    createMock.mockResolvedValueOnce(okResponse);
+
+    await generateAgentReply({
+      systemPrompt: "Eres el agente de una agencia.",
+      tone: "cercano",
+      replyLength: "breve",
+      industry: "otro",
+      model: "claude-sonnet-5",
+      history: [],
+      userMessage: "¿Cuánto cuesta algo así?",
+      userImages: [{ mediaType: "image/png", data: "X" }],
+    });
+
+    const { messages } = createMock.mock.calls.at(-1)![0] as { messages: SentMessage[] };
+    const blocks = messages.at(-1)!.content as { type: string; text?: string }[];
+    expect(blocks.at(-1)).toEqual({ type: "text", text: "¿Cuánto cuesta algo así?" });
+  });
+});

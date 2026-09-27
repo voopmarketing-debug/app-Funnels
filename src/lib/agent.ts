@@ -8,7 +8,13 @@ import {
   type WhatsAppInboundMessage,
 } from "@/lib/whatsapp";
 import { uploadAttachment } from "@/lib/attachments";
-import { generateAgentReply, type AgentHistoryMessage, type AgentReplyUsage } from "@/lib/ai";
+import {
+  generateAgentReply,
+  VISION_MEDIA_TYPES,
+  type AgentHistoryMessage,
+  type AgentReplyUsage,
+  type VisionImage,
+} from "@/lib/ai";
 import { synthesizeVoiceNote, transcribeVoiceNote } from "@/lib/tts";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS } from "@/lib/plans";
@@ -21,6 +27,10 @@ const MEDIA_TYPE_LABEL: Record<string, string> = {
 };
 
 const HISTORY_LIMIT = 20;
+
+// Claude's per-image cap is 5 MB after base64 encoding (~33% larger than the
+// raw bytes) — bigger photos still reach the AI, just as a text placeholder.
+const MAX_VISION_IMAGE_BYTES = 3.5 * 1024 * 1024;
 
 function formatAppointmentDate(date: Date): string {
   return new Intl.DateTimeFormat("es-CO", {
@@ -156,11 +166,11 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
 
   // Media arrives from Meta as a short-lived id (its download URL expires
   // within minutes), so it has to be fetched and re-hosted on our own
-  // storage right away, before this message row is even written — the AI
-  // never "sees" the file itself (no vision call here), it only gets a
-  // plain-text placeholder in its history so the conversation still reads
-  // naturally if the owner scrolls back or the agent references it.
+  // storage right away, before this message row is even written. A photo
+  // is also handed to the AI as real vision input for THIS reply (see
+  // inboundImage); in the stored history it's just a text placeholder.
   let messageContent = message.text;
+  let inboundImage: VisionImage | null = null;
   let mediaFields: {
     mediaUrl?: string;
     mediaType?: string;
@@ -187,6 +197,12 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
           mediaFilename: message.media.filename,
           mediaSizeBytes: size,
         };
+
+        const baseMime = meta.mimeType.split(";")[0].trim().toLowerCase();
+        const visionMime = VISION_MEDIA_TYPES.find((t) => t === baseMime);
+        if (message.media.type === "image" && visionMime && bytes.length <= MAX_VISION_IMAGE_BYTES) {
+          inboundImage = { mediaType: visionMime, data: bytes.toString("base64") };
+        }
 
         if (message.media.type === "audio") {
           inboundWasVoiceNote = true;
@@ -254,10 +270,16 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     return;
   }
 
-  const history: AgentHistoryMessage[] = previousMessages.map((msg) => ({
-    role: msg.role === "CUSTOMER" ? "user" : "assistant",
-    content: msg.content,
-  }));
+  // Internal error / plan-limit notices are stored as AGENT messages so they
+  // show in the dashboard, but they were never sent to the customer — feeding
+  // them back as the agent's own past replies would confuse the model (and
+  // it might start imitating raw error text).
+  const history: AgentHistoryMessage[] = previousMessages
+    .filter((msg) => !(msg.role === "AGENT" && /^\[(ERROR INTERNO|LÍMITE DE PLAN)/.test(msg.content)))
+    .map((msg) => ({
+      role: msg.role === "CUSTOMER" ? "user" : "assistant",
+      content: msg.content,
+    }));
 
   const availableMedia = await prisma.agentMedia.findMany({
     where: { businessId: business.id },
@@ -275,9 +297,16 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       industry: business.industry,
       model: business.agent.model,
       history,
-      // For a voice note this is the transcript (see above) — message.text
-      // itself is always empty for audio, Meta never sends a caption on it.
-      userMessage: inboundWasVoiceNote ? messageContent : message.text,
+      // Never message.text directly: for a voice note that's always empty
+      // (messageContent holds the transcript), and for a photo sent without
+      // a caption it's empty too — an empty user turn is rejected outright
+      // by the API, which is exactly how caption-less photos used to fail
+      // with "user messages must have non-empty content" and get no reply.
+      // (A caption-less photo passes "" here on purpose: generateAgentReply
+      // then labels it as "sent without text" next to the actual image,
+      // instead of the stored "[Imagen]" placeholder.)
+      userMessage: inboundImage && !message.text.trim() ? "" : messageContent,
+      userImages: inboundImage ? [inboundImage] : undefined,
       owner: ownerMembership?.user,
       availableMedia,
     });

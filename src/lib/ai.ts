@@ -4,6 +4,11 @@ import { anthropic } from "@/lib/anthropicClient";
 
 export type AgentHistoryMessage = { role: "user" | "assistant"; content: string };
 
+// The image types Claude's vision input accepts — anything else a customer
+// sends (e.g. HEIC) still reaches the AI, just as a text placeholder.
+export const VISION_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+export type VisionImage = { mediaType: (typeof VISION_MEDIA_TYPES)[number]; data: string };
+
 const TONE_INSTRUCTIONS: Record<string, string> = {
   cercano: "Tono cercano y cálido, como si le hablaras a un conocido — informal pero respetuoso.",
   formal: "Tono formal y profesional, cuidando la gramática y sin abreviaturas de chat.",
@@ -304,6 +309,9 @@ export async function generateAgentReply(params: {
   model: string;
   history: AgentHistoryMessage[];
   userMessage: string;
+  // A photo the customer just sent, passed as real vision input so the
+  // agent can actually respond to what's in it instead of guessing.
+  userImages?: VisionImage[];
   owner?: OwnerContext;
   availableMedia?: AvailableMedia[];
 }): Promise<{ text: string; usage: AgentReplyUsage; sendMediaId?: string; appointment?: DetectedAppointment }> {
@@ -326,6 +334,23 @@ export async function generateAgentReply(params: {
   const tools: Anthropic.Tool[] = [buildMarkAppointmentTool()];
   if (availableMedia.length > 0) tools.push(buildSendMediaTool(availableMedia));
 
+  // The API rejects any turn with empty content ("user messages must have
+  // non-empty content") — a caption-less photo, or a media-only reply in the
+  // history, would otherwise fail the whole call and leave the customer
+  // with no answer at all.
+  const history = params.history.map((msg) => ({ ...msg, content: msg.content.trim() || "[Adjunto]" }));
+  const images = params.userImages ?? [];
+  const userText = params.userMessage.trim() || (images.length > 0 ? "(El cliente envió esta imagen sin texto.)" : "[Adjunto]");
+  const userContent: Anthropic.ContentBlockParam[] = [
+    ...images.map(
+      (img): Anthropic.ImageBlockParam => ({
+        type: "image",
+        source: { type: "base64", media_type: img.mediaType, data: img.data },
+      }),
+    ),
+    { type: "text", text: userText },
+  ];
+
   const response = await anthropic.messages.create({
     model: params.model,
     max_tokens: MAX_TOKENS_BY_LENGTH[params.replyLength] ?? 300,
@@ -339,7 +364,7 @@ export async function generateAgentReply(params: {
     // diagnosis.ts, which genuinely reasons over several transcripts.
     output_config: { effort: "low" },
     system,
-    messages: [...params.history, { role: "user", content: params.userMessage }],
+    messages: [...history, { role: "user", content: userContent }],
     tools,
   });
 
