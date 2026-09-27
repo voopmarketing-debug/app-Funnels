@@ -1,4 +1,4 @@
-import type { WebsiteContent } from "@/lib/websiteContent";
+import { SERIF_FONTS, type WebsiteContent } from "@/lib/websiteContent";
 
 function escapeHtml(text: string): string {
   return text
@@ -159,8 +159,8 @@ ${fontLink(fonts)}
     --btn-text: ${btnText};
     --bg: ${sanitizeHexColor(content.theme.backgroundColor, "#ffffff")};
     --text: ${sanitizeHexColor(content.theme.textColor, "#0a0a0a")};
-    --heading-font: "${content.theme.headingFont}", sans-serif;
-    --body-font: "${content.theme.bodyFont}", sans-serif;
+    --heading-font: "${content.theme.headingFont}", ${SERIF_FONTS.has(content.theme.headingFont) ? "Georgia, serif" : "system-ui, sans-serif"};
+    --body-font: "${content.theme.bodyFont}", ${SERIF_FONTS.has(content.theme.bodyFont) ? "Georgia, serif" : "system-ui, sans-serif"};
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--body-font); line-height: 1.65; -webkit-font-smoothing: antialiased; }

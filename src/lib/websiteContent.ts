@@ -3,6 +3,10 @@ import { z } from "zod";
 // A curated, versatile set of Google Fonts — kept small and deliberate so
 // every combination still looks intentional, and so the renderer only ever
 // needs to load fonts from this fixed list (see lib/websiteTemplate.ts).
+// Every family here must ship 400/600/700 on Google Fonts — the renderer
+// requests exactly those weights, and a family missing one fails the whole
+// stylesheet request. SERIF_FONTS lets the renderer pick the right generic
+// fallback while the web font loads.
 export const FONT_OPTIONS = [
   "Inter",
   "Poppins",
@@ -12,7 +16,25 @@ export const FONT_OPTIONS = [
   "Space Grotesk",
   "Nunito Sans",
   "Work Sans",
+  "Fraunces",
+  "Cormorant Garamond",
+  "Lora",
+  "Manrope",
+  "Plus Jakarta Sans",
+  "DM Sans",
+  "Outfit",
+  "Sora",
+  "Syne",
+  "Bricolage Grotesque",
 ] as const;
+
+export const SERIF_FONTS: ReadonlySet<string> = new Set([
+  "Playfair Display",
+  "Merriweather",
+  "Fraunces",
+  "Cormorant Garamond",
+  "Lora",
+]);
 
 // 6 content blocks (hero, offer, how it works, why us, objections, contact)
 // — deliberately no "testimonios" block: the AI has no real reviews to draw
@@ -41,9 +63,9 @@ function hexColorField(fallback: string) {
 
 export const WebsiteContentSchema = z.object({
   theme: z.object({
-    primaryColor: hexColorField("#1f6feb").describe("Color principal en hex para botones y acentos, ej. #1f6feb — elegido a propósito para el rubro, no un genérico de IA."),
-    backgroundColor: hexColorField("#ffffff").describe("Color de fondo del sitio en hex."),
-    textColor: hexColorField("#0a0a0a").describe("Color del texto principal en hex, con buen contraste sobre backgroundColor."),
+    primaryColor: hexColorField("#1f6feb").describe("Único color de acento en hex para botones y textos pequeños, elegido a propósito para el rubro, con contraste de al menos 4.5:1 sobre backgroundColor."),
+    backgroundColor: hexColorField("#ffffff").describe("Color de fondo del sitio en hex, nunca #ffffff ni #000000 puros."),
+    textColor: hexColorField("#0a0a0a").describe("Color del texto principal en hex, tintado del mismo matiz, con contraste de al menos 7:1 sobre backgroundColor."),
     headingFont: z.enum(FONT_OPTIONS).catch("Inter").describe("Fuente para títulos."),
     bodyFont: z.enum(FONT_OPTIONS).catch("Inter").describe("Fuente para texto de párrafo."),
   }),
@@ -77,7 +99,7 @@ export const WebsiteContentSchema = z.object({
       .describe("3 a 4 servicios/productos concretos que ofrece el negocio, con datos reales, no relleno genérico."),
   }),
   howItWorks: z.object({
-    heading: z.string().describe('Ej. "Cómo funciona" o "Así trabajamos contigo".'),
+    heading: z.string().describe("Título con beneficio, no una etiqueta: la página ya muestra \"Cómo funciona\" encima."),
     items: z
       .array(z.object({ title: z.string(), description: z.string() }))
       .min(3)
@@ -87,7 +109,7 @@ export const WebsiteContentSchema = z.object({
       ),
   }),
   whyUs: z.object({
-    heading: z.string().describe('Ej. "Por qué elegirnos" — nunca un genérico "Sobre nosotros".'),
+    heading: z.string().describe("Título con la idea diferencial del negocio, no una etiqueta: la página ya muestra \"Por qué elegirnos\" encima."),
     items: z
       .array(z.object({ title: z.string(), description: z.string() }))
       .min(3)
@@ -97,7 +119,7 @@ export const WebsiteContentSchema = z.object({
       ),
   }),
   objections: z.object({
-    heading: z.string().describe('Ej. "Antes de escribirnos, resolvemos tus dudas" — no un genérico "Preguntas frecuentes".'),
+    heading: z.string().describe("Título que desactive la duda principal, no un genérico \"Preguntas frecuentes\"."),
     items: z
       .array(z.object({ question: z.string(), answer: z.string() }))
       .min(2)

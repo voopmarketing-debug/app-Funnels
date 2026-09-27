@@ -33,8 +33,8 @@ async function parseWebsiteContent(prompt: string): Promise<AiWebsiteContent> {
   try {
     response = await anthropic.messages.parse({
       model: "claude-sonnet-5",
-      max_tokens: 2600,
-      output_config: { format: zodOutputFormat(AiWebsiteContentSchema), effort: "low" },
+      max_tokens: 8000,
+      output_config: { format: zodOutputFormat(AiWebsiteContentSchema), effort: "medium" },
       messages: [{ role: "user", content: prompt }],
     });
   } catch (err) {
@@ -57,14 +57,30 @@ export const INDUSTRY_LABELS: Record<string, string> = Object.fromEntries(
 // different words swapped in. Exported so lib/websiteHeroImage.ts can reuse
 // the same curated direction for its image prompt instead of duplicating it.
 export const INDUSTRY_DIRECTION: Record<string, string> = {
-  coaching: "Cálido y aspiracional, con foco en la transformación del cliente y prueba social — no corporativo ni frío.",
-  clinica: "Limpio, confiable y calmado — transmite higiene y profesionalismo médico sin sentirse una web genérica de plantilla.",
-  saas: "Moderno y directo al beneficio del producto, con jerarquía visual clara — el visitante entiende qué hace el producto en 3 segundos.",
-  ecommerce: "Visual y orientado a producto, con llamados a la acción de compra claros — foco en mostrar catálogo/oferta.",
-  inmobiliaria: "Elegante y aspiracional, con foco en propiedades/ubicación y confianza — transmite solidez.",
-  restaurante: "Apetitoso y cálido, con foco en el menú/ambiente — que dé ganas de ir o pedir ya.",
-  agencia: "Seguro y orientado a resultados, con foco en casos/servicios — transmite expertise sin sonar genérico.",
-  otro: "Profesional y claro, adaptado a lo que el negocio realmente ofrece según su descripción.",
+  coaching: "Cálido, humano y aspiracional. Foco en la transformación concreta del cliente (el antes y el después), nunca corporativo ni frío.",
+  clinica: "Limpio, sereno y confiable. Transmite rigor médico, higiene y trato cercano, sin parecer plantilla de hospital genérica.",
+  saas: "Moderno, preciso y directo al beneficio. El visitante entiende qué hace el producto y para quién en 3 segundos.",
+  ecommerce: "Visual y orientado a producto. Deseo inmediato, beneficios tangibles y compra sin fricción.",
+  inmobiliaria: "Elegante, sobrio y aspiracional. Transmite solidez, exclusividad y seguridad en una decisión grande.",
+  restaurante: "Apetitoso, sensorial y cálido. Que se sienta el sabor y el ambiente, y den ganas de ir o pedir ya.",
+  agencia: "Seguro, audaz y orientado a resultados. Transmite criterio y experiencia sin sonar a promesa vacía.",
+  otro: "Profesional, claro y con personalidad propia, adaptado a lo que el negocio realmente ofrece según su descripción.",
+};
+
+// Art direction the generator hands the model on top of INDUSTRY_DIRECTION:
+// a concrete palette territory and font pairings from FONT_OPTIONS, so the
+// model makes a deliberate choice instead of falling back to Inter + blue.
+// Kept separate from INDUSTRY_DIRECTION because lib/websiteHeroImage.ts
+// reuses that one for photos, where font names would just be noise.
+const INDUSTRY_DESIGN_SYSTEM: Record<string, string> = {
+  coaching: "Paleta: fondo claro con un matiz cálido sutil (no beige genérico), acento vivo con energía (coral profundo, verde bosque, azul petróleo o ciruela). Tipografías sugeridas: Fraunces + DM Sans, Bricolage Grotesque + Manrope, u Outfit + Nunito Sans.",
+  clinica: "Paleta: fondo blanco roto frío o verde/azul muy pálido, acento sereno y con autoridad (verde salvia profundo, azul clínico, teal). Tipografías sugeridas: Plus Jakarta Sans + Plus Jakarta Sans, Lora + Nunito Sans, o Manrope + Inter.",
+  saas: "Paleta: fondo muy claro neutro-frío o modo oscuro profundo tintado (no negro puro), un acento eléctrico pero legible (índigo, verde lima oscuro, naranja intenso). Tipografías sugeridas: Sora + DM Sans, Bricolage Grotesque + Inter, o Space Grotesk + Manrope.",
+  ecommerce: "Paleta: fondo claro limpio que no compita con el producto, acento de compra con mucha presencia. Tipografías sugeridas: Outfit + DM Sans, Syne + Work Sans, o Plus Jakarta Sans + Inter.",
+  inmobiliaria: "Paleta: tonos sobrios y profundos (verde botella, azul marino, grafito tintado) sobre fondo claro piedra o fondo oscuro elegante, acento dorado apagado o bronce solo si encaja. Tipografías sugeridas: Cormorant Garamond + Manrope, Playfair Display + DM Sans, o Fraunces + Plus Jakarta Sans.",
+  restaurante: "Paleta: colores que abren el apetito según la cocina (rojo tomate, verde oliva, mostaza, vino), fondo crema claro o fondo oscuro cálido. Tipografías sugeridas: Fraunces + Work Sans, Playfair Display + Outfit, o Syne + DM Sans.",
+  agencia: "Paleta: contraste fuerte y con carácter, fondo oscuro tintado o claro muy limpio, un acento audaz. Tipografías sugeridas: Syne + DM Sans, Bricolage Grotesque + Inter, o Sora + Manrope.",
+  otro: "Paleta: elige según la personalidad real del negocio, con un solo acento memorable. Tipografías: una pareja con contraste claro entre títulos y texto (serif + sans, o una display con carácter + una sans legible).",
 };
 
 export type WebsiteGenerationContext = {
@@ -111,11 +127,11 @@ export type WebsiteGenerationContext = {
  * and can be edited field-by-field afterward — see WebsiteEditor.
  *
  * Kept to exactly 6 content blocks (hero/offer/how it works/why us/
- * objections/contact — see WebsiteContentSchema) and run at low reasoning
- * effort with a smaller output budget than a general-purpose generation
- * call would use: this is "write focused copy from given inputs," not
- * open-ended reasoning, and it runs on every "Generar sitio web" click, so
- * cost matters.
+ * objections/contact — see WebsiteContentSchema). Runs at medium effort so
+ * the model can work through the strategy step in the prompt (ideal client,
+ * main objection, central idea) before writing; max_tokens leaves room for
+ * that thinking on top of the structured output so it never truncates.
+ * Generation is already rate-limited per business (websiteGenerationLimit).
  */
 export async function generateWebsiteContent(ctx: WebsiteGenerationContext): Promise<WebsiteContent> {
   const industryLabel = INDUSTRY_LABELS[ctx.industry] ?? INDUSTRY_LABELS.otro;
@@ -129,32 +145,56 @@ export async function generateWebsiteContent(ctx: WebsiteGenerationContext): Pro
     .filter((s): s is string => !!s)
     .join(", ");
 
-  const prompt = `Eres un copywriter y diseñador web senior. Genera el contenido de una landing page de 6 bloques (hero, oferta, cómo funciona, por qué elegirnos, objeciones, contacto) para este negocio real:
+  const designSystem = INDUSTRY_DESIGN_SYSTEM[ctx.industry] ?? INDUSTRY_DESIGN_SYSTEM.otro;
 
+  const prompt = `Actúas como el director creativo y el copywriter de conversión de la mejor agencia de diseño web con IA del mundo: sitios con el nivel visual de un ganador de Awwwards y el copy de un especialista en respuesta directa que vende. Tu trabajo es crear la landing page de este negocio real como si fuera el cliente más importante de la agencia.
+
+DATOS DEL NEGOCIO
 - Nombre: ${ctx.businessName}
 - Rubro: ${industryLabel}
-- Qué hace / a quién le sirve (fuente real de contenido — escribe copy propio a partir de esto, no lo repitas literal): ${ctx.description || "Negocio local — usa el rubro para inferir servicios típicos y créalos de forma creíble."}
+- Qué hace / a quién le sirve (fuente real de contenido; escribe copy propio a partir de esto, no lo copies literal): ${ctx.description || "Negocio local. Usa el rubro para inferir servicios típicos y preséntalos de forma creíble."}
 ${location ? `- Ubicación: ${location}` : ""}
 ${socials ? `- Redes sociales: ${socials}` : ""}
-${ctx.purpose ? `- OBJETIVO ESPECÍFICO DE ESTA PÁGINA (ajusta el copy y el botón principal a esto): ${ctx.purpose}` : "- Esta página es la presentación general del negocio."}
+${ctx.purpose ? `- OBJETIVO ESPECÍFICO DE ESTA PÁGINA (todo el copy y el botón principal empujan hacia esto): ${ctx.purpose}` : "- Esta página es la presentación general del negocio y su objetivo es que el visitante escriba por WhatsApp."}
 ${ctx.salesContext ? `\n${ctx.salesContext}\n` : ""}
-
-DIRECCIÓN VISUAL PARA ESTE RUBRO: ${direction}
+DIRECCIÓN DE ARTE PARA ESTE RUBRO
+- Personalidad: ${direction}
+- Sistema visual: ${designSystem}
 ${
   ctx.designPrompt
-    ? `\nINSTRUCCIONES DEL DUEÑO DEL NEGOCIO PARA ESTA PÁGINA (esto tiene prioridad sobre la dirección visual genérica de arriba cuando haya conflicto — es lo que el cliente pidió explícitamente): "${ctx.designPrompt}"\n`
+    ? `\nBRIEF DEL CLIENTE PARA ESTA PÁGINA (tiene prioridad sobre la dirección de arte cuando haya conflicto, es lo que el cliente pidió explícitamente): "${ctx.designPrompt}"\n`
     : ""
 }
+ANTES DE ESCRIBIR, piensa como estratega (no lo incluyas en la respuesta):
+1. ¿Quién es el cliente ideal exacto y qué situación lo trae a esta página?
+2. ¿Qué resultado concreto quiere y qué miedo o duda lo frena?
+3. ¿Cuál es la idea central que hace a este negocio distinto? Todo el sitio gira alrededor de esa idea.
 
-Reglas:
-1. Contenido 100% real y específico a este negocio — nada de "Lorem ipsum" ni placeholders genéricos. Si falta un dato (precios, horarios), redáctalo de forma creíble sin inventar cifras falsas.
-2. Colores (hex) y tipografías elegidos a propósito para este rubro — nada del look genérico de IA: evita el degradado morado/azul por defecto, evita el combo trillado "beige cálido + terracota/bronce", evita negro puro #000000 o blanco puro #ffffff como texto/fondo. Un solo color de acento (primaryColor) usado con intención, buen contraste entre textColor y backgroundColor.
-3. El bloque "objections" es el más importante: usa el contexto de conversaciones reales dado arriba (si lo hay) para identificar 2-4 dudas u objeciones DE VERDAD que frenan la venta de este negocio, y respóndelas de forma directa y convincente — no pongas preguntas frecuentes genéricas tipo "¿cómo los contacto?". Si no hay contexto de conversaciones, infiere las objeciones típicas más realistas para este rubro específico.
-4. "howItWorks": el proceso REAL para convertirse en cliente de este negocio (ej. escribir por WhatsApp, agendar, primera sesión), en orden, no un genérico "Paso 1, Paso 2, Paso 3".
-5. "whyUs": diferenciadores CONCRETOS y específicos de este negocio, nunca frases vacías como "calidad y confianza" o "años de experiencia" a menos que sea un dato real dado arriba.
-6. videoUrl: siempre null — no gastes esfuerzo en esto, el cliente lo agrega después si quiere.
-7. El botón principal (hero.ctaLabel) y el texto de contacto deben reflejar el objetivo específico de la página si se dio uno arriba.
-8. Copy sin relleno de IA: evita frases hechas tipo "revoluciona", "desbloquea tu potencial", "lleva tu negocio al siguiente nivel", "en la era digital", "transforma tu vida". Sé concreto y directo, como lo diría el dueño del negocio. No uses guion largo (—); usa punto o coma.`;
+ESTÁNDAR DE COPY
+- Hero, heading: la promesa principal en máximo 10 palabras. Resultado concreto para un público concreto, con un detalle que solo este negocio podría decir. Nada de preguntas retóricas, nada de repetir el nombre del negocio, nada de titulares que sirvan para cualquier empresa del rubro.
+- Hero, subheading: 1 o 2 frases (máximo 30 palabras) que digan qué ofreces, a quién y cómo, y quiten la primera duda.
+- Hero, ctaLabel: 2 a 5 palabras, empieza con verbo, de baja fricción y alineado al objetivo de la página (ej. "Escríbenos por WhatsApp", "Agenda tu valoración", "Pide tu cotización").
+- Títulos de sección (offer, howItWorks, whyUs, objections, contact): cada uno comunica un beneficio o una idea, no una etiqueta. La página ya muestra etiquetas como "Lo que ofrecemos" o "Cómo funciona" encima, así que el título NUNCA repite esa etiqueta.
+- offer: servicios o productos reales. Título de 2 a 5 palabras; descripción de máximo 25 palabras con el resultado para el cliente y un detalle concreto (qué incluye, para quién, en cuánto tiempo), sin inventar precios.
+- howItWorks: el camino real y sin fricción desde "me interesa" hasta "ya soy cliente". El primer paso coincide con el botón principal. Título corto tipo verbo; descripción de una frase que quite miedo.
+- whyUs: diferenciadores concretos y verificables. Nunca "calidad", "confianza", "compromiso", "atención personalizada" ni "años de experiencia" a menos que sea un dato real dado arriba; si no hay datos duros, usa diferencias de método, enfoque o garantía de proceso.
+- objections (el bloque más importante): usa el contexto de conversaciones reales (si lo hay) para detectar 2 a 4 dudas que DE VERDAD frenan la venta (precio, tiempo, confianza, si funciona para mi caso, qué pasa si no me gusta). Escribe la pregunta como la diría el cliente, en primera persona. La respuesta empieza respondiendo directo (sí, no, depende de X) y luego da la razón, en máximo 40 palabras. Nada de preguntas genéricas tipo "¿cómo los contacto?".
+- contact: título que invite a dar el paso hoy y un body de una frase que reduzca el riesgo de escribir (respuesta rápida, sin compromiso, etc.), sin urgencia falsa ni escasez inventada.
+- Voz: como hablaría el mejor vendedor del negocio. Frases cortas, verbos activos, concreto. Tutea salvo que el rubro y el público pidan "usted" (ej. inmobiliaria de lujo o clínica con público mayor); sé consistente en toda la página.
+- Prohibido: "revoluciona", "desbloquea", "potencia", "lleva tu negocio al siguiente nivel", "en la era digital", "transforma tu vida", "soluciones integrales", "de calidad", "tu mejor opción", signos de exclamación en exceso, emojis y guion largo (—). Usa punto o coma.
+- Nunca inventes cifras, premios, clientes, reseñas, años de experiencia ni certificaciones que no estén en los datos.
+
+ESTÁNDAR VISUAL (theme)
+- Elige una paleta como directora de arte, coherente con la dirección de arte de arriba. Nada del look genérico de IA: sin azul #1f6feb por defecto, sin degradado morado/azul, sin el combo "beige cálido + terracota", sin negro lima neón.
+- backgroundColor: nunca #ffffff ni #000000 puros. Si es claro, un blanco roto con un matiz sutil hacia el acento; si es oscuro, un tono profundo tintado.
+- textColor: casi negro (o casi blanco en fondo oscuro) tintado del mismo matiz; contraste de al menos 7:1 contra el fondo.
+- primaryColor: un solo acento con intención. Se usa en botones y en textos pequeños sobre el fondo, así que debe tener contraste de al menos 4.5:1 contra backgroundColor. Nada de pasteles sobre fondo claro ni tonos apagados sobre fondo oscuro.
+- headingFont y bodyFont: una pareja con contraste intencional (serif editorial + sans limpia, o display con carácter + sans legible), preferiblemente de las sugeridas para el rubro. Inter o Poppins solo si de verdad es la mejor elección, no por defecto.
+
+REGLAS FINALES
+- Contenido 100% real y específico a este negocio, nada de "Lorem ipsum" ni placeholders. Si falta un dato (precios, horarios), redacta sin él en vez de inventarlo.
+- videoUrl: siempre null.
+- Antes de responder, revisa: ¿el titular solo podría ser de este negocio? ¿Cada sección tiene un dato concreto? ¿Hay alguna frase de relleno que un director creativo tacharía? Corrige lo que falle.`;
 
   const content = await parseWebsiteContent(prompt);
   // ctaUrl is caller-controlled (e.g. an agenda link), not something the
@@ -182,7 +222,12 @@ ${JSON.stringify(currentContent, null, 2)}
 
 El dueño del negocio pidió este cambio: "${instruction}"
 
-Devuelve el contenido COMPLETO de la página (mismo formato) aplicando ese cambio. Todo lo que no tenga que ver con el pedido debe quedar EXACTAMENTE igual — no reescribas ni "mejores" texto que no te pidieron cambiar. Si agregas texto nuevo, evita frases de relleno tipo IA y guion largo (—); usa punto o coma.`;
+Actúa como el director creativo de la mejor agencia de diseño web con IA del mundo. Devuelve el contenido COMPLETO de la página (mismo formato) aplicando ese cambio. Todo lo que no tenga que ver con el pedido debe quedar EXACTAMENTE igual: no reescribas ni "mejores" texto que no te pidieron cambiar.
+
+Lo que sí cambies debe tener nivel de agencia premium:
+- Copy concreto y específico del negocio, frases cortas, sin relleno tipo IA ("revoluciona", "desbloquea", "siguiente nivel", "soluciones integrales"), sin emojis y sin guion largo (—); usa punto o coma. No inventes cifras, reseñas ni premios.
+- Si cambias colores: backgroundColor nunca #ffffff ni #000000 puros, textColor con contraste de al menos 7:1 sobre el fondo, primaryColor con contraste de al menos 4.5:1 sobre el fondo.
+- Si cambias tipografías: una pareja con contraste intencional entre títulos y texto.`;
 
   const updated = await parseWebsiteContent(prompt);
   // Which sections are on/off is the owner's own toggle choice (see
