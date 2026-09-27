@@ -1681,7 +1681,10 @@ export async function createWebsitePage(
 }
 
 /** Regenerates one page's content from scratch, reusing its stored name/purpose/design brief. */
-export async function regenerateWebsitePage(businessId: string, websiteId: string): Promise<void> {
+export async function regenerateWebsitePage(
+  businessId: string,
+  websiteId: string,
+): Promise<{ content: WebsiteContent; generatedAt: Date }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
@@ -1728,15 +1731,28 @@ export async function regenerateWebsitePage(businessId: string, websiteId: strin
     ]);
     await recordWebsiteGeneration(businessId);
 
+    const generatedAt = new Date();
     await prisma.website.update({
       where: { id: websiteId },
       // Keep the previous image if this regeneration's image call failed
       // (API hiccup, content-policy refusal) — a transient failure
       // shouldn't cost the client an image that was already working.
-      data: { content, aiImageUrl: aiImageUrl ?? website.aiImageUrl, whatsappNumber: displayNumber, model: "claude-sonnet-5" },
+      // generatedAt is bumped so "Última versión" reflects this regeneration.
+      data: {
+        content,
+        aiImageUrl: aiImageUrl ?? website.aiImageUrl,
+        whatsappNumber: displayNumber,
+        model: "claude-sonnet-5",
+        generatedAt,
+      },
     });
 
     revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    revalidatePath(`/dashboard/businesses/${businessId}/website/${websiteId}`);
+    // Returned so the open editor can swap in the new content directly —
+    // its form state is seeded once from props, so a router.refresh alone
+    // left it showing (and a later "Guardar" re-saving) the old version.
+    return { content, generatedAt };
   } catch (err) {
     console.error(`regenerateWebsitePage failed for website ${websiteId}:`, err);
     throw new Error(err instanceof Error ? err.message : "No se pudo regenerar el sitio web");

@@ -11,7 +11,7 @@ export function WebsiteEditor({
   websiteId,
   content: initialContent,
   customDomain,
-  generatedAt,
+  generatedAt: initialGeneratedAt,
   publicUrl,
   stats,
   leads,
@@ -42,6 +42,8 @@ export function WebsiteEditor({
   const [isApplyingPrompt, startApplyingPrompt] = useTransition();
   const [promptError, setPromptError] = useState<string | null>(null);
   const [promptApplied, setPromptApplied] = useState(false);
+  const [generatedAt, setGeneratedAt] = useState(initialGeneratedAt);
+  const [regenerateError, setRegenerateError] = useState<string | null>(null);
 
   function save() {
     setSaveError(null);
@@ -60,9 +62,17 @@ export function WebsiteEditor({
 
   function regenerate() {
     if (!confirm("Esto reemplaza todo el texto y los colores actuales con una nueva versión generada por IA. ¿Seguir?")) return;
+    setRegenerateError(null);
     startRegenerating(async () => {
-      await regenerateWebsitePage(businessId, websiteId);
-      router.refresh();
+      try {
+        const result = await regenerateWebsitePage(businessId, websiteId);
+        setContent(result.content);
+        setGeneratedAt(new Date(result.generatedAt));
+        setPreviewKey((k) => k + 1);
+        router.refresh();
+      } catch (err) {
+        setRegenerateError(err instanceof Error ? err.message : "No se pudo regenerar la página");
+      }
     });
   }
 
@@ -153,6 +163,7 @@ export function WebsiteEditor({
           </button>
           {saved && <span className="fl-mono text-xs text-accent">✓ Guardado</span>}
           {saveError && <span className="text-xs text-error">{saveError}</span>}
+          {regenerateError && <span className="text-xs text-error">{regenerateError}</span>}
         </div>
 
         <Section title="Colores y tipografía" defaultOpen>
