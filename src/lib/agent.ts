@@ -116,7 +116,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     where: {
       businessId_customerPhone: { businessId: business.id, customerPhone: message.from },
     },
-    update: { customerName: message.contactName, lastMessageAt: new Date() },
+    update: { lastMessageAt: new Date() },
     create: {
       businessId: business.id,
       customerPhone: message.from,
@@ -124,6 +124,12 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       stageId: firstStage.id,
     },
   });
+  // The WhatsApp profile name only fills an EMPTY name — once the business
+  // has named the contact itself (lead panel, "Agregar contacto", CSV
+  // import), their name wins over whatever the customer's profile says.
+  if (!conversation.customerName?.trim() && message.contactName?.trim()) {
+    await prisma.conversation.update({ where: { id: conversation.id }, data: { customerName: message.contactName } });
+  }
 
   // Most recent N messages, not the oldest N: `take` with an ascending sort
   // would otherwise return the very start of the conversation once it grows

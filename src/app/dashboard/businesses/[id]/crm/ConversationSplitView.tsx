@@ -38,6 +38,7 @@ export function ConversationSplitView({
   templates: { id: string; name: string; bodyText: string }[];
   selectedConversation: {
     customerName: string | null;
+    customerEmail: string | null;
     customerPhone: string;
     aiPaused: boolean;
     stageId: string;
@@ -132,6 +133,7 @@ export function ConversationSplitView({
             conversationId={selectedConversationId}
             businessName={businessName}
             customerName={selectedConversation.customerName}
+            customerEmail={selectedConversation.customerEmail}
             customerPhone={selectedConversation.customerPhone}
             aiPaused={selectedConversation.aiPaused}
             stageId={selectedConversation.stageId}
@@ -158,9 +160,15 @@ export function ConversationSplitView({
         // as a block it grew to its content and the card clipped the bottom.
         <div className="hidden min-h-0 md:flex">
           <LeadDetailPanel
+            // Keyed by conversation: the panel's fields are local state
+            // seeded from props, so without a remount switching chats kept
+            // showing the previous contact's name/notes/tags.
+            key={selectedConversationId}
             businessId={businessId}
             conversationId={selectedConversationId}
             customerPhone={selectedConversation.customerPhone}
+            customerName={selectedConversation.customerName}
+            customerEmail={selectedConversation.customerEmail}
             tags={selectedConversation.tags}
             notes={selectedConversation.notes}
             appointmentAt={selectedConversation.appointmentAt}

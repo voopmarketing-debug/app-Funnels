@@ -5,6 +5,8 @@ import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
 import { TemplateSendButton } from "./conversations/[conversationId]/TemplateSendButton";
 import { MessageScrollArea } from "./MessageScrollArea";
 import { contactInitial, contactLabel, formatPhone } from "@/lib/contactDisplay";
+import { ContactFormDialog } from "./ContactFormDialog";
+import { ImageLightbox } from "./ImageLightbox";
 
 // This renders server-side, where the runtime clock is UTC (Vercel), not
 // Bogotá — toLocaleTimeString() without a timeZone silently used that UTC
@@ -49,6 +51,7 @@ export function ConversationThread({
   conversationId,
   businessName,
   customerName,
+  customerEmail = null,
   customerPhone,
   aiPaused,
   stageId,
@@ -62,6 +65,7 @@ export function ConversationThread({
   conversationId: string;
   businessName: string;
   customerName: string | null;
+  customerEmail?: string | null;
   customerPhone: string;
   aiPaused: boolean;
   stageId: string;
@@ -109,6 +113,19 @@ export function ConversationThread({
           />
           <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} />
           <StageSelector businessId={businessId} conversationId={conversationId} stageId={stageId} stages={stages} />
+          {/* Phones don't get the lead panel (desktop-only third column), so
+              the contact's name/email are edited from here instead. */}
+          <div className="flex-none md:hidden">
+            <ContactFormDialog
+              mode="edit"
+              businessId={businessId}
+              conversationId={conversationId}
+              customerPhone={customerPhone}
+              customerName={customerName}
+              customerEmail={customerEmail}
+              triggerClassName="whitespace-nowrap rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+            />
+          </div>
         </div>
       </div>
 
@@ -198,8 +215,7 @@ export function ConversationThread({
 
 function MediaPreview({ url, type, filename }: { url: string; type: string | null; filename: string | null }) {
   if (type === "image") {
-    // eslint-disable-next-line @next/next/no-img-element -- external blob-storage URL, no next/image remote config
-    return <img src={url} alt={filename ?? "Imagen adjunta"} className="mb-1.5 max-h-64 w-full rounded-lg object-cover" />;
+    return <ImageLightbox url={url} alt={filename ?? "Imagen adjunta"} />;
   }
   if (type === "audio") {
     return <audio controls src={url} className="mb-1.5 w-56 max-w-full" />;

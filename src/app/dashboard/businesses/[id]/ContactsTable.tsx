@@ -32,10 +32,11 @@ export function ContactsTable({
       <div className="flex justify-end">
         <DownloadCsvButton
           filename="contactos"
-          headers={["Nombre", "Teléfono", "Etapa", "Última actividad"]}
+          headers={["Nombre", "Teléfono", "Correo", "Etapa", "Última actividad"]}
           rows={conversations.map((c) => [
             c.customerName ?? "",
             c.customerPhone,
+            c.customerEmail ?? "",
             stageById.get(c.stageId)?.name ?? "",
             formatDate(c.lastMessageAt),
           ])}
@@ -47,6 +48,7 @@ export function ContactsTable({
           <tr className="border-b border-border bg-surface text-xs uppercase tracking-wide text-ink-muted">
             <th className="px-4 py-3 font-medium">Nombre</th>
             <th className="px-4 py-3 font-medium">Teléfono</th>
+            <th className="px-4 py-3 font-medium">Correo</th>
             <th className="px-4 py-3 font-medium">Etapa</th>
             <th className="px-4 py-3 font-medium">Última actividad</th>
           </tr>
@@ -66,6 +68,7 @@ export function ContactsTable({
                   </Link>
                 </td>
                 <td className="fl-mono px-4 py-3 text-xs text-ink-muted">{c.customerPhone}</td>
+                <td className="px-4 py-3 text-xs text-ink-muted">{c.customerEmail ?? "—"}</td>
                 <td className="px-4 py-3">
                   {stage && style && (
                     <span className="inline-flex items-center gap-1.5">

@@ -11,6 +11,7 @@ export type CrmStage = { id: string; name: string; position: number };
 export type CrmConversation = {
   id: string;
   customerName: string | null;
+  customerEmail: string | null;
   customerPhone: string;
   stageId: string;
   lastMessageAt: string;

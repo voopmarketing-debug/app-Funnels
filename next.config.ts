@@ -5,8 +5,8 @@ import { SECURITY_HEADERS, SITE_CSP } from "./src/lib/securityHeaders";
 // real Next.js/React routes). 'unsafe-inline' on script-src is needed for
 // Next's own hydration bootstrap scripts (no nonce middleware is wired up);
 // it still blocks loading any *external* script, which is what actually
-// matters here since there's no dangerouslySetInnerHTML anywhere in the
-// dashboard (see the cyber-neo audit).
+// matters here. The only dangerouslySetInnerHTML is the static theme script
+// in app/layout.tsx (a hardcoded constant, no user data).
 // media-src explicitly set (not left to fall back to default-src 'self')
 // because voice notes, image, and video attachments are all hosted on
 // Vercel Blob's own domain, not this app's origin — without this, the

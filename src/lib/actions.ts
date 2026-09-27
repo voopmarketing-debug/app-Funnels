@@ -23,6 +23,8 @@ import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator
 import { generateHeroImage } from "@/lib/websiteHeroImage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
+import { isValidEmail, normalizePhone } from "@/lib/phone";
+import { MAX_IMPORT_ROWS, type ImportContactRow } from "@/lib/contactImport";
 import { AvailabilitySchema, DEFAULT_AVAILABILITY, type Availability } from "@/lib/agenda";
 import {
   resolveMediaType,
@@ -626,6 +628,179 @@ export async function updateConversationDetails(
 
   revalidatePath(`/dashboard/businesses/${businessId}/crm`);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+}
+
+/** Name/email typed into the lead panel (or the mobile "Editar contacto" dialog). Empty string clears a field. */
+export async function updateContactInfo(
+  businessId: string,
+  conversationId: string,
+  data: { name?: string; email?: string },
+): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const name = data.name?.trim().slice(0, 120);
+  const email = data.email?.trim().toLowerCase().slice(0, 200);
+  if (email && !isValidEmail(email)) throw new Error("El correo no es válido");
+
+  await prisma.conversation.update({
+    where: { id: conversationId, businessId },
+    data: {
+      ...(name !== undefined && { customerName: name || null }),
+      ...(email !== undefined && { customerEmail: email || null }),
+    },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+}
+
+// Where a hand-added or imported contact lands when the caller doesn't pick
+// a stage: the first stage of the business's default pipeline — the same
+// place a brand-new inbound WhatsApp conversation lands (see lib/agent.ts).
+async function resolveContactStage(businessId: string, stageId: string | null | undefined) {
+  if (stageId) {
+    const stage = await prisma.pipelineStage.findFirst({ where: { id: stageId, businessId }, select: { id: true } });
+    if (!stage) throw new Error("Etapa inválida");
+    return stage.id;
+  }
+  const first = await prisma.pipelineStage.findFirst({
+    where: { businessId, pipeline: { isDefault: true } },
+    orderBy: { position: "asc" },
+    select: { id: true },
+  });
+  if (!first) throw new Error("Este negocio no tiene un embudo configurado");
+  return first.id;
+}
+
+export type CreateContactResult = { ok: true; conversationId: string; existed: boolean } | { ok: false; error: string };
+
+/**
+ * "Agregar contacto" — creates a CRM contact with no messages yet, so the
+ * business can message them (with a template, since there's no open 24h
+ * window) or include them in a broadcast. A phone that already exists
+ * returns that contact instead of creating a duplicate.
+ */
+export async function createContact(
+  businessId: string,
+  data: { phone: string; name?: string; email?: string; stageId?: string | null; countryCode?: string },
+): Promise<CreateContactResult> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const phone = normalizePhone(data.phone, data.countryCode);
+  if (!phone) return { ok: false, error: "El teléfono no es válido. Incluye el indicativo del país si no es de Colombia (ej. +52…)." };
+  const name = data.name?.trim().slice(0, 120) || null;
+  const email = data.email?.trim().toLowerCase().slice(0, 200) || null;
+  if (email && !isValidEmail(email)) return { ok: false, error: "El correo no es válido" };
+
+  const existing = await prisma.conversation.findUnique({
+    where: { businessId_customerPhone: { businessId, customerPhone: phone } },
+    select: { id: true },
+  });
+  if (existing) return { ok: true, conversationId: existing.id, existed: true };
+
+  const stageId = await resolveContactStage(businessId, data.stageId);
+  const created = await prisma.conversation.create({
+    data: { businessId, customerPhone: phone, customerName: name, customerEmail: email, stageId },
+    select: { id: true },
+  });
+
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  return { ok: true, conversationId: created.id, existed: false };
+}
+
+export type ImportContactsResult = {
+  created: number;
+  updated: number;
+  skipped: { row: number; reason: string }[];
+};
+
+/**
+ * CSV import (parsed in the browser, see ImportContactsDialog). New phones
+ * are created in the chosen stage; a phone that already exists is enriched
+ * without overwriting anything the business already has — empty name/email
+ * get filled, tags are merged, notes are only set if there were none — and
+ * it stays in whatever stage it's already in.
+ */
+export async function importContacts(
+  businessId: string,
+  rows: ImportContactRow[],
+  // rowOffset: the dialog sends big files in chunks (server actions cap the
+  // request body at 1MB), so row numbers in `skipped` stay file-relative.
+  options: { stageId?: string | null; countryCode?: string; rowOffset?: number },
+): Promise<ImportContactsResult> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+  if (rows.length > MAX_IMPORT_ROWS) throw new Error(`Máximo ${MAX_IMPORT_ROWS} contactos por archivo`);
+
+  const stageId = await resolveContactStage(businessId, options.stageId);
+  const skipped: ImportContactsResult["skipped"] = [];
+  const byPhone = new Map<string, { name: string | null; email: string | null; tags: string[]; notes: string | null }>();
+
+  rows.forEach((row, i) => {
+    const rowNumber = (options.rowOffset ?? 0) + i + 2; // +1 for the header row, +1 for 1-based numbering
+    const phone = normalizePhone(row.phone ?? "", options.countryCode);
+    if (!phone) {
+      skipped.push({ row: rowNumber, reason: row.phone?.trim() ? `Teléfono inválido: ${row.phone.trim().slice(0, 30)}` : "Sin teléfono" });
+      return;
+    }
+    let email = row.email?.trim().toLowerCase().slice(0, 200) || null;
+    if (email && !isValidEmail(email)) {
+      skipped.push({ row: rowNumber, reason: `Correo inválido (se importó sin correo): ${email.slice(0, 40)}` });
+      email = null;
+    }
+    const tags = (row.tags ?? "")
+      .split(/[;|]/)
+      .map((t) => t.trim().slice(0, 40))
+      .filter(Boolean);
+    const prev = byPhone.get(phone);
+    // Same phone twice in one file: merge instead of failing the row.
+    byPhone.set(phone, {
+      name: prev?.name || row.name?.trim().slice(0, 120) || null,
+      email: prev?.email || email,
+      tags: Array.from(new Set([...(prev?.tags ?? []), ...tags])),
+      notes: prev?.notes || row.notes?.trim().slice(0, 2000) || null,
+    });
+  });
+
+  const phones = Array.from(byPhone.keys());
+  const existing = await prisma.conversation.findMany({
+    where: { businessId, customerPhone: { in: phones } },
+    select: { id: true, customerPhone: true, customerName: true, customerEmail: true, tags: true, notes: true },
+  });
+  const existingByPhone = new Map(existing.map((c) => [c.customerPhone, c]));
+
+  const toCreate = phones
+    .filter((p) => !existingByPhone.has(p))
+    .map((p) => {
+      const c = byPhone.get(p)!;
+      return { businessId, customerPhone: p, customerName: c.name, customerEmail: c.email, tags: c.tags, notes: c.notes, stageId };
+    });
+  const { count: created } = await prisma.conversation.createMany({ data: toCreate, skipDuplicates: true });
+
+  const updates = existing
+    .map((c) => {
+      const incoming = byPhone.get(c.customerPhone)!;
+      const mergedTags = Array.from(new Set([...c.tags, ...incoming.tags]));
+      const data = {
+        ...(!c.customerName && incoming.name && { customerName: incoming.name }),
+        ...(!c.customerEmail && incoming.email && { customerEmail: incoming.email }),
+        ...(mergedTags.length !== c.tags.length && { tags: mergedTags }),
+        ...(!c.notes && incoming.notes && { notes: incoming.notes }),
+      };
+      return Object.keys(data).length > 0 ? prisma.conversation.update({ where: { id: c.id }, data }) : null;
+    })
+    .filter((u) => u !== null);
+  for (let i = 0; i < updates.length; i += 100) {
+    await prisma.$transaction(updates.slice(i, i + 100));
+  }
+
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  return { created, updated: updates.length, skipped };
 }
 
 export type BroadcastResult = { totalRecipients: number; sentCount: number; failedCount: number };

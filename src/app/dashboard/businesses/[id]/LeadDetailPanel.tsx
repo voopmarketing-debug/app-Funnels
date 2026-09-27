@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { updateConversationDetails } from "@/lib/actions";
+import { useRouter } from "next/navigation";
+import { updateContactInfo, updateConversationDetails } from "@/lib/actions";
+import { formatPhone } from "@/lib/contactDisplay";
 
 const TAG_SUGGESTIONS = ["Lead calificado", "Cliente potencial", "Cotización enviada", "Urgente"];
 
@@ -19,6 +21,8 @@ export function LeadDetailPanel({
   businessId,
   conversationId,
   customerPhone,
+  customerName,
+  customerEmail,
   tags,
   notes,
   appointmentAt,
@@ -27,6 +31,8 @@ export function LeadDetailPanel({
   businessId: string;
   conversationId: string;
   customerPhone: string;
+  customerName: string | null;
+  customerEmail: string | null;
   tags: string[];
   notes: string | null;
   appointmentAt: Date | null;
@@ -63,6 +69,10 @@ export function LeadDetailPanel({
   const [apptDate, setApptDate] = useState(toLocalInputValue(appointmentAt));
   const [apptNote, setApptNote] = useState(appointmentNote ?? "");
   const [savedPulse, setSavedPulse] = useState<string | null>(null);
+  const router = useRouter();
+  const [nameValue, setNameValue] = useState(customerName ?? "");
+  const [emailValue, setEmailValue] = useState(customerEmail ?? "");
+  const [contactError, setContactError] = useState<string | null>(null);
 
   function flashSaved(field: string) {
     setSavedPulse(field);
@@ -87,6 +97,24 @@ export function LeadDetailPanel({
     startTransition(async () => {
       await updateConversationDetails(businessId, conversationId, { tags: next });
       flashSaved("tags");
+    });
+  }
+
+  // Saved on blur, like notes. The name also shows in the chat header and
+  // the conversation list, so those re-render right after it changes.
+  function saveContact(field: "name" | "email") {
+    const value = field === "name" ? nameValue.trim() : emailValue.trim();
+    const current = (field === "name" ? customerName : customerEmail) ?? "";
+    if (value === current) return;
+    setContactError(null);
+    startTransition(async () => {
+      try {
+        await updateContactInfo(businessId, conversationId, field === "name" ? { name: value } : { email: value });
+        flashSaved("contact");
+        router.refresh();
+      } catch (err) {
+        setContactError(err instanceof Error ? err.message : "No se pudo guardar");
+      }
     });
   }
 
@@ -135,16 +163,44 @@ export function LeadDetailPanel({
       >
         › Ocultar
       </button>
-      <section>
-        <h3 className="fl-mono mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Contacto</h3>
-        <a
-          href={`https://wa.me/${customerPhone.replace(/[^0-9]/g, "")}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-accent hover:underline"
-        >
-          Abrir en WhatsApp ↗
-        </a>
+      <section className="space-y-2">
+        <div className="flex items-center gap-2">
+          <h3 className="fl-mono text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Contacto</h3>
+          {savedPulse === "contact" && <span className="text-[10px] text-accent">Guardado ✓</span>}
+        </div>
+        <input
+          value={nameValue}
+          onChange={(e) => setNameValue(e.target.value)}
+          onBlur={() => saveContact("name")}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          maxLength={120}
+          placeholder="Nombre del contacto"
+          aria-label="Nombre del contacto"
+          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
+        />
+        <input
+          type="email"
+          value={emailValue}
+          onChange={(e) => setEmailValue(e.target.value)}
+          onBlur={() => saveContact("email")}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          maxLength={200}
+          placeholder="Correo electrónico"
+          aria-label="Correo electrónico"
+          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
+        />
+        {contactError && <p className="text-[11px] text-error">{contactError}</p>}
+        <div className="flex items-center justify-between gap-2">
+          <span className="fl-mono text-xs text-ink-muted">{formatPhone(customerPhone)}</span>
+          <a
+            href={`https://wa.me/${customerPhone.replace(/[^0-9]/g, "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-accent hover:underline"
+          >
+            Abrir en WhatsApp ↗
+          </a>
+        </div>
       </section>
 
       <section>

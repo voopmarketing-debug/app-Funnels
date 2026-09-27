@@ -207,6 +207,10 @@ model Conversation {
   businessId     String
   customerPhone  String
   customerName   String?
+  // Optional contact data the business owner fills in by hand (lead panel,
+  // "Agregar contacto") or brings in via CSV import — WhatsApp only ever
+  // gives us the phone and a profile name.
+  customerEmail  String?
   stageId        String
   // When true, the AI agent stays silent on new messages in this specific
   // conversation — for when the business owner wants to take over one chat

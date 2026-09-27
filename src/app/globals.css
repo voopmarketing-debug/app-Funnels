@@ -231,3 +231,17 @@ dialog::backdrop {
     box-shadow: 0 8px 20px -8px rgba(var(--glow-accent), 0.7);
   }
 }
+
+/* Tailwind's preflight zeroes every element's margin, which removes the
+ * browser's `margin: auto` that centers a modal <dialog> — every dialog
+ * opened pinned to the top-left corner. Restored here (in the base layer, so
+ * a utility like m-0 on a full-screen dialog still wins), with a cap so a
+ * tall dialog scrolls instead of running off a phone screen. */
+@layer base {
+  dialog:modal {
+    margin: auto;
+    max-width: calc(100% - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+  }
+}

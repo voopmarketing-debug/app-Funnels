@@ -10,6 +10,8 @@ import { CrmTabs } from "./CrmTabs";
 import { PipelineSwitcher } from "./PipelineSwitcher";
 import { ConversationSplitView } from "./ConversationSplitView";
 import { BroadcastDialog } from "./BroadcastDialog";
+import { ImportContactsDialog } from "./ImportContactsDialog";
+import { ContactFormDialog } from "../ContactFormDialog";
 import { BroadcastHistory } from "./BroadcastHistory";
 import { AgentSwitcher } from "../AgentSwitcher";
 import { CrmLivePoller } from "./CrmLivePoller";
@@ -52,10 +54,28 @@ export default async function CrmPage({
   const [business, conversations, accessibleBusinesses, approvedTemplates, stageCounts, totalConversations] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
     prisma.conversation.findMany({
-      where: { businessId: id, stage: { pipelineId: selectedPipeline.id } },
+      where: {
+        businessId: id,
+        stage: { pipelineId: selectedPipeline.id },
+        // The chat list only shows real conversations — contacts added by
+        // hand or imported from a CSV have no messages yet and would bury
+        // the actual chats (they're in Lista/Tablero, and open in the chat
+        // view once they write or get a template).
+        ...(tab === "chat" && { messages: { some: {} } }),
+      },
       orderBy: { lastMessageAt: "desc" },
-      take: 50,
-      select: { id: true, customerName: true, customerPhone: true, stageId: true, lastMessageAt: true, lastReadAt: true },
+      // Lista is the contacts directory (and its CSV export), so it gets a
+      // much larger window than the chat list and the board.
+      take: tab === "list" ? 2000 : 50,
+      select: {
+        id: true,
+        customerName: true,
+        customerEmail: true,
+        customerPhone: true,
+        stageId: true,
+        lastMessageAt: true,
+        lastReadAt: true,
+      },
     }),
     prisma.membership.findMany({
       where: { userId: session.user.id },
@@ -98,6 +118,7 @@ export default async function CrmPage({
   const conversationSummaries = conversations.map((c) => ({
     id: c.id,
     customerName: c.customerName,
+    customerEmail: c.customerEmail,
     customerPhone: c.customerPhone,
     stageId: c.stageId,
     lastMessageAt: c.lastMessageAt.toISOString(),
@@ -182,6 +203,7 @@ export default async function CrmPage({
     if (full) {
       selectedConversation = {
         customerName: full.customerName,
+        customerEmail: full.customerEmail,
         customerPhone: full.customerPhone,
         aiPaused: full.aiPaused,
         stageId: full.stageId,
@@ -236,13 +258,17 @@ export default async function CrmPage({
               />
             )}
           </div>
-          <BroadcastDialog
-            businessId={id}
-            stages={stages}
-            templates={approvedTemplates}
-            stageCounts={stageCountMap}
-            totalConversations={totalConversations}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <ContactFormDialog mode="create" businessId={id} stages={stages} />
+            <ImportContactsDialog businessId={id} stages={stages} />
+            <BroadcastDialog
+              businessId={id}
+              stages={stages}
+              templates={approvedTemplates}
+              stageCounts={stageCountMap}
+              totalConversations={totalConversations}
+            />
+          </div>
         </div>
 
         {tab === "board" && <CrmBoard businessId={id} stages={stages} conversations={conversationSummaries} />}
