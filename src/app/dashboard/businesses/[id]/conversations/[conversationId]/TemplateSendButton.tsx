@@ -40,7 +40,7 @@ export function TemplateSendButton({
             ? "Enviar una plantilla aprobada"
             : "Han pasado más de 24h desde el último mensaje del cliente — usa una plantilla para reabrir la conversación"
         }
-        className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition ${
+        className={`flex flex-none items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs font-semibold transition ${
           windowOpen
             ? "border-border-strong text-ink-muted hover:border-accent hover:text-accent"
             : "animate-pulse border-accent bg-accent/10 text-accent"

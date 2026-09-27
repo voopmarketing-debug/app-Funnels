@@ -33,7 +33,7 @@ export function AiPauseButton({
           ? "La IA no está respondiendo en esta conversación"
           : "La IA responde automáticamente en esta conversación"
       }
-      className={`fl-mono flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition disabled:opacity-60 ${
+      className={`fl-mono flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition disabled:opacity-60 ${
         aiPaused
           ? "border-error/50 bg-error/10 text-error"
           : "border-accent/50 bg-accent/10 text-accent"

@@ -4,6 +4,7 @@ import { StageSelector } from "./conversations/[conversationId]/StageSelector";
 import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
 import { TemplateSendButton } from "./conversations/[conversationId]/TemplateSendButton";
 import { MessageScrollArea } from "./MessageScrollArea";
+import { contactInitial, contactLabel, formatPhone } from "@/lib/contactDisplay";
 
 // This renders server-side, where the runtime clock is UTC (Vercel), not
 // Bogotá — toLocaleTimeString() without a timeZone silently used that UTC
@@ -75,34 +76,40 @@ export function ConversationThread({
   // its own breadcrumb already.
   mobileBackHref?: string;
 }) {
-  const customerInitial = (customerName?.trim()[0] ?? customerPhone.slice(-2)).toUpperCase();
+  const customerInitial = contactInitial(customerName, customerPhone);
   const businessInitial = businessName.trim()[0]?.toUpperCase() ?? "F";
+  const label = contactLabel(customerName, customerPhone);
+  const phoneLabel = formatPhone(customerPhone);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
+      {/* Two rows on a phone (who → actions) so the name, phone and buttons
+          never overlap; a single row from md up, same as before. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface px-3 py-2.5 md:flex-nowrap md:px-4 md:py-3">
         {mobileBackHref && (
           <Link
             href={mobileBackHref}
             aria-label="Volver a las conversaciones"
-            className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ink-muted transition hover:text-ink md:hidden"
+            className="-ml-1 flex h-10 w-8 flex-none items-center justify-center text-2xl leading-none text-ink-muted transition hover:text-ink md:hidden"
           >
             ‹
           </Link>
         )}
         <Avatar initial={customerInitial} variant="customer" />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-lg font-bold">{customerName ?? customerPhone}</h2>
-          <p className="fl-mono text-xs tracking-wide text-ink-muted">{customerPhone}</p>
+          <h2 className="truncate text-base font-bold md:text-lg">{label}</h2>
+          {label !== phoneLabel && <p className="fl-mono truncate text-xs tracking-wide text-ink-muted">{phoneLabel}</p>}
         </div>
-        <TemplateSendButton
-          businessId={businessId}
-          conversationId={conversationId}
-          templates={templates}
-          windowOpen={windowOpen}
-        />
-        <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} />
-        <StageSelector businessId={businessId} conversationId={conversationId} stageId={stageId} stages={stages} />
+        <div className="flex w-full items-center gap-2 overflow-x-auto [scrollbar-width:none] md:w-auto md:flex-none md:overflow-visible">
+          <TemplateSendButton
+            businessId={businessId}
+            conversationId={conversationId}
+            templates={templates}
+            windowOpen={windowOpen}
+          />
+          <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} />
+          <StageSelector businessId={businessId} conversationId={conversationId} stageId={stageId} stages={stages} />
+        </div>
       </div>
 
       <MessageScrollArea messageCount={messages.length}>
@@ -110,12 +117,19 @@ export function ConversationThread({
           const isError = message.content.startsWith("[ERROR INTERNO");
 
           if (isError) {
+            // A plain-language notice first — the raw API error is only
+            // useful for debugging, so it's tucked away (and wrapped, so a
+            // long JSON line can't push the chat wider than the screen).
             return (
               <div
                 key={message.id}
-                className="mx-auto max-w-[90%] rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-center text-xs text-red-300"
+                className="mx-auto w-full max-w-[90%] rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-center text-xs text-red-300"
               >
-                <p>{message.content}</p>
+                <p className="font-semibold">⚠ La IA no pudo responder este mensaje</p>
+                <details className="mt-1 text-left">
+                  <summary className="cursor-pointer text-center opacity-80">Ver detalle técnico</summary>
+                  <p className="fl-mono mt-1 break-all text-[10px] opacity-80">{message.content}</p>
+                </details>
                 <p className="mt-1 opacity-70">{formatMessageDateTime(message.createdAt)}</p>
               </div>
             );

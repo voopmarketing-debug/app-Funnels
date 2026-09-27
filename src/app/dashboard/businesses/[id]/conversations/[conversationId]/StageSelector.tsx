@@ -41,7 +41,7 @@ export function StageSelector({
       value={stageId}
       disabled={isPending}
       onChange={(e) => handleChange(e.target.value)}
-      className="fl-mono rounded-md border border-border bg-background px-2 py-1 text-[11px] uppercase tracking-wide text-ink-muted outline-none focus:border-accent"
+      className="fl-mono max-w-[11rem] flex-none rounded-md border border-border bg-background px-2 py-1.5 text-[11px] uppercase tracking-wide text-ink-muted outline-none focus:border-accent"
     >
       {groupByPipeline
         ? pipelineNames.map((pipelineName) => (

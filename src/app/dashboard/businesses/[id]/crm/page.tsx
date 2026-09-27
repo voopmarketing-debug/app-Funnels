@@ -203,10 +203,15 @@ export default async function CrmPage({
     }
   }
 
+  // On a phone, an open chat takes the whole screen (WhatsApp-style) — the
+  // page title, embudo editor and tabs are hidden until you go back to the
+  // list with the chat's own ‹ button. Desktop keeps everything visible.
+  const hideChromeOnMobile = tab === "chat" && !!selectedConversation ? "hidden md:block" : "";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <CrmLivePoller businessId={id} />
-      <div>
+      <div className={hideChromeOnMobile}>
         <Link href={`/dashboard/businesses/${id}`} className="text-sm text-ink-muted underline hover:text-ink">
           ← {business.name}
         </Link>
@@ -216,11 +221,13 @@ export default async function CrmPage({
         </div>
       </div>
 
-      <PipelineManager businessId={id} pipelines={allPipelines} />
+      <div className={hideChromeOnMobile}>
+        <PipelineManager businessId={id} pipelines={allPipelines} />
+      </div>
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className={`${hideChromeOnMobile ? "hidden md:flex" : "flex"} flex-wrap items-center justify-between gap-2`}>
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             <CrmTabs activeTab={tab} />
             {allPipelines.length > 1 && (
               <PipelineSwitcher

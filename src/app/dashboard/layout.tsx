@@ -91,15 +91,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
         isAgencyAdmin={isAgencyAdmin}
         primaryBusinessId={primaryBusiness?.businessId ?? null}
         onSignOut={handleSignOut}
+        mobileActions={<NotificationBell notifications={notifications} unreadCount={unreadCount} />}
       />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end gap-3 border-b border-border px-6 py-3">
+        {/* Desktop only — on mobile the bell lives in the sidebar's top bar
+            and "Mi perfil" is in the menu, so this row would just duplicate them. */}
+        <header className="hidden items-center justify-end gap-3 border-b border-border px-6 py-3 md:flex">
           <NotificationBell notifications={notifications} unreadCount={unreadCount} />
           <Link href="/dashboard/account" className="fl-mono text-xs tracking-wide text-ink-muted transition hover:text-ink">
             Mi perfil
           </Link>
         </header>
-        <main className="min-w-0 flex-1 p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

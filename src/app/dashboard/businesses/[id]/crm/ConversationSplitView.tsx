@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { stageStyle } from "@/lib/crmStages";
+import { contactInitial, contactLabel } from "@/lib/contactDisplay";
 import { ConversationThread } from "../ConversationThread";
 import { LeadDetailPanel } from "../LeadDetailPanel";
 import type { CrmStage, CrmConversation } from "../CrmBoard";
@@ -67,7 +68,15 @@ export function ConversationSplitView({
   const showListOnMobile = !selectedConversationId;
 
   return (
-    <div className="fl-card flex h-[calc(100vh-14rem)] min-h-[28rem] overflow-hidden">
+    // Mobile: an open chat fills the screen under the top bar (the CRM page
+    // hides its own header while a chat is open — see crm/page.tsx), and
+    // dvh keeps the composer above the phone browser's own toolbar instead
+    // of behind it. Desktop sizing is unchanged.
+    <div
+      className={`fl-card flex overflow-hidden md:h-[calc(100vh-14rem)] md:min-h-[28rem] ${
+        showListOnMobile ? "h-[calc(100dvh-15rem)] min-h-[22rem]" : "h-[calc(100dvh-6rem)] min-h-[20rem]"
+      }`}
+    >
       <div
         className={`${showListOnMobile ? "flex" : "hidden md:flex"} w-full flex-col overflow-y-auto border-r border-border md:w-64 md:flex-none`}
       >
@@ -77,7 +86,7 @@ export function ConversationSplitView({
         {conversations.map((c) => {
           const stage = stageById.get(c.stageId);
           const style = stage ? stageStyle(stage.position) : null;
-          const initial = (c.customerName?.trim()[0] ?? c.customerPhone.slice(-2)).toUpperCase();
+          const initial = contactInitial(c.customerName, c.customerPhone);
           const isActive = c.id === selectedConversationId;
           const isUnread = c.unreadCount > 0;
 
@@ -94,7 +103,7 @@ export function ConversationSplitView({
               </div>
               <div className="min-w-0 flex-1">
                 <p className={`truncate text-sm ${isUnread ? "font-bold text-ink" : "font-medium text-ink"}`}>
-                  {c.customerName ?? c.customerPhone}
+                  {contactLabel(c.customerName, c.customerPhone)}
                 </p>
                 <p className="flex items-center gap-1.5 truncate text-xs text-ink-muted">
                   {style && <span className={`h-1.5 w-1.5 flex-none rounded-full ${style.dot}`} />}

@@ -23,7 +23,9 @@ export function CrmTabs({ activeTab }: { activeTab: string }) {
   const suffix = pipelineParam ? `pipeline=${pipelineParam}` : "";
 
   return (
-    <div className="flex items-center gap-2">
+    // Scrolls sideways on narrow screens instead of pushing the whole page
+    // wider than the viewport (which made every other element shift/cut off).
+    <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto [scrollbar-width:none] md:overflow-visible">
       {TABS.map((tab) => {
         const active = activeTab === tab.key;
         const Icon = tab.icon;
@@ -32,7 +34,7 @@ export function CrmTabs({ activeTab }: { activeTab: string }) {
           <Link
             key={tab.key}
             href={query ? `${pathname}?${query}` : pathname}
-            className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition"
+            className="flex flex-none items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-semibold transition"
             style={
               active
                 ? {

@@ -221,8 +221,10 @@ export function ManualMessageForm({
           <textarea
             name="text"
             rows={1}
-            placeholder="Escribe como si fueras tú (interviene la conversación)..."
-            className="max-h-32 flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-2 text-sm text-ink outline-none focus:border-accent"
+            placeholder="Mensaje..."
+            // text-base (16px) on phones: iOS Safari auto-zooms the whole
+            // page into any focused field smaller than that.
+            className="max-h-32 min-w-0 flex-1 resize-none rounded-2xl border border-border bg-background px-3 py-2 text-base text-ink outline-none focus:border-accent md:px-4 md:text-sm"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -235,7 +237,7 @@ export function ManualMessageForm({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            className="flex-none rounded-full bg-accent px-3 py-2 text-sm md:px-4 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
           >
             {isPending ? "..." : "Enviar"}
           </button>
@@ -261,7 +263,7 @@ export function ManualMessageForm({
       {state.error ? (
         <p className="pl-1 text-xs font-medium text-error">⚠ No se pudo enviar: {state.error}</p>
       ) : (
-        <p className="fl-mono pl-1 text-[10px] text-ink-faint">
+        <p className={`fl-mono pl-1 text-[10px] text-ink-faint ${pendingFileName ? "" : "hidden md:block"}`}>
           {pendingFileName ? `Adjunto: ${pendingFileName}` : SIZE_HINT}
         </p>
       )}

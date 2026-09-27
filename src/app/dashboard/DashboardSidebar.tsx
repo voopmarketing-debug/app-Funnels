@@ -214,10 +214,14 @@ export function DashboardSidebar({
   isAgencyAdmin,
   primaryBusinessId,
   onSignOut,
+  mobileActions,
 }: {
   isAgencyAdmin: boolean;
   primaryBusinessId: string | null;
   onSignOut: () => Promise<void>;
+  // Rendered in the mobile top bar next to the menu button (e.g. the
+  // notification bell), so mobile doesn't need a second header row.
+  mobileActions?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -232,19 +236,22 @@ export function DashboardSidebar({
     <>
       {/* Mobile-only top bar — hidden entirely on md+ (md:hidden), so it
           never appears alongside or instead of the desktop sidebar below. */}
-      <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3 md:hidden">
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-surface px-4 py-2.5 md:hidden">
         <Link href="/dashboard" className="flex items-center gap-2.5">
           <FunnelsLogoMark className="h-6 w-6 flex-none" />
           <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
         </Link>
-        <button
-          type="button"
-          onClick={() => setMobileOpen(true)}
-          aria-label="Abrir menú"
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-ink-muted transition hover:border-accent hover:text-accent"
-        >
-          <MenuIcon />
-        </button>
+        <div className="flex items-center gap-2">
+          {mobileActions}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Abrir menú"
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-border text-ink-muted transition hover:border-accent hover:text-accent"
+          >
+            <MenuIcon />
+          </button>
+        </div>
       </div>
 
       {/* Mobile slide-in drawer — position:fixed takes it out of the page's
