@@ -82,48 +82,54 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   const canEditPlan = membership.role === "ADMIN";
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <div>
+    <div className="space-y-6 md:space-y-8">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold">{business.name}</h1>
-          <p className="fl-mono text-xs tracking-wide text-ink-muted">
+          <p className="fl-mono break-all text-xs tracking-wide text-ink-muted">
             WhatsApp: {business.wabaPhoneNumberId}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        {/* On phones the shortcuts scroll sideways in one row instead of
+            pushing the page wider than the screen. */}
+        <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] md:gap-3 md:overflow-visible md:pb-0">
           <Link
             href={`/dashboard/businesses/${id}/crm`}
-            className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+            className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
           >
             Ver CRM
           </Link>
           <Link
             href={`/dashboard/businesses/${id}/analytics`}
-            className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+            className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
           >
             Ver KPIs
           </Link>
           <Link
             href={`/dashboard/businesses/${id}/templates`}
-            className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+            className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
           >
             Plantillas
           </Link>
           <Link
             href={`/dashboard/businesses/${id}/website`}
-            className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+            className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
           >
             Sitio web
           </Link>
           {canManageBusiness && (
             <Link
               href="/dashboard/account"
-              className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
+              className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
             >
               Equipo
             </Link>
           )}
-          {canManageBusiness && <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />}
+          {canManageBusiness && (
+            <div className="order-first flex-none whitespace-nowrap md:order-none">
+              <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
+            </div>
+          )}
         </div>
       </div>
 
