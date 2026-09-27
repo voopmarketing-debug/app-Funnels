@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Montserrat, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
 // Applies the client's saved theme choice (see ThemeToggle.tsx) before the
-// page paints, so switching to light mode doesn't flash dark on every load.
-// `beforeInteractive` makes Next.js inline this in <head>, ahead of hydration.
+// page paints, so light mode doesn't load dark on every refresh. Rendered as
+// a plain inline <script> in <head> so the browser runs it synchronously
+// while parsing — next/script's beforeInteractive only queues it for the
+// Next.js runtime, which runs after first paint (and noticeably later on a
+// slow phone), so the page showed dark until the JS bundle loaded.
 const THEME_INIT_SCRIPT = `
   try {
     if (window.localStorage.getItem("fl-theme") === "light") {
@@ -37,16 +39,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="es"
       className={`${montserrat.variable} ${jetbrainsMono.variable} h-full antialiased`}
-      // The beforeInteractive theme script (below) sets data-theme on this
+      // The inline theme script (in <head>) sets data-theme on this
       // element before React hydrates, based on localStorage — which the
       // server can't know at render time. That's an intentional mismatch on
       // this one attribute, not a bug: suppress the hydration warning for it.
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
-        <Script id="fl-theme-init" strategy="beforeInteractive">
-          {THEME_INIT_SCRIPT}
-        </Script>
         <Providers>{children}</Providers>
       </body>
     </html>

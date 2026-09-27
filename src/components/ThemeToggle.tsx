@@ -42,8 +42,8 @@ function MoonIcon() {
 
 // Client-selectable dark/light toggle — the brand defaults to dark, but the
 // business owner can switch from the dashboard (or any auth screen) if they
-// prefer a light workspace. Persisted in localStorage; see the inline
-// beforeInteractive script in layout.tsx for the flash-free initial paint.
+// prefer a light workspace. Persisted in localStorage; see the inline <head>
+// script in layout.tsx for the flash-free initial paint.
 export function ThemeToggle({
   className = "fl-nav-icon",
   showLabel = false,
