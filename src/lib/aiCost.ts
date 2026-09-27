@@ -20,6 +20,13 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
     cacheWrite: (2 / PER_MILLION) * 2,
     cacheRead: (2 / PER_MILLION) * 0.1,
   },
+  "claude-opus-5-5": {
+    input: 4 / PER_MILLION,
+    output: 20 / PER_MILLION,
+    cacheWrite: (4 / PER_MILLION) * 2,
+    cacheRead: (4 / PER_MILLION) * 0.1,
+  },
+  // Kept so diagnoses generated before the switch to Opus 5.5 still price.
   "claude-opus-5": {
     input: 5 / PER_MILLION,
     output: 25 / PER_MILLION,

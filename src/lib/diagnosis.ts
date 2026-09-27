@@ -118,11 +118,16 @@ export async function generateSalesDiagnosis(
   const input = await buildDiagnosisInput(businessId);
   if (!input) return { status: "insufficient_data" };
 
+  // Opus 5.5: cheaper per token than Opus 5 at the same analysis quality.
+  // Thinking is always on for this model and its default effort is
+  // "medium", so effort is pinned to "high" (Opus 5's default) to keep the
+  // diagnosis as thorough as before, and max_tokens leaves room for that
+  // thinking on top of the JSON, which counts against the same limit.
   const response = await anthropic.messages.parse({
-    model: "claude-opus-5",
-    max_tokens: 4096,
+    model: "claude-opus-5-5",
+    max_tokens: 16000,
     system: SYSTEM_PROMPT,
-    output_config: { format: zodOutputFormat(SalesDiagnosisSchema) },
+    output_config: { format: zodOutputFormat(SalesDiagnosisSchema), effort: "high" },
     messages: [
       {
         role: "user",
