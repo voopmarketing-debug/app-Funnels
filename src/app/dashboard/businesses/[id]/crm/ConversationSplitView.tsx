@@ -73,7 +73,7 @@ export function ConversationSplitView({
     // dvh keeps the composer above the phone browser's own toolbar instead
     // of behind it. Desktop sizing is unchanged.
     <div
-      className={`fl-card flex overflow-hidden md:h-[calc(100vh-14rem)] md:min-h-[28rem] ${
+      className={`fl-card flex overflow-hidden md:h-[calc(100dvh-21rem)] md:min-h-[28rem] ${
         showListOnMobile ? "h-[calc(100dvh-15rem)] min-h-[22rem]" : "h-[calc(100dvh-6rem)] min-h-[20rem]"
       }`}
     >
@@ -153,8 +153,10 @@ export function ConversationSplitView({
       {selectedConversation && selectedConversationId && (
         // Desktop-only third column for now — on mobile the thread already
         // fills the screen (see above), and stacking a third full-width
-        // panel under it would bury the chat itself.
-        <div className="hidden md:block">
+        // panel under it would bury the chat itself. md:flex (not block) so
+        // the panel is stretched to the card's height and scrolls itself —
+        // as a block it grew to its content and the card clipped the bottom.
+        <div className="hidden min-h-0 md:flex">
           <LeadDetailPanel
             businessId={businessId}
             conversationId={selectedConversationId}
