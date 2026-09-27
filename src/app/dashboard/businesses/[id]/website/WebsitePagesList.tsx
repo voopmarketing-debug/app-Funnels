@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createWebsitePage, createAgendaPage, deleteWebsitePage, renameWebsitePage } from "@/lib/actions";
+import { ClientDate } from "@/components/ClientDate";
 
 type Page = {
   id: string;
@@ -316,7 +317,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
             <FormIcon /> {page.leadCount}
           </span>
           <span className="text-ink-faint">
-            {page.generatedAt.toLocaleDateString("es-CO", { day: "numeric", month: "short" })}
+            <ClientDate date={page.generatedAt} options={{ day: "numeric", month: "short" }} />
           </span>
           {page.customDomain && <span className="fl-mono text-accent">{page.customDomain}</span>}
         </div>

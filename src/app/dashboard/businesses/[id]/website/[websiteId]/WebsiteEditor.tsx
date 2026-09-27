@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage, applyWebsitePrompt } from "@/lib/actions";
 import { FONT_OPTIONS, type WebsiteContent } from "@/lib/websiteContent";
 import { DownloadCsvButton } from "@/components/DownloadCsvButton";
+import { ClientDate } from "@/components/ClientDate";
 
 export function WebsiteEditor({
   businessId,
@@ -51,6 +52,7 @@ export function WebsiteEditor({
     startSaving(async () => {
       try {
         await updateWebsiteContent(businessId, websiteId, content);
+        setGeneratedAt(new Date());
         setSaved(true);
         setPreviewKey((k) => k + 1);
         setTimeout(() => setSaved(false), 2000);
@@ -84,6 +86,7 @@ export function WebsiteEditor({
       try {
         const updated = await applyWebsitePrompt(businessId, websiteId, promptText);
         setContent(updated);
+        setGeneratedAt(new Date());
         setPromptText("");
         setPromptApplied(true);
         setPreviewKey((k) => k + 1);
@@ -600,7 +603,7 @@ export function WebsiteEditor({
                   lead.name,
                   lead.contact,
                   lead.message ?? "",
-                  lead.createdAt.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }),
+                  lead.createdAt.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric", timeZone: "America/Bogota" }),
                 ])}
               />
             </div>
@@ -610,7 +613,7 @@ export function WebsiteEditor({
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm font-medium text-ink">{lead.name}</p>
                     <p className="fl-mono flex-none text-[10px] text-ink-faint">
-                      {lead.createdAt.toLocaleDateString("es-CO", { day: "numeric", month: "short" })}
+                      <ClientDate date={lead.createdAt} options={{ day: "numeric", month: "short" }} />
                     </p>
                   </div>
                   <p className="fl-mono text-xs text-accent">{lead.contact}</p>
@@ -623,7 +626,7 @@ export function WebsiteEditor({
 
         <div className="fl-card space-y-2 p-4">
           <p className="text-xs text-ink-muted">
-            Última versión: {generatedAt.toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+            Última actualización: <ClientDate date={generatedAt} options={{ dateStyle: "medium", timeStyle: "short" }} />
           </p>
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
             <a

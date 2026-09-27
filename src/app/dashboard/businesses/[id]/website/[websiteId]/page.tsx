@@ -158,7 +158,9 @@ export default async function WebsiteEditorPage({
         websiteId={websiteId}
         content={parsedContent.data}
         customDomain={website.customDomain}
-        generatedAt={website.generatedAt}
+        // updatedAt, not generatedAt: covers regenerations, AI edits and
+        // manual saves alike, so the date always reflects the latest change.
+        generatedAt={website.updatedAt}
         publicUrl={`https://${appHost}/sitio/${website.slug}`}
         stats={{ totalViews, clicksWhatsapp, clicksAgenda }}
         leads={leads}

@@ -8,6 +8,7 @@ import { shiftMonthStr, type Availability } from "@/lib/agendaAvailability";
 import { formatDateInZone } from "@/lib/timezone";
 import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
 import { DomainSection } from "./WebsiteEditor";
+import { ClientDate } from "@/components/ClientDate";
 
 /** `#RRGGBB` + a 2-digit hex alpha (e.g. "26" ≈ 15%) — used to tint the calendar with the clinic's own primary color without a CSS color-mix dependency. */
 function withAlpha(hex: string, alpha: string): string {
@@ -272,7 +273,7 @@ export function AgendaEditor({
                               className="fl-mono text-xs font-bold"
                               style={{ color: accent }}
                             >
-                              {a.startsAt.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", timeZone: config.timezone })}
+                              <ClientDate date={a.startsAt} options={{ hour: "2-digit", minute: "2-digit" }} timeZone={config.timezone} />
                             </p>
                             <p className="truncate text-sm font-medium text-ink">{a.name}</p>
                             <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
@@ -407,7 +408,7 @@ export function AgendaEditor({
                   <div key={a.id} className="flex items-start justify-between gap-2 rounded-md border border-border bg-background p-3">
                     <div className="min-w-0">
                       <p className="fl-mono text-[10px] font-bold" style={{ color: accent }}>
-                        {a.startsAt.toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        <ClientDate date={a.startsAt} options={{ day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }} />
                       </p>
                       <p className="truncate text-sm font-medium text-ink">{a.name}</p>
                       <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
@@ -433,7 +434,7 @@ export function AgendaEditor({
 
         <div className="fl-card space-y-2 p-4">
           <p className="text-xs text-ink-muted">
-            Última actualización: {generatedAt.toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}
+            Última actualización: <ClientDate date={generatedAt} options={{ dateStyle: "medium", timeStyle: "short" }} />
           </p>
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
             <a
