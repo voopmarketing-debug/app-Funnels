@@ -18,6 +18,7 @@ import {
 import { synthesizeVoiceNote, transcribeVoiceNote } from "@/lib/tts";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS } from "@/lib/plans";
+import { contactLabel } from "@/lib/contactDisplay";
 
 const MEDIA_TYPE_LABEL: Record<string, string> = {
   image: "Imagen",
@@ -243,7 +244,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   // are exactly the cases where a human most needs to know someone wrote in,
   // since the agent won't respond on its own.
   {
-    const leadLabel = conversation.customerName || conversation.customerPhone;
+    const leadLabel = contactLabel(conversation.customerName, conversation.customerPhone);
     const excerpt = messageContent.length > 80 ? `${messageContent.slice(0, 80)}...` : messageContent;
     await prisma.notification.create({
       data: {
@@ -342,7 +343,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
           where: { id: conversation.id },
           data: { appointmentAt, appointmentNote: result.appointment.note },
         });
-        const leadLabel = conversation.customerName || conversation.customerPhone;
+        const leadLabel = contactLabel(conversation.customerName, conversation.customerPhone);
         await prisma.notification.create({
           data: {
             businessId: business.id,

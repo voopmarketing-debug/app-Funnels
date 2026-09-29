@@ -18,12 +18,14 @@ import {
   verifyWabaConnection,
   uploadTemplateHeaderImage,
   type TemplateButton,
+  subscribeAppToWaba,
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
 import { generateHeroImage } from "@/lib/websiteHeroImage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { isValidEmail, normalizePhone } from "@/lib/phone";
+import { resubscribeWhatsAppWebhook, runWhatsAppHealthCheck, type WhatsAppHealth } from "@/lib/whatsappHealth";
 import { MAX_IMPORT_ROWS, type ImportContactRow } from "@/lib/contactImport";
 import { AvailabilitySchema, DEFAULT_AVAILABILITY, type Availability } from "@/lib/agenda";
 import {
@@ -419,6 +421,17 @@ export async function updateWabaCredentials(
   if (!verification.ok) {
     return { verified: false, verifyError: verification.error };
   }
+
+  // Credentials are fine — also make sure our app is subscribed to this
+  // number's WhatsApp Business Account, the step most often missed in Meta's
+  // setup (without it, customers' messages silently never reach us). Then
+  // record a fresh health check for the "Estado de WhatsApp" panel.
+  const saved = await prisma.business.findUnique({ where: { id: businessId }, select: { wabaId: true } });
+  if (saved?.wabaId) {
+    const subscribed = await subscribeAppToWaba({ wabaId: saved.wabaId, accessToken: tokenToVerify });
+    if (!subscribed.ok) console.warn(`Could not subscribe app to WABA for business ${businessId}: ${subscribed.error}`);
+  }
+  await runWhatsAppHealthCheck(businessId).catch((err) => console.error("Health check after saving credentials failed:", err));
   return { verified: true, displayPhoneNumber: verification.displayPhoneNumber };
 }
 
@@ -801,6 +814,34 @@ export async function importContacts(
 
   revalidatePath(`/dashboard/businesses/${businessId}/crm`);
   return { created, updated: updates.length, skipped };
+}
+
+/** "Revisar conexión" in the Estado de WhatsApp panel — owners/admins only. */
+export async function checkWhatsAppConnection(businessId: string): Promise<WhatsAppHealth> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+  const health = await runWhatsAppHealthCheck(businessId);
+  if (!health) throw new Error("Negocio no encontrado");
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  return health;
+}
+
+/** "Reconectar recepción": re-subscribes our Meta app to the number's WhatsApp Business Account, then re-checks. */
+export async function reconnectWhatsAppWebhook(businessId: string): Promise<{ ok: boolean; error?: string; health?: WhatsAppHealth }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { id: true, wabaPhoneNumberId: true, wabaAccessToken: true, wabaId: true, webhookError: true, webhookErrorAt: true },
+  });
+  if (!business) throw new Error("Negocio no encontrado");
+  const result = await resubscribeWhatsAppWebhook(business);
+  if (!result.ok) return { ok: false, error: result.error };
+  const health = (await runWhatsAppHealthCheck(businessId)) ?? undefined;
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  return { ok: true, health };
 }
 
 export type BroadcastResult = { totalRecipients: number; sentCount: number; failedCount: number };

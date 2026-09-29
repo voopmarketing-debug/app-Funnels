@@ -1,6 +1,13 @@
+import { isBsuid } from "@/lib/contactDisplay";
 import { createHmac, timingSafeEqual } from "crypto";
 
 const GRAPH_API_VERSION = "v21.0";
+
+// A contact identified only by a business-scoped user ID (see isBsuid) is
+// addressed with "recipient" instead of "to", which only takes phone numbers.
+function recipientField(id: string): { to: string } | { recipient: string } {
+  return isBsuid(id) ? { recipient: id } : { to: id };
+}
 
 /** Meta's error responses are JSON with the useful bit nested in error.message — this pulls that out so a failed send shows a human sentence instead of a raw JSON blob. */
 function parseMetaErrorMessage(status: number, rawBody: string): string {
@@ -33,7 +40,7 @@ export async function sendWhatsAppTextMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type: "text",
         text: { body: text },
       }),
@@ -113,6 +120,81 @@ export async function verifyWabaConnection(params: {
   };
 }
 
+/**
+ * Which Meta apps are subscribed to this WhatsApp Business Account's
+ * webhooks. If OUR app isn't in the list, Meta never sends us inbound
+ * messages for any number on the account — they just vanish, with no error
+ * anywhere on our side. That's the most common "a customer wrote and
+ * nothing arrived" cause (e.g. after reconnecting the number in Meta).
+ */
+export async function fetchWabaSubscribedApps(params: {
+  wabaId: string;
+  accessToken: string;
+}): Promise<{ ok: true; appIds: string[] } | { ok: false; error: string }> {
+  try {
+    const response = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/subscribed_apps`, {
+      headers: { Authorization: `Bearer ${params.accessToken}` },
+    });
+    const body = (await response.json().catch(() => null)) as {
+      data?: { whatsapp_business_api_data?: { id?: string } }[];
+      error?: { message?: string };
+    } | null;
+    if (!response.ok) return { ok: false, error: body?.error?.message ?? `Meta respondió ${response.status}` };
+    const appIds = (body?.data ?? []).map((d) => d.whatsapp_business_api_data?.id).filter((id): id is string => !!id);
+    return { ok: true, appIds };
+  } catch {
+    return { ok: false, error: "No se pudo contactar a Meta" };
+  }
+}
+
+/** Subscribes the app that owns this token to the WABA's webhooks (Meta's "subscribed_apps" POST). */
+export async function subscribeAppToWaba(params: {
+  wabaId: string;
+  accessToken: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const response = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/subscribed_apps`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${params.accessToken}` },
+    });
+    if (response.ok) return { ok: true };
+    const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+    return { ok: false, error: body?.error?.message ?? `Meta respondió ${response.status}` };
+  } catch {
+    return { ok: false, error: "No se pudo contactar a Meta" };
+  }
+}
+
+/** How many real (non-reaction) inbound messages a payload carries — to detect any the parser couldn't read. */
+export function countInboundMessages(payload: unknown): number {
+  let count = 0;
+  const entries = isRecord(payload) && Array.isArray(payload.entry) ? payload.entry : [];
+  for (const entry of entries) {
+    const changes = isRecord(entry) && Array.isArray(entry.changes) ? entry.changes : [];
+    for (const change of changes) {
+      const value = isRecord(change) && isRecord(change.value) ? change.value : undefined;
+      const msgs = value && Array.isArray(value.messages) ? value.messages : [];
+      count += msgs.filter((m) => isRecord(m) && m.type !== "reaction").length;
+    }
+  }
+  return count;
+}
+
+/** Best-effort list of phone_number_ids a webhook payload is about — for health tracking, not for trust decisions. */
+export function phoneNumberIdsInPayload(payload: unknown): string[] {
+  const ids = new Set<string>();
+  const entries = isRecord(payload) && Array.isArray(payload.entry) ? payload.entry : [];
+  for (const entry of entries) {
+    const changes = isRecord(entry) && Array.isArray(entry.changes) ? entry.changes : [];
+    for (const change of changes) {
+      const value = isRecord(change) && isRecord(change.value) ? change.value : undefined;
+      const metadata = value && isRecord(value.metadata) ? value.metadata : undefined;
+      if (typeof metadata?.phone_number_id === "string") ids.add(metadata.phone_number_id);
+    }
+  }
+  return Array.from(ids);
+}
+
 export type OutboundMediaType = "image" | "document" | "audio" | "video";
 
 /** Sends a media message by public link — Meta fetches the file itself, no upload-to-Meta step needed. */
@@ -142,7 +224,7 @@ export async function sendWhatsAppMediaMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type,
         [type]: mediaPayload,
       }),
@@ -335,7 +417,7 @@ export async function sendWhatsAppTemplateMessage(params: {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to,
+        ...recipientField(to),
         type: "template",
         template: { name: templateName, language: { code: language }, ...(components ? { components } : {}) },
       }),
@@ -436,6 +518,27 @@ function describeNonTextMessage(msg: Record<string, unknown>): string | null {
   }
 }
 
+function nonEmpty(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+/**
+ * Who sent this message. Since Meta's 2026 WhatsApp usernames rollout, a
+ * NEW customer who uses a username can arrive with no phone number at all:
+ * "from"/"wa_id" missing (or holding a business-scoped user ID) and the
+ * identity only in "from_user_id"/"user_id". This used to require "from",
+ * so those first messages were dropped silently — existing chats kept
+ * working, but new contacts never reached the CRM or the AI. The phone is
+ * still preferred whenever Meta sends it, so existing contacts keep matching
+ * their stored conversation.
+ */
+function senderIdentity(msg: Record<string, unknown>, contact: Record<string, unknown> | undefined): string | undefined {
+  const candidates = [msg.from, contact?.wa_id, msg.from_user_id, msg.user_id, contact?.user_id]
+    .map(nonEmpty)
+    .filter((c): c is string => !!c);
+  return candidates.find((c) => /^\d{6,15}$/.test(c)) ?? candidates[0];
+}
+
 /** Parses a Meta Cloud API webhook payload into the inbound messages it carries (text, media, or a text description of other types). */
 export function parseInboundMessages(payload: unknown): WhatsAppInboundMessage[] {
   const messages: WhatsAppInboundMessage[] = [];
@@ -452,15 +555,14 @@ export function parseInboundMessages(payload: unknown): WhatsAppInboundMessage[]
       if (!phoneNumberId) continue;
 
       const contacts = Array.isArray(value.contacts) ? value.contacts : [];
-      const contactName =
-        isRecord(contacts[0]) && isRecord(contacts[0].profile) && typeof contacts[0].profile.name === "string"
-          ? contacts[0].profile.name
-          : undefined;
+      const contact = isRecord(contacts[0]) ? contacts[0] : undefined;
+      const profile = contact && isRecord(contact.profile) ? contact.profile : undefined;
+      const contactName = nonEmpty(profile?.name) ?? nonEmpty(profile?.username) ?? nonEmpty(contact?.username);
 
       const waMessages = Array.isArray(value.messages) ? value.messages : [];
       for (const msg of waMessages) {
         if (!isRecord(msg)) continue;
-        const from = typeof msg.from === "string" ? msg.from : undefined;
+        const from = senderIdentity(msg, contact);
         const whatsappMsgId = typeof msg.id === "string" ? msg.id : undefined;
         if (!from || !whatsappMsgId) continue;
 

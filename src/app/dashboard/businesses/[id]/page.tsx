@@ -11,6 +11,8 @@ import { AgentPowerButton } from "./AgentPowerButton";
 import { PlanUsageCard } from "./PlanUsageCard";
 import { StatTile } from "./analytics/StatTile";
 import { ChatIcon, ClockIcon, BoltIcon, HourglassIcon } from "./analytics/StatIcons";
+import { WhatsAppHealthPanel } from "./WhatsAppHealthPanel";
+import { isRecentWebhookError } from "@/lib/whatsappHealth";
 
 function formatPercent(value: number | null): string {
   return value === null ? "—" : `${Math.round(value)}%`;
@@ -141,6 +143,18 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           limit={planLimit}
           status={planStatus}
           canEditPlan={canEditPlan}
+        />
+      )}
+
+      {canManageBusiness && business.wabaPhoneNumberId && (
+        <WhatsAppHealthPanel
+          businessId={id}
+          lastWebhookAt={business.lastWebhookAt}
+          webhookError={isRecentWebhookError(business.webhookErrorAt) ? business.webhookError : null}
+          webhookErrorAt={isRecentWebhookError(business.webhookErrorAt) ? business.webhookErrorAt : null}
+          healthOk={business.whatsappHealthOk}
+          healthMessage={business.whatsappHealthMessage}
+          healthCheckedAt={business.whatsappHealthCheckedAt}
         />
       )}
 

@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateContactInfo, updateConversationDetails } from "@/lib/actions";
-import { formatPhone } from "@/lib/contactDisplay";
+import { formatPhone, isBsuid } from "@/lib/contactDisplay";
 
 const TAG_SUGGESTIONS = ["Lead calificado", "Cliente potencial", "Cotización enviada", "Urgente"];
 
@@ -192,14 +192,17 @@ export function LeadDetailPanel({
         {contactError && <p className="text-[11px] text-error">{contactError}</p>}
         <div className="flex items-center justify-between gap-2">
           <span className="fl-mono text-xs text-ink-muted">{formatPhone(customerPhone)}</span>
-          <a
-            href={`https://wa.me/${customerPhone.replace(/[^0-9]/g, "")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-accent hover:underline"
-          >
-            Abrir en WhatsApp ↗
-          </a>
+          {/* No wa.me link for a username contact: Meta hides their number. */}
+          {!isBsuid(customerPhone) && (
+            <a
+              href={`https://wa.me/${customerPhone.replace(/[^0-9]/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-accent hover:underline"
+            >
+              Abrir en WhatsApp ↗
+            </a>
+          )}
         </div>
       </section>
 

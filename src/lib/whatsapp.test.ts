@@ -113,6 +113,46 @@ describe("parseInboundMessages", () => {
     ]);
   });
 
+  it("accepts a new contact who hides their number behind a WhatsApp username (BSUID only)", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "1234567890" },
+                contacts: [{ profile: { name: "Laura" }, user_id: "CO.1A2B3C4D5E" }],
+                messages: [{ id: "wamid.9", from_user_id: "CO.1A2B3C4D5E", type: "text", text: { body: "hola" } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(parseInboundMessages(payload)).toEqual([
+      { phoneNumberId: "1234567890", from: "CO.1A2B3C4D5E", contactName: "Laura", whatsappMsgId: "wamid.9", text: "hola" },
+    ]);
+  });
+
+  it("still prefers the phone number when Meta sends both it and a BSUID", () => {
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "1234567890" },
+                contacts: [{ profile: { name: "Ana" }, wa_id: "573001234567", user_id: "CO.ZZZ999" }],
+                messages: [{ id: "wamid.10", from: "573001234567", user_id: "CO.ZZZ999", type: "text", text: { body: "hola" } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(parseInboundMessages(payload)[0].from).toBe("573001234567");
+  });
+
   it("returns an empty array for malformed payloads", () => {
     expect(parseInboundMessages(null)).toEqual([]);
     expect(parseInboundMessages({})).toEqual([]);

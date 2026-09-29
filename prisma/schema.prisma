@@ -54,6 +54,20 @@ model Business {
   subscriptionStartedAt DateTime?
   subscriptionEndsAt    DateTime?
 
+  // WhatsApp connection health (see lib/whatsappHealth.ts). lastWebhookAt:
+  // last time Meta delivered ANY event (message or delivery receipt) for
+  // this number — if customers write and this doesn't move, Meta isn't
+  // sending us anything. webhookError*: last failure while receiving
+  // (bad signature, processing crash). whatsappHealth*: result of the last
+  // connection check (token, phone id, webhook subscription), so an alert
+  // is sent only when it goes from OK to broken, not every day.
+  lastWebhookAt           DateTime?
+  webhookError            String?
+  webhookErrorAt          DateTime?
+  whatsappHealthOk        Boolean?
+  whatsappHealthMessage   String?
+  whatsappHealthCheckedAt DateTime?
+
   memberships    Membership[]
   agent          AIAgent?
   conversations  Conversation[]
