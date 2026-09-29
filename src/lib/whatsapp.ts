@@ -390,7 +390,53 @@ export type WhatsAppInboundMessage = {
 
 const INBOUND_MEDIA_TYPES = new Set<InboundMediaType>(["image", "audio", "document", "video"]);
 
-/** Parses a Meta Cloud API webhook payload into the inbound messages it carries (text or media). */
+// Text for inbound message types that aren't plain text or downloadable
+// media. Returns null for types that shouldn't create a message at all.
+function describeNonTextMessage(msg: Record<string, unknown>): string | null {
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const obj = (v: unknown) => (isRecord(v) ? v : undefined);
+  switch (msg.type) {
+    case "reaction":
+      return null;
+    case "button":
+      // Quick-reply button on a template message.
+      return str(obj(msg.button)?.text) ?? "[Tocó un botón de la plantilla]";
+    case "interactive": {
+      const interactive = obj(msg.interactive);
+      const reply = obj(interactive?.button_reply) ?? obj(interactive?.list_reply);
+      return str(reply?.title) ?? "[Respuesta a un mensaje interactivo]";
+    }
+    case "location": {
+      const loc = obj(msg.location);
+      const lat = loc?.latitude;
+      const lng = loc?.longitude;
+      const place = [str(loc?.name), str(loc?.address)].filter(Boolean).join(", ");
+      const link = typeof lat === "number" && typeof lng === "number" ? ` https://maps.google.com/?q=${lat},${lng}` : "";
+      return `[Ubicación compartida${place ? `: ${place}` : ""}]${link}`;
+    }
+    case "contacts": {
+      const list = Array.isArray(msg.contacts) ? msg.contacts : [];
+      const described = list
+        .map((c) => {
+          const card = obj(c);
+          const name = str(obj(card?.name)?.formatted_name);
+          const phones = (Array.isArray(card?.phones) ? card.phones : [])
+            .map((ph) => str(obj(ph)?.phone))
+            .filter(Boolean)
+            .join(", ");
+          return [name, phones].filter(Boolean).join(" ");
+        })
+        .filter(Boolean);
+      return `[Contacto compartido${described.length ? `: ${described.join("; ")}` : ""}]`;
+    }
+    case "sticker":
+      return "[Sticker]";
+    default:
+      return `[Mensaje de tipo "${typeof msg.type === "string" ? msg.type : "desconocido"}" que no se puede mostrar aquí; revísalo en WhatsApp]`;
+  }
+}
+
+/** Parses a Meta Cloud API webhook payload into the inbound messages it carries (text, media, or a text description of other types). */
 export function parseInboundMessages(payload: unknown): WhatsAppInboundMessage[] {
   const messages: WhatsAppInboundMessage[] = [];
 
@@ -440,9 +486,16 @@ export function parseInboundMessages(payload: unknown): WhatsAppInboundMessage[]
             text: caption,
             media: { type: msg.type as InboundMediaType, mediaId, filename },
           });
+          continue;
         }
-        // Other types (sticker, location, contacts, reactions, ...) are
-        // silently skipped, same as before this function handled media.
+
+        // Everything else used to be dropped silently, so e.g. a customer
+        // tapping a template's quick-reply button, or sharing a location,
+        // never reached the CRM and got no reply. Now each becomes text the
+        // business (and the AI) can read. Reactions are the one exception:
+        // an emoji on an earlier message isn't a new message to answer.
+        const text = describeNonTextMessage(msg);
+        if (text) messages.push({ phoneNumberId, from, contactName, whatsappMsgId, text });
       }
     }
   }

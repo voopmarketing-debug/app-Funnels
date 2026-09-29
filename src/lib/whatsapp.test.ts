@@ -77,6 +77,42 @@ describe("parseInboundMessages", () => {
     expect(parseInboundMessages(payload)).toEqual([]);
   });
 
+  it("turns buttons, locations, contacts and stickers into readable text, and skips reactions", () => {
+    const msg = (id: string, extra: Record<string, unknown>) => ({ id, from: "573001234567", ...extra });
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "1234567890" },
+                messages: [
+                  msg("w1", { type: "button", button: { text: "Sí, me interesa" } }),
+                  msg("w2", { type: "interactive", interactive: { type: "list_reply", list_reply: { title: "Plan anual" } } }),
+                  msg("w3", { type: "location", location: { latitude: 4.6, longitude: -74.08, name: "Oficina" } }),
+                  msg("w4", {
+                    type: "contacts",
+                    contacts: [{ name: { formatted_name: "Ana" }, phones: [{ phone: "+57 300 111 2233" }] }],
+                  }),
+                  msg("w5", { type: "sticker", sticker: { id: "s1" } }),
+                  msg("w6", { type: "reaction", reaction: { emoji: "👍", message_id: "w1" } }),
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(parseInboundMessages(payload).map((m) => m.text)).toEqual([
+      "Sí, me interesa",
+      "Plan anual",
+      "[Ubicación compartida: Oficina] https://maps.google.com/?q=4.6,-74.08",
+      "[Contacto compartido: Ana +57 300 111 2233]",
+      "[Sticker]",
+    ]);
+  });
+
   it("returns an empty array for malformed payloads", () => {
     expect(parseInboundMessages(null)).toEqual([]);
     expect(parseInboundMessages({})).toEqual([]);

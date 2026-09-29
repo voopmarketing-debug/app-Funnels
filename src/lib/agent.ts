@@ -61,11 +61,6 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     return;
   }
 
-  if (!business.agent?.enabled) {
-    console.warn(`AI agent disabled or not configured for business ${business.id}`);
-    return;
-  }
-
   // Meta's webhook delivery is "at least once" — if our processing (Claude
   // call + WhatsApp send) takes long enough that Meta doesn't get its ack in
   // time, it retries the same message, which would otherwise run the entire
@@ -258,6 +253,16 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
         message: `${leadLabel} te escribió: "${excerpt}"`,
       },
     });
+  }
+
+  // Agent switched off ("Agente apagado") or never configured: the message
+  // is still saved and notified above, so the business sees who wrote in
+  // and can answer by hand — it just gets no AI reply. (This used to return
+  // before saving anything, so with the agent off, new messages never even
+  // reached the CRM.)
+  if (!business.agent?.enabled) {
+    console.warn(`AI agent disabled or not configured for business ${business.id}; message saved without AI reply`);
+    return;
   }
 
   if (conversation.aiPaused) {

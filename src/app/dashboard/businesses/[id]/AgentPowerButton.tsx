@@ -9,6 +9,12 @@ export function AgentPowerButton({ businessId, enabled }: { businessId: string; 
   const [isPending, startTransition] = useTransition();
 
   function handleClick() {
+    // Turning it off stops every AI reply on this WhatsApp line, and on a
+    // phone this button sits first in a swipeable row, where a stray tap is
+    // easy — so switching off needs a confirmation. Turning on doesn't.
+    if (enabled && !confirm("¿Apagar el agente? La IA dejará de responder a todos los clientes de este WhatsApp. Los mensajes seguirán llegando al CRM.")) {
+      return;
+    }
     startTransition(async () => {
       await toggleAgentEnabled(businessId, !enabled);
       router.refresh();
