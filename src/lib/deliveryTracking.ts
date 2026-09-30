@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { contactLabel } from "@/lib/contactDisplay";
 import type { WhatsAppStatusUpdate } from "@/lib/whatsapp";
 
 const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
@@ -19,7 +20,12 @@ const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
 export async function applyDeliveryStatus(update: WhatsAppStatusUpdate): Promise<void> {
   const message = await prisma.message.findFirst({
     where: { whatsappMsgId: update.whatsappMsgId },
-    select: { id: true, deliveryStatus: true },
+    select: {
+      id: true,
+      deliveryStatus: true,
+      broadcastId: true,
+      conversation: { select: { id: true, businessId: true, customerName: true, customerPhone: true } },
+    },
   });
   // No matching message — e.g. a status echo for a send we don't track, or
   // it arrived before our own message.create() committed. Nothing to update.
@@ -35,7 +41,28 @@ export async function applyDeliveryStatus(update: WhatsAppStatusUpdate): Promise
     data: {
       deliveryStatus: update.status,
       deliveryStatusAt: new Date(update.timestamp * 1000),
-      deliveryError: update.status === "failed" ? (update.errorMessage ?? null) : null,
+      // The Meta code rides along in parentheses — lib/replyRecovery.ts reads
+      // it to tell a retryable failure from a permanent one.
+      deliveryError:
+        update.status === "failed"
+          ? `${update.errorMessage ?? "Error de entrega"}${update.errorCode ? ` (${update.errorCode})` : ""}`
+          : null,
     },
   });
+
+  // A reply (AI or human) that never reached the customer is exactly the
+  // "they wrote and got nothing" case — tell the business right away. A
+  // retryable failure is also re-sent automatically (lib/replyRecovery.ts).
+  // Broadcast failures are already summarized in the Difusiones tab.
+  if (update.status === "failed" && !message.broadcastId) {
+    const who = contactLabel(message.conversation.customerName, message.conversation.customerPhone);
+    await prisma.notification.create({
+      data: {
+        businessId: message.conversation.businessId,
+        conversationId: message.conversation.id,
+        type: "WHATSAPP_ALERT",
+        message: `⚠ WhatsApp no entregó la respuesta a ${who}: ${update.errorMessage ?? "error de entrega"}${update.errorCode ? ` (código ${update.errorCode})` : ""}. Se reintentará automáticamente si es posible.`,
+      },
+    });
+  }
 }

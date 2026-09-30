@@ -56,6 +56,8 @@ export function ConversationSplitView({
       mediaUrl: string | null;
       mediaType: string | null;
       mediaFilename: string | null;
+      deliveryStatus: string | null;
+      deliveryError: string | null;
     }[];
   } | null;
 }) {

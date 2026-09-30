@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { maybeRetryPendingReplies } from "@/lib/replyRecovery";
 import {
   countInboundMessages,
   parseInboundMessages,
@@ -94,6 +95,23 @@ export async function POST(req: NextRequest) {
     if (result.status === "rejected") {
       console.error("Failed to handle inbound WhatsApp webhook item:", result.reason);
     }
+  }
+
+  // After acknowledging Meta: retry any chat of these businesses that's still
+  // unanswered (a failed AI call or send, a reply Meta reported undelivered,
+  // a function that timed out mid-reply). Throttled per business.
+  if (phoneNumberIds.length > 0) {
+    after(async () => {
+      try {
+        const businesses = await prisma.business.findMany({
+          where: { wabaPhoneNumberId: { in: phoneNumberIds } },
+          select: { id: true },
+        });
+        await maybeRetryPendingReplies(businesses.map((b) => b.id));
+      } catch (err) {
+        console.error("Reply recovery (webhook) failed:", err);
+      }
+    });
   }
 
   return NextResponse.json({ received: true });

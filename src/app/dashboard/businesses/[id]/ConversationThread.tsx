@@ -40,7 +40,22 @@ type ThreadMessage = {
   mediaUrl?: string | null;
   mediaType?: string | null;
   mediaFilename?: string | null;
+  deliveryStatus?: string | null;
+  deliveryError?: string | null;
 };
+
+// WhatsApp-style ticks on our outbound messages, from Meta's delivery
+// receipts — so "did the customer actually get it?" is visible at a glance,
+// and an undelivered reply shows why instead of silently looking sent.
+function DeliveryTicks({ status, error }: { status?: string | null; error?: string | null }) {
+  if (status === "failed") {
+    return <span className="font-semibold text-error">⚠ No entregado{error ? `: ${error}` : ""}</span>;
+  }
+  if (status === "read") return <span className="font-semibold text-accent">✓✓ Leído</span>;
+  if (status === "delivered") return <span>✓✓ Entregado</span>;
+  if (status === "sent") return <span>✓ Enviado</span>;
+  return null;
+}
 
 // The message thread + composer for one WhatsApp conversation — shared by
 // the standalone /conversations/[conversationId] page and the "Conversaciones"
@@ -198,6 +213,11 @@ export function ConversationThread({
                   <span className="fl-mono mb-1 text-[10px] uppercase tracking-wide text-ink-muted">Agente IA</span>
                 )}
                 {bubble}
+                {isAgent && message.deliveryStatus && (
+                  <p className="mt-0.5 max-w-[80%] text-right text-[10px] text-ink-muted">
+                    <DeliveryTicks status={message.deliveryStatus} error={message.deliveryError} />
+                  </p>
+                )}
               </div>
             </div>
           );

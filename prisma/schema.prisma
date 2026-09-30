@@ -62,6 +62,9 @@ model Business {
   // connection check (token, phone id, webhook subscription), so an alert
   // is sent only when it goes from OK to broken, not every day.
   lastWebhookAt           DateTime?
+  // Throttle for the opportunistic "retry unanswered chats" sweep that
+  // piggybacks on webhook deliveries and dashboard polling.
+  lastReplySweepAt        DateTime?
   webhookError            String?
   webhookErrorAt          DateTime?
   whatsappHealthOk        Boolean?
@@ -231,6 +234,12 @@ model Conversation {
   // by hand without touching the agent for everyone else.
   aiPaused       Boolean  @default(false)
   lastMessageAt  DateTime @default(now())
+  // Automatic reply retries (see lib/replyRecovery.ts): how many times in a
+  // row the AI reply to this conversation's latest customer message failed
+  // or wasn't delivered, and when the last attempt started (so two runs
+  // never retry the same conversation at once). Reset on a delivered reply.
+  replyAttempts      Int       @default(0)
+  lastReplyAttemptAt DateTime?
   createdAt      DateTime @default(now())
   // Null = nobody on the team has opened this conversation yet, so every
   // customer message counts as unread (see crm/page.tsx, which bumps this

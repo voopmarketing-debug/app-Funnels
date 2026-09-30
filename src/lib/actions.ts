@@ -3,6 +3,8 @@
 import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { maybeRetryPendingReplies } from "@/lib/replyRecovery";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -2482,6 +2484,11 @@ export async function getConversationActivitySignature(businessId: string): Prom
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
+
+  // While someone has the CRM open, this poll also nudges the unanswered-
+  // chat recovery for this business (throttled to once a minute, runs after
+  // the response so the poll stays fast).
+  after(() => maybeRetryPendingReplies([businessId]).catch((err) => console.error("Reply recovery (poll) failed:", err)));
 
   const result = await prisma.conversation.aggregate({
     where: { businessId },

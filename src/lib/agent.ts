@@ -13,8 +13,10 @@ import {
   VISION_MEDIA_TYPES,
   type AgentHistoryMessage,
   type AgentReplyUsage,
+  type OwnerContext,
   type VisionImage,
 } from "@/lib/ai";
+import type { AIAgent, Business, Conversation, Message } from "@prisma/client";
 import { synthesizeVoiceNote, transcribeVoiceNote } from "@/lib/tts";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS } from "@/lib/plans";
@@ -238,6 +240,8 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       ...mediaFields,
     },
   });
+  // A new customer message gets a fresh reply-retry budget (see replyToConversation).
+  await prisma.conversation.update({ where: { id: conversation.id }, data: { replyAttempts: 0 } });
 
   // Fires on every inbound customer message, independent of whether the AI
   // ends up replying (paused conversation, over plan limit, etc.) — those
@@ -282,11 +286,84 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     return;
   }
 
+  await replyToConversation({
+    business: { ...business, agent: business.agent },
+    conversation,
+    accessToken,
+    owner: ownerMembership?.user,
+    previousMessages,
+    // Never message.text directly: for a voice note that's always empty
+    // (messageContent holds the transcript), and for a photo sent without
+    // a caption it's empty too — an empty user turn is rejected outright
+    // by the API. A caption-less photo passes "" on purpose: generateAgentReply
+    // then labels it as "sent without text" next to the actual image.
+    userMessage: inboundImage && !message.text.trim() ? "" : messageContent,
+    userImages: inboundImage ? [inboundImage] : undefined,
+    replyAsVoiceNote: inboundWasVoiceNote,
+    to: message.from,
+  });
+}
+
+export type ReplyContext = {
+  business: Business & { agent: AIAgent };
+  conversation: Conversation;
+  accessToken: string;
+  owner: OwnerContext | undefined;
+  // Conversation history BEFORE the message being answered.
+  previousMessages: Message[];
+  userMessage: string;
+  userImages?: VisionImage[];
+  replyAsVoiceNote: boolean;
+  to: string;
+};
+
+export const MAX_REPLY_ATTEMPTS = 3;
+
+/**
+ * Generates and sends the AI reply, tracking attempts on the conversation so
+ * lib/replyRecovery.ts can retry a reply that failed (AI error, WhatsApp
+ * send error, or a later "failed" delivery report) — and so two runs never
+ * answer the same message at the same time. The counter is per customer
+ * message: it resets when a new one arrives (handleIncomingMessage), not on
+ * a send Meta accepted, since a send can still be reported "failed" later —
+ * that keeps retries bounded. After MAX_REPLY_ATTEMPTS the business is
+ * alerted to answer by hand.
+ */
+export async function replyToConversation(ctx: ReplyContext): Promise<void> {
+  const tracked = await prisma.conversation.update({
+    where: { id: ctx.conversation.id },
+    data: { replyAttempts: { increment: 1 }, lastReplyAttemptAt: new Date() },
+    select: { replyAttempts: true },
+  });
+  try {
+    await generateAndSendReply(ctx);
+  } catch (err) {
+    if (tracked.replyAttempts >= MAX_REPLY_ATTEMPTS) {
+      await alertReplyGaveUp(ctx, err).catch(() => {});
+    }
+    throw err;
+  }
+}
+
+export async function alertReplyGaveUp(ctx: ReplyContext, err: unknown): Promise<void> {
+  const reason = (err instanceof Error ? err.message : String(err)).slice(0, 200);
+  await prisma.notification.create({
+    data: {
+      businessId: ctx.business.id,
+      conversationId: ctx.conversation.id,
+      type: "WHATSAPP_ALERT",
+      message: `⚠ No se pudo responder a ${contactLabel(ctx.conversation.customerName, ctx.conversation.customerPhone)} después de ${MAX_REPLY_ATTEMPTS} intentos (${reason}). Respóndele manualmente desde el CRM.`,
+    },
+  });
+}
+
+async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
+  const { business, conversation, accessToken } = ctx;
   // Internal error / plan-limit notices are stored as AGENT messages so they
   // show in the dashboard, but they were never sent to the customer — feeding
   // them back as the agent's own past replies would confuse the model (and
   // it might start imitating raw error text).
-  const history: AgentHistoryMessage[] = previousMessages
+  const history: AgentHistoryMessage[] = ctx.previousMessages
     .filter((msg) => !(msg.role === "AGENT" && /^\[(ERROR INTERNO|LÍMITE DE PLAN)/.test(msg.content)))
     .map((msg) => ({
       role: msg.role === "CUSTOMER" ? "user" : "assistant",
@@ -317,9 +394,9 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       // (A caption-less photo passes "" here on purpose: generateAgentReply
       // then labels it as "sent without text" next to the actual image,
       // instead of the stored "[Imagen]" placeholder.)
-      userMessage: inboundImage && !message.text.trim() ? "" : messageContent,
-      userImages: inboundImage ? [inboundImage] : undefined,
-      owner: ownerMembership?.user,
+      userMessage: ctx.userMessage,
+      userImages: ctx.userImages,
+      owner: ctx.owner,
       availableMedia,
     });
     reply = result.text;
@@ -372,7 +449,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     // failure here just falls back to a normal text reply instead of losing
     // the message entirely.
     let voiceNote: { url: string; sizeBytes: number } | null = null;
-    if (!toolMedia && inboundWasVoiceNote && reply) {
+    if (!toolMedia && ctx.replyAsVoiceNote && reply) {
       try {
         const audioBytes = await synthesizeVoiceNote(reply);
         const { url, size } = await uploadAttachment({
@@ -393,7 +470,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       ? await sendWhatsAppMediaMessage({
           phoneNumberId: business.wabaPhoneNumberId!,
           accessToken,
-          to: message.from,
+          to: ctx.to,
           type: toolMedia.mediaType as "image" | "document",
           link: toolMedia.url,
           // Meta caps an image/document caption well under a plain text
@@ -406,14 +483,14 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
         ? await sendWhatsAppMediaMessage({
             phoneNumberId: business.wabaPhoneNumberId!,
             accessToken,
-            to: message.from,
+            to: ctx.to,
             type: "audio",
             link: voiceNote.url,
           })
         : await sendWhatsAppTextMessage({
             phoneNumberId: business.wabaPhoneNumberId!,
             accessToken,
-            to: message.from,
+            to: ctx.to,
             // Only reachable with an empty reply if Claude replied with just a
             // tool call and the referenced media vanished between generation
             // and send (deleted mid-flight) — an empty WhatsApp text send

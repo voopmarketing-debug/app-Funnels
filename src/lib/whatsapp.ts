@@ -3,11 +3,6 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 const GRAPH_API_VERSION = "v21.0";
 
-// A contact identified only by a business-scoped user ID (see isBsuid) is
-// addressed with "recipient" instead of "to", which only takes phone numbers.
-function recipientField(id: string): { to: string } | { recipient: string } {
-  return isBsuid(id) ? { recipient: id } : { to: id };
-}
 
 /** Meta's error responses are JSON with the useful bit nested in error.message — this pulls that out so a failed send shows a human sentence instead of a raw JSON blob. */
 function parseMetaErrorMessage(status: number, rawBody: string): string {
@@ -22,6 +17,61 @@ function parseMetaErrorMessage(status: number, rawBody: string): string {
   return `Meta respondió con un error (${status}): ${rawBody}`;
 }
 
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const RETRY_DELAYS_MS = [1000, 3000];
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * POSTs one message to Meta's /messages endpoint. Every outbound send (AI
+ * reply, manual reply, media, template, broadcast) goes through here, so a
+ * momentary hiccup — Meta rate-limiting (429), a 5xx, a dropped connection —
+ * is retried a couple of times instead of silently costing a customer their
+ * reply. For a username contact (BSUID), if Meta rejects the "recipient"
+ * field it's retried once with the id in "to", since Meta's rollout of
+ * BSUID sending hasn't reached every account at the same time.
+ */
+async function postMessage(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  message: Record<string, unknown>;
+}): Promise<{ messageId: string }> {
+  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${params.phoneNumberId}/messages`;
+  const addressings: Record<string, string>[] = isBsuid(params.to)
+    ? [{ recipient: params.to }, { to: params.to }]
+    : [{ to: params.to }];
+
+  let lastError = "WhatsApp API did not return a message id";
+  for (const addressing of addressings) {
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${params.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ messaging_product: "whatsapp", ...addressing, ...params.message }),
+        });
+      } catch (err) {
+        lastError = `No se pudo contactar a Meta: ${err instanceof Error ? err.message : String(err)}`;
+        if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+
+      if (response.ok) {
+        const data = (await response.json()) as { messages?: { id: string }[] };
+        const messageId = data.messages?.[0]?.id;
+        if (!messageId) throw new Error("WhatsApp API did not return a message id");
+        return { messageId };
+      }
+
+      lastError = parseMetaErrorMessage(response.status, await response.text());
+      if (!RETRYABLE_STATUS.has(response.status)) break; // try the next addressing (BSUID) or give up
+      if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+  }
+  throw new Error(lastError);
+}
+
 export async function sendWhatsAppTextMessage(params: {
   phoneNumberId: string;
   accessToken: string;
@@ -30,33 +80,15 @@ export async function sendWhatsAppTextMessage(params: {
 }): Promise<{ messageId: string }> {
   const { phoneNumberId, accessToken, to, text } = params;
 
-  const response = await fetch(
-    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        ...recipientField(to),
-        type: "text",
-        text: { body: text },
-      }),
+  return postMessage({
+    phoneNumberId,
+    accessToken,
+    to,
+    message: {
+      type: "text",
+      text: { body: text },
     },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(parseMetaErrorMessage(response.status, body));
-  }
-
-  const data = (await response.json()) as { messages?: { id: string }[] };
-  const messageId = data.messages?.[0]?.id;
-  if (!messageId) throw new Error("WhatsApp API did not return a message id");
-
-  return { messageId };
+  });
 }
 
 /** Looks up the actual dialable WhatsApp number behind a phone_number_id — needed to build a wa.me link (the id itself isn't dialable). */
@@ -214,33 +246,15 @@ export async function sendWhatsAppMediaMessage(params: {
   if (caption && type !== "audio") mediaPayload.caption = caption;
   if (filename && type === "document") mediaPayload.filename = filename;
 
-  const response = await fetch(
-    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        ...recipientField(to),
-        type,
-        [type]: mediaPayload,
-      }),
+  return postMessage({
+    phoneNumberId,
+    accessToken,
+    to,
+    message: {
+      type,
+      [type]: mediaPayload,
     },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(parseMetaErrorMessage(response.status, body));
-  }
-
-  const data = (await response.json()) as { messages?: { id: string }[] };
-  const messageId = data.messages?.[0]?.id;
-  if (!messageId) throw new Error("WhatsApp API did not return a message id");
-
-  return { messageId };
+  });
 }
 
 /**
@@ -407,33 +421,15 @@ export async function sendWhatsAppTemplateMessage(params: {
     ? [{ type: "header", parameters: [{ type: "image", image: { link: headerImageUrl } }] }]
     : undefined;
 
-  const response = await fetch(
-    `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        ...recipientField(to),
-        type: "template",
-        template: { name: templateName, language: { code: language }, ...(components ? { components } : {}) },
-      }),
+  return postMessage({
+    phoneNumberId,
+    accessToken,
+    to,
+    message: {
+      type: "template",
+      template: { name: templateName, language: { code: language }, ...(components ? { components } : {}) },
     },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(parseMetaErrorMessage(response.status, body));
-  }
-
-  const data = (await response.json()) as { messages?: { id: string }[] };
-  const messageId = data.messages?.[0]?.id;
-  if (!messageId) throw new Error("WhatsApp API did not return a message id");
-
-  return { messageId };
+  });
 }
 
 /**
@@ -610,6 +606,7 @@ export type WhatsAppStatusUpdate = {
   status: "sent" | "delivered" | "read" | "failed";
   timestamp: number; // unix seconds, from Meta
   errorMessage?: string;
+  errorCode?: number; // Meta error code, e.g. 131047 = 24h window closed
 };
 
 const KNOWN_STATUSES = new Set(["sent", "delivered", "read", "failed"]);
@@ -641,10 +638,11 @@ export function parseStatusUpdates(payload: unknown): WhatsAppStatusUpdate[] {
         const timestamp = Number.isFinite(timestampRaw) ? timestampRaw : Math.floor(Date.now() / 1000);
 
         const errors = Array.isArray(s.errors) ? s.errors : [];
-        const errorMessage =
-          isRecord(errors[0]) && typeof errors[0].title === "string" ? errors[0].title : undefined;
+        const firstError = isRecord(errors[0]) ? errors[0] : undefined;
+        const errorMessage = typeof firstError?.title === "string" ? firstError.title : undefined;
+        const errorCode = typeof firstError?.code === "number" ? firstError.code : undefined;
 
-        updates.push({ whatsappMsgId, status: status as WhatsAppStatusUpdate["status"], timestamp, errorMessage });
+        updates.push({ whatsappMsgId, status: status as WhatsAppStatusUpdate["status"], timestamp, errorMessage, errorCode });
       }
     }
   }
