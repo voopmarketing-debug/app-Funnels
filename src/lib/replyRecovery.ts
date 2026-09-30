@@ -76,7 +76,7 @@ export async function retryPendingReplies(options: { businessIds?: string[]; lim
 
 type Candidate = Prisma.ConversationGetPayload<{ include: { business: { include: { agent: true } } } }>;
 
-async function recoverConversation(conversation: Candidate, now: number): Promise<boolean> {
+async function recoverConversation(conversation: Candidate, now: number, manual = false): Promise<boolean> {
   const { business } = conversation;
   if (!business.agent || !business.wabaAccessToken || !business.wabaPhoneNumberId) return false;
 
@@ -88,7 +88,7 @@ async function recoverConversation(conversation: Candidate, now: number): Promis
   const latestIdx = recentDesc.findIndex((m) => !(m.role === "AGENT" && NOTICE.test(m.content)));
   if (latestIdx === -1) return false;
   const latest = recentDesc[latestIdx];
-  if (latest.role === "CUSTOMER" && now - latest.createdAt.getTime() < MIN_AGE_MS) return false;
+  if (!manual && latest.role === "CUSTOMER" && now - latest.createdAt.getTime() < MIN_AGE_MS) return false;
 
   // Claim the conversation first (optimistic lock on the attempt timestamp)
   // so two concurrent sweeps can never both answer it.
@@ -207,4 +207,27 @@ export async function maybeRetryPendingReplies(businessIds: string[]): Promise<v
     if (claimed.count > 0) due.push(id);
   }
   if (due.length > 0) await retryPendingReplies({ businessIds: due, limit: 10 });
+}
+
+/**
+ * "Reintentar respuesta" in the chat: the business asked to try again now
+ * (e.g. right after topping up the Anthropic balance), so the attempt budget
+ * and cooldown are reset and the same recovery runs immediately.
+ */
+export async function retryConversationNow(conversationId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await prisma.conversation.update({ where: { id: conversationId }, data: { replyAttempts: 0, lastReplyAttemptAt: null } });
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { business: { include: { agent: true } } },
+  });
+  if (!conversation) return { ok: false, error: "Conversación no encontrada" };
+  if (Date.now() - conversation.lastMessageAt.getTime() > WINDOW_MS) {
+    return { ok: false, error: "Pasaron más de 24 h desde su último mensaje: WhatsApp solo permite escribirle con una plantilla." };
+  }
+  try {
+    const acted = await recoverConversation(conversation, Date.now(), true);
+    return acted ? { ok: true } : { ok: false, error: "No hay ningún mensaje pendiente de respuesta en este chat." };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message.slice(0, 300) : "No se pudo responder" };
+  }
 }

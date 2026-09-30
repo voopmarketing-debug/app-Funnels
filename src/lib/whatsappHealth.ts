@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { sendEmail } from "@/lib/email";
+import { checkAnthropic, checkOpenAi } from "@/lib/aiServiceHealth";
 import { fetchWabaSubscribedApps, subscribeAppToWaba, verifyWabaConnection } from "@/lib/whatsapp";
 
 // Why this exists: when WhatsApp stops delivering to us (expired token, the
@@ -93,6 +94,10 @@ export async function checkWhatsAppHealth(business: HealthBusiness): Promise<Wha
     checks.push({ label: "Últimos mensajes", ok: false, detail: business.webhookError });
   }
 
+  // The AI side too: WhatsApp can be fine and customers still get nothing
+  // if Anthropic rejects every call (e.g. an unpaid balance).
+  checks.push(await checkAnthropic(), await checkOpenAi());
+
   return { ok: checks.every((c) => c.ok), checks, canResubscribe };
 }
 
@@ -173,7 +178,7 @@ export async function runWhatsAppHealthCheck(businessId: string): Promise<WhatsA
   if (!business) return null;
   const health = await checkWhatsAppHealth(business);
   const firstProblem = health.checks.find((c) => !c.ok);
-  const summary = firstProblem ? `${firstProblem.label}: ${firstProblem.detail}` : "Conexión con WhatsApp funcionando.";
+  const summary = firstProblem ? `${firstProblem.label}: ${firstProblem.detail}` : "WhatsApp e IA funcionando.";
 
   await prisma.business.update({
     where: { id: businessId },
@@ -183,13 +188,13 @@ export async function runWhatsAppHealthCheck(businessId: string): Promise<WhatsA
   if (!health.ok && business.whatsappHealthOk !== false) {
     await alertBusiness(
       businessId,
-      `⚠ WhatsApp dejó de funcionar. ${summary}`,
-      "⚠ Tu agente de WhatsApp no está recibiendo mensajes",
+      `⚠ Tu agente dejó de responder. ${summary}`,
+      "⚠ Tu agente de WhatsApp dejó de funcionar",
       true,
     );
   } else if (health.ok && business.whatsappHealthOk === false) {
     await prisma.notification.create({
-      data: { businessId, type: "WHATSAPP_ALERT", message: "✅ La conexión con WhatsApp volvió a funcionar." },
+      data: { businessId, type: "WHATSAPP_ALERT", message: "✅ Tu agente volvió a funcionar con normalidad." },
     });
   }
   return health;

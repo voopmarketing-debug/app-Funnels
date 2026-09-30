@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { maybeRetryPendingReplies } from "@/lib/replyRecovery";
+import { maybeRetryPendingReplies, retryConversationNow } from "@/lib/replyRecovery";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -844,6 +844,22 @@ export async function reconnectWhatsAppWebhook(businessId: string): Promise<{ ok
   const health = (await runWhatsAppHealthCheck(businessId)) ?? undefined;
   revalidatePath(`/dashboard/businesses/${businessId}`);
   return { ok: true, health };
+}
+
+/** "↻ Reintentar respuesta" on a chat where the AI reply failed. */
+export async function retryConversationReply(
+  businessId: string,
+  conversationId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+  const conversation = await prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { id: true } });
+  if (!conversation) return { ok: false, error: "Conversación no encontrada" };
+  const result = await retryConversationNow(conversationId);
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+  return result;
 }
 
 export type BroadcastResult = { totalRecipients: number; sentCount: number; failedCount: number };

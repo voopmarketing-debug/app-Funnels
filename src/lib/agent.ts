@@ -21,6 +21,9 @@ import { synthesizeVoiceNote, transcribeVoiceNote } from "@/lib/tts";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS } from "@/lib/plans";
 import { contactLabel } from "@/lib/contactDisplay";
+import Anthropic from "@anthropic-ai/sdk";
+import { describeAnthropicError } from "@/lib/aiServiceHealth";
+import { reportWebhookProblem } from "@/lib/whatsappHealth";
 
 const MEDIA_TYPE_LABEL: Record<string, string> = {
   image: "Imagen",
@@ -437,6 +440,12 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
     // has repeatedly broken the platform's own log viewer before we could
     // read it there. Tagged so we know it happened during the Claude call.
     await logInternalError(conversation.id, "IA", err);
+    // A billing/key problem blocks EVERY reply, not just this one — alert
+    // right away (throttled) instead of waiting for the daily health check.
+    const described = describeAnthropicError(err);
+    if (described.billing || err instanceof Anthropic.AuthenticationError) {
+      await reportWebhookProblem(business.id, `La IA no pudo responder. ${described.text}`).catch(() => {});
+    }
     throw err;
   }
 

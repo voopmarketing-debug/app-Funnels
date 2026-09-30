@@ -71,7 +71,7 @@ export function WhatsAppHealthPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full ${ok ? "bg-accent" : "animate-pulse bg-error"}`} />
-          <h2 className="text-sm font-semibold text-ink">Estado de WhatsApp</h2>
+          <h2 className="text-sm font-semibold text-ink">Estado del agente (WhatsApp + IA)</h2>
           <span className={`text-xs font-medium ${ok ? "text-accent" : "text-error"}`}>
             {ok ? "Funcionando" : "Requiere atención"}
           </span>

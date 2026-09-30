@@ -7,6 +7,7 @@ import { MessageScrollArea } from "./MessageScrollArea";
 import { contactInitial, contactLabel, formatPhone } from "@/lib/contactDisplay";
 import { ContactFormDialog } from "./ContactFormDialog";
 import { ImageLightbox } from "./ImageLightbox";
+import { RetryReplyButton } from "./RetryReplyButton";
 
 // This renders server-side, where the runtime clock is UTC (Vercel), not
 // Bogotá — toLocaleTimeString() without a timeZone silently used that UTC
@@ -43,6 +44,16 @@ type ThreadMessage = {
   deliveryStatus?: string | null;
   deliveryError?: string | null;
 };
+
+// The stored notice is "[ERROR INTERNO - IA|WHATSAPP] <raw error>" — this
+// turns the common causes into something the business owner can act on.
+function errorReason(content: string): string | null {
+  if (/credit balance|billing/i.test(content)) return "Motivo: se acabó el saldo de Anthropic (la IA). Recarga y toca «Reintentar».";
+  if (/authentication_error|invalid x-api-key|API key/i.test(content)) return "Motivo: la clave de la IA (Anthropic) no es válida.";
+  if (/overloaded|529|rate_limit/i.test(content)) return "Motivo: la IA estaba saturada en ese momento.";
+  if (/ERROR INTERNO - WHATSAPP/.test(content)) return "Motivo: WhatsApp rechazó el envío de la respuesta.";
+  return null;
+}
 
 // WhatsApp-style ticks on our outbound messages, from Meta's delivery
 // receipts — so "did the customer actually get it?" is visible at a glance,
@@ -145,7 +156,7 @@ export function ConversationThread({
       </div>
 
       <MessageScrollArea messageCount={messages.length}>
-        {messages.map((message) => {
+        {messages.map((message, index) => {
           const isError = message.content.startsWith("[ERROR INTERNO");
 
           if (isError) {
@@ -158,11 +169,13 @@ export function ConversationThread({
                 className="mx-auto w-full max-w-[90%] rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-center text-xs text-red-300"
               >
                 <p className="font-semibold">⚠ La IA no pudo responder este mensaje</p>
+                {errorReason(message.content) && <p className="mt-1">{errorReason(message.content)}</p>}
                 <details className="mt-1 text-left">
                   <summary className="cursor-pointer text-center opacity-80">Ver detalle técnico</summary>
                   <p className="fl-mono mt-1 break-all text-[10px] opacity-80">{message.content}</p>
                 </details>
                 <p className="mt-1 opacity-70">{formatMessageDateTime(message.createdAt)}</p>
+                {index === messages.length - 1 && <RetryReplyButton businessId={businessId} conversationId={conversationId} />}
               </div>
             );
           }
