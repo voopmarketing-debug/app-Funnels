@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createWebsitePageV2, websiteCreationChat } from "@/lib/actions";
 import { PAGE_TYPE_LABELS, STYLE_INFO, STYLE_KEYS, type PageType, type StyleKey } from "@/lib/websiteContentV2";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
+import { ColorCodeInput } from "@/components/ColorCodeInput";
 
 type Proposal = { title: string; pageType: PageType; style: StyleKey; why: string; brief: string };
 type Ready = { pageType: PageType; style: StyleKey; name: string; purpose: string; brief: string };
@@ -403,7 +404,7 @@ export function CreationStudio({
                   <p className="text-xs text-ink-muted">
                     {brandPrimary
                       ? "Tu página usará tu color en botones y detalles, con el estilo que elegiste."
-                      : "Opcional. Si no eliges, usamos los colores del estilo."}
+                      : "Opcional. Toca el cuadro o pega el código de tu color (#F3F3EF o rgb). Si no eliges, usamos los del estilo."}
                   </p>
                   <div className="flex flex-wrap items-center gap-3">
                     {(
@@ -412,20 +413,29 @@ export function CreationStudio({
                         ["Secundario", brandSecondary, setBrandSecondary],
                       ] as const
                     ).map(([label, value, set]) => (
-                      <label key={label} className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 text-xs text-ink-muted">
-                        <input
-                          type="color"
-                          value={value ?? "#1f6feb"}
-                          onChange={(e) => set(e.target.value)}
+                      <div key={label} className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5">
+                        <label className="relative h-8 w-8 flex-none cursor-pointer" title={`Elegir color ${label.toLowerCase()}`}>
+                          <span
+                            className={`block h-full w-full rounded-md border border-black/10 ${value ? "" : "bg-[repeating-linear-gradient(45deg,var(--surface-2)_0_4px,var(--border)_4px_8px)]"}`}
+                            style={value ? { background: value } : undefined}
+                          />
+                          <input
+                            type="color"
+                            value={value ?? "#1f6feb"}
+                            onChange={(e) => set(e.target.value)}
+                            disabled={label === "Secundario" && !brandPrimary}
+                            aria-label={`Color ${label.toLowerCase()} de tu marca`}
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                          />
+                        </label>
+                        <span className="text-xs font-semibold text-ink">{label}</span>
+                        <ColorCodeInput
+                          value={value}
+                          label={`color ${label.toLowerCase()}`}
                           disabled={label === "Secundario" && !brandPrimary}
-                          aria-label={`Color ${label.toLowerCase()} de tu marca`}
-                          className="h-7 w-7 cursor-pointer rounded border-0 bg-transparent p-0 disabled:opacity-40"
+                          onChange={(hex) => set(hex)}
                         />
-                        <span>
-                          <span className="block font-semibold text-ink">{label}</span>
-                          <span className="font-mono">{value ?? "Sin elegir"}</span>
-                        </span>
-                      </label>
+                      </div>
                     ))}
                     {brandPrimary && (
                       <button

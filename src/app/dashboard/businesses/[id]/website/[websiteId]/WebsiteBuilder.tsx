@@ -14,6 +14,7 @@ import {
 } from "@/lib/websiteContentV2";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
+import { ColorCodeInput } from "@/components/ColorCodeInput";
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
 
 type Tab = "chat" | "diseno" | "secciones" | "ajustes";
@@ -472,7 +473,7 @@ function ThemeEditor({
         <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
           <PencilIcon className="h-4 w-4 text-accent" /> Colores de tu página
         </p>
-        <p className="text-[12px] text-ink-muted">Toca un color para cambiarlo. Verás el cambio en la página al instante.</p>
+        <p className="text-[12px] text-ink-muted">Toca el color o pega su código (#F3F3EF o rgb). Verás el cambio en la página al instante.</p>
       </div>
 
       <div className="space-y-2">
@@ -498,17 +499,11 @@ function ThemeEditor({
                 <p className="text-sm font-semibold leading-tight text-ink">{label}</p>
                 <p className="truncate text-[12px] text-ink-muted">{hint}</p>
               </div>
-              <input
+              <ColorCodeInput
                 value={theme[key]}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  const hex = v.startsWith("#") ? v : `#${v}`;
-                  setTheme({ ...theme, [key]: v });
-                  if (/^#[0-9a-fA-F]{6}$/.test(hex)) update({ ...theme, [key]: hex.toLowerCase() });
-                }}
                 disabled={disabled}
-                aria-label={`Código del ${label.toLowerCase()}`}
-                className="w-[5.5rem] flex-none rounded-md border border-border bg-surface px-2 py-1.5 font-mono text-xs uppercase text-ink outline-none focus:border-accent"
+                label={label.toLowerCase()}
+                onChange={(hex) => update({ ...theme, [key]: hex })}
               />
             </div>
           );
