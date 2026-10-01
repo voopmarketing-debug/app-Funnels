@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { WebsiteContentSchema } from "@/lib/websiteContent";
-import { renderWebsiteHtml } from "@/lib/websiteTemplate";
-import { getWebsiteHeroContext } from "@/lib/websiteHero";
+import { renderStoredWebsite } from "@/lib/websiteRender";
 import { renderAgendaHtml } from "@/lib/agendaTemplate";
 import {
   AvailabilitySchema,
@@ -134,8 +132,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     });
   }
 
-  const parsedContent = WebsiteContentSchema.safeParse(website.content);
-  if (!parsedContent.success) {
+  const html = await renderStoredWebsite(website, { trackingBasePath: `/sitio/${slug}`, leadSubmitted, preview });
+  if (!html) {
     // Content saved under an earlier version of the schema — ask the
     // owner to regenerate rather than showing a raw 500 to visitors.
     return new NextResponse(
@@ -143,22 +141,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", ...siteSecurityHeaders() } },
     );
   }
-
-  const { eyebrow, heroImageUrl } = await getWebsiteHeroContext(
-    website.businessId,
-    website.business.industry,
-    website.aiImageUrl,
-  );
-
-  const html = renderWebsiteHtml(parsedContent.data, {
-    businessName: website.business.name,
-    whatsappNumber: website.whatsappNumber,
-    trackingBasePath: `/sitio/${slug}`,
-    leadSubmitted,
-    preview,
-    eyebrow,
-    heroImageUrl,
-  });
 
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },

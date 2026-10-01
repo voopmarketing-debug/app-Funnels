@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { WebsiteContentSchema } from "@/lib/websiteContent";
-import { renderWebsiteHtml } from "@/lib/websiteTemplate";
-import { getWebsiteHeroContext } from "@/lib/websiteHero";
+import { renderStoredWebsite, resolveClickTarget } from "@/lib/websiteRender";
 import { renderAgendaHtml } from "@/lib/agendaTemplate";
 import {
   AvailabilitySchema,
@@ -174,16 +172,6 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  const parsedContent = WebsiteContentSchema.safeParse(website.content);
-  if (!parsedContent.success) {
-    // Content saved under an earlier version of the schema — ask the
-    // owner to regenerate rather than showing a raw error to visitors.
-    return new NextResponse(
-      "Esta página necesita actualizarse — pide al dueño del negocio que entre a su panel y le dé 'Regenerar todo con IA'.",
-      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", ...customDomainSecurityHeaders() } },
-    );
-  }
-  const content = parsedContent.data;
 
   // Same lead-capture form POST as /sitio/[slug]/registro, reached here as
   // a root-relative "/registro" action since a custom domain has no slug.
@@ -199,8 +187,7 @@ export async function proxy(request: NextRequest) {
   // root-relative "/ir" link since a custom domain has no slug in its path.
   if (request.nextUrl.pathname === "/ir") {
     const label = request.nextUrl.searchParams.get("label") ?? "unknown";
-    const destination = content.hero.ctaUrl ? "agenda" : "whatsapp";
-    const target = content.hero.ctaUrl || `https://wa.me/${website.whatsappNumber.replace(/[^0-9]/g, "")}`;
+    const { target, destination } = await resolveClickTarget(website, request.nextUrl.searchParams.get("p"));
 
     try {
       await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "cta_click", label, destination } });
@@ -217,20 +204,18 @@ export async function proxy(request: NextRequest) {
     console.error("Failed to log website view event:", err);
   }
 
-  const { eyebrow, heroImageUrl } = await getWebsiteHeroContext(
-    website.businessId,
-    website.business.industry,
-    website.aiImageUrl,
-  );
-
-  const html = renderWebsiteHtml(content, {
-    businessName: website.business.name,
-    whatsappNumber: website.whatsappNumber,
+  const html = await renderStoredWebsite(website, {
     trackingBasePath: "",
     leadSubmitted: request.nextUrl.searchParams.get("registrado") === "1",
-    eyebrow,
-    heroImageUrl,
   });
+  if (!html) {
+    // Content saved under an earlier version of the schema — ask the
+    // owner to regenerate rather than showing a raw error to visitors.
+    return new NextResponse(
+      "Esta página necesita actualizarse — pide al dueño del negocio que entre a su panel y le dé 'Regenerar todo con IA'.",
+      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", ...customDomainSecurityHeaders() } },
+    );
+  }
 
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...customDomainSecurityHeaders() },

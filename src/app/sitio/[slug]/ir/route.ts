@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { WebsiteContentSchema } from "@/lib/websiteContent";
+import { resolveClickTarget } from "@/lib/websiteRender";
 
 // Every CTA button on a generated page routes through here instead of
 // linking straight to WhatsApp/the agenda link — logs a click, then
@@ -16,16 +16,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
   const website = await prisma.website.findUnique({
     where: { slug },
-    select: { id: true, content: true, whatsappNumber: true },
+    select: { id: true, content: true, whatsappNumber: true, businessId: true },
   });
   if (!website) {
     return new NextResponse("Sitio no encontrado", { status: 404 });
   }
 
-  const parsedContent = WebsiteContentSchema.safeParse(website.content);
-  const ctaUrl = parsedContent.success ? parsedContent.data.hero.ctaUrl : null;
-  const destination = ctaUrl ? "agenda" : "whatsapp";
-  const target = ctaUrl || `https://wa.me/${website.whatsappNumber.replace(/[^0-9]/g, "")}`;
+  // ?p=<productId>: "Pedir por WhatsApp" on a product card — opens the
+  // chat with the order already written.
+  const { target, destination } = await resolveClickTarget(website, req.nextUrl.searchParams.get("p"));
 
   if (!preview) {
     try {

@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createWebsitePage, createAgendaPage, deleteWebsitePage, renameWebsitePage } from "@/lib/actions";
+import { createWebsitePageV2, createAgendaPage, deleteWebsitePage, renameWebsitePage } from "@/lib/actions";
 import { ClientDate } from "@/components/ClientDate";
 
 type Page = {
@@ -80,13 +80,21 @@ export function WebsitePagesList({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={openNewPageDialog}
-            className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover disabled:opacity-50"
-          >
-            + Nueva página
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/dashboard/businesses/${businessId}/website/crear`}
+              className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
+            >
+              ✦ Crear con IA
+            </Link>
+            <button
+              type="button"
+              onClick={openNewPageDialog}
+              className="rounded-md border border-border-strong px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-accent"
+            >
+              + Página rápida o agenda
+            </button>
+          </div>
         </div>
       )}
 
@@ -116,17 +124,16 @@ export function WebsitePagesList({
           <div>
             <p className="text-sm font-medium text-ink">Este negocio todavía no tiene sitio web</p>
             <p className="mx-auto mt-1 max-w-xs text-xs text-ink-muted">
-              Cuéntale a la IA cómo quieres tu página y la arma completa — después puedes editar todo (textos,
-              colores, link) o pedirle cambios con IA.
+              Conversa con la IA: te propone ideas según tu negocio (landing, tienda, producto, evento) y la
+              arma completa. Después la editas pidiéndole cambios por chat.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openNewPageDialog}
-            className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover disabled:opacity-50"
+          <Link
+            href={`/dashboard/businesses/${businessId}/website/crear`}
+            className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
           >
-            ✨ Generar sitio web
-          </button>
+            ✦ Crear con IA
+          </Link>
         </div>
       )}
     </div>
@@ -407,12 +414,14 @@ function NewPageForm({
 
     startTransition(async () => {
       try {
-        const { id } = await createWebsitePage(businessId, {
+        // Quick path from this dialog also uses the new builder (v2).
+        const result = await createWebsitePageV2(businessId, {
           purpose: purpose || undefined,
-          designPrompt: designPrompt || undefined,
+          brief: designPrompt || undefined,
         });
+        if (!result.ok) throw new Error(result.error);
         onClose();
-        router.push(`/dashboard/businesses/${businessId}/website/${id}`);
+        router.push(`/dashboard/businesses/${businessId}/website/${result.id}`);
       } catch (err) {
         setState({ error: err instanceof Error ? err.message : "No se pudo crear la página" });
       }

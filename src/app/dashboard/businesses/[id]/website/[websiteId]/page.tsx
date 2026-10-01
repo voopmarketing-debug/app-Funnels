@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { AvailabilitySchema, DEFAULT_AVAILABILITY, parseMonthStr, getCurrentMonthStr } from "@/lib/agenda";
 import { WebsiteEditor } from "./WebsiteEditor";
+import { WebsiteBuilder } from "./WebsiteBuilder";
+import { UpgradeToBuilderBanner } from "./UpgradeToBuilderBanner";
+import { WebsiteContentV2Schema, isV2Content } from "@/lib/websiteContentV2";
 import { AgendaEditor } from "./AgendaEditor";
 import { RegenerateOldPageButton } from "./RegenerateOldPageButton";
 
@@ -103,6 +106,29 @@ export default async function WebsiteEditorPage({
     );
   }
 
+  // New builder (v2 content): full-screen chat + design + live preview.
+  if (isV2Content(website.content)) {
+    const v2 = WebsiteContentV2Schema.safeParse(website.content);
+    if (v2.success) {
+      const [views, clicks, leadCount] = await Promise.all([
+        prisma.websiteEvent.count({ where: { websiteId, type: "view" } }),
+        prisma.websiteEvent.count({ where: { websiteId, type: "cta_click" } }),
+        prisma.websiteLead.count({ where: { websiteId } }),
+      ]);
+      return (
+        <WebsiteBuilder
+          businessId={id}
+          websiteId={websiteId}
+          name={website.name}
+          slug={website.slug}
+          publicUrl={`https://${appHost}/sitio/${website.slug}`}
+          initialContent={v2.data}
+          stats={{ views, clicks, leads: leadCount }}
+        />
+      );
+    }
+  }
+
   const parsedContent = WebsiteContentSchema.safeParse(website.content);
 
   if (!parsedContent.success) {
@@ -152,6 +178,8 @@ export default async function WebsiteEditorPage({
         <h1 className="mt-1 text-xl font-bold">{website.name}</h1>
         {website.purpose && <p className="mt-1 max-w-2xl text-sm text-ink-muted">{website.purpose}</p>}
       </div>
+
+      <UpgradeToBuilderBanner businessId={id} websiteId={websiteId} />
 
       <WebsiteEditor
         businessId={id}

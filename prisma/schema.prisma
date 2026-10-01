@@ -80,6 +80,7 @@ model Business {
   messageTemplates MessageTemplate[]
   websites       Website[]
   agentMedia     AgentMedia[]
+  products       Product[]
   notifications  Notification[]
 }
 
@@ -102,6 +103,32 @@ model AgentMedia {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
+}
+
+// The business's product catalog — what the "tienda" and "producto" page
+// types render (see lib/websiteContentV2.ts). The AI never invents
+// products or prices; it can only pick from these.
+model Product {
+  id             String   @id @default(cuid())
+  businessId     String
+  name           String
+  description    String   @default("")
+  // Whole pesos (or the business's currency units) — no cents needed.
+  price          Int?
+  compareAtPrice Int?
+  currency       String   @default("COP")
+  category       String?
+  imageUrl       String?
+  // Short label shown on the card, e.g. "Nuevo", "Más vendido", "-20%".
+  badge          String?
+  active         Boolean  @default(true)
+  position       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, active, position])
 }
 
 enum PlanTier {

@@ -26,6 +26,16 @@ import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator
 import { generateHeroImage } from "@/lib/websiteHeroImage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
+import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import {
+  generateWebsiteContentV2,
+  applyWebsiteEditV2,
+  websiteCreationTurn,
+  type CreationTurn,
+  type WebsiteV2Context,
+} from "@/lib/websiteGeneratorV2";
+import { getCatalogProducts } from "@/lib/websiteRender";
+import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import { isValidEmail, normalizePhone } from "@/lib/phone";
 import { resubscribeWhatsAppWebhook, runWhatsAppHealthCheck, type WhatsAppHealth } from "@/lib/whatsappHealth";
 import { MAX_IMPORT_ROWS, type ImportContactRow } from "@/lib/contactImport";
@@ -1820,11 +1830,15 @@ async function resolveWhatsappNumberForBusiness(businessId: string): Promise<{ d
   const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
 
   if (business.wabaAccessToken && business.wabaPhoneNumberId) {
-    const accessToken = decryptSecret(business.wabaAccessToken);
-    const displayNumber = await fetchWhatsAppDisplayNumber({ phoneNumberId: business.wabaPhoneNumberId, accessToken });
-    if (displayNumber) return { displayNumber };
-    // Meta lookup failed (expired token, etc.) — fall through to the
-    // owner's phone below instead of blocking site creation over it.
+    try {
+      const accessToken = decryptSecret(business.wabaAccessToken);
+      const displayNumber = await fetchWhatsAppDisplayNumber({ phoneNumberId: business.wabaPhoneNumberId, accessToken });
+      if (displayNumber) return { displayNumber };
+    } catch (err) {
+      console.error(`resolveWhatsappNumberForBusiness: could not read the WhatsApp token for ${businessId}:`, err);
+    }
+    // Meta lookup failed (expired/unreadable token, etc.) — fall through to
+    // the owner's phone below instead of blocking site creation over it.
   }
 
   const ownerMembership = await prisma.membership.findFirst({
@@ -2585,4 +2599,238 @@ export async function getUnreadNotificationCount(): Promise<number> {
   if (businessIds.length === 0) return 0;
 
   return prisma.notification.count({ where: { businessId: { in: businessIds }, readAt: null } });
+}
+
+// ---------------------------------------------------------------------------
+// Website builder v2 (see lib/websiteContentV2.ts): pages with page types,
+// 12 visual styles, product catalog, a creation chat and chat edits.
+
+async function buildWebsiteV2Context(
+  businessId: string,
+  // The creation chat never needs the WhatsApp number (and resolving it
+  // calls Meta), so only page generation asks for it.
+  opts: { withNumber?: boolean } = { withNumber: true },
+): Promise<WebsiteV2Context & { displayNumber: string }> {
+  const [business, ownerMembership, products, photoCount] = await Promise.all([
+    prisma.business.findUniqueOrThrow({ where: { id: businessId }, include: { agent: true } }),
+    prisma.membership.findFirst({
+      where: { businessId, role: "OWNER" },
+      include: { user: { select: { city: true, country: true, facebook: true, instagram: true, tiktok: true } } },
+    }),
+    getCatalogProducts(businessId),
+    prisma.agentMedia.count({ where: { businessId, mediaType: "image" } }),
+  ]);
+  const [{ displayNumber }, salesContext] = await Promise.all([
+    opts.withNumber ? resolveWhatsappNumberForBusiness(businessId) : Promise.resolve({ displayNumber: "" }),
+    buildSalesContext(businessId, business.agent?.diagnosisReport),
+  ]);
+  return {
+    businessName: business.name,
+    industry: business.industry,
+    description: business.agent?.systemPrompt ?? "",
+    whatsappNumber: displayNumber,
+    displayNumber,
+    city: ownerMembership?.user.city,
+    country: ownerMembership?.user.country,
+    instagram: ownerMembership?.user.instagram,
+    facebook: ownerMembership?.user.facebook,
+    tiktok: ownerMembership?.user.tiktok,
+    salesContext,
+    products,
+    photoCount,
+  };
+}
+
+/** One turn of the "Crear con IA" chat — proposals, one question at a time, then a ready brief. */
+// The builder actions below return { ok: false, error } instead of throwing:
+// Next.js strips a thrown error's message in production (the client only
+// sees "Minified React error #441"), and these errors are meant for the user.
+export type BuilderResult<T> = ({ ok: true } & T) | { ok: false; error: string };
+
+function builderError(where: string, err: unknown): { ok: false; error: string } {
+  console.error(`${where} failed:`, err);
+  // Errors from the Claude API (or anything with an HTTP status) carry raw
+  // JSON in their message; show the person something they can act on.
+  const status = typeof err === "object" && err !== null && "status" in err ? (err as { status?: unknown }).status : undefined;
+  if (typeof status === "number") {
+    if (status === 429 || status === 529) {
+      return { ok: false, error: "La IA está saturada en este momento. Espera un minuto e intenta de nuevo." };
+    }
+    return { ok: false, error: "La IA no respondió. Intenta de nuevo en unos segundos; si sigue pasando, escríbenos a soporte." };
+  }
+  return { ok: false, error: err instanceof Error ? err.message : "Algo salió mal, intenta de nuevo" };
+}
+
+export async function websiteCreationChat(
+  businessId: string,
+  history: { role: "user" | "assistant"; text: string }[],
+): Promise<BuilderResult<{ turn: CreationTurn }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+
+    const key = `website-chat:${businessId}`;
+    if (await isRateLimited(key, 80, 24 * 60 * 60 * 1000)) {
+      throw new Error("Llegaste al límite de mensajes de hoy con el asistente. Intenta mañana.");
+    }
+    await recordRateLimitEvent(key);
+
+    const ctx = await buildWebsiteV2Context(businessId, { withNumber: false });
+    const trimmed = history.slice(-16).map((m) => ({ role: m.role, text: m.text.slice(0, 1500) }));
+    return { ok: true, turn: await websiteCreationTurn(ctx, trimmed) };
+  } catch (err) {
+    return builderError(`websiteCreationChat(${businessId})`, err);
+  }
+}
+
+export async function createWebsitePageV2(
+  businessId: string,
+  input: { name?: string; purpose?: string; brief?: string; pageType?: PageType | null; style?: StyleKey | null; ctaUrl?: string },
+): Promise<BuilderResult<{ id: string }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    await assertWebsiteGenerationAllowed(businessId);
+
+    const ctx = await buildWebsiteV2Context(businessId);
+    const existingCount = await prisma.website.count({ where: { businessId } });
+    const name = input.name?.trim().slice(0, 80) || (existingCount === 0 ? "Sitio principal" : `Página ${existingCount + 1}`);
+    const ctaUrl = input.ctaUrl && /^https?:\/\//i.test(input.ctaUrl.trim()) ? input.ctaUrl.trim() : null;
+
+    const [content, aiImageUrl] = await Promise.all([
+      generateWebsiteContentV2({
+        ...ctx,
+        purpose: input.purpose?.trim() || null,
+        designPrompt: input.brief?.trim() || null,
+        pageType: input.pageType ?? null,
+        style: input.style ?? null,
+        ctaUrl,
+      }),
+      ctx.photoCount > 0 ? Promise.resolve(null) : generateHeroImage({ businessName: ctx.businessName, industry: ctx.industry, description: ctx.description }),
+    ]);
+    if (ctaUrl) content.heroCtaUrl = ctaUrl;
+    await recordWebsiteGeneration(businessId);
+
+    const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0);
+    const website = await prisma.website.create({
+      data: {
+        businessId,
+        name,
+        purpose: input.purpose?.trim() || null,
+        designPrompt: input.brief?.trim() || null,
+        slug,
+        content,
+        aiImageUrl,
+        whatsappNumber: ctx.displayNumber,
+        model: "claude-sonnet-5",
+      },
+    });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, id: website.id };
+  } catch (err) {
+    return builderError(`createWebsitePageV2(${businessId})`, err);
+  }
+}
+
+/** Chat edit on a v2 page; v1 pages are upgraded to v2 by regenerating. */
+export async function applyWebsitePromptV2(
+  businessId: string,
+  websiteId: string,
+  instruction: string,
+): Promise<BuilderResult<{ content: WebsiteContentV2 }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    const trimmed = instruction.trim().slice(0, 2000);
+    if (!trimmed) throw new Error("Escribe qué cambio quieres");
+    await assertWebsiteGenerationAllowed(businessId);
+
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const current = WebsiteContentV2Schema.parse(website.content);
+    const products = await getCatalogProducts(businessId);
+    const updated = await applyWebsiteEditV2(current, trimmed, products);
+    await recordWebsiteGeneration(businessId);
+    await prisma.website.update({ where: { id: websiteId }, data: { content: updated } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, content: updated };
+  } catch (err) {
+    return builderError(`applyWebsitePromptV2(${websiteId})`, err);
+  }
+}
+
+/** Regenerates a page as v2 from its stored brief (also how a v1 page gets upgraded). */
+export async function regenerateWebsitePageV2(businessId: string, websiteId: string): Promise<BuilderResult<object>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    await assertWebsiteGenerationAllowed(businessId);
+
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const ctx = await buildWebsiteV2Context(businessId);
+    const previous = isV2Content(website.content) ? WebsiteContentV2Schema.safeParse(website.content) : null;
+    const content = await generateWebsiteContentV2({
+      ...ctx,
+      purpose: website.purpose,
+      designPrompt: website.designPrompt,
+      pageType: previous?.success ? previous.data.pageType : null,
+      style: previous?.success ? previous.data.style : null,
+      ctaUrl: previous?.success ? previous.data.heroCtaUrl : null,
+    });
+    await recordWebsiteGeneration(businessId);
+    await prisma.website.update({
+      where: { id: websiteId },
+      data: { content, whatsappNumber: ctx.displayNumber, generatedAt: new Date(), model: "claude-sonnet-5" },
+    });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true };
+  } catch (err) {
+    return builderError(`regenerateWebsitePageV2(${websiteId})`, err);
+  }
+}
+
+/** Builder controls that don't need AI: style, hidden sections, order, colors, fonts. */
+export async function updateWebsiteDesignV2(
+  businessId: string,
+  websiteId: string,
+  patch: {
+    style?: StyleKey;
+    hidden?: number[];
+    move?: { from: number; to: number };
+    theme?: Partial<WebsiteContentV2["theme"]>;
+    heroCtaUrl?: string | null;
+  },
+): Promise<WebsiteContentV2> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+  const current = WebsiteContentV2Schema.parse(website.content);
+  const next: WebsiteContentV2 = { ...current, sections: [...current.sections], hidden: [...current.hidden] };
+  if (patch.style) {
+    next.style = patch.style;
+    // Picking a style also brings its palette and fonts, so the change is
+    // obvious; colors can still be fine-tuned right after.
+    next.theme = { ...current.theme, ...STYLE_THEME[patch.style] } as WebsiteContentV2["theme"];
+  }
+  if (patch.theme) next.theme = { ...next.theme, ...patch.theme };
+  if (patch.hidden) next.hidden = patch.hidden.filter((i) => Number.isInteger(i) && i > 0 && i < next.sections.length);
+  if (patch.heroCtaUrl !== undefined) next.heroCtaUrl = patch.heroCtaUrl && /^https?:\/\//i.test(patch.heroCtaUrl) ? patch.heroCtaUrl : null;
+  if (patch.move) {
+    const { from, to } = patch.move;
+    // The hero always stays first.
+    if (from > 0 && to > 0 && from < next.sections.length && to < next.sections.length) {
+      const [moved] = next.sections.splice(from, 1);
+      next.sections.splice(to, 0, moved);
+      next.hidden = next.hidden.map((i) => (i === from ? to : from < to && i > from && i <= to ? i - 1 : from > to && i >= to && i < from ? i + 1 : i));
+    }
+  }
+  const parsed = WebsiteContentV2Schema.parse(next);
+  await prisma.website.update({ where: { id: websiteId }, data: { content: parsed } });
+  revalidatePath(`/dashboard/businesses/${businessId}/website`);
+  return parsed;
 }

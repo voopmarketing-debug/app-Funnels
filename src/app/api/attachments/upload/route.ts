@@ -35,7 +35,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         }
         if (typeof businessId !== "string" || !businessId) throw new Error("Falta el negocio");
         await requireBusinessMembership(session.user.id, businessId);
-        if (!pathname.startsWith(`chat/${businessId}/`)) throw new Error("Ruta de archivo no permitida");
+        // chat/: chat attachments; products/: product photos (see ProductManager).
+        if (!pathname.startsWith(`chat/${businessId}/`) && !pathname.startsWith(`products/${businessId}/`)) {
+          throw new Error("Ruta de archivo no permitida");
+        }
 
         return {
           allowedContentTypes: ["image/*", "audio/*", "video/*", "application/*", "text/*"],
