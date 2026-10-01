@@ -3,8 +3,6 @@
 import { useState, useTransition } from "react";
 import { generateSalesDiagnosis, type SalesDiagnosisResult } from "@/lib/actions";
 import type { SalesDiagnosis } from "@/lib/diagnosis";
-import { StatTile } from "./StatTile";
-import { BoltIcon, AlertIcon, FunnelIcon } from "./StatIcons";
 
 type InitialDiagnosis = { diagnosis: SalesDiagnosis; generatedAt: string } | null;
 
@@ -19,28 +17,6 @@ function formatDate(iso: string): string {
     minute: "2-digit",
     hour12: true,
   }).format(new Date(iso));
-}
-
-// Meter: fill carries severity, track is a lighter step of the same hue so
-// the state reads across the whole bar even before you look at the number.
-function severityColors(score: number): { fill: string; track: string } {
-  if (score >= 8) return { fill: "#0ca30c", track: "rgba(12,163,12,0.16)" };
-  if (score >= 5) return { fill: "#fab219", track: "rgba(250,178,25,0.16)" };
-  return { fill: "#d03b3b", track: "rgba(208,59,59,0.16)" };
-}
-
-function ScoreMeter({ score }: { score: number }) {
-  const { fill, track } = severityColors(score);
-  return (
-    <div className="flex flex-none flex-col items-center gap-1.5">
-      <div className="h-2 w-24 overflow-hidden rounded-full" style={{ backgroundColor: track }}>
-        <div className="h-full rounded-full" style={{ width: `${(score / 10) * 100}%`, backgroundColor: fill }} />
-      </div>
-      <span className="fl-mono text-[13px] font-semibold" style={{ color: fill }}>
-        {score} / 10
-      </span>
-    </div>
-  );
 }
 
 // Builds and downloads the report as a PDF client-side (jsPDF) — the report
@@ -120,154 +96,167 @@ export function SalesDiagnosisPanel({
     });
   }
 
+  const d = current?.diagnosis;
+  const verdict = d ? scoreVerdict(d.puntuacion) : null;
+
   return (
-    <section className="fl-card p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-ink">Diagnóstico de ventas (IA)</h2>
-          <p className="mt-1 text-xs text-ink-faint">
-            La IA lee tus conversaciones reales de WhatsApp y te dice qué mejorar en el trato con el cliente y el
-            cierre para vender más — no es una opinión genérica, está basado en lo que de verdad pasó.
+          <h2 className="text-lg font-semibold text-ink">Diagnóstico de ventas</h2>
+          <p className="max-w-2xl text-sm text-ink-muted">
+            La IA lee tus conversaciones reales de WhatsApp y te dice qué mejorar para vender más.
           </p>
         </div>
-        <div className="flex flex-none flex-col items-end gap-1">
-          <div className="flex items-center gap-2">
-            {current && (
-              <button
-                type="button"
-                onClick={() => downloadDiagnosisPdf(businessName, current.diagnosis, current.generatedAt)}
-                className="flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
-              >
-                <DownloadIcon /> Descargar PDF
-              </button>
-            )}
+        <div className="flex flex-wrap items-center gap-2">
+          {current && (
             <button
               type="button"
-              onClick={handleGenerate}
-              disabled={isPending}
-              className="flex items-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+              onClick={() => downloadDiagnosisPdf(businessName, current.diagnosis, current.generatedAt)}
+              className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold text-ink transition hover:border-accent"
             >
-              {isPending && <span className="h-2 w-2 animate-pulse rounded-full bg-accent-ink" />}
-              {isPending ? "Analizando..." : current ? "Actualizar diagnóstico" : "Generar diagnóstico"}
+              <DownloadIcon /> PDF
             </button>
-          </div>
-          {isPending && <p className="text-[13px] text-ink-faint">Puede tardar hasta 30 segundos — está leyendo tus conversaciones a fondo.</p>}
+          )}
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={isPending}
+            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+          >
+            {isPending && <span className="h-2 w-2 animate-pulse rounded-full bg-accent-ink" />}
+            {isPending ? "Analizando…" : current ? "Actualizar" : "Generar diagnóstico"}
+          </button>
         </div>
       </div>
 
-      {notice && (
-        <p className="mt-4 rounded-md border border-border-strong bg-surface-2 p-3 text-sm text-ink-muted">{notice}</p>
-      )}
+      {isPending && <p className="text-sm text-ink-muted">Puede tardar hasta 30 segundos: está leyendo tus conversaciones a fondo.</p>}
+      {notice && <p className="rounded-lg border border-border-strong bg-surface-2 p-3 text-sm text-ink">{notice}</p>}
 
       {!current && !notice && !isPending && (
-        <p className="mt-4 text-sm text-ink-muted">
-          Todavía no has generado un diagnóstico. Dale clic al botón para analizar tus conversaciones.
-        </p>
+        <div className="fl-card p-5 text-sm text-ink-muted">
+          Todavía no tienes un diagnóstico. Genéralo y la IA te dirá qué está funcionando, qué te está costando ventas y qué hacer primero.
+        </div>
       )}
 
-      {current && (
-        <details open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)} className="group mt-4">
-          <summary
-            className="flex cursor-pointer list-none flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-border-strong bg-surface-2 px-4 py-3 transition hover:border-accent hover:bg-border md:flex-nowrap [&::-webkit-details-marker]:hidden"
-          >
-            <ScoreMeter score={current.diagnosis.puntuacion} />
-            <div className="min-w-0 flex-1 basis-40">
-              <p className="fl-mono text-[13px] tracking-wide text-ink-faint">
-                Generado el {formatDate(current.generatedAt)}
-              </p>
-              <p className="truncate text-sm text-ink-muted">{current.diagnosis.resumen}</p>
-            </div>
-            <span className="flex w-full flex-none items-center justify-center gap-1.5 border-t border-border pt-3 text-sm font-semibold text-accent md:w-auto md:border-0 md:pt-0">
-              <span className="hidden group-open:inline">Ocultar</span>
-              <span className="group-open:hidden">Ver diagnóstico completo</span>
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="flex-none transition-transform duration-200 group-open:rotate-180"
-              >
-                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-          </summary>
-
-          <div className="mt-5 space-y-5 border-t border-border pt-5">
-            <p className="text-sm text-ink-muted">{current.diagnosis.resumen}</p>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <StatTile
-                label="Fortalezas"
-                value={String(current.diagnosis.fortalezas.length)}
-                description="Cosas que el agente ya está haciendo bien en estas conversaciones reales."
-                tone="accent"
-                icon={<BoltIcon />}
-              />
-              <StatTile
-                label="Debilidades"
-                value={String(current.diagnosis.debilidades.length)}
-                description="Problemas concretos que están costando ventas, detallados abajo."
-                tone="amber"
-                icon={<AlertIcon />}
-              />
-              <StatTile
-                label="Recomendaciones"
-                value={String(current.diagnosis.recomendaciones.length)}
-                description="Acciones concretas para vender más, listas abajo."
-                tone="secondary"
-                icon={<FunnelIcon />}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <h3 className="mb-2 fl-mono text-[13px] uppercase tracking-wide" style={{ color: "var(--accent-hover)" }}>
-                  Fortalezas
-                </h3>
-                <ul className="space-y-2">
-                  {current.diagnosis.fortalezas.map((item, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-ink-muted">
-                      <span className="mt-0.5 flex-none" style={{ color: "var(--accent)" }}>
-                        +
-                      </span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+      {d && verdict && current && (
+        <>
+          {/* Score + summary: the one thing to read */}
+          <div className="fl-card flex flex-col gap-5 p-5 md:flex-row md:items-center">
+            <ScoreRing score={d.puntuacion} color={verdict.color} />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: verdict.bg, color: verdict.text }}>
+                  {verdict.label}
+                </span>
+                <span className="text-xs text-ink-muted">Generado el {formatDate(current.generatedAt)}</span>
               </div>
-
-              <div>
-                <h3 className="mb-2 fl-mono text-[13px] uppercase tracking-wide text-error">Debilidades</h3>
-                <ul className="space-y-2">
-                  {current.diagnosis.debilidades.map((item, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-ink-muted">
-                      <span className="mt-0.5 flex-none text-error">−</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="mb-2 fl-mono text-[13px] uppercase tracking-wide text-ink-muted">
-                Recomendaciones para vender más
-              </h3>
-              <ol className="space-y-2">
-                {current.diagnosis.recomendaciones.map((item, i) => (
-                  <li key={i} className="flex gap-2.5 text-sm text-ink-muted">
-                    <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[13px] font-bold text-accent-ink">
-                      {i + 1}
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ol>
+              <p className="text-[15px] leading-relaxed text-ink">{d.resumen}</p>
             </div>
           </div>
-        </details>
+
+          {/* The first thing to do */}
+          {d.recomendaciones[0] && (
+            <div className="rounded-2xl border-2 border-accent/50 bg-accent/10 p-5">
+              <p className="text-xs font-bold uppercase tracking-wide text-accent">Empieza por aquí</p>
+              <p className="mt-1.5 text-[15px] font-medium leading-relaxed text-ink">{d.recomendaciones[0]}</p>
+            </div>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <DiagnosisList
+              title="Qué te está costando ventas"
+              subtitle="Lo que pasó en tus conversaciones reales"
+              tone="bad"
+              items={d.debilidades}
+            />
+            <DiagnosisList
+              title="Qué hacer para vender más"
+              subtitle="En orden de prioridad"
+              tone="todo"
+              items={d.recomendaciones}
+              numbered
+            />
+          </div>
+
+          <details open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)} className="fl-card group p-5">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
+              <span>
+                <span className="block text-sm font-semibold text-ink">Lo que ya haces bien ({d.fortalezas.length})</span>
+                <span className="block text-xs text-ink-muted">Mantén esto: está funcionando</span>
+              </span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="flex-none text-ink-muted transition-transform group-open:rotate-180">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </summary>
+            <ul className="mt-4 divide-y divide-border">
+              {d.fortalezas.map((item, i) => (
+                <li key={i} className="flex gap-3 py-3 text-sm leading-relaxed text-ink first:pt-0 last:pb-0">
+                  <span className="mt-1 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-[#0ca30c]/15 text-[11px] font-bold text-[var(--status-good)]">✓</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </>
       )}
     </section>
+  );
+}
+
+function scoreVerdict(score: number): { label: string; color: string; bg: string; text: string } {
+  if (score >= 8) return { label: "Tu agente vende muy bien", color: "#0ca30c", bg: "rgba(12,163,12,0.12)", text: "var(--status-good)" };
+  if (score >= 5) return { label: "Va bien, pero puede vender más", color: "#fab219", bg: "rgba(250,178,25,0.16)", text: "var(--status-warn)" };
+  return { label: "Está dejando ventas sobre la mesa", color: "#d03b3b", bg: "rgba(208,59,59,0.12)", text: "var(--status-bad)" };
+}
+
+function ScoreRing({ score, color }: { score: number; color: string }) {
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative h-24 w-24 flex-none" role="img" aria-label={`Puntuación ${score} de 10`}>
+      <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
+        <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" style={{ stroke: "var(--surface-2)" }} />
+        <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" strokeLinecap="round" stroke={color} strokeDasharray={`${(score / 10) * c} ${c}`} />
+      </svg>
+      <span className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold tabular-nums text-ink">{score}</span>
+        <span className="text-[11px] text-ink-muted">de 10</span>
+      </span>
+    </div>
+  );
+}
+
+function DiagnosisList({
+  title,
+  subtitle,
+  items,
+  tone,
+  numbered = false,
+}: {
+  title: string;
+  subtitle: string;
+  items: string[];
+  tone: "bad" | "todo";
+  numbered?: boolean;
+}) {
+  return (
+    <div className="fl-card p-5">
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
+      <p className="text-xs text-ink-muted">{subtitle}</p>
+      <ul className="mt-4 divide-y divide-border">
+        {items.map((item, i) => (
+          <li key={i} className="flex gap-3 py-3 text-sm leading-relaxed text-ink first:pt-0 last:pb-0">
+            {numbered ? (
+              <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">{i + 1}</span>
+            ) : (
+              <span className={`mt-2 h-2 w-2 flex-none rounded-full ${tone === "bad" ? "bg-error" : "bg-accent"}`} />
+            )}
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
