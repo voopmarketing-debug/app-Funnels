@@ -25,14 +25,18 @@ describe("billingMonthsFromProductName", () => {
 
 describe("extendSubscriptionEnd", () => {
   const now = new Date("2026-10-01T12:00:00Z");
-  it("starts from today when there is no running period", () => {
+  it("pays from the charge date, plus grace days", () => {
     expect(extendSubscriptionEnd(null, 1, now).toISOString().slice(0, 10)).toBe("2026-11-04");
     expect(extendSubscriptionEnd(new Date("2026-09-01T00:00:00Z"), 1, now).toISOString().slice(0, 10)).toBe("2026-11-04");
   });
-  it("stacks a renewal on the running period without stacking grace days", () => {
+  it("a renewal charged near the end adds the next month", () => {
     const first = extendSubscriptionEnd(null, 1, now); // 2026-11-04
-    const renewed = extendSubscriptionEnd(first, 1, new Date("2026-10-31T12:00:00Z"));
+    const renewed = extendSubscriptionEnd(first, 1, new Date("2026-11-01T12:00:00Z"));
     expect(renewed.toISOString().slice(0, 10)).toBe("2026-12-04");
+  });
+  it("two notices about the same charge don't add two months", () => {
+    const once = extendSubscriptionEnd(null, 1, now);
+    expect(extendSubscriptionEnd(once, 1, now).toISOString()).toBe(once.toISOString());
   });
 });
 

@@ -28,6 +28,7 @@ export type ClientRow = {
   websites: number;
   lastActivity: string | null;
   lastPayment: string | null;
+  paymentProvider: string;
   lines: { businessId: string; name: string; whatsappConnected: boolean; startedAt: string | null; endsAt: string | null }[];
   addons: { id: string; title: string; expiresAt: string; quantity: number; kind: string }[];
 };
@@ -185,7 +186,7 @@ export function ClientsList({ rows, nowIso }: { rows: ClientRow[]; nowIso: strin
               <div>
                 <dt className="text-xs text-ink-muted">Último pago</dt>
                 <dd className="font-medium text-ink">{r.lastPayment ? fmtDate(r.lastPayment) : "Manual / sin registro"}</dd>
-                {r.lastPayment && <dd className="text-xs text-ink-muted">Automático (Hotmart)</dd>}
+                {r.lastPayment && <dd className="text-xs text-ink-muted">Automático ({r.paymentProvider})</dd>}
               </div>
               <div>
                 <dt className="text-xs text-ink-muted">Clientes con IA este mes</dt>

@@ -3,7 +3,8 @@
 // token to fetch the real, current status before granting anything. That
 // also means a forged webhook call can't provision an account by itself: at
 // worst it makes us look up an id that isn't really approved.
-const MP_API = "https://api.mercadopago.com";
+// Overridable only so the webhook flow can be exercised against a local stand-in.
+const MP_API = process.env.MERCADOPAGO_API_BASE || "https://api.mercadopago.com";
 
 export type MpNotification = { type: string; id: string };
 
@@ -39,6 +40,9 @@ async function mpGet(path: string): Promise<Record<string, unknown> | null> {
 export type MpPayment = {
   id: string;
   approved: boolean;
+  // Raw MP status: approved, refunded, charged_back, pending, rejected…
+  status: string;
+  approvedAt: Date | null;
   payer: MpPayer;
   externalReference: string | null;
   amount: number;
@@ -53,6 +57,8 @@ export async function fetchMpPayment(id: string): Promise<MpPayment | null> {
   return {
     id: String(payment.id ?? id),
     approved: payment.status === "approved",
+    status: typeof payment.status === "string" ? payment.status : "",
+    approvedAt: typeof payment.date_approved === "string" ? new Date(payment.date_approved) : null,
     payer: (payment.payer as MpPayer) ?? {},
     externalReference: typeof payment.external_reference === "string" ? payment.external_reference : null,
     amount: typeof payment.transaction_amount === "number" ? payment.transaction_amount : 0,
@@ -96,9 +102,53 @@ export async function createMpCheckoutLink(params: {
   return data.init_point ?? null;
 }
 
+export type MpPreapproval = {
+  id: string;
+  approved: boolean;
+  status: string;
+  email: string;
+  // The subscription plan's title ("Funnels Labs Pro") and monthly amount.
+  reason: string;
+  amount: number;
+  frequencyMonths: number;
+  createdAt: Date;
+};
+
 /** For a subscription notification (type: "subscription_preapproval" / "preapproval"). */
-export async function fetchMpPreapproval(id: string): Promise<{ approved: boolean; email: string } | null> {
+export async function fetchMpPreapproval(id: string): Promise<MpPreapproval | null> {
   const sub = await mpGet(`/preapproval/${id}`);
   if (!sub) return null;
-  return { approved: sub.status === "authorized", email: typeof sub.payer_email === "string" ? sub.payer_email : "" };
+  const recurring = (sub.auto_recurring as Record<string, unknown> | undefined) ?? {};
+  const frequency = typeof recurring.frequency === "number" ? recurring.frequency : 1;
+  const frequencyType = typeof recurring.frequency_type === "string" ? recurring.frequency_type : "months";
+  return {
+    id: String(sub.id ?? id),
+    approved: sub.status === "authorized",
+    status: typeof sub.status === "string" ? sub.status : "",
+    email: typeof sub.payer_email === "string" ? sub.payer_email : "",
+    reason: typeof sub.reason === "string" ? sub.reason : "",
+    amount: typeof recurring.transaction_amount === "number" ? recurring.transaction_amount : 0,
+    frequencyMonths: frequencyType === "months" ? Math.max(1, frequency) : 1,
+    createdAt: typeof sub.date_created === "string" ? new Date(sub.date_created) : new Date(),
+  };
+}
+
+/**
+ * One monthly charge of a subscription (type: "subscription_authorized_payment").
+ * Each renewal is its own authorized payment, linked to its preapproval.
+ */
+export async function fetchMpAuthorizedPayment(
+  id: string,
+): Promise<{ id: string; preapprovalId: string; approved: boolean; amount: number; chargedAt: Date } | null> {
+  const ap = await mpGet(`/authorized_payments/${id}`);
+  if (!ap) return null;
+  const payment = (ap.payment as Record<string, unknown> | undefined) ?? {};
+  const when = (typeof ap.debit_date === "string" && ap.debit_date) || (typeof ap.date_created === "string" && ap.date_created) || "";
+  return {
+    id: String(ap.id ?? id),
+    preapprovalId: typeof ap.preapproval_id === "string" ? ap.preapproval_id : "",
+    approved: payment.status === "approved" || ap.status === "processed",
+    amount: typeof ap.transaction_amount === "number" ? ap.transaction_amount : 0,
+    chargedAt: when ? new Date(when) : new Date(),
+  };
 }

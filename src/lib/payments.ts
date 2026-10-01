@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { provisionClientFromPurchase } from "@/lib/provisioning";
+import type { PlanTier } from "@prisma/client";
 import {
   billingMonthsFromProductName,
   extendSubscriptionEnd,
@@ -10,6 +11,26 @@ import {
   type HotmartPurchase,
 } from "@/lib/hotmart";
 import { PLAN_LABELS } from "@/lib/plans";
+
+export type PaymentProvider = "hotmart" | "mercadopago";
+
+const PROVIDER_LABEL: Record<PaymentProvider, string> = { hotmart: "Hotmart", mercadopago: "Mercado Pago" };
+
+/** One subscription charge (or its refund), whatever the payment provider. */
+export type SubscriptionCharge = {
+  provider: PaymentProvider;
+  // The provider's id for this charge; each renewal is a different one.
+  transaction: string;
+  action: HotmartAction;
+  event: string;
+  email: string;
+  name: string;
+  phone: string;
+  productName: string;
+  // When the provider says which plan it is; otherwise read from productName.
+  planTier?: PlanTier;
+  chargeDate?: Date;
+};
 
 export type PaymentResult =
   | { status: "activated"; businessIds: string[]; endsAt: Date; newAccount: boolean }
@@ -37,6 +58,15 @@ async function alertAgency(subject: string, lines: string[]): Promise<void> {
  * each month's charge pushes the end date forward on its own.
  */
 export async function applyHotmartPayment(purchase: HotmartPurchase & { action: HotmartAction }): Promise<PaymentResult> {
+  return applySubscriptionCharge({ provider: "hotmart", ...purchase });
+}
+
+/**
+ * Applies a subscription charge exactly once per (provider, transaction):
+ * creates the account if it's new, sets the plan and extends the paid
+ * period of every line it owns; a refund or chargeback ends it.
+ */
+export async function applySubscriptionCharge(purchase: SubscriptionCharge): Promise<PaymentResult> {
   const email = purchase.email.trim().toLowerCase();
 
   // Claim the transaction first so a retried or duplicate delivery can't
@@ -45,7 +75,7 @@ export async function applyHotmartPayment(purchase: HotmartPurchase & { action: 
   let claimId: string;
   try {
     const claim = await prisma.paymentEvent.create({
-      data: { provider: "hotmart", transaction: purchase.transaction, action: purchase.action, event: purchase.event, email },
+      data: { provider: purchase.provider, transaction: purchase.transaction, action: purchase.action, event: purchase.event, email },
     });
     claimId = claim.id;
   } catch (err) {
@@ -70,8 +100,8 @@ async function ownedBusinessIds(email: string): Promise<string[]> {
   return user?.memberships.map((m) => m.businessId) ?? [];
 }
 
-async function grant(purchase: HotmartPurchase, email: string): Promise<PaymentResult> {
-  const planTier = planTierFromProductName(purchase.productName);
+async function grant(purchase: SubscriptionCharge, email: string): Promise<PaymentResult> {
+  const planTier = purchase.planTier ?? planTierFromProductName(purchase.productName);
   const months = billingMonthsFromProductName(purchase.productName);
 
   let newAccount = false;
@@ -97,7 +127,7 @@ async function grant(purchase: HotmartPurchase, email: string): Promise<PaymentR
   // One subscription covers every line the account owns: all of them end on
   // the same date, the latest one any of them already had.
   const latestEnd = businesses.reduce<Date | null>((max, b) => (b.subscriptionEndsAt && (!max || b.subscriptionEndsAt > max) ? b.subscriptionEndsAt : max), null);
-  const endsAt = extendSubscriptionEnd(latestEnd, months, now);
+  const endsAt = extendSubscriptionEnd(latestEnd, months, purchase.chargeDate ?? now);
   const restarting = !latestEnd || latestEnd <= now;
 
   await prisma.$transaction(
@@ -117,16 +147,16 @@ async function grant(purchase: HotmartPurchase, email: string): Promise<PaymentR
     `${newAccount ? "Se creó la cuenta y se activó" : "Se renovó"} automáticamente la membresía de <b>${purchase.name || email}</b> (${email}).`,
     `Producto: ${purchase.productName || "—"}${planTier ? ` · Plan ${PLAN_LABELS[planTier]}` : ""}`,
     `Activa hasta el <b>${formatDate(endsAt)}</b>. Negocios: ${businesses.map((b) => b.name).join(", ")}.`,
-    `Transacción Hotmart: ${purchase.transaction}`,
+    `Pago ${PROVIDER_LABEL[purchase.provider]}: ${purchase.transaction}`,
   ]);
 
   return { status: "activated", businessIds, endsAt, newAccount };
 }
 
-async function revoke(purchase: HotmartPurchase, email: string): Promise<PaymentResult> {
+async function revoke(purchase: SubscriptionCharge, email: string): Promise<PaymentResult> {
   // Only a charge we actually applied can be taken back.
   const granted = await prisma.paymentEvent.findUnique({
-    where: { provider_transaction_action: { provider: "hotmart", transaction: purchase.transaction, action: "grant" } },
+    where: { provider_transaction_action: { provider: purchase.provider, transaction: purchase.transaction, action: "grant" } },
   });
   if (!granted) return { status: "ignored", reason: "No había un pago aplicado con esa transacción" };
 
@@ -135,9 +165,9 @@ async function revoke(purchase: HotmartPurchase, email: string): Promise<Payment
     await prisma.business.updateMany({ where: { id: { in: businessIds } }, data: { subscriptionEndsAt: new Date() } });
   }
   await alertAgency(`Reembolso o contracargo: ${purchase.name || email}`, [
-    `Hotmart reportó <b>${purchase.event === "PURCHASE_CHARGEBACK" ? "un contracargo" : "un reembolso"}</b> de ${purchase.name || email} (${email}).`,
+    `${PROVIDER_LABEL[purchase.provider]} reportó <b>${/CHARGEBACK|charged_back/i.test(purchase.event) ? "un contracargo" : "un reembolso"}</b> de ${purchase.name || email} (${email}).`,
     `Su membresía quedó vencida desde ahora. Si fue un error, puedes reactivarla en Clientes.`,
-    `Transacción Hotmart: ${purchase.transaction}`,
+    `Pago ${PROVIDER_LABEL[purchase.provider]}: ${purchase.transaction}`,
   ]);
   return { status: "revoked", businessIds };
 }

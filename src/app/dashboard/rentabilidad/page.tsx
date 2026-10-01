@@ -204,7 +204,7 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
           value={money(totals.aiCost)}
           hint={projectedAi !== null ? `Proyección a fin de mes: ${money(projectedAi)}` : `${totals.contacts.toLocaleString("es-CO")} clientes atendidos`}
         />
-        <Tile label="Comisiones" value={money(totals.fees)} hint="Hotmart y Mercado Pago (estimado)" />
+        <Tile label="Comisiones" value={money(totals.fees)} hint="Mercado Pago, ~4% (estimado)" />
         <Tile label="Gastos fijos" value={money(totals.fixedCosts)} hint="Herramientas del mes" />
         <Tile
           label="Ganancia neta"

@@ -68,7 +68,7 @@ export default async function ClientsPage() {
     prisma.paymentEvent.findMany({
       where: { email: { in: emails }, action: "grant" },
       orderBy: { createdAt: "desc" },
-      select: { email: true, createdAt: true },
+      select: { email: true, createdAt: true, provider: true },
     }),
   ]);
 
@@ -76,8 +76,8 @@ export default async function ClientsPage() {
   const activityBy = new Map(activityRows.map((r) => [r.businessId, r.last]));
   const teamBy = new Map(teamRows.map((r) => [r.businessId, r._count]));
   const websitesBy = new Map(websiteRows.map((r) => [r.businessId, r._count]));
-  const lastPaymentBy = new Map<string, Date>();
-  for (const p of payments) if (!lastPaymentBy.has(p.email)) lastPaymentBy.set(p.email, p.createdAt);
+  const lastPaymentBy = new Map<string, { at: Date; provider: string }>();
+  for (const p of payments) if (!lastPaymentBy.has(p.email)) lastPaymentBy.set(p.email, { at: p.createdAt, provider: p.provider });
 
   // One row per client account (an owner can run several WhatsApp lines).
   const rows = new Map<string, ClientRow>();
@@ -104,7 +104,8 @@ export default async function ClientsPage() {
         team: 0,
         websites: 0,
         lastActivity: null,
-        lastPayment: lastPaymentBy.get(user.email.toLowerCase())?.toISOString() ?? null,
+        lastPayment: lastPaymentBy.get(user.email.toLowerCase())?.at.toISOString() ?? null,
+        paymentProvider: lastPaymentBy.get(user.email.toLowerCase())?.provider === "hotmart" ? "Hotmart" : "Mercado Pago",
         lines: [],
         addons: (activeAddons.filter((a) => a.userId === user.id)).map((a) => ({
           id: a.id,
@@ -161,7 +162,7 @@ export default async function ClientsPage() {
         <div>
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="max-w-2xl text-sm text-ink-muted">
-            Quién te paga, hasta cuándo y cómo usa la plataforma. Las membresías se activan y renuevan solas con cada pago de Hotmart.
+            Quién te paga, hasta cuándo y cómo usa la plataforma. Las membresías se activan y renuevan solas con cada pago de Mercado Pago.
           </p>
         </div>
         <CreateClientForm />

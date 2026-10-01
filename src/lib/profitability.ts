@@ -15,8 +15,7 @@ import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_USD } from "@/lib/plans";
 
 // Reference figures — adjust here if the deals change.
 export const COP_PER_USD = 4000;
-const HOTMART_FEE_RATE = 0.099;
-const HOTMART_FEE_FIXED_USD = 1;
+// Plans and packs are charged through Mercado Pago (~4% per payment).
 const MERCADOPAGO_FEE_RATE = 0.04;
 
 export const FIXED_COSTS_USD: { label: string; amount: number }[] = [
@@ -253,7 +252,7 @@ export async function getProfitabilityReport(adminUserId: string, monthParam: st
     const accountAddons = addons.filter((a) => a.userId === g.userId);
     const addonRevenue = accountAddons.reduce((sum, a) => sum + a.priceCop / COP_PER_USD, 0);
     const fees =
-      (planRevenue > 0 ? planRevenue * HOTMART_FEE_RATE + HOTMART_FEE_FIXED_USD : 0) +
+      planRevenue * MERCADOPAGO_FEE_RATE +
       accountAddons.filter((a) => a.source === "MERCADOPAGO").reduce((sum, a) => sum + (a.priceCop / COP_PER_USD) * MERCADOPAGO_FEE_RATE, 0);
 
     const breakdown = emptyBreakdown();

@@ -3,8 +3,8 @@ import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { ActivateForm } from "./ActivateForm";
 
-// Hotmart sends the buyer here after paying (set this URL as the product's
-// thank-you page). The account is created by the payment webhook (see
+// The buyer lands here after paying (set this URL as the success / thank-you
+// page of the Mercado Pago link or subscription plan). The account is created by the payment webhook (see
 // lib/payments.ts) and the activation link goes to the purchase email, so
 // this page's only job is getting them to that first login + onboarding.
 export default function GraciasPage() {

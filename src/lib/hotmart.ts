@@ -84,18 +84,20 @@ export function billingMonthsFromProductName(productName: string): number {
   return 1;
 }
 
-// Hotmart retries a failed renewal charge for a few days; don't lock a
-// paying client out in the meantime.
+// A failed renewal charge is retried for a few days (Hotmart and Mercado
+// Pago both do); don't lock a paying client out in the meantime.
 export const RENEWAL_GRACE_DAYS = 3;
 
-/** New end of the paid period after a charge: from today, or from the current end if it hasn't passed yet. */
-export function extendSubscriptionEnd(currentEnd: Date | null, months: number, now = new Date()): Date {
-  const base = currentEnd && currentEnd > now ? new Date(currentEnd) : new Date(now);
-  // Grace days only count once: strip them from a still-running period
-  // before adding the next one.
-  if (currentEnd && currentEnd > now) base.setUTCDate(base.getUTCDate() - RENEWAL_GRACE_DAYS);
-  const end = new Date(base);
+/**
+ * End of the paid period after a charge made on `chargeDate`: that date plus
+ * the months it pays for (and the grace days), or the current end if that's
+ * later. Taking the max (instead of adding to the current end) means two
+ * notifications about the same charge — e.g. Mercado Pago's subscription
+ * authorization and its first payment — can't add two months.
+ */
+export function extendSubscriptionEnd(currentEnd: Date | null, months: number, chargeDate = new Date()): Date {
+  const end = new Date(chargeDate);
   end.setUTCMonth(end.getUTCMonth() + months);
   end.setUTCDate(end.getUTCDate() + RENEWAL_GRACE_DAYS);
-  return end;
+  return currentEnd && currentEnd > end ? new Date(currentEnd) : end;
 }

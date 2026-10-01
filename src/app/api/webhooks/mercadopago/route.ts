@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseMpNotification, fetchMpPayment, fetchMpPreapproval } from "@/lib/mercadopago";
-import { provisionClientFromPurchase } from "@/lib/provisioning";
+import { parseMpNotification, fetchMpPayment, fetchMpPreapproval, fetchMpAuthorizedPayment } from "@/lib/mercadopago";
+import { applySubscriptionCharge } from "@/lib/payments";
+import { mpPlanFor } from "@/lib/mercadopagoPlans";
 import { prisma } from "@/lib/prisma";
 import { ADDON_PACKS } from "@/lib/addonPacks";
 import { activateAddon } from "@/lib/addons";
@@ -10,6 +11,10 @@ async function alertAgency(subject: string, detail: string) {
   console.error(subject, detail);
   const to = process.env.AGENCY_ADMIN_EMAIL?.trim();
   if (to) await sendEmail({ to, subject, html: `<p>${detail}</p>` }).catch(() => {});
+}
+
+function fullName(payer: { first_name?: string; last_name?: string }): string {
+  return [payer.first_name, payer.last_name].filter(Boolean).join(" ");
 }
 
 // Mercado Pago has no shared-secret header like Hotmart's Hottok — the real
@@ -73,24 +78,87 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ received: true, actioned: true });
       }
-      if (payment?.approved && payment.payer.email) {
-        const name = [payment.payer.first_name, payment.payer.last_name].filter(Boolean).join(" ");
-        await provisionClientFromPurchase({
-          businessName: name || "Nuevo negocio",
-          email: payment.payer.email,
+      // Refund or chargeback of a plan payment we applied: membership ends.
+      if (payment && (payment.status === "refunded" || payment.status === "charged_back") && payerEmail) {
+        await applySubscriptionCharge({
+          provider: "mercadopago",
+          transaction: `payment:${payment.id}`,
+          action: "revoke",
+          event: payment.status,
+          email: payerEmail,
+          name: fullName(payment.payer),
+          phone: "",
+          productName: payment.description,
+        });
+        return NextResponse.json({ received: true, actioned: true });
+      }
+      // A plan bought with a Mercado Pago link (one-time or a subscription's
+      // monthly charge): create the account if new and extend its membership.
+      if (payment?.approved && payerEmail) {
+        const plan = mpPlanFor(payment.description, payment.amount);
+        if (!plan) {
+          await alertAgency(
+            "Pago de Mercado Pago sin plan reconocido",
+            `Llegó un pago de ${payment.amount} ${payment.currency} (${payment.description || "sin descripción"}, pago ${payment.id}) de ${payerEmail}. No coincide con ningún plan ni paquete; actívalo a mano desde Clientes si corresponde.`,
+          );
+          return NextResponse.json({ received: true, actioned: false });
+        }
+        await applySubscriptionCharge({
+          provider: "mercadopago",
+          transaction: `payment:${payment.id}`,
+          action: "grant",
+          event: "payment.approved",
+          email: payerEmail,
+          name: fullName(payment.payer),
           phone: payment.payer.phone?.number ?? "",
+          productName: payment.description,
+          planTier: plan.planTier,
+          chargeDate: payment.approvedAt ?? new Date(),
         });
       }
     } else if (notification.type === "subscription_preapproval" || notification.type === "preapproval") {
+      // The client authorized a monthly subscription: activate right away.
+      // Later monthly charges arrive as subscription_authorized_payment.
       const sub = await fetchMpPreapproval(notification.id);
       if (sub?.approved && sub.email) {
-        await provisionClientFromPurchase({ businessName: "Nuevo negocio", email: sub.email, phone: "" });
+        const plan = mpPlanFor(sub.reason, sub.amount) ?? { planTier: "STARTER" as const, months: 1 };
+        await applySubscriptionCharge({
+          provider: "mercadopago",
+          transaction: `preapproval:${sub.id}`,
+          action: "grant",
+          event: "preapproval.authorized",
+          email: sub.email,
+          name: "",
+          phone: "",
+          productName: sub.reason,
+          planTier: plan.planTier,
+          chargeDate: sub.createdAt,
+        });
+      }
+    } else if (notification.type === "subscription_authorized_payment") {
+      const charge = await fetchMpAuthorizedPayment(notification.id);
+      const sub = charge?.approved && charge.preapprovalId ? await fetchMpPreapproval(charge.preapprovalId) : null;
+      if (charge && sub?.email) {
+        const plan = mpPlanFor(sub.reason, sub.amount) ?? { planTier: "STARTER" as const, months: 1 };
+        await applySubscriptionCharge({
+          provider: "mercadopago",
+          transaction: `authorized:${charge.id}`,
+          action: "grant",
+          event: "subscription_authorized_payment",
+          email: sub.email,
+          name: "",
+          phone: "",
+          productName: sub.reason,
+          planTier: plan.planTier,
+          chargeDate: charge.chargedAt,
+        });
       }
     }
   } catch (err) {
-    console.error("Failed to provision client from Mercado Pago notification:", err, notification);
-    // Still 200 — MP retries aggressively on non-2xx, and we already logged
-    // this for manual follow-up.
+    console.error("Failed to apply Mercado Pago notification:", err, notification);
+    // 500 so Mercado Pago retries: a failed charge releases its claim (see
+    // lib/payments.ts), so the retry applies it.
+    return new NextResponse("Error applying notification", { status: 500 });
   }
 
   return NextResponse.json({ received: true, actioned: true });

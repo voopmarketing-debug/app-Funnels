@@ -70,6 +70,15 @@ export const PLAN_PRICE_USD: Record<PlanTier, number> = {
   SCALE: 597,
 };
 
+// The same prices in COP, as charged through Mercado Pago (~4.000 COP per
+// USD, rounded). A Mercado Pago payment or subscription of exactly one of
+// these amounts is recognized as that plan when its title doesn't say.
+export const PLAN_PRICE_COP: Record<PlanTier, number> = {
+  STARTER: 390000,
+  PRO: 1190000,
+  SCALE: 2390000,
+};
+
 // Which models the agency can pick for a client's WhatsApp replies (see
 // setAgentModel in lib/actions.ts). Haiku answers at roughly half the cost
 // per message; Sonnet is the default and the better closer.
