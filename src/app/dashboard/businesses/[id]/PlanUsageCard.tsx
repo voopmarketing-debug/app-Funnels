@@ -80,14 +80,14 @@ export function PlanUsageCard({
         </div>
 
         <p className="fl-mono text-xs text-ink-muted">
-          {used} / {limit === null ? "∞" : limit} contactos este mes
+          {used} / {limit === null ? "∞" : limit} clientes atendidos por IA este mes · contactos en CRM ilimitados
         </p>
       </div>
       {limit !== null && (
         <div className="w-full flex-none sm:w-auto">
           <AddonStore
             businessId={businessId}
-            label="Comprar más contactos"
+            label="Ampliar cupo de IA"
             className="w-full rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover sm:w-auto"
           />
         </div>

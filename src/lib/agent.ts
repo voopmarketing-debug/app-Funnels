@@ -548,7 +548,7 @@ async function logPlanLimitNotice(conversationId: string, planLimit: number): Pr
     data: {
       conversationId,
       role: "AGENT",
-      content: `[LÍMITE DE PLAN] Este negocio alcanzó su límite de ${planLimit} contactos activos este mes. La IA se pausó automáticamente en esta conversación para evitar sobrecostos — respondan manualmente o actualicen de plan para reactivarla (botón de IA en la conversación).`,
+      content: `[LÍMITE DE PLAN] Este negocio alcanzó su límite de ${planLimit} clientes atendidos por IA este mes. La IA se pausó automáticamente en esta conversación para evitar sobrecostos — respondan manualmente o actualicen de plan para reactivarla (botón de IA en la conversación).`,
     },
   });
 }

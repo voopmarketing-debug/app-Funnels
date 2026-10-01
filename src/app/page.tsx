@@ -25,6 +25,14 @@ const SEGMENTS = [
 
 const FAQ = [
   {
+    q: "¿Cuántos contactos puedo tener?",
+    a: "Ilimitados. Tu CRM guarda todos tus contactos y conversaciones sin tope. Lo que el plan cuenta es cuántos clientes distintos atiende tu agente de IA en el mes (400 en Starter), y a cada uno le responde todas las veces que haga falta.",
+  },
+  {
+    q: "¿Qué pasa si llego al límite del mes?",
+    a: "Te avisamos al 80%. Si llegas al 100%, tus clientes actuales siguen siendo atendidos y puedes responder a mano a los nuevos, o agregar un paquete de clientes desde tu panel y la IA vuelve a responder al instante.",
+  },
+  {
     q: "¿Puedo cancelar cuando quiera?",
     a: "Sí. Cancelas cuando quieras y tu acceso sigue activo hasta el final del periodo que ya pagaste — sin penalización.",
   },
@@ -52,8 +60,9 @@ const PLANS = [
     billingNote: "Se cobra automáticamente cada trimestre (vía Hotmart) — no es un pago único.",
     billingDetail:
       "El plan normal es $150 USD/mes ($450 USD por trimestre). Por el lanzamiento del software, tu trimestre completo queda en $150 USD en vez de $450 USD, y ese precio se mantiene en cada cobro automático mientras la oferta esté activa.",
-    contacts: "Hasta 400 contactos activos/mes",
+    contacts: "400 clientes atendidos por IA al mes",
     features: [
+      "Contactos ilimitados en tu CRM",
       "1 línea de WhatsApp (un negocio)",
       "Agente con memoria completa de la conversación",
       "CRM personalizable por etapas",
@@ -71,9 +80,9 @@ const PLANS = [
     priceSuffix: "",
     billingNote: "Agenda una llamada y nosotros implementamos todo por ti, de principio a fin.",
     billingDetail: "",
-    contacts: "Contactos y líneas de WhatsApp a la medida de tu volumen",
+    contacts: "Clientes atendidos por IA y líneas a la medida de tu volumen",
     features: [
-      "Todo lo del plan Starter, sin límite de contactos ni de líneas",
+      "Todo lo del plan Starter, con cupo de IA y líneas a tu medida",
       "Desarrollo a medida: lo que tu negocio necesite, hecho para ti",
       "Lo implementamos nosotros, de punta a punta",
       "Gerente de cuenta dedicado + soporte por WhatsApp",
@@ -179,8 +188,9 @@ export default async function Home() {
       <section id="precios" className="relative mx-auto max-w-5xl px-6 py-16">
         <h2 className="text-center text-2xl font-bold">Planes</h2>
         <p className="mx-auto mt-2 max-w-xl text-center text-sm text-ink-muted">
-          Pago trimestral (cada 3 meses), débito automático — sin sorpresas mes a mes. Un contacto
-          activo es cada cliente distinto que te escribe en el mes. Precios de referencia en USD.
+          Pago trimestral (cada 3 meses), débito automático — sin sorpresas mes a mes. Tu CRM guarda
+          contactos ilimitados; el cupo del plan es cuántos clientes distintos atiende tu agente de IA
+          cada mes, con todas las respuestas que necesiten. Precios de referencia en USD.
         </p>
 
         <div className="mx-auto mt-8 grid max-w-3xl gap-6 sm:grid-cols-2">
@@ -257,11 +267,12 @@ export default async function Home() {
         </div>
 
         <p className="mt-6 text-center text-sm text-ink-muted">
-          ¿Superas los contactos de tu plan?{" "}
-          <a href="mailto:voopmarketing@gmail.com" className="text-accent hover:underline">
+          ¿Tu negocio atiende más clientes? Agrega paquetes de +200, +400 o +1.000 clientes atendidos
+          por IA desde tu panel y se activan al instante.{" "}
+          <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
             Escríbenos
           </a>{" "}
-          y lo ajustamos sin cortar tu servicio.
+          si necesitas algo a tu medida.
         </p>
       </section>
 

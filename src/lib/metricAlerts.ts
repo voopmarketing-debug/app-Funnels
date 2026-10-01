@@ -123,7 +123,7 @@ async function checkPlanUsage(businessId: string, planTier: PlanTier): Promise<b
     return createAlertOnce({
       businessId,
       type: "PLAN_USAGE_CRITICAL",
-      message: `Superaste el límite de contactos activos de tu plan ${PLAN_LABELS[planTier]} este mes (${used}/${limit}) — el agente puede dejar de responder a contactos nuevos hasta el próximo mes o hasta actualizar de plan.`,
+      message: `Superaste el límite de clientes atendidos por IA de tu plan ${PLAN_LABELS[planTier]} este mes (${used}/${limit}) — el agente puede dejar de responder a clientes nuevos hasta el próximo mes o hasta actualizar de plan.`,
       dedupeSince,
     });
   }
@@ -131,7 +131,7 @@ async function checkPlanUsage(businessId: string, planTier: PlanTier): Promise<b
     return createAlertOnce({
       businessId,
       type: "PLAN_USAGE_WARNING",
-      message: `Este mes ya usaste el ${Math.round(ratio * 100)}% de tu límite de contactos activos del plan ${PLAN_LABELS[planTier]} (${used}/${limit}).`,
+      message: `Este mes ya usaste el ${Math.round(ratio * 100)}% de tu límite de clientes atendidos por IA del plan ${PLAN_LABELS[planTier]} (${used}/${limit}).`,
       dedupeSince,
     });
   }

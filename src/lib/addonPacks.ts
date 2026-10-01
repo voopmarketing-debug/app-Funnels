@@ -25,7 +25,7 @@ export const ADDON_PACKS: AddonPack[] = [
     kind: "CONTACTS",
     quantity: 200,
     priceCop: 219_000,
-    title: "+200 contactos",
+    title: "+200 clientes con IA",
     description: "Para un mes con un poco más de movimiento.",
   },
   {
@@ -33,7 +33,7 @@ export const ADDON_PACKS: AddonPack[] = [
     kind: "CONTACTS",
     quantity: 400,
     priceCop: 429_000,
-    title: "+400 contactos",
+    title: "+400 clientes con IA",
     description: "Duplica la capacidad del plan Starter.",
     highlight: true,
   },
@@ -42,7 +42,7 @@ export const ADDON_PACKS: AddonPack[] = [
     kind: "CONTACTS",
     quantity: 1000,
     priceCop: 1_049_000,
-    title: "+1.000 contactos",
+    title: "+1.000 clientes con IA",
     description: "Para campañas grandes o temporada alta.",
   },
   {

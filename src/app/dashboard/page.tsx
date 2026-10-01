@@ -350,20 +350,20 @@ async function PlanLimitAlert({
       <div className="min-w-0 flex-1">
         <p className={`text-sm font-semibold ${full ? "text-error" : "text-ink"}`}>
           {full
-            ? `Llegaste al límite: ${contacts.toLocaleString("es-CO")} de ${limit.toLocaleString("es-CO")} contactos este mes`
-            : `Vas en ${contacts.toLocaleString("es-CO")} de ${limit.toLocaleString("es-CO")} contactos este mes`}
+            ? `Llegaste al límite: ${contacts.toLocaleString("es-CO")} de ${limit.toLocaleString("es-CO")} clientes atendidos por IA este mes`
+            : `Vas en ${contacts.toLocaleString("es-CO")} de ${limit.toLocaleString("es-CO")} clientes atendidos por IA este mes`}
         </p>
         <p className="text-xs text-ink-muted">
           {full
-            ? "Tu agente ya no responde a contactos nuevos. Agrega un paquete y vuelve a responder al instante."
-            : "Cuando llegues al límite, tu agente dejará de responder a contactos nuevos. Amplía tu capacidad antes."}
+            ? "Tu agente ya no responde a clientes nuevos (los actuales siguen atendidos). Agrega un paquete y vuelve a responder al instante."
+            : "Cuando llegues al límite, tu agente dejará de responder a clientes nuevos. Amplía tu capacidad antes."}
         </p>
       </div>
       <div className="flex-none">
         <AddonStore
           businessId={businessId}
           kind="CONTACTS"
-          label="Agregar contactos"
+          label="Agregar clientes con IA"
           className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
         />
       </div>
@@ -420,7 +420,7 @@ async function PlanCard({
         />
       )}
       <UsageBar
-        label="Contactos activos este mes"
+        label="Clientes atendidos por IA este mes"
         value={`${contacts.toLocaleString("es-CO")} / ${contactLimit?.toLocaleString("es-CO") ?? "∞"}`}
         percent={contactLimit ? contactRatio * 100 : 0}
         tone={contactRatio >= 0.8 ? "warn" : "ok"}

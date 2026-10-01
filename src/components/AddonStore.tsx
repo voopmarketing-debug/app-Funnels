@@ -109,7 +109,7 @@ export function AddonStore({
         </div>
         {error && <p className="px-5 pb-4 text-sm text-error">{error}</p>}
         <p className="border-t border-border px-5 py-3 text-xs text-ink-faint">
-          Los contactos se cuentan por persona distinta que escribe en el mes. Los paquetes se suman a tu plan mientras estén vigentes.
+          Tu CRM guarda contactos ilimitados. El cupo cuenta cada cliente distinto que atiende la IA en el mes (con todas sus respuestas). Los paquetes se suman a tu plan mientras estén vigentes.
         </p>
       </dialog>
     </>

@@ -42,7 +42,7 @@ export default function TermsOfServicePage() {
           <Section title="2. Cuentas y planes">
             <ul className="list-disc space-y-1.5 pl-5">
               <li>Eres responsable de mantener segura tu contraseña y de la actividad que ocurra en tu cuenta.</li>
-              <li>Cada plan tiene límites de uso (por ejemplo, contactos activos por mes o números de WhatsApp conectados) — puedes ver los tuyos en el panel.</li>
+              <li>Cada plan tiene límites de uso (por ejemplo, clientes atendidos por IA por mes o números de WhatsApp conectados) — puedes ver los tuyos en el panel.</li>
               <li>Si superas el límite de tu plan, el agente de IA puede pausarse automáticamente en las conversaciones nuevas hasta que actualices de plan o un humano tome el control.</li>
               <li>Puedes cancelar tu suscripción cuando quieras; el acceso se mantiene activo hasta el final del periodo ya pagado.</li>
             </ul>
