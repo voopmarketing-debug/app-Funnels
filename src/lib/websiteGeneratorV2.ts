@@ -4,7 +4,6 @@ import { anthropic } from "@/lib/anthropicClient";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { INDUSTRY_LABELS, INDUSTRY_DIRECTION, type WebsiteGenerationContext } from "@/lib/websiteGenerator";
 import {
-  AiWebsiteV2Schema,
   PAGE_TYPES,
   STYLE_KEYS,
   type AiWebsiteV2,
@@ -15,7 +14,7 @@ import {
   formatMoney,
 } from "@/lib/websiteContentV2";
 import { recordAnthropicUsage } from "@/lib/aiUsage";
-import { AiPageSchema, fromAiPage, toAiSection } from "@/lib/websiteAiFormat";
+import { AiPageSchema, fromAiPage, toAiSection, type AiPage } from "@/lib/websiteAiFormat";
 
 // Same model the v1 generator has been running on in production — a page
 // is a single structured-output call that has to finish inside the
@@ -27,6 +26,9 @@ export type WebsiteV2Context = WebsiteGenerationContext & {
   photoCount: number;
   pageType?: PageType | null;
   style?: StyleKey | null;
+  // The business's own colors (Business.brandPrimaryColor/Secondary). When
+  // set, the page's accent is the brand color, whatever style is chosen.
+  brandColors?: { primary: string; secondary: string | null } | null;
 };
 
 async function parseStructured<T extends z.ZodType>(schema: T, prompt: string, effort: "low" | "medium"): Promise<z.infer<T>> {
@@ -48,6 +50,62 @@ async function parseStructured<T extends z.ZodType>(schema: T, prompt: string, e
   if (response.stop_reason === "refusal") throw new Error("La IA no pudo generar esta página con esa instrucción. Prueba redactándola distinto.");
   if (!response.parsed_output) throw new Error("La IA no devolvió el contenido de la página");
   return response.parsed_output as z.infer<T>;
+}
+
+// Page generation does NOT use structured outputs: the page format is big
+// enough that the API rejected its compiled grammar in production ("The
+// compiled grammar is too large"). Instead the model gets the JSON schema
+// in the prompt, we validate the answer with zod, and retry once with the
+// validation error if it doesn't fit.
+const PAGE_JSON_SCHEMA = JSON.stringify(zodOutputFormat(AiPageSchema).schema);
+
+function extractJson(text: string): unknown {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) throw new Error("La respuesta no trae JSON");
+  return JSON.parse(text.slice(start, end + 1));
+}
+
+async function generatePageJson(prompt: string): Promise<AiPage> {
+  const instructions = `${prompt}
+
+FORMATO DE RESPUESTA
+Responde SOLO con un objeto JSON válido (sin texto antes ni después, sin \`\`\`) que cumpla este JSON Schema. Todos los campos de cada sección van presentes; usa null o [] en los que no apliquen a ese tipo de sección.
+${PAGE_JSON_SCHEMA}`;
+  let lastError = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      output_config: { effort: "medium" },
+      messages: [
+        {
+          role: "user",
+          content:
+            attempt === 0
+              ? instructions
+              : `${instructions}\n\nTu respuesta anterior no se pudo usar (${lastError}). Devuelve el JSON completo y válido.`,
+        },
+      ],
+    });
+    await recordAnthropicUsage(MODEL, response.usage);
+    if (response.stop_reason === "refusal") throw new Error("La IA no pudo generar esta página con esa instrucción. Prueba redactándola distinto.");
+    const text = response.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
+    try {
+      const parsed = AiPageSchema.safeParse(extractJson(text));
+      if (parsed.success && parsed.data.sections.length > 0) return parsed.data;
+      lastError = parsed.success ? "no trae secciones" : parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    } catch (err) {
+      lastError = response.stop_reason === "max_tokens" ? "se cortó por largo" : err instanceof Error ? err.message : "JSON inválido";
+    }
+    console.error(`generatePageJson attempt ${attempt + 1} unusable: ${lastError}`);
+  }
+  throw new Error("La IA devolvió una página incompleta. Intenta de nuevo.");
+}
+
+function applyBrand(content: WebsiteContentV2, brand: WebsiteV2Context["brandColors"]): WebsiteContentV2 {
+  if (!brand?.primary) return content;
+  return { ...content, theme: { ...content.theme, primaryColor: brand.primary } };
 }
 
 function productsBlock(products: CatalogProduct[]): string {
@@ -113,6 +171,7 @@ ${ctx.designPrompt ? `- BRIEF DEL CLIENTE (prioridad máxima si choca con otra r
 ${ctx.pageType ? `- TIPO DE PÁGINA ELEGIDO POR EL CLIENTE: ${ctx.pageType} (respétalo)` : ""}
 ${ctx.style ? `- ESTILO ELEGIDO POR EL CLIENTE: ${ctx.style} (respétalo)` : ""}
 - Fotos reales del negocio disponibles: ${ctx.photoCount}
+${ctx.brandColors?.primary ? `- COLORES DE MARCA: principal ${ctx.brandColors.primary}${ctx.brandColors.secondary ? `, secundario ${ctx.brandColors.secondary}` : ""}. primaryColor = el principal, sin cambiarlo; construye fondo, superficies y texto alrededor de ellos para que la página se sienta de esta marca.` : ""}
 ${ctx.salesContext ? `\nCONTEXTO REAL DE VENTAS (dudas y objeciones de sus clientes)\n${ctx.salesContext}\n` : ""}
 PRODUCTOS reales cargados (usa SOLO estos ids; nunca inventes productos, precios ni descuentos):
 ${productsBlock(ctx.products)}
@@ -179,10 +238,10 @@ function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: 
 }
 
 export async function generateWebsiteContentV2(ctx: WebsiteV2Context): Promise<WebsiteContentV2> {
-  const ai = fromAiPage(await parseStructured(AiPageSchema, buildPrompt(ctx), "medium"));
+  const ai = fromAiPage(await generatePageJson(buildPrompt(ctx)));
   if (ctx.pageType) ai.pageType = ctx.pageType;
   if (ctx.style) ai.style = ctx.style;
-  return normalize(ai, ctx);
+  return applyBrand(normalize(ai, ctx), ctx.brandColors);
 }
 
 /** Chat edits on an existing v2 page ("haz el titular más corto", "cámbialo a estilo lujo"). */
@@ -206,7 +265,7 @@ El dueño del negocio pidió este cambio: "${instruction}"
 
 Actúa como el director creativo de la mejor agencia de diseño web con IA del mundo. Devuelve la página COMPLETA en el mismo formato aplicando ese cambio. Todo lo que no tenga que ver con el pedido queda EXACTAMENTE igual: no reescribas texto que no te pidieron. Puedes agregar, quitar o reordenar secciones si el pedido lo implica.
 Lo que cambies debe tener nivel de agencia premium: copy concreto, sin relleno de IA, sin emojis ni guion largo, sin inventar precios, reseñas, descuentos ni cifras. Si cambias colores: fondo nunca #ffffff/#000000 puros, texto ≥7:1, acento ≥4.5:1.`;
-  const ai = fromAiPage(await parseStructured(AiPageSchema, prompt, "medium"));
+  const ai = fromAiPage(await generatePageJson(prompt));
   const next = normalize(ai, { products, ctaUrl: current.heroCtaUrl });
   // Keep the owner's hide toggles only while the section list is the same shape.
   const sameShape = next.sections.length === current.sections.length && next.sections.every((s, i) => s.type === current.sections[i].type);
@@ -262,13 +321,16 @@ export async function websiteCreationTurn(
       : history.map((m) => `${m.role === "user" ? "CLIENTE" : "TÚ"}: ${m.text}`).join("\n");
   const prompt = `Eres el director creativo de una agencia de diseño web con IA y estás conversando por chat con el dueño de un negocio para crear su página web. Le hablas a él directamente, de tú, con un tono cálido, seguro e inspirador: que sienta que su negocio merece una página de primer nivel y que está a un minuto de tenerla. Nada de jerga (no digas brief, CTA, landing, lead, captación, funnel, conversión): habla de clientes, mensajes, citas, ventas y pedidos.
 
-Tu trabajo: entender qué necesita, proponer ideas concretas basadas en lo que YA cargó en la plataforma y llegar rápido a un plan listo. Pregunta solo lo que de verdad falte (máximo una pregunta por turno, fácil de responder). Cuando haya suficiente, llena "ready" y dile que a la derecha ya puede ver cómo queda su página, elegir el estilo y tocar "Crear mi página".
+Tu trabajo: proponer ideas concretas basadas en lo que YA sabes de su negocio (abajo) y llegar a un plan listo lo antes posible, idealmente en cuanto elija una idea. Ya conoces su negocio: NO le preguntes lo que puedes deducir de los datos (qué vende, a quién, el tono, el estilo visual ni los colores). Tú decides el estilo que mejor le va a su rubro y a su marca y se lo dices; él lo puede cambiar después en el panel de la derecha. Pregunta solo un dato que de verdad no exista en los datos y sea indispensable (máximo una pregunta en toda la conversación, fácil de responder). Cuando elija una idea o te diga lo que quiere, llena "ready" en ese mismo turno y dile que a la derecha ya ve cómo queda su página y puede tocar "Crear mi página".
 
 DATOS QUE YA TIENE EN LA PLATAFORMA
 - Negocio: ${ctx.businessName} (${INDUSTRY_LABELS[ctx.industry] ?? "otro"})
 - Lo que hace: ${ctx.description.slice(0, 1500) || "sin descripción todavía"}
 - Productos cargados: ${ctx.products.length}${ctx.products.length ? ` (ej. ${ctx.products.slice(0, 5).map((p) => p.name).join(", ")})` : ""}
 - Fotos reales: ${ctx.photoCount}
+${[ctx.city, ctx.country].filter(Boolean).length ? `- Ubicación: ${[ctx.city, ctx.country].filter(Boolean).join(", ")}` : ""}
+${ctx.instagram || ctx.facebook || ctx.tiktok ? `- Redes: ${[ctx.instagram, ctx.facebook, ctx.tiktok].filter(Boolean).join(", ")}` : ""}
+${ctx.brandColors?.primary ? `- Colores de su marca: ${ctx.brandColors.primary}${ctx.brandColors.secondary ? ` y ${ctx.brandColors.secondary}` : ""} (la página ya usará estos colores; no preguntes por colores)` : "- Colores de marca: no los ha cargado; puede elegirlos en el panel de la derecha (no preguntes por colores)"}
 ${ctx.salesContext ? `- Lo que preguntan sus clientes: ${ctx.salesContext.slice(0, 800)}` : ""}
 
 TIPOS DE PÁGINA

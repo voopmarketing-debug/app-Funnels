@@ -39,7 +39,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   ]);
   const products = sampleProducts(realProducts);
 
-  const html = renderWebsiteHtmlV2(buildSampleContent({ pageType, style, businessName: membership.business.name, products }), {
+  const content = buildSampleContent({ pageType, style, businessName: membership.business.name, products });
+  // The owner's brand color, while picking it in the studio.
+  const color = req.nextUrl.searchParams.get("color");
+  if (color && /^#[0-9a-fA-F]{6}$/.test(color)) content.theme = { ...content.theme, primaryColor: color };
+
+  const html = renderWebsiteHtmlV2(content, {
     businessName: membership.business.name,
     // Links stay on the page: this is a picture of the design, not a site.
     trackingBasePath: "#",

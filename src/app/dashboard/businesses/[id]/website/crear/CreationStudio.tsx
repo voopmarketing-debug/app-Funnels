@@ -39,11 +39,13 @@ export function CreationStudio({
   businessName,
   productCount,
   needsWhatsapp = false,
+  initialBrand = { primary: null, secondary: null },
 }: {
   businessId: string;
   businessName: string;
   productCount: number;
   needsWhatsapp?: boolean;
+  initialBrand?: { primary: string | null; secondary: string | null };
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -59,8 +61,18 @@ export function CreationStudio({
   const whatsappDigits = whatsapp.replace(/\D/g, "");
   const whatsappMissing = needsWhatsapp && (whatsappDigits.length < 8 || whatsappDigits.length > 15);
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  // Brand colors: null = let the style decide.
+  const [brandPrimary, setBrandPrimary] = useState<string | null>(initialBrand.primary);
+  const [brandSecondary, setBrandSecondary] = useState<string | null>(initialBrand.secondary);
+  // The previews reload with the color only once the picker settles, not
+  // on every drag step (each style card is a live page).
+  const [previewColor, setPreviewColor] = useState<string | null>(initialBrand.primary);
+  useEffect(() => {
+    const id = setTimeout(() => setPreviewColor(brandPrimary), 500);
+    return () => clearTimeout(id);
+  }, [brandPrimary]);
   const previewSrc = (style: StyleKey, pageType: PageType) =>
-    `/dashboard/businesses/${businessId}/website/muestra?style=${style}&type=${pageType}`;
+    `/dashboard/businesses/${businessId}/website/muestra?style=${style}&type=${pageType}${previewColor ? `&color=${encodeURIComponent(previewColor)}` : ""}`;
   const [, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -145,6 +157,8 @@ export function CreationStudio({
           pageType: plan.pageType,
           style: plan.style,
           whatsappNumber: needsWhatsapp ? whatsapp : undefined,
+          brandPrimaryColor: brandPrimary,
+          brandSecondaryColor: brandPrimary ? brandSecondary : null,
         });
         if (!result.ok) throw new Error(result.error);
         router.push(`/dashboard/businesses/${businessId}/website/${result.id}`);
@@ -381,6 +395,50 @@ export function CreationStudio({
                         </button>
                       );
                     })}
+                  </div>
+                </fieldset>
+
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-semibold text-ink">Los colores de tu marca</legend>
+                  <p className="text-xs text-ink-muted">
+                    {brandPrimary
+                      ? "Tu página usará tu color en botones y detalles, con el estilo que elegiste."
+                      : "Opcional. Si no eliges, usamos los colores del estilo."}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {(
+                      [
+                        ["Principal", brandPrimary, setBrandPrimary],
+                        ["Secundario", brandSecondary, setBrandSecondary],
+                      ] as const
+                    ).map(([label, value, set]) => (
+                      <label key={label} className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 text-xs text-ink-muted">
+                        <input
+                          type="color"
+                          value={value ?? "#1f6feb"}
+                          onChange={(e) => set(e.target.value)}
+                          disabled={label === "Secundario" && !brandPrimary}
+                          aria-label={`Color ${label.toLowerCase()} de tu marca`}
+                          className="h-7 w-7 cursor-pointer rounded border-0 bg-transparent p-0 disabled:opacity-40"
+                        />
+                        <span>
+                          <span className="block font-semibold text-ink">{label}</span>
+                          <span className="font-mono">{value ?? "Sin elegir"}</span>
+                        </span>
+                      </label>
+                    ))}
+                    {brandPrimary && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrandPrimary(null);
+                          setBrandSecondary(null);
+                        }}
+                        className="text-xs text-ink-muted underline hover:text-ink"
+                      >
+                        Usar los del estilo
+                      </button>
+                    )}
                   </div>
                 </fieldset>
 

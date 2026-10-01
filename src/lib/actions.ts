@@ -2639,7 +2639,36 @@ async function buildWebsiteV2Context(
     salesContext,
     products,
     photoCount,
+    brandColors: await resolveBrandColors(business),
   };
+}
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * The business's brand colors: the ones saved from the creation studio, or
+ * failing that the accent of its most recent page, so a second page matches
+ * the first without asking again.
+ */
+async function resolveBrandColors(business: {
+  id: string;
+  brandPrimaryColor: string | null;
+  brandSecondaryColor: string | null;
+}): Promise<{ primary: string; secondary: string | null } | null> {
+  if (business.brandPrimaryColor && HEX_COLOR.test(business.brandPrimaryColor)) {
+    return {
+      primary: business.brandPrimaryColor,
+      secondary: business.brandSecondaryColor && HEX_COLOR.test(business.brandSecondaryColor) ? business.brandSecondaryColor : null,
+    };
+  }
+  const latest = await prisma.website.findFirst({
+    where: { businessId: business.id, pageType: "landing" },
+    orderBy: { generatedAt: "desc" },
+    select: { content: true },
+  });
+  const theme = (latest?.content as { theme?: { primaryColor?: unknown }; primaryColor?: unknown } | null) ?? null;
+  const fromPage = theme?.theme?.primaryColor ?? theme?.primaryColor;
+  return typeof fromPage === "string" && HEX_COLOR.test(fromPage) ? { primary: fromPage, secondary: null } : null;
 }
 
 /** One turn of the "Crear con IA" chat — proposals, one question at a time, then a ready brief. */
@@ -2657,7 +2686,14 @@ function builderError(where: string, err: unknown): { ok: false; error: string }
     if (status === 429 || status === 529) {
       return { ok: false, error: "La IA está saturada en este momento. Espera un minuto e intenta de nuevo." };
     }
-    return { ok: false, error: "La IA no respondió. Intenta de nuevo en unos segundos; si sigue pasando, escríbenos a soporte." };
+    // A short technical detail, so a screenshot of the error tells us what
+    // actually failed (production logs aren't always at hand).
+    const apiMessage =
+      typeof err === "object" && err !== null && "error" in err
+        ? ((err as { error?: { error?: { message?: unknown } } }).error?.error?.message ?? "")
+        : "";
+    const detail = `${status}${typeof apiMessage === "string" && apiMessage ? ` · ${apiMessage.slice(0, 140)}` : ""}`;
+    return { ok: false, error: `La IA no respondió. Intenta de nuevo en unos segundos; si sigue pasando, envíanos esta captura. (Detalle: ${detail})` };
   }
   return { ok: false, error: err instanceof Error ? err.message : "Algo salió mal, intenta de nuevo" };
 }
@@ -2697,6 +2733,10 @@ export async function createWebsitePageV2(
     // Typed in the creation studio when the business has no WhatsApp
     // connected and the owner has no phone on file yet.
     whatsappNumber?: string;
+    // Brand colors picked in the studio; saved on the business for every
+    // future page.
+    brandPrimaryColor?: string | null;
+    brandSecondaryColor?: string | null;
   },
 ): Promise<BuilderResult<{ id: string }>> {
   try {
@@ -2716,6 +2756,14 @@ export async function createWebsitePageV2(
       if (owner && !owner.user.phone?.trim()) {
         await prisma.user.update({ where: { id: owner.user.id }, data: { phone: `+${digits}` } });
       }
+    }
+
+    if (input.brandPrimaryColor !== undefined || input.brandSecondaryColor !== undefined) {
+      const clean = (v: string | null | undefined) => (v && HEX_COLOR.test(v) ? v.toLowerCase() : null);
+      await prisma.business.update({
+        where: { id: businessId },
+        data: { brandPrimaryColor: clean(input.brandPrimaryColor), brandSecondaryColor: clean(input.brandSecondaryColor) },
+      });
     }
 
     const ctx = await buildWebsiteV2Context(businessId);

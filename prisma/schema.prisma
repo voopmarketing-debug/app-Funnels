@@ -43,7 +43,12 @@ model Business {
   // (see src/lib/plans.ts). Assigned by the agency after a sales call — not
   // self-service, no billing integration wired to it yet, so this is purely
   // informational: reaching the cap never blocks the agent from replying.
-  planTier PlanTier @default(STARTER)
+  planTier            PlanTier @default(STARTER)
+  // Brand colors (hex), set from the website creation studio. The page
+  // generator uses them as the page's accent so every new page looks like
+  // the business, not like a random palette.
+  brandPrimaryColor   String?
+  brandSecondaryColor String?
 
   // Current paid-period window — set manually by the agency (ADMIN) from
   // /dashboard/clients whenever they confirm a Hotmart payment, since
