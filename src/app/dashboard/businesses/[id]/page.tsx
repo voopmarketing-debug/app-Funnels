@@ -418,7 +418,8 @@ export default async function BusinessPage({
         )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile
-            label="Contactos nuevos"
+            label="Clientes nuevos"
+            hint="Te escribieron por primera vez"
             value={String(analytics.newConversations)}
             sublabel={`${analytics.totalConversations.toLocaleString("es-CO")} en total`}
             description={`Personas que te escribieron por primera vez ${period}.`}
@@ -427,6 +428,7 @@ export default async function BusinessPage({
           />
           <StatTile
             label="Tiempo de respuesta"
+            hint="Promedio hasta que el cliente recibe respuesta"
             value={formatMinutes(analytics.responseTime.avgMinutes)}
             status={responseTimeStatus(analytics.responseTime.avgMinutes)}
             description={`En promedio ${period}, cuánto tardó en llegar una respuesta después de que un cliente escribió. Entre menos, mejor.`}
@@ -434,9 +436,9 @@ export default async function BusinessPage({
             icon={<ClockIcon />}
           />
           <StatTile
-            label="Automatización IA"
+            label="Atendido por la IA"
+            hint="Respuestas sin que nadie interviniera"
             value={formatPercent(analytics.automationRate)}
-            sublabel="de respuestas sin humano"
             status={automationStatus(analytics.automationRate)}
             description={`De cada 100 respuestas enviadas ${period}, cuántas las contestó la IA sola, sin que nadie de tu equipo interviniera.`}
             tone="secondary"
@@ -444,6 +446,7 @@ export default async function BusinessPage({
           />
           <StatTile
             label="Esperando respuesta"
+            hint="Clientes sin contestar"
             value={String(analytics.awaitingReply)}
             sublabel="ahora mismo"
             status={awaitingReplyStatus(analytics.awaitingReply)}

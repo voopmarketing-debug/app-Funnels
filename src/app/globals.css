@@ -11,6 +11,11 @@
 :root {
   color-scheme: dark;
 
+  /* KPI status pill text (good / attention / needs work). */
+  --status-good: #5fd35f;
+  --status-warn: #fbc04d;
+  --status-bad: #ff8080;
+
   --background: #0a0a0a;
   --surface: #161616;
   --surface-2: #1e1e1e;
@@ -40,6 +45,10 @@
  * button/badge. */
 :root[data-theme="light"] {
   color-scheme: light;
+
+  --status-good: #157a15;
+  --status-warn: #8f5a00;
+  --status-bad: #b42828;
 
   --background: #f6f6f2;
   --surface: #ffffff;

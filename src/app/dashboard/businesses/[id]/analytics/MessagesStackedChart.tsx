@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DailyMessagePoint } from "@/lib/analytics";
 
-const WIDTH = 640;
-const HEIGHT = 240;
-const PADDING = { top: 16, right: 12, bottom: 28, left: 32 };
+const HEIGHT = 260;
+const PADDING = { top: 16, right: 12, bottom: 34, left: 40 };
 const GAP = 2; // surface-color gap between stacked segments, per dataviz mark spec
 
 // Validated (dataviz skill validator, --pairs all, dark mode, this app's
@@ -34,8 +33,25 @@ function topRoundedRectPath(x: number, y: number, w: number, h: number, r: numbe
   return `M ${x} ${y + h} L ${x} ${y + radius} Q ${x} ${y} ${x + radius} ${y} L ${x + w - radius} ${y} Q ${x + w} ${y} ${x + w} ${y + radius} L ${x + w} ${y + h} Z`;
 }
 
+/** Draw the chart at its real pixel width so axis text stays a readable size on phones. */
+function useChartWidth(fallback: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(fallback);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setWidth(Math.max(280, Math.round(el.clientWidth)));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return { ref, width };
+}
+
 export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const { ref: boxRef, width: WIDTH } = useChartWidth(640);
 
   const plotWidth = WIDTH - PADDING.left - PADDING.right;
   const plotHeight = HEIGHT - PADDING.top - PADDING.bottom;
@@ -49,7 +65,7 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
   const barWidth = Math.min(24, slot * 0.65);
 
   const yTicks = [0, 0.5, 1].map((f) => Math.round(maxValue * f));
-  const labelEvery = Math.ceil(data.length / 6);
+  const labelEvery = Math.ceil(data.length / Math.max(2, Math.floor(WIDTH / 90)));
 
   function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -59,15 +75,17 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
   }
 
   const hovered = hoverIndex !== null ? data[hoverIndex] : null;
+  const isEmpty = totals.every((t) => t === 0);
   const hoveredX = hoverIndex !== null ? PADDING.left + hoverIndex * slot + slot / 2 : 0;
 
   return (
-    <div className="relative">
-      <div className="mb-2 flex items-center gap-4 text-xs text-ink-muted">
+    <div ref={boxRef} className="relative">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
         {SERIES.map((s) => (
           <span key={s.key} className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
             {s.label}
+            <span className="font-semibold tabular-nums text-ink">{data.reduce((sum, d) => sum + d[s.key], 0).toLocaleString("es-CO")}</span>
           </span>
         ))}
       </div>
@@ -84,8 +102,8 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
           const y = baselineY - tick * scale;
           return (
             <g key={tick}>
-              <line x1={PADDING.left} x2={WIDTH - PADDING.right} y1={y} y2={y} style={{ stroke: "var(--border)" }} strokeWidth={1} />
-              <text x={PADDING.left - 8} y={y + 3} textAnchor="end" fontSize={10} style={{ fill: "var(--ink-muted)" }}>
+              <line x1={PADDING.left} x2={WIDTH - PADDING.right} y1={y} y2={y} style={{ stroke: "var(--border)" }} strokeWidth={1} strokeDasharray={tick === 0 ? undefined : "3 4"} />
+              <text x={PADDING.left - 8} y={y + 3} textAnchor="end" fontSize={11} style={{ fill: "var(--ink-muted)" }}>
                 {tick}
               </text>
             </g>
@@ -119,7 +137,7 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
                 ) : null,
               )}
               {i % labelEvery === 0 && (
-                <text x={x + barWidth / 2} y={HEIGHT - 8} textAnchor="middle" fontSize={10} style={{ fill: "var(--ink-muted)" }}>
+                <text x={x + barWidth / 2} y={HEIGHT - 8} textAnchor="middle" fontSize={11} style={{ fill: "var(--ink-muted)" }}>
                   {formatDayLabel(d.date)}
                 </text>
               )}
@@ -140,7 +158,10 @@ export function MessagesStackedChart({ data }: { data: DailyMessagePoint[] }) {
         )}
       </svg>
 
-      {hovered && (
+      {isEmpty && (
+        <p className="pointer-events-none absolute inset-x-0 top-1/2 text-center text-sm text-ink-muted">Sin mensajes en este período</p>
+      )}
+      {hovered && !isEmpty && (
         <div
           className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-md border border-border-strong bg-surface-2 px-2.5 py-1.5 text-xs shadow-lg"
           style={{ left: `${(hoveredX / WIDTH) * 100}%` }}
