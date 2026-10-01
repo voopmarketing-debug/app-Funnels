@@ -1,11 +1,28 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { sendManualMessage } from "@/lib/actions";
+import { MAX_ATTACHMENT_BYTES, maxMbFor, resolveMediaType } from "@/lib/attachmentLimits";
+import { EmojiPicker } from "@/components/EmojiPicker";
 
 type SendState = { sentCount: number; error: string | null };
 
 const SIZE_HINT = "Imágenes hasta 5 MB · audio/video hasta 16 MB · documentos hasta 20 MB";
+
+// Below this a file can still ride inside the Server Action request itself
+// (Next's body limit is 4MB, see next.config.ts) — used only as a fallback
+// if the direct-to-storage upload fails for some reason.
+const IN_REQUEST_FALLBACK_BYTES = 3.5 * 1024 * 1024;
+
+function safeUploadName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "archivo";
+}
+
+function formatMb(bytes: number): string {
+  // Rounded UP so a file just over the limit never reads as "20.0 MB".
+  return `${(Math.ceil((bytes / (1024 * 1024)) * 10) / 10).toFixed(1)} MB`;
+}
 
 function formatSeconds(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
@@ -23,6 +40,10 @@ export function ManualMessageForm({
   windowOpen: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Where the caret was last — mobile browsers drop a textarea's selection
+  // once it loses focus (tapping the emoji panel), so it's tracked here.
+  const caretRef = useRef<{ start: number; end: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -53,13 +74,95 @@ export function ManualMessageForm({
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedMicId, setSelectedMicId] = useState<string>("");
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const isUploading = uploadPercent !== null;
+  const isBusy = isPending || isUploading;
 
   useEffect(() => {
     if (!isPending && !state.error) {
       formRef.current?.reset();
+      caretRef.current = null;
       setPendingFileName(null);
     }
   }, [isPending, state.sentCount, state.error]);
+
+  function clearPickedFile() {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setPendingFileName(null);
+  }
+
+  /**
+   * Files go straight from the browser to our storage (Vercel Blob) and only
+   * their URL is sent to the server — Server Actions can't carry more than
+   * ~4MB, while WhatsApp allows up to 16MB (audio/video) and 20MB
+   * (documents). The server re-checks the real size and type before sending.
+   */
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (isBusy) return;
+    setLocalError(null);
+    const formData = new FormData(e.currentTarget);
+    const fileEntry = formData.get("file");
+    const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
+    if (!file && !String(formData.get("text") ?? "").trim()) return;
+
+    if (file) {
+      const contentType = (file.type || "application/octet-stream").split(";")[0].trim();
+      const mediaType = resolveMediaType(contentType);
+      if (!mediaType) {
+        setLocalError("Ese tipo de archivo no se puede enviar por WhatsApp");
+        clearPickedFile();
+        return;
+      }
+      if (file.size > MAX_ATTACHMENT_BYTES[mediaType]) {
+        setLocalError(
+          `"${file.name}" pesa ${formatMb(file.size)} y WhatsApp permite máximo ${maxMbFor(mediaType)} MB para este tipo de archivo`,
+        );
+        clearPickedFile();
+        return;
+      }
+
+      setUploadPercent(0);
+      try {
+        const blob = await upload(`chat/${businessId}/${safeUploadName(file.name)}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/attachments/upload",
+          clientPayload: JSON.stringify({ businessId }),
+          contentType,
+          multipart: file.size > 5 * 1024 * 1024,
+          onUploadProgress: ({ percentage }) => setUploadPercent(Math.round(percentage)),
+        });
+        formData.delete("file");
+        formData.set("fileUrl", blob.url);
+        formData.set("fileName", file.name);
+      } catch (err) {
+        // Small files can still go the old way, inside the request itself.
+        if (file.size > IN_REQUEST_FALLBACK_BYTES) {
+          setUploadPercent(null);
+          setLocalError(
+            `No se pudo subir el archivo (${err instanceof Error ? err.message : "error de conexión"}). Revisa tu internet e intenta de nuevo.`,
+          );
+          return;
+        }
+      }
+      setUploadPercent(null);
+    }
+
+    startTransition(() => formAction(formData));
+  }
+
+  function insertEmoji(emoji: string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const caret = caretRef.current ?? { start: el.value.length, end: el.value.length };
+    const start = Math.min(caret.start, el.value.length);
+    const end = Math.min(Math.max(caret.end, start), el.value.length);
+    el.setRangeText(emoji, start, end, "end");
+    caretRef.current = { start: start + emoji.length, end: start + emoji.length };
+    // On touch screens focusing would pop the keyboard over the picker.
+    if (window.matchMedia("(pointer: fine)").matches) el.focus();
+  }
 
   // Lists available microphones so the person recording can pick their
   // computer's own mic instead of whatever the browser/OS defaults to —
@@ -170,7 +273,7 @@ export function ManualMessageForm({
   }
 
   return (
-    <form ref={formRef} action={formAction} className="flex flex-col gap-1.5 border-t border-border bg-surface p-3">
+    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-1.5 border-t border-border bg-surface p-3">
       {!windowOpen && (
         <p className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-[11px] text-accent">
           Pasaron más de 24h desde el último mensaje del cliente — usa el botón{" "}
@@ -182,7 +285,7 @@ export function ManualMessageForm({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isPending || isRecording}
+          disabled={isBusy || isRecording}
           title="Adjuntar archivo o imagen"
           className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-border text-ink-muted transition hover:border-accent hover:text-accent disabled:opacity-60"
         >
@@ -191,7 +294,7 @@ export function ManualMessageForm({
         <button
           type="button"
           onClick={toggleRecording}
-          disabled={isPending}
+          disabled={isBusy}
           title={isRecording ? "Detener y enviar grabación" : "Grabar nota de voz"}
           className={`flex h-9 w-9 flex-none items-center justify-center rounded-full border transition ${
             isRecording
@@ -201,6 +304,7 @@ export function ManualMessageForm({
         >
           🎤
         </button>
+        {!isRecording && <EmojiPicker onPick={insertEmoji} disabled={isBusy} />}
         {isRecording ? (
           <div className="flex flex-1 items-center gap-2 rounded-2xl border border-error/40 bg-error/10 px-4 py-2">
             <span className="relative flex h-2.5 w-2.5 flex-none">
@@ -219,7 +323,11 @@ export function ManualMessageForm({
           </div>
         ) : (
           <textarea
+            ref={textareaRef}
             name="text"
+            onSelect={(e) => {
+              caretRef.current = { start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd };
+            }}
             rows={1}
             placeholder="Mensaje..."
             // text-base (16px) on phones: iOS Safari auto-zooms the whole
@@ -236,10 +344,10 @@ export function ManualMessageForm({
         {!isRecording && (
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isBusy}
             className="flex-none rounded-full bg-accent px-3 py-2 text-sm md:px-4 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
           >
-            {isPending ? "..." : "Enviar"}
+            {isUploading ? `${uploadPercent}%` : isPending ? "..." : "Enviar"}
           </button>
         )}
       </div>
@@ -260,9 +368,21 @@ export function ManualMessageForm({
           </select>
         </label>
       )}
-      {state.error ? (
+      {isUploading && (
+        <div className="flex items-center gap-2 pl-1" role="status" aria-live="polite">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${uploadPercent}%` }} />
+          </div>
+          <span className="fl-mono flex-none text-[10px] text-ink-muted">
+            Subiendo {pendingFileName} · {uploadPercent}%
+          </span>
+        </div>
+      )}
+      {localError ? (
+        <p className="pl-1 text-xs font-medium text-error">⚠ {localError}</p>
+      ) : state.error ? (
         <p className="pl-1 text-xs font-medium text-error">⚠ No se pudo enviar: {state.error}</p>
-      ) : (
+      ) : isUploading ? null : (
         <p className={`fl-mono pl-1 text-[10px] text-ink-faint ${pendingFileName ? "" : "hidden md:block"}`}>
           {pendingFileName ? `Adjunto: ${pendingFileName}` : SIZE_HINT}
         </p>

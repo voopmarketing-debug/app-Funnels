@@ -14,7 +14,7 @@ import { SECURITY_HEADERS, SITE_CSP } from "./src/lib/securityHeaders";
 // load anything, which is exactly what broke playback of sent/received
 // voice notes right after this CSP first shipped.
 const APP_CSP =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://vercel.com/api/blob/; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
 const nextConfig: NextConfig = {
   // Server Actions cap request bodies at 1MB by default — too small for a

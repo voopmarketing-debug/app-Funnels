@@ -36,6 +36,9 @@ import {
   MAX_ATTACHMENT_BYTES,
   maxMbFor,
   MAX_AGENT_MEDIA_PER_BUSINESS,
+  verifyChatUpload,
+  deleteAttachment,
+  type MediaType,
 } from "@/lib/attachments";
 import { convertToOggOpus } from "@/lib/audioConvert";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
@@ -1259,9 +1262,14 @@ export async function sendManualMessage(
   await requireBusinessMembership(session.user.id, businessId);
 
   const text = String(formData.get("text") ?? "").trim();
+  // Two ways a file arrives: `fileUrl` — the composer already uploaded it
+  // straight from the browser to Blob (the only way past the ~4MB request
+  // body cap, up to WhatsApp's 16–20MB) — or `file`, the original in-body
+  // upload, kept as the fallback for small files if the direct upload fails.
+  const fileUrl = String(formData.get("fileUrl") ?? "").trim();
   const fileEntry = formData.get("file");
-  const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
-  if (!text && !file) throw new Error("text or file is required");
+  const file = !fileUrl && fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
+  if (!text && !file && !fileUrl) throw new Error("text or file is required");
 
   const [business, conversation] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id: businessId } }),
@@ -1276,22 +1284,47 @@ export async function sendManualMessage(
   const phoneNumberId = business.wabaPhoneNumberId;
   const to = conversation.customerPhone;
 
-  if (file) {
-    const mediaType = resolveMediaType(file.type);
-    if (!mediaType) throw new Error("Tipo de archivo no soportado");
-    if (file.size > MAX_ATTACHMENT_BYTES[mediaType]) {
-      throw new Error(`El archivo supera el máximo permitido (${maxMbFor(mediaType)} MB)`);
-    }
+  if (file || fileUrl) {
+    let mediaType: MediaType;
+    let bytes: Buffer | null = null;
+    let filename: string;
+    let contentType: string;
+    let url: string | null = null;
+    let size: number;
 
-    let bytes: Buffer = Buffer.from(await file.arrayBuffer());
-    let filename = file.name;
-    let contentType = file.type;
+    if (fileUrl) {
+      const uploaded = await verifyChatUpload({ url: fileUrl, businessId });
+      mediaType = uploaded.mediaType;
+      contentType = uploaded.contentType;
+      size = uploaded.size;
+      url = uploaded.url;
+      const givenName = String(formData.get("fileName") ?? "").trim().slice(0, 120);
+      filename = givenName || uploaded.pathname.split("/").pop() || "archivo";
+    } else {
+      const picked = file!;
+      const resolved = resolveMediaType(picked.type);
+      if (!resolved) throw new Error("Tipo de archivo no soportado");
+      if (picked.size > MAX_ATTACHMENT_BYTES[resolved]) {
+        throw new Error(`El archivo supera el máximo permitido (${maxMbFor(resolved)} MB)`);
+      }
+      mediaType = resolved;
+      bytes = Buffer.from(await picked.arrayBuffer());
+      filename = picked.name;
+      contentType = picked.type;
+      size = bytes.byteLength;
+    }
 
     // WhatsApp only accepts/plays voice notes in Ogg/Opus — a browser
     // recording (see the mic button in ManualMessageForm) comes out as
     // WebM/Opus, which Meta silently rejects, so it's normalized here
     // before upload. Covers any other audio format someone attaches too.
     if (mediaType === "audio" && contentType !== "audio/ogg; codecs=opus") {
+      const directUploadUrl = url;
+      if (!bytes) {
+        const res = await fetch(directUploadUrl!);
+        if (!res.ok) throw new Error("No se pudo leer el audio subido, intenta de nuevo");
+        bytes = Buffer.from(await res.arrayBuffer());
+      }
       bytes = await convertToOggOpus(bytes);
       filename = filename.replace(/\.[^.]+$/, "") + ".ogg";
       // Meta reads the Content-Type Meta's crawler fetches from our blob URL
@@ -1300,9 +1333,15 @@ export async function sendManualMessage(
       // phone ("this audio is no longer available"). The codecs parameter
       // is required, not optional, for WhatsApp to treat it as real Opus.
       contentType = "audio/ogg; codecs=opus";
+      url = null;
+      size = bytes.byteLength;
+      // The unconverted original is never shown or sent anywhere.
+      if (directUploadUrl) after(() => deleteAttachment(directUploadUrl));
     }
 
-    const { url } = await uploadAttachment({ bytes, filename, contentType });
+    if (!url) {
+      url = (await uploadAttachment({ bytes: bytes!, filename, contentType })).url;
+    }
 
     // Meta doesn't support a caption on audio messages — if there's text
     // alongside a voice note, it goes out as its own follow-up message.
@@ -1328,7 +1367,7 @@ export async function sendManualMessage(
         mediaType,
         mediaMimeType: contentType,
         mediaFilename: filename,
-        mediaSizeBytes: bytes.byteLength,
+        mediaSizeBytes: size,
       },
     });
 
