@@ -69,10 +69,14 @@ export function WhatsAppHealthPanel({
   return (
     <section className={`fl-card space-y-3 p-4 ${ok ? "" : "border-error/50"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${ok ? "bg-accent" : "animate-pulse bg-error"}`} />
-          <h2 className="text-sm font-semibold text-ink">Estado del agente (WhatsApp + IA)</h2>
-          <span className={`text-xs font-medium ${ok ? "text-accent" : "text-error"}`}>
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="whitespace-nowrap text-sm font-semibold text-ink">Estado del agente</h2>
+          <span
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${
+              ok ? "bg-accent/15 text-accent" : "bg-error/15 text-error"
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-accent" : "animate-pulse bg-error"}`} />
             {ok ? "Funcionando" : "Requiere atención"}
           </span>
         </div>
@@ -93,18 +97,18 @@ export function WhatsAppHealthPanel({
             disabled={isPending}
             className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent disabled:opacity-60"
           >
-            {isPending ? "Revisando..." : "Revisar conexión ahora"}
+            {isPending ? "Revisando..." : "Revisar ahora"}
           </button>
         </div>
       </div>
 
-      <dl className="grid gap-2 text-xs sm:grid-cols-2">
+      <dl className="grid grid-cols-2 gap-3 text-xs">
         <div>
-          <dt className="text-ink-faint">Último mensaje o evento recibido de Meta</dt>
+          <dt className="text-ink-faint">Último mensaje recibido</dt>
           <dd className="text-ink">{lastWebhookAt ? <ClientDate date={lastWebhookAt} options={DATE_OPTIONS} /> : "Aún no registrado"}</dd>
         </div>
         <div>
-          <dt className="text-ink-faint">Última revisión automática</dt>
+          <dt className="text-ink-faint">Última revisión</dt>
           <dd className="text-ink">
             {healthCheckedAt ? (
               <>
@@ -140,7 +144,7 @@ export function WhatsAppHealthPanel({
       {error && <p className="text-xs font-medium text-error">{error}</p>}
 
       <p className="text-[13px] text-ink-faint">
-        Se revisa sola todos los días. Si algo falla, te avisamos en la campana y por correo.
+        Se revisa sola cada día. Si algo falla, te avisamos.
       </p>
     </section>
   );
