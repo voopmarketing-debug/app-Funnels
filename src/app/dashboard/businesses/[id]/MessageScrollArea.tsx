@@ -32,7 +32,7 @@ export function MessageScrollArea({ messageCount, children }: { messageCount: nu
 
   return (
     <div className="relative min-h-0 flex-1">
-      <div ref={containerRef} onScroll={handleScroll} className="h-full space-y-3 overflow-y-auto bg-background px-4 py-4">
+      <div ref={containerRef} onScroll={handleScroll} className="h-full space-y-1 overflow-y-auto bg-background px-3 py-4 md:px-5">
         {children}
       </div>
       {showJumpButton && (

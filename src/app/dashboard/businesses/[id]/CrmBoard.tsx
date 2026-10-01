@@ -16,6 +16,8 @@ export type CrmConversation = {
   stageId: string;
   lastMessageAt: string;
   unreadCount: number;
+  // Only loaded for the chat list (Conversaciones tab).
+  lastMessage?: { content: string; from: "customer" | "ai" | "human"; mediaType: string | null } | null;
 };
 
 export function CrmBoard({

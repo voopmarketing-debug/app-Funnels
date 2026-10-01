@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { upload } from "@vercel/blob/client";
 import { sendManualMessage } from "@/lib/actions";
 import { MAX_ATTACHMENT_BYTES, maxMbFor, resolveMediaType } from "@/lib/attachmentLimits";
@@ -8,7 +8,7 @@ import { EmojiPicker } from "@/components/EmojiPicker";
 
 type SendState = { sentCount: number; error: string | null };
 
-const SIZE_HINT = "Imágenes hasta 5 MB · audio/video hasta 16 MB · documentos hasta 20 MB";
+const SIZE_HINT = "Imágenes 5 MB · audio/video 16 MB · documentos 20 MB";
 
 // Below this a file can still ride inside the Server Action request itself
 // (Next's body limit is 4MB, see next.config.ts) — used only as a fallback
@@ -30,14 +30,49 @@ function formatSeconds(totalSeconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+// Re-renders the countdown every 30s; the server snapshot is null so the
+// server HTML and hydration never disagree about "now".
+function subscribeClock(onChange: () => void) {
+  const id = setInterval(onChange, 30_000);
+  return () => clearInterval(id);
+}
+const getMinuteNow = () => Math.floor(Date.now() / 60_000) * 60_000;
+
+function WindowCountdown({ expiresAt }: { expiresAt: string }) {
+  const now = useSyncExternalStore(subscribeClock, getMinuteNow, () => null);
+  if (now === null) return null;
+  const msLeft = new Date(expiresAt).getTime() - now;
+  if (msLeft <= 0) return null;
+  const hours = Math.floor(msLeft / 3_600_000);
+  const minutes = Math.floor((msLeft % 3_600_000) / 60_000);
+  const urgent = msLeft < 2 * 3_600_000;
+  return (
+    <span
+      title="Tiempo que queda para responder con mensajes libres. Después, WhatsApp solo permite plantillas aprobadas."
+      className={`whitespace-nowrap text-[11px] ${urgent ? "font-semibold text-error" : "text-ink-faint"}`}
+    >
+      <span className="hidden lg:inline">La ventana de respuesta cierra en </span>
+      <span className="lg:hidden">⏱ </span>
+      {hours}h {String(minutes).padStart(2, "0")}m
+    </span>
+  );
+}
+
+const ICON_BUTTON =
+  "flex h-9 w-9 flex-none items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-50";
+
 export function ManualMessageForm({
   businessId,
   conversationId,
   windowOpen,
+  windowExpiresAt = null,
+  recipientLabel,
 }: {
   businessId: string;
   conversationId: string;
   windowOpen: boolean;
+  windowExpiresAt?: string | null;
+  recipientLabel?: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -273,45 +308,29 @@ export function ManualMessageForm({
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-1.5 border-t border-border bg-surface p-3">
+    <form ref={formRef} onSubmit={handleSubmit} className="border-t border-border bg-surface p-2 md:p-3">
       {!windowOpen && (
-        <p className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-[11px] text-accent">
+        <p className="mb-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-[11px] text-accent">
           Pasaron más de 24h desde el último mensaje del cliente — usa el botón{" "}
           <span className="font-semibold">📋 Plantilla</span> de arriba para reabrir la conversación.
         </p>
       )}
       <input ref={fileInputRef} type="file" name="file" hidden onChange={handleFilePicked} />
-      <div className="flex items-end gap-2">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isBusy || isRecording}
-          title="Adjuntar archivo o imagen"
-          className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-border text-ink-muted transition hover:border-accent hover:text-accent disabled:opacity-60"
-        >
-          📎
-        </button>
-        <button
-          type="button"
-          onClick={toggleRecording}
-          disabled={isBusy}
-          title={isRecording ? "Detener y enviar grabación" : "Grabar nota de voz"}
-          className={`flex h-9 w-9 flex-none items-center justify-center rounded-full border transition ${
-            isRecording
-              ? "border-error bg-error text-white"
-              : "border-border text-ink-muted hover:border-accent hover:text-accent"
-          }`}
-        >
-          🎤
-        </button>
-        {!isRecording && <EmojiPicker onPick={insertEmoji} disabled={isBusy} />}
+      {/* Kommo-style composer: the text gets the full width, tools sit in a
+          quiet row underneath with the 24h window countdown and Enviar. */}
+      <div className="rounded-xl border border-border bg-background transition focus-within:border-accent/60">
+        {recipientLabel && !isRecording && (
+          <p className="hidden truncate px-3 pt-2 text-[11px] text-ink-faint md:block">
+            Responder a <span className="font-semibold text-ink-muted">{recipientLabel}</span> por WhatsApp
+          </p>
+        )}
         {isRecording ? (
-          <div className="flex flex-1 items-center gap-2 rounded-2xl border border-error/40 bg-error/10 px-4 py-2">
+          <div className="flex items-center gap-2 px-3 py-3">
             <span className="relative flex h-2.5 w-2.5 flex-none">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-error opacity-75" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-error" />
             </span>
-            <span className="text-sm font-semibold text-error">Grabando...</span>
+            <span className="text-sm font-semibold text-error">Grabando nota de voz</span>
             <span className="fl-mono text-xs text-error/80">{formatSeconds(recordingSeconds)}</span>
             <button
               type="button"
@@ -328,11 +347,11 @@ export function ManualMessageForm({
             onSelect={(e) => {
               caretRef.current = { start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd };
             }}
-            rows={1}
-            placeholder="Mensaje..."
+            rows={2}
+            placeholder="Escribe un mensaje…"
             // text-base (16px) on phones: iOS Safari auto-zooms the whole
             // page into any focused field smaller than that.
-            className="max-h-32 min-w-0 flex-1 resize-none rounded-2xl border border-border bg-background px-3 py-2 text-base text-ink outline-none focus:border-accent md:px-4 md:text-sm"
+            className="block max-h-40 min-h-[2.75rem] w-full resize-none bg-transparent px-3 py-2 text-base text-ink outline-none placeholder:text-ink-faint md:min-h-[3.5rem] md:text-sm"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -341,35 +360,78 @@ export function ManualMessageForm({
             }}
           />
         )}
-        {!isRecording && (
+        <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
+          {!isRecording && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isBusy}
+              title="Adjuntar archivo o imagen"
+              aria-label="Adjuntar archivo o imagen"
+              className={ICON_BUTTON}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+                <path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9" />
+              </svg>
+            </button>
+          )}
           <button
-            type="submit"
+            type="button"
+            onClick={toggleRecording}
             disabled={isBusy}
-            className="flex-none rounded-full bg-accent px-3 py-2 text-sm md:px-4 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            title={isRecording ? "Detener y enviar grabación" : "Grabar nota de voz"}
+            aria-label={isRecording ? "Detener y enviar grabación" : "Grabar nota de voz"}
+            className={isRecording ? `${ICON_BUTTON} !bg-error !text-white` : ICON_BUTTON}
           >
-            {isUploading ? `${uploadPercent}%` : isPending ? "..." : "Enviar"}
+            {isRecording ? (
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-5 w-5" aria-hidden="true">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+              </svg>
+            )}
           </button>
-        )}
+          {!isRecording && <EmojiPicker onPick={insertEmoji} disabled={isBusy} buttonClassName={ICON_BUTTON} />}
+          {micDevices.length > 1 && !isRecording && (
+            <select
+              value={selectedMicId}
+              onChange={(e) => handleMicChange(e.target.value)}
+              title="Micrófono para las notas de voz"
+              aria-label="Micrófono para las notas de voz"
+              className="fl-mono ml-1 hidden max-w-[150px] truncate bg-transparent text-[10px] text-ink-faint outline-none hover:text-ink-muted md:block"
+            >
+              <option value="">🎙️ Micrófono por defecto</option>
+              {micDevices.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  🎙️ {d.label || `Micrófono ${d.deviceId.slice(0, 6)}`}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="ml-auto flex items-center gap-2 pl-2">
+            {windowOpen && windowExpiresAt && !isRecording && <WindowCountdown expiresAt={windowExpiresAt} />}
+            {!isRecording && (
+              <button
+                type="submit"
+                disabled={isBusy}
+                className="flex h-9 flex-none items-center gap-1.5 rounded-lg bg-accent px-3.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+              >
+                {isUploading ? `${uploadPercent}%` : isPending ? "Enviando…" : "Enviar"}
+                {!isBusy && (
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+                    <path d="M3.4 20.4l17.45-7.48a1 1 0 0 0 0-1.84L3.4 3.6a.99.99 0 0 0-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
-      {micDevices.length > 1 && !isRecording && (
-        <label className="flex items-center gap-1.5 pl-1 text-[10px] text-ink-faint">
-          🎙️
-          <select
-            value={selectedMicId}
-            onChange={(e) => handleMicChange(e.target.value)}
-            className="fl-mono max-w-[220px] truncate bg-transparent text-[10px] text-ink-muted outline-none"
-          >
-            <option value="">Micrófono por defecto del navegador</option>
-            {micDevices.map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Micrófono ${d.deviceId.slice(0, 6)}`}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
       {isUploading && (
-        <div className="flex items-center gap-2 pl-1" role="status" aria-live="polite">
+        <div className="mt-1.5 flex items-center gap-2 px-1" role="status" aria-live="polite">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
             <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${uploadPercent}%` }} />
           </div>
@@ -379,12 +441,14 @@ export function ManualMessageForm({
         </div>
       )}
       {localError ? (
-        <p className="pl-1 text-xs font-medium text-error">⚠ {localError}</p>
+        <p className="mt-1.5 px-1 text-xs font-medium text-error">⚠ {localError}</p>
       ) : state.error ? (
-        <p className="pl-1 text-xs font-medium text-error">⚠ No se pudo enviar: {state.error}</p>
-      ) : isUploading ? null : (
-        <p className={`fl-mono pl-1 text-[10px] text-ink-faint ${pendingFileName ? "" : "hidden md:block"}`}>
-          {pendingFileName ? `Adjunto: ${pendingFileName}` : SIZE_HINT}
+        <p className="mt-1.5 px-1 text-xs font-medium text-error">⚠ No se pudo enviar: {state.error}</p>
+      ) : isUploading ? null : pendingFileName ? (
+        <p className="fl-mono mt-1.5 px-1 text-[10px] text-ink-faint">Adjunto: {pendingFileName}</p>
+      ) : (
+        <p className="fl-mono mt-1 hidden px-1 text-[10px] text-ink-faint md:block">
+          Enter envía · Shift+Enter nueva línea · {SIZE_HINT}
         </p>
       )}
     </form>

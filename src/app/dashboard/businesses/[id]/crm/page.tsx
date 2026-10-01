@@ -115,6 +115,28 @@ export default async function CrmPage({
     }
   }
 
+  // Last message of each chat for the list's preview line ("IA: Claro, …"),
+  // like Kommo/WhatsApp — only the chat tab shows it.
+  const lastMessages =
+    tab === "chat"
+      ? await prisma.message.findMany({
+          where: { conversationId: { in: conversations.map((c) => c.id) } },
+          orderBy: { createdAt: "desc" },
+          distinct: ["conversationId"],
+          select: { conversationId: true, content: true, role: true, sentByHuman: true, mediaType: true },
+        })
+      : [];
+  const lastMessageByConversation = new Map(
+    lastMessages.map((m) => [
+      m.conversationId,
+      {
+        content: m.content.slice(0, 160),
+        from: m.role === "CUSTOMER" ? ("customer" as const) : m.sentByHuman ? ("human" as const) : ("ai" as const),
+        mediaType: m.mediaType,
+      },
+    ]),
+  );
+
   const conversationSummaries = conversations.map((c) => ({
     id: c.id,
     customerName: c.customerName,
@@ -123,6 +145,7 @@ export default async function CrmPage({
     stageId: c.stageId,
     lastMessageAt: c.lastMessageAt.toISOString(),
     unreadCount: unreadCountByConversation.get(c.id) ?? 0,
+    lastMessage: lastMessageByConversation.get(c.id) ?? null,
   }));
 
   // Only queried when the Difusiones tab is actually open — every other tab
@@ -243,9 +266,9 @@ export default async function CrmPage({
         </div>
       </div>
 
-      <div className={hideChromeOnMobile}>
-        <PipelineManager businessId={id} pipelines={allPipelines} />
-      </div>
+      {/* Editing embudos/etapas is board work — kept off the chat tab so the
+          inbox gets the full height of the screen, Kommo-style. */}
+      {tab !== "chat" && <PipelineManager businessId={id} pipelines={allPipelines} />}
 
       <div className="space-y-3">
         <div className={`${hideChromeOnMobile ? "hidden md:flex" : "flex"} flex-wrap items-center justify-between gap-2`}>

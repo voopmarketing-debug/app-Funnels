@@ -1,21 +1,7 @@
-import Link from "next/link";
-import { stageStyle } from "@/lib/crmStages";
-import { contactInitial, contactLabel } from "@/lib/contactDisplay";
 import { ConversationThread } from "../ConversationThread";
 import { LeadDetailPanel } from "../LeadDetailPanel";
+import { ConversationList } from "./ConversationList";
 import type { CrmStage, CrmConversation } from "../CrmBoard";
-
-function formatRelativeTime(iso: string): string {
-  const date = new Date(iso);
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.round(diffMs / 60000);
-  if (diffMin < 1) return "ahora";
-  if (diffMin < 60) return `${diffMin} min`;
-  const diffH = Math.round(diffMin / 60);
-  if (diffH < 24) return `${diffH} h`;
-  const diffD = Math.round(diffH / 24);
-  return `${diffD} d`;
-}
 
 // WhatsApp-Web-style split inbox: every conversation on the left, the
 // selected one's full thread on the right. Selection is a URL param
@@ -61,8 +47,6 @@ export function ConversationSplitView({
     }[];
   } | null;
 }) {
-  const stageById = new Map(stages.map((s) => [s.id, s]));
-
   // On mobile there's only room for one of {list, thread} at a time — which
   // one shows is driven by whether a conversation is selected (the same
   // `conv` URL param that already decides selectedConversation), so no
@@ -76,56 +60,14 @@ export function ConversationSplitView({
     // dvh keeps the composer above the phone browser's own toolbar instead
     // of behind it. Desktop sizing is unchanged.
     <div
-      className={`fl-card flex overflow-hidden md:h-[calc(100dvh-21rem)] md:min-h-[28rem] ${
-        showListOnMobile ? "h-[calc(100dvh-15rem)] min-h-[22rem]" : "h-[calc(100dvh-6rem)] min-h-[20rem]"
+      className={`fl-card flex overflow-hidden md:h-[calc(100dvh-16rem)] md:min-h-[30rem] ${
+        showListOnMobile ? "h-[calc(100dvh-12rem)] min-h-[22rem]" : "h-[calc(100dvh-6rem)] min-h-[20rem]"
       }`}
     >
       <div
-        className={`${showListOnMobile ? "flex" : "hidden md:flex"} w-full flex-col overflow-y-auto border-r border-border md:w-64 md:flex-none`}
+        className={`${showListOnMobile ? "flex" : "hidden md:flex"} w-full flex-col border-r border-border md:w-72 md:flex-none`}
       >
-        {conversations.length === 0 && (
-          <p className="p-4 text-center text-xs text-ink-muted">Aún no hay conversaciones.</p>
-        )}
-        {conversations.map((c) => {
-          const stage = stageById.get(c.stageId);
-          const style = stage ? stageStyle(stage.position) : null;
-          const initial = contactInitial(c.customerName, c.customerPhone);
-          const isActive = c.id === selectedConversationId;
-          const isUnread = c.unreadCount > 0;
-
-          return (
-            <Link
-              key={c.id}
-              href={`?tab=chat&conv=${c.id}`}
-              className={`flex items-center gap-3 border-b border-border px-3 py-3 transition ${
-                isActive ? "bg-accent/10" : isUnread ? "bg-accent/5 hover:bg-surface-2" : "hover:bg-surface-2"
-              }`}
-            >
-              <div className="fl-mono flex h-9 w-9 flex-none items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-bold text-ink-muted">
-                {initial.slice(0, 2)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={`truncate text-sm ${isUnread ? "font-bold text-ink" : "font-medium text-ink"}`}>
-                  {contactLabel(c.customerName, c.customerPhone)}
-                </p>
-                <p className="flex items-center gap-1.5 truncate text-xs text-ink-muted">
-                  {style && <span className={`h-1.5 w-1.5 flex-none rounded-full ${style.dot}`} />}
-                  {stage?.name ?? c.customerPhone}
-                </p>
-              </div>
-              <div className="flex flex-none flex-col items-end gap-1">
-                <span className={`fl-mono text-[10px] ${isUnread ? "font-semibold text-accent" : "text-ink-faint"}`}>
-                  {formatRelativeTime(c.lastMessageAt)}
-                </span>
-                {isUnread && (
-                  <span className="fl-mono flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink">
-                    {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
-        })}
+        <ConversationList stages={stages} conversations={conversations} selectedConversationId={selectedConversationId} />
       </div>
 
       <div className={`${showListOnMobile ? "hidden md:flex" : "flex"} min-w-0 flex-1 flex-col`}>

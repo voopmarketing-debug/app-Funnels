@@ -97,7 +97,16 @@ function readRecents(): string[] {
  * Emoji button + popover for a message composer. Stays open so several
  * emojis can be added in a row; closes on outside click or Escape.
  */
-export function EmojiPicker({ onPick, disabled = false }: { onPick: (emoji: string) => void; disabled?: boolean }) {
+export function EmojiPicker({
+  onPick,
+  disabled = false,
+  buttonClassName,
+}: {
+  onPick: (emoji: string) => void;
+  disabled?: boolean;
+  /** Replaces the default round bordered trigger (e.g. a toolbar icon button). */
+  buttonClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [recents, setRecents] = useState<string[]>([]);
   const [activeId, setActiveId] = useState(CATEGORIES[0].id);
@@ -187,11 +196,23 @@ export function EmojiPicker({ onPick, disabled = false }: { onPick: (emoji: stri
         title="Emojis"
         aria-label="Insertar emoji"
         aria-expanded={open}
-        className={`flex h-9 w-9 items-center justify-center rounded-full border text-lg transition disabled:opacity-60 ${
-          open ? "border-accent text-accent" : "border-border text-ink-muted hover:border-accent hover:text-accent"
-        }`}
+        className={
+          buttonClassName
+            ? `${buttonClassName} ${open ? "text-accent" : ""}`
+            : `flex h-9 w-9 items-center justify-center rounded-full border text-lg transition disabled:opacity-60 ${
+                open ? "border-accent text-accent" : "border-border text-ink-muted hover:border-accent hover:text-accent"
+              }`
+        }
       >
-        😊
+        {buttonClassName ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-5 w-5" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
+            <path d="M9 9.5h.01M15 9.5h.01" strokeWidth="2.6" />
+          </svg>
+        ) : (
+          "😊"
+        )}
       </button>
       {open && position && (
         <div
