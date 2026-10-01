@@ -12,6 +12,8 @@ import {
   getAvailableSlotsForAnyProfessional,
 } from "@/lib/agenda";
 import { siteSecurityHeaders } from "@/lib/securityHeaders";
+import { FONT_OPTIONS } from "@/lib/websiteContent";
+import type { WebsiteContentV2 } from "@/lib/websiteContentV2";
 
 // Publicly serves one business page — no auth, meant to be shared/indexed
 // like any regular website. Rendered fresh from the structured content on
@@ -20,6 +22,29 @@ import { siteSecurityHeaders } from "@/lib/securityHeaders";
 // Branches on website.pageType: "landing" (the default, AI-generated
 // content) or "agenda" (a real booking calendar — see lib/agendaTemplate.ts
 // and app/sitio/[slug]/reservar/route.ts for the booking submission).
+// Builder live preview: unsaved colors/fonts come in the query string of
+// the preview iframe. Only hex colors and known fonts are accepted.
+function themeOverrideFromQuery(params: URLSearchParams): Partial<WebsiteContentV2["theme"]> | undefined {
+  const hex = (key: string) => {
+    const v = params.get(key);
+    return v && /^#[0-9a-fA-F]{6}$/.test(v) ? v : undefined;
+  };
+  const font = (key: string) => {
+    const v = params.get(key);
+    return v && (FONT_OPTIONS as readonly string[]).includes(v) ? (v as WebsiteContentV2["theme"]["headingFont"]) : undefined;
+  };
+  const override = {
+    primaryColor: hex("pc"),
+    backgroundColor: hex("bg"),
+    surfaceColor: hex("sc"),
+    textColor: hex("tc"),
+    headingFont: font("hf"),
+    bodyFont: font("bf"),
+  };
+  const clean = Object.fromEntries(Object.entries(override).filter(([, v]) => v !== undefined));
+  return Object.keys(clean).length > 0 ? clean : undefined;
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const leadSubmitted = req.nextUrl.searchParams.get("registrado") === "1";
@@ -132,7 +157,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     });
   }
 
-  const html = await renderStoredWebsite(website, { trackingBasePath: `/sitio/${slug}`, leadSubmitted, preview });
+  const html = await renderStoredWebsite(website, {
+    trackingBasePath: `/sitio/${slug}`,
+    leadSubmitted,
+    preview,
+    themeOverride: preview ? themeOverrideFromQuery(req.nextUrl.searchParams) : undefined,
+  });
   if (!html) {
     // Content saved under an earlier version of the schema — ask the
     // owner to regenerate rather than showing a raw 500 to visitors.

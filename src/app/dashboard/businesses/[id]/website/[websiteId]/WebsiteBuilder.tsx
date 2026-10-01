@@ -14,6 +14,7 @@ import {
 } from "@/lib/websiteContentV2";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
+import { STYLE_THEME } from "@/lib/websiteStylePreview";
 
 type Tab = "chat" | "diseno" | "secciones" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
@@ -64,6 +65,13 @@ export function WebsiteBuilder({
   const [tab, setTab] = useState<Tab>("chat");
   const [device, setDevice] = useState<Device>("desktop");
   const [previewVersion, setPreviewVersion] = useState(0);
+  // Unsaved colors/fonts from the Diseño tab, shown live in the preview.
+  const [draftTheme, setDraftTheme] = useState<WebsiteContentV2["theme"] | null>(null);
+  const [previewTheme, setPreviewTheme] = useState<WebsiteContentV2["theme"] | null>(null);
+  useEffect(() => {
+    const id = setTimeout(() => setPreviewTheme(draftTheme), 350);
+    return () => clearTimeout(id);
+  }, [draftTheme]);
   const [chat, setChat] = useState<ChatEntry[]>([
     { role: "assistant", text: "Pídeme cualquier cambio como se lo pedirías a tu diseñador: textos, colores, secciones, estilo. Lo aplico y lo ves al instante en la vista previa." },
   ]);
@@ -283,9 +291,19 @@ export function WebsiteBuilder({
           )}
 
           {tab === "diseno" && (
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-ink-faint">Estilo</p>
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-3">
+              <ThemeEditor
+                content={content}
+                disabled={!!busy}
+                onDraftChange={setDraftTheme}
+                onSave={(theme) => {
+                  setDraftTheme(null);
+                  runDesign("Guardando colores…", { theme });
+                }}
+              />
+              <div className="space-y-2 border-t border-border pt-5">
+                <p className="text-sm font-semibold text-ink">Estilo de la página</p>
+                <p className="text-[12px] text-ink-muted">Cambia formas, colores y tipografías de una vez.</p>
                 <div className="grid grid-cols-2 gap-2">
                   {STYLE_KEYS.map((k) => (
                     <button
@@ -300,9 +318,7 @@ export function WebsiteBuilder({
                     </button>
                   ))}
                 </div>
-                <p className="text-[12px] text-ink-faint">Cada estilo cambia formas, colores y tipografías. Luego puedes ajustar los colores abajo o pedirle al Chat IA que adapte los textos.</p>
               </div>
-              <ThemeEditor content={content} disabled={!!busy} onSave={(theme) => runDesign("Guardando colores…", { theme })} />
             </div>
           )}
 
@@ -380,7 +396,12 @@ export function WebsiteBuilder({
             className={`relative h-full overflow-hidden bg-white transition-[width] duration-300 md:rounded-xl md:border md:border-border md:shadow-2xl ${isPending ? "opacity-80" : ""}`}
             style={{ width: DEVICE_WIDTH[device], maxWidth: "100%" }}
           >
-            <iframe key={previewVersion} src={`/sitio/${slug}?preview=1&v=${previewVersion}`} title="Vista previa de la página" className="h-full w-full border-0" />
+            <iframe
+              key={`${previewVersion}-${previewTheme ? themeQuery(previewTheme) : ""}`}
+              src={`/sitio/${slug}?preview=1&v=${previewVersion}${previewTheme ? `&${themeQuery(previewTheme)}` : ""}`}
+              title="Vista previa de la página"
+              className="h-full w-full border-0"
+            />
             {busy && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
                 <span className="rounded-full bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-lg">✦ {busy}</span>
@@ -393,63 +414,178 @@ export function WebsiteBuilder({
   );
 }
 
+function themeQuery(theme: WebsiteContentV2["theme"]): string {
+  return new URLSearchParams({
+    pc: theme.primaryColor,
+    bg: theme.backgroundColor,
+    sc: theme.surfaceColor,
+    tc: theme.textColor,
+    hf: theme.headingFont,
+    bf: theme.bodyFont,
+  }).toString();
+}
+
+const COLOR_FIELDS: { key: "primaryColor" | "backgroundColor" | "surfaceColor" | "textColor"; label: string; hint: string }[] = [
+  { key: "primaryColor", label: "Color principal", hint: "Botones, enlaces y palabras destacadas" },
+  { key: "backgroundColor", label: "Fondo", hint: "El color de fondo de toda la página" },
+  { key: "surfaceColor", label: "Tarjetas y franjas", hint: "Bloques y secciones alternas" },
+  { key: "textColor", label: "Texto", hint: "Títulos y párrafos" },
+];
+
+const PALETTE_STYLES = ["corporativo", "clinico", "calido", "producto", "pop", "tech", "lujo", "gourmet"] as const;
+
+function PencilIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden="true">
+      <path d="M13.6 3.6a2 2 0 0 1 2.8 2.8l-8.7 8.7-3.6.8.8-3.6 8.7-8.7Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function ThemeEditor({
   content,
   disabled,
   onSave,
+  onDraftChange,
 }: {
   content: WebsiteContentV2;
   disabled: boolean;
   onSave: (theme: Partial<WebsiteContentV2["theme"]>) => void;
+  onDraftChange: (theme: WebsiteContentV2["theme"] | null) => void;
 }) {
   const [theme, setTheme] = useState(content.theme);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reflect AI/style changes
     setTheme(content.theme);
-  }, [content.theme]);
+    onDraftChange(null);
+  }, [content.theme, onDraftChange]);
   const changed = JSON.stringify(theme) !== JSON.stringify(content.theme);
-  const colors: [keyof WebsiteContentV2["theme"], string][] = [
-    ["primaryColor", "Acento (botones)"],
-    ["backgroundColor", "Fondo"],
-    ["surfaceColor", "Tarjetas y franjas"],
-    ["textColor", "Texto"],
-  ];
+
+  function update(next: WebsiteContentV2["theme"]) {
+    setTheme(next);
+    onDraftChange(JSON.stringify(next) === JSON.stringify(content.theme) ? null : next);
+  }
+
   return (
-    <div className="space-y-3">
-      <p className="text-xs font-bold uppercase tracking-wide text-ink-faint">Colores y tipografía</p>
-      <div className="grid grid-cols-2 gap-2">
-        {colors.map(([key, label]) => (
-          <label key={key} className="flex items-center gap-2 rounded-lg border border-border bg-background p-2">
-            <input
-              type="color"
-              value={/^#[0-9a-fA-F]{6}$/.test(theme[key]) ? theme[key] : "#000000"}
-              onChange={(e) => setTheme({ ...theme, [key]: e.target.value })}
-              className="h-7 w-7 flex-none cursor-pointer rounded border-0 bg-transparent p-0"
-            />
-            <span className="min-w-0 text-[12px] leading-tight">{label}</span>
+    <div className="space-y-4">
+      <div>
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+          <PencilIcon className="h-4 w-4 text-accent" /> Colores de tu página
+        </p>
+        <p className="text-[12px] text-ink-muted">Toca un color para cambiarlo. Verás el cambio en la página al instante.</p>
+      </div>
+
+      <div className="space-y-2">
+        {COLOR_FIELDS.map(({ key, label, hint }) => {
+          const value = /^#[0-9a-fA-F]{6}$/.test(theme[key]) ? theme[key] : "#000000";
+          return (
+            <div key={key} className="group flex items-center gap-3 rounded-xl border border-border bg-background p-2.5 transition hover:border-accent focus-within:border-accent">
+              <label className="relative h-11 w-11 flex-none cursor-pointer" title={`Cambiar ${label.toLowerCase()}`}>
+                <span className="block h-full w-full rounded-lg border border-black/10 shadow-inner" style={{ background: value }} />
+                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-ink shadow">
+                  <PencilIcon className="h-3 w-3" />
+                </span>
+                <input
+                  type="color"
+                  value={value}
+                  disabled={disabled}
+                  onChange={(e) => update({ ...theme, [key]: e.target.value })}
+                  aria-label={`Cambiar ${label.toLowerCase()}`}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
+              </label>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold leading-tight text-ink">{label}</p>
+                <p className="truncate text-[12px] text-ink-muted">{hint}</p>
+              </div>
+              <input
+                value={theme[key]}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  const hex = v.startsWith("#") ? v : `#${v}`;
+                  setTheme({ ...theme, [key]: v });
+                  if (/^#[0-9a-fA-F]{6}$/.test(hex)) update({ ...theme, [key]: hex.toLowerCase() });
+                }}
+                disabled={disabled}
+                aria-label={`Código del ${label.toLowerCase()}`}
+                className="w-[5.5rem] flex-none rounded-md border border-border bg-surface px-2 py-1.5 font-mono text-xs uppercase text-ink outline-none focus:border-accent"
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[12px] font-semibold text-ink">Combinaciones listas</p>
+        <div className="grid grid-cols-4 gap-2">
+          {PALETTE_STYLES.map((k) => {
+            const p = STYLE_THEME[k];
+            return (
+              <button
+                key={k}
+                type="button"
+                disabled={disabled}
+                title={STYLE_INFO[k].label}
+                onClick={() =>
+                  update({ ...theme, primaryColor: p.primaryColor, backgroundColor: p.backgroundColor, surfaceColor: p.surfaceColor, textColor: p.textColor })
+                }
+                className="overflow-hidden rounded-lg border border-border transition hover:border-accent disabled:opacity-50"
+              >
+                <span className="flex h-9" style={{ background: p.backgroundColor }}>
+                  <span className="m-auto flex gap-1">
+                    <span className="h-3.5 w-3.5 rounded-full" style={{ background: p.primaryColor }} />
+                    <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ background: p.surfaceColor }} />
+                    <span className="h-3.5 w-3.5 rounded-full" style={{ background: p.textColor }} />
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-[12px] font-semibold text-ink">Tipografía</p>
+        {(["headingFont", "bodyFont"] as const).map((key) => (
+          <label key={key} className="block space-y-1">
+            <span className="text-[12px] text-ink-muted">{key === "headingFont" ? "Títulos" : "Textos"}</span>
+            <select
+              value={theme[key]}
+              disabled={disabled}
+              onChange={(e) => update({ ...theme, [key]: e.target.value as (typeof FONT_OPTIONS)[number] })}
+              className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm outline-none focus:border-accent"
+              style={{ fontFamily: `"${theme[key]}", system-ui, sans-serif` }}
+            >
+              {FONT_OPTIONS.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
           </label>
         ))}
       </div>
-      {(["headingFont", "bodyFont"] as const).map((key) => (
-        <label key={key} className="block space-y-1">
-          <span className="text-[12px] text-ink-muted">{key === "headingFont" ? "Fuente de títulos" : "Fuente del texto"}</span>
-          <select
-            value={theme[key]}
-            onChange={(e) => setTheme({ ...theme, [key]: e.target.value as (typeof FONT_OPTIONS)[number] })}
-            className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm outline-none focus:border-accent"
-          >
-            {FONT_OPTIONS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-        </label>
-      ))}
+
       {changed && (
-        <button type="button" disabled={disabled} onClick={() => onSave(theme)} className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-ink disabled:opacity-60">
-          Aplicar colores y fuentes
-        </button>
+        <div className="sticky bottom-0 -mx-3 flex items-center gap-2 border-t border-border bg-surface px-3 py-2.5 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.3)]">
+          <p className="min-w-0 flex-1 text-[12px] text-ink-muted">Cambios sin guardar</p>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => update(content.theme)}
+            className="rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-60"
+          >
+            Descartar
+          </button>
+          <button
+            type="button"
+            disabled={disabled || COLOR_FIELDS.some(({ key }) => !/^#[0-9a-fA-F]{6}$/.test(theme[key]))}
+            onClick={() => onSave(theme)}
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-accent-ink disabled:opacity-60"
+          >
+            Guardar cambios
+          </button>
+        </div>
       )}
     </div>
   );

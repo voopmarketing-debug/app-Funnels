@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { renderWebsiteHtml } from "@/lib/websiteTemplate";
 import { renderWebsiteHtmlV2 } from "@/lib/websiteTemplateV2";
-import { WebsiteContentV2Schema, formatMoney, isV2Content, type CatalogProduct } from "@/lib/websiteContentV2";
+import { WebsiteContentV2Schema, formatMoney, isV2Content, type CatalogProduct, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { getWebsiteHeroContext } from "@/lib/websiteHero";
 
 type StoredWebsite = {
@@ -28,7 +28,14 @@ export async function getCatalogProducts(businessId: string): Promise<CatalogPro
  */
 export async function renderStoredWebsite(
   website: StoredWebsite,
-  opts: { trackingBasePath: string; leadSubmitted?: boolean; preview?: boolean },
+  opts: {
+    trackingBasePath: string;
+    leadSubmitted?: boolean;
+    preview?: boolean;
+    // Unsaved colors/fonts from the builder's Diseño tab, shown live in the
+    // preview iframe before the owner applies them (v2 pages only).
+    themeOverride?: Partial<WebsiteContentV2["theme"]>;
+  },
 ): Promise<string | null> {
   const { eyebrow, heroImageUrl } = await getWebsiteHeroContext(website.businessId, website.business.industry, website.aiImageUrl);
 
@@ -44,7 +51,8 @@ export async function renderStoredWebsite(
         select: { url: true },
       }),
     ]);
-    return renderWebsiteHtmlV2(parsed.data, {
+    const content = opts.themeOverride ? { ...parsed.data, theme: { ...parsed.data.theme, ...opts.themeOverride } } : parsed.data;
+    return renderWebsiteHtmlV2(content, {
       businessName: website.business.name,
       trackingBasePath: opts.trackingBasePath,
       preview: opts.preview,
