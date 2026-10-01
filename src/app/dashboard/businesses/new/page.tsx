@@ -35,7 +35,7 @@ export default async function NewBusinessPage() {
               Hablar con soporte
             </a>
             <Link
-              href="/dashboard"
+              href="/dashboard/agentes"
               className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink transition hover:border-accent"
             >
               Volver a agentes de IA

@@ -16,6 +16,25 @@ function HomeIcon() {
   );
 }
 
+function BotIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <rect x="4.5" y="7.5" width="15" height="11" rx="3" stroke="currentColor" strokeWidth="2" />
+      <path d="M12 7.5V4.5M9.5 12.5v1M14.5 12.5v1M2.5 12v2.5M21.5 12v2.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="3.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function MegaphoneIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function UsersIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
@@ -133,12 +152,16 @@ function NavLinks({
   return (
     <>
       <nav className="flex flex-1 flex-col gap-1 px-3">
-        <Link
-          href="/dashboard"
-          className="fl-nav-item"
-          data-active={isActive("/dashboard") && !isActive("/dashboard/clients") && !isActive("/dashboard/account")}
-        >
+        <Link href="/dashboard" className="fl-nav-item" data-active={isActive("/dashboard")}>
           <HomeIcon />
+          Inicio
+        </Link>
+        <Link
+          href="/dashboard/agentes"
+          className="fl-nav-item"
+          data-active={isActive("/dashboard/agentes") || pathname === "/dashboard/businesses/new"}
+        >
+          <BotIcon />
           Agentes de IA
         </Link>
         {primaryBusinessId && (
@@ -185,6 +208,12 @@ function NavLinks({
           <Link href="/dashboard/clients" className="fl-nav-item" data-active={isActive("/dashboard/clients")}>
             <UsersIcon />
             Clientes
+          </Link>
+        )}
+        {isAgencyAdmin && (
+          <Link href="/dashboard/novedades" className="fl-nav-item" data-active={isActive("/dashboard/novedades")}>
+            <MegaphoneIcon />
+            Novedades
           </Link>
         )}
         <Link href="/dashboard/account" className="fl-nav-item" data-active={isActive("/dashboard/account")}>

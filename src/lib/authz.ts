@@ -33,3 +33,18 @@ export async function requireBusinessOwnerOrAdmin(userId: string, businessId: st
     throw new Error("Solo el dueño del negocio o la agencia pueden hacer esto");
   }
 }
+
+/**
+ * The agency (Funnels Labs itself) is whoever holds an ADMIN membership on
+ * any business — same definition the dashboard layout uses to show the
+ * agency-only nav items. Platform-wide content like announcements is gated
+ * on this, not on any single business.
+ */
+export async function isAgencyAdmin(userId: string): Promise<boolean> {
+  const admin = await prisma.membership.findFirst({ where: { userId, role: "ADMIN" }, select: { id: true } });
+  return admin !== null;
+}
+
+export async function requireAgencyAdmin(userId: string): Promise<void> {
+  if (!(await isAgencyAdmin(userId))) throw new Error("Solo la agencia puede hacer esto");
+}

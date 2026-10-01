@@ -15,7 +15,7 @@ export function NewBusinessForm({ industryOptions }: { industryOptions: { value:
       } catch (err) {
         return { error: err instanceof Error ? err.message : "No se pudo crear el agente, intenta de nuevo" };
       }
-      router.push("/dashboard");
+      router.push("/dashboard/agentes");
       return { error: null };
     },
     { error: null },

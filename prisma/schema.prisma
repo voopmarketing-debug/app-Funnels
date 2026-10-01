@@ -716,3 +716,28 @@ model RateLimitAttempt {
 
   @@index([key, createdAt])
 }
+
+// Platform-wide announcements the agency publishes to every client's Inicio
+// page (see app/dashboard/page.tsx) and manages from /dashboard/novedades.
+// BANNER = the big campaign-style hero at the top (only the first live one
+// shows); NEWS = an entry in the "Novedades" list. Not tied to a business:
+// it's the agency talking to all its clients at once.
+model Announcement {
+  id        String    @id @default(cuid())
+  kind      String    @default("NEWS") // "BANNER" | "NEWS"
+  title     String
+  body      String    @db.Text
+  badge     String? // short label, e.g. "Nuevo", "Promo"
+  imageUrl  String?
+  ctaLabel  String?
+  ctaUrl    String?
+  published Boolean   @default(false)
+  // Optional live window — outside it the announcement is hidden even if published.
+  startsAt  DateTime?
+  endsAt    DateTime?
+  position  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([kind, published])
+}

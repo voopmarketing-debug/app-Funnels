@@ -17,6 +17,13 @@ const APP_CSP =
   "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
 const nextConfig: NextConfig = {
+  // Server Actions cap request bodies at 1MB by default — too small for a
+  // phone photo sent from the chat composer or an announcement image.
+  // Vercel functions can't accept bodies past ~4.5MB anyway, so 4MB is the
+  // practical ceiling for anything uploaded through a Server Action.
+  experimental: {
+    serverActions: { bodySizeLimit: "4mb" },
+  },
   // ffmpeg-static ships a native binary (voice-note conversion, see
   // lib/audioConvert.ts) — keep it out of the server bundle and make sure
   // Vercel's file tracer actually copies the binary into the deployment.

@@ -1,7 +1,13 @@
 // Click-to-chat link straight to the founder's personal WhatsApp — support
 // is handled manually for now, not through the Cloud API/AI agent pipeline.
-export const SUPPORT_WHATSAPP_LINK =
-  "https://wa.me/573001680375?text=" + encodeURIComponent("Hola, necesito soporte con Funnels Labs");
+const SUPPORT_WHATSAPP_NUMBER = "573001680375";
+
+/** wa.me link to Funnels Labs support with a prefilled message. */
+export function supportWhatsAppLink(text: string): string {
+  return `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+}
+
+export const SUPPORT_WHATSAPP_LINK = supportWhatsAppLink("Hola, necesito soporte con Funnels Labs");
 
 // Meta's own per-message rate for a MARKETING-category template sent to a
 // Colombia number, USD, as published on Meta's WhatsApp Business Platform

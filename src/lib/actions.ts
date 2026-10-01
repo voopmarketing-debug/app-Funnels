@@ -348,7 +348,7 @@ export async function createBusiness(formData: FormData): Promise<void> {
     },
   });
 
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
   redirect(`/dashboard/businesses/${business.id}`);
 }
 
@@ -1462,7 +1462,7 @@ export async function updateBusinessPlan(businessId: string, planTier: PlanTier)
 
   await prisma.business.update({ where: { id: businessId }, data: { planTier } });
   revalidatePath(`/dashboard/businesses/${businessId}`);
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 /**
@@ -1508,7 +1508,7 @@ export async function updateBusinessName(businessId: string, name: string): Prom
 
   await prisma.business.update({ where: { id: businessId }, data: { name: trimmed } });
   revalidatePath(`/dashboard/businesses/${businessId}`);
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 /**
@@ -1526,7 +1526,7 @@ export async function deleteBusiness(businessId: string): Promise<void> {
   await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   await prisma.business.delete({ where: { id: businessId } });
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 export type ForgotPasswordState = { submitted: boolean };
@@ -1649,7 +1649,7 @@ export async function updateOwnProfile(
     },
   });
   revalidatePath("/dashboard/account");
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
   return { error: null, saved: true };
 }
 
@@ -2469,7 +2469,7 @@ export async function markNotificationRead(notificationId: string): Promise<void
   await requireBusinessMembership(session.user.id, notification.businessId);
 
   await prisma.notification.update({ where: { id: notificationId }, data: { readAt: new Date() } });
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 /** "Marcar todas como leídas" in the notification bell — every unread notification across every business this user belongs to. */
@@ -2485,7 +2485,7 @@ export async function markAllNotificationsRead(): Promise<void> {
     where: { businessId: { in: businessIds }, readAt: null },
     data: { readAt: new Date() },
   });
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 /**
