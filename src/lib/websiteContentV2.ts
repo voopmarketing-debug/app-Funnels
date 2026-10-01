@@ -11,11 +11,11 @@ export const PAGE_TYPES = ["servicios", "producto", "tienda", "evento", "captaci
 export type PageType = (typeof PAGE_TYPES)[number];
 
 export const PAGE_TYPE_LABELS: Record<PageType, string> = {
-  servicios: "Landing de servicios",
+  servicios: "Página de servicios",
   producto: "Venta de un producto",
   tienda: "Tienda / catálogo",
   evento: "Evento o lanzamiento",
-  captacion: "Captación y agenda",
+  captacion: "Conseguir clientes y citas",
 };
 
 export const STYLE_KEYS = [

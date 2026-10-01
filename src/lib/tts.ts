@@ -1,3 +1,5 @@
+import { recordSpeech, recordTranscription } from "@/lib/aiUsage";
+
 const OPENAI_API_BASE = "https://api.openai.com/v1";
 
 function getOpenAiKey(): string {
@@ -32,7 +34,9 @@ export async function synthesizeVoiceNote(text: string): Promise<Buffer> {
     throw new Error(`OpenAI TTS error (${response.status}): ${body}`);
   }
 
-  return Buffer.from(await response.arrayBuffer());
+  const audio = Buffer.from(await response.arrayBuffer());
+  await recordSpeech(text.length);
+  return audio;
 }
 
 /**
@@ -45,6 +49,8 @@ export async function transcribeVoiceNote(params: { bytes: Buffer; mimeType: str
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(params.bytes)], { type: params.mimeType }), `voice-note.${extension}`);
   form.append("model", "whisper-1");
+  // verbose_json adds the audio duration, which is what whisper bills by.
+  form.append("response_format", "verbose_json");
 
   const response = await fetch(`${OPENAI_API_BASE}/audio/transcriptions`, {
     method: "POST",
@@ -57,6 +63,7 @@ export async function transcribeVoiceNote(params: { bytes: Buffer; mimeType: str
     throw new Error(`OpenAI transcription error (${response.status}): ${body}`);
   }
 
-  const data = (await response.json()) as { text?: string };
+  const data = (await response.json()) as { text?: string; duration?: number };
+  if (typeof data.duration === "number") await recordTranscription(data.duration);
   return data.text?.trim() || null;
 }

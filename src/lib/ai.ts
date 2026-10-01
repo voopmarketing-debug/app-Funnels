@@ -362,7 +362,10 @@ export async function generateAgentReply(params: {
     // measurable accuracy loss, per Anthropic's published cost-optimization
     // benchmarks). Left untouched on the sales-diagnosis call in
     // diagnosis.ts, which genuinely reasons over several transcripts.
-    output_config: { effort: "low" },
+    // Haiku 4.5 (the economical option, see AGENT_MODELS) has no effort
+    // control and doesn't think by default, so the param is only sent to
+    // models that accept it.
+    ...(params.model.startsWith("claude-haiku") ? {} : { output_config: { effort: "low" as const } }),
     system,
     messages: [...history, { role: "user", content: userContent }],
     tools,

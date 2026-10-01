@@ -1,0 +1,237 @@
+[
+ {
+  "type": "hero",
+  "badge": null,
+  "chips": [
+   "Envío gratis",
+   "Garantía 1 año"
+  ],
+  "eyebrow": "Audífonos inalámbricos",
+  "heading": "Silencio total, 40 horas de música",
+  "variant": "product",
+  "ctaLabel": "Pedir por WhatsApp",
+  "highlight": "40 horas",
+  "productId": "cmup03p8l0000e17d8eefv8zj",
+  "subheading": "Cancelación de ruido activa para trabajar, viajar o entrenar sin distracciones.",
+  "showLeadForm": false,
+  "secondaryCtaLabel": null
+ },
+ {
+  "type": "trustBar",
+  "items": [
+   {
+    "icon": "shield",
+    "title": "Garantía de 1 año",
+    "description": "Directa con nosotros"
+   },
+   {
+    "icon": "truck",
+    "title": "Envío gratis",
+    "description": "A todo el país"
+   },
+   {
+    "icon": "card",
+    "title": "Paga al recibir",
+    "description": "Contraentrega disponible"
+   }
+  ]
+ },
+ {
+  "type": "productSpotlight",
+  "specs": [
+   {
+    "label": "Batería",
+    "value": "40 horas"
+   },
+   {
+    "label": "Conexión",
+    "value": "Bluetooth 5.3"
+   },
+   {
+    "label": "Incluye",
+    "value": "Estuche rígido"
+   }
+  ],
+  "bullets": [
+   {
+    "icon": "bolt",
+    "title": "40 horas de batería",
+    "description": "Una semana de uso sin cargar."
+   },
+   {
+    "icon": "sparkle",
+    "title": "Cancelación activa",
+    "description": "Bloquea el ruido del bus y la oficina."
+   },
+   {
+    "icon": "heart",
+    "title": "Livianos",
+    "description": "Cómodos por horas."
+   }
+  ],
+  "heading": "Por qué Aero Max",
+  "productId": "cmup03p8l0000e17d8eefv8zj"
+ },
+ {
+  "rows": [
+   {
+    "us": "40 horas",
+    "label": "Batería",
+    "others": "15 a 20 horas"
+   },
+   {
+    "us": "Activa",
+    "label": "Cancelación de ruido",
+    "others": "Pasiva"
+   },
+   {
+    "us": "1 año directa",
+    "label": "Garantía",
+    "others": "Con el fabricante"
+   }
+  ],
+  "type": "comparison",
+  "heading": "No todos los audífonos son iguales",
+  "usLabel": "Aero Max",
+  "othersLabel": "Lo típico"
+ },
+ {
+  "type": "objections",
+  "items": [
+   {
+    "answer": "Sí. Funcionan con cualquier equipo con Bluetooth.",
+    "question": "¿Sirven con iPhone y Android?"
+   },
+   {
+    "answer": "Sí, en ciudades principales tenemos contraentrega.",
+    "question": "¿Puedo pagar al recibir?"
+   }
+  ],
+  "kicker": "Preguntas",
+  "heading": "Lo que nos preguntan antes de comprar"
+ },
+ {
+  "type": "productGrid",
+  "kicker": "También te puede gustar",
+  "heading": "Productos relacionados",
+  "variant": "row",
+  "productIds": [
+   "cmup03p990006e17d7kfb2qno",
+   "cmup03p8s0001e17d6e6yvn47",
+   "cmup03p920004e17dlby160qg"
+  ],
+  "showCategoryFilter": false
+ },
+ {
+  "type": "features",
+  "intro": null,
+  "items": [
+   {
+    "icon": "chat",
+    "title": "Respuestas que venden",
+    "description": "Cómo entrenar al agente con tus objeciones reales."
+   },
+   {
+    "icon": "calendar",
+    "title": "Agenda automática",
+    "description": "Citas confirmadas sin que tú contestes."
+   },
+   {
+    "icon": "bolt",
+    "title": "Seguimiento",
+    "description": "Mensajes que reactivan clientes fríos."
+   }
+  ],
+  "kicker": "Lo que vas a aprender",
+  "heading": "Del primer mensaje a la venta cerrada",
+  "variant": "icons"
+ },
+ {
+  "type": "agenda",
+  "items": [
+   {
+    "when": "Martes 10 de abril · 8:00 p. m.",
+    "title": "Clase 1: tu agente en una hora",
+    "description": "Configuramos juntos tu primer agente."
+   },
+   {
+    "when": "Miércoles 11 · 8:00 p. m.",
+    "title": "Clase 2: objeciones",
+    "description": "Cómo responde a precio, tiempo y confianza."
+   },
+   {
+    "when": "Jueves 12 · 8:00 p. m.",
+    "title": "Clase 3: escalar",
+    "description": "Difusiones y seguimiento automático."
+   }
+  ],
+  "kicker": "Agenda",
+  "heading": "Tres noches, tres resultados"
+ },
+ {
+  "body": "Ayuda a negocios en Latinoamérica a vender por WhatsApp con agentes de IA.",
+  "name": "Juan Valderrama",
+  "role": "Fundador de Funnels Labs",
+  "type": "host",
+  "kicker": "Quién te acompaña",
+  "heading": "Tu instructor"
+ },
+ {
+  "body": "Te enviamos el link de acceso por WhatsApp.",
+  "type": "leadForm",
+  "kicker": "Cupos gratuitos",
+  "heading": "Reserva tu lugar",
+  "buttonLabel": "Quiero mi cupo"
+ },
+ {
+  "body": "Fundas y cargadores con descuento mientras haya existencias.",
+  "tone": "dark",
+  "type": "promo",
+  "kicker": "Temporada",
+  "heading": "Hasta 30% en accesorios seleccionados",
+  "ctaLabel": "Quiero el descuento"
+ },
+ {
+  "body": "Escríbenos y te ayudamos a elegir, sin compromiso.",
+  "type": "cta",
+  "heading": "¿Dudas con algún producto?",
+  "ctaLabel": "Hablar por WhatsApp"
+ },
+ {
+  "type": "steps",
+  "items": [
+   {
+    "title": "Escríbenos",
+    "description": "Te respondemos por WhatsApp en minutos."
+   },
+   {
+    "title": "Valoración",
+    "description": "La doctora revisa tu caso."
+   },
+   {
+    "title": "Tu plan",
+    "description": "Empiezas con un plan y precio claros."
+   }
+  ],
+  "kicker": "Cómo funciona",
+  "heading": "Así empezamos"
+ },
+ {
+  "type": "stats",
+  "items": [
+   {
+    "value": "+1.200",
+    "label": "pedidos entregados"
+   },
+   {
+    "value": "4,9",
+    "label": "calificación"
+   }
+  ]
+ },
+ {
+  "type": "gallery",
+  "kicker": "Así trabajamos",
+  "heading": "Nuestro taller"
+ }
+]

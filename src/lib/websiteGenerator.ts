@@ -2,6 +2,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { anthropic } from "@/lib/anthropicClient";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { WebsiteContentSchema, type WebsiteContent, type VisibleSections } from "@/lib/websiteContent";
+import { recordAnthropicUsage } from "@/lib/aiUsage";
 
 // What the AI actually generates — everything in WebsiteContentSchema
 // except visibleSections, which is business-owner UI state (see its
@@ -41,6 +42,7 @@ async function parseWebsiteContent(prompt: string): Promise<AiWebsiteContent> {
     console.error("generateWebsiteContent: Anthropic structured-output call failed:", err);
     throw new Error(err instanceof Error ? err.message : "Falló la generación del sitio con IA");
   }
+  await recordAnthropicUsage("claude-sonnet-5", response.usage);
 
   if (!response.parsed_output) {
     throw new Error("Claude no devolvió el contenido del sitio");

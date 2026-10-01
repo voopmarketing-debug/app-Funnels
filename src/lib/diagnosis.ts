@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropicClient";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
+import { recordAnthropicUsage } from "@/lib/aiUsage";
 
 const ERROR_PREFIX = "[ERROR INTERNO";
 const PLAN_LIMIT_PREFIX = "[LÍMITE DE PLAN";
@@ -135,6 +136,7 @@ export async function generateSalesDiagnosis(
       },
     ],
   });
+  await recordAnthropicUsage("claude-opus-5-5", response.usage);
 
   if (!response.parsed_output) {
     throw new Error("Claude no devolvió un diagnóstico válido");

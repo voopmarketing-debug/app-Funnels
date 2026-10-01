@@ -14,6 +14,8 @@ import {
   type WebsiteContentV2,
   formatMoney,
 } from "@/lib/websiteContentV2";
+import { recordAnthropicUsage } from "@/lib/aiUsage";
+import { AiPageSchema, fromAiPage, toAiSection } from "@/lib/websiteAiFormat";
 
 // Same model the v1 generator has been running on in production — a page
 // is a single structured-output call that has to finish inside the
@@ -38,8 +40,11 @@ async function parseStructured<T extends z.ZodType>(schema: T, prompt: string, e
     });
   } catch (err) {
     console.error("websiteGeneratorV2: Anthropic call failed:", err);
-    throw new Error(err instanceof Error ? err.message : "Falló la generación con IA");
+    // Rethrown as-is: the builder actions turn API errors (which carry an
+    // HTTP status) into a readable message — see builderError in actions.ts.
+    throw err;
   }
+  await recordAnthropicUsage(MODEL, response.usage);
   if (response.stop_reason === "refusal") throw new Error("La IA no pudo generar esta página con esa instrucción. Prueba redactándola distinto.");
   if (!response.parsed_output) throw new Error("La IA no devolvió el contenido de la página");
   return response.parsed_output as z.infer<T>;
@@ -174,7 +179,7 @@ function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: 
 }
 
 export async function generateWebsiteContentV2(ctx: WebsiteV2Context): Promise<WebsiteContentV2> {
-  const ai = await parseStructured(AiWebsiteV2Schema, buildPrompt(ctx), "medium");
+  const ai = fromAiPage(await parseStructured(AiPageSchema, buildPrompt(ctx), "medium"));
   if (ctx.pageType) ai.pageType = ctx.pageType;
   if (ctx.style) ai.style = ctx.style;
   return normalize(ai, ctx);
@@ -186,7 +191,7 @@ export async function applyWebsiteEditV2(
   instruction: string,
   products: CatalogProduct[],
 ): Promise<WebsiteContentV2> {
-  const editable = { pageType: current.pageType, style: current.style, announcement: current.announcement, theme: current.theme, sections: current.sections };
+  const editable = { pageType: current.pageType, style: current.style, announcement: current.announcement, theme: current.theme, sections: current.sections.map(toAiSection) };
   const prompt = `Aquí está el contenido actual de una página web, en JSON:
 
 ${JSON.stringify(editable, null, 2)}
@@ -201,7 +206,7 @@ El dueño del negocio pidió este cambio: "${instruction}"
 
 Actúa como el director creativo de la mejor agencia de diseño web con IA del mundo. Devuelve la página COMPLETA en el mismo formato aplicando ese cambio. Todo lo que no tenga que ver con el pedido queda EXACTAMENTE igual: no reescribas texto que no te pidieron. Puedes agregar, quitar o reordenar secciones si el pedido lo implica.
 Lo que cambies debe tener nivel de agencia premium: copy concreto, sin relleno de IA, sin emojis ni guion largo, sin inventar precios, reseñas, descuentos ni cifras. Si cambias colores: fondo nunca #ffffff/#000000 puros, texto ≥7:1, acento ≥4.5:1.`;
-  const ai = await parseStructured(AiWebsiteV2Schema, prompt, "medium");
+  const ai = fromAiPage(await parseStructured(AiPageSchema, prompt, "medium"));
   const next = normalize(ai, { products, ctaUrl: current.heroCtaUrl });
   // Keep the owner's hide toggles only while the section list is the same shape.
   const sameShape = next.sections.length === current.sections.length && next.sections.every((s, i) => s.type === current.sections[i].type);
@@ -214,20 +219,25 @@ Lo que cambies debe tener nivel de agencia premium: copy concreto, sin relleno d
 // hands back a ready brief the "Crear página" button turns into a page.
 
 export const CreationTurnSchema = z.object({
-  reply: z.string().describe("Respuesta conversacional, cálida y breve (máx. 90 palabras), en español, sin emojis ni guion largo."),
+  reply: z
+    .string()
+    .describe("Respuesta conversacional, cálida, inspiradora y breve (máx. 80 palabras), en español, tuteando, sin emojis ni guion largo, sin jerga de marketing."),
   proposals: z
     .array(
       z.object({
-        title: z.string().describe("Nombre corto de la idea, ej. 'Tienda con catálogo completo'"),
+        title: z.string().describe("Nombre corto y atractivo de la idea, en palabras del cliente, ej. 'Tu tienda con pedidos por WhatsApp'"),
         pageType: z.enum(PAGE_TYPES).catch("servicios"),
         style: z.enum(STYLE_KEYS).catch("editorial"),
-        why: z.string().describe("Por qué esta idea le sirve a ESTE negocio, una frase."),
+        why: z.string().describe("Qué va a lograr el dueño con esta página, una frase concreta e inspiradora (resultado, no características)."),
         brief: z.string().describe("Brief listo para generar (máx. 80 palabras): objetivo, público, tono, qué destacar y llamado a la acción."),
       }),
     )
     .catch([])
     .describe("2 o 3 propuestas en el primer turno o cuando el usuario pida ideas; vacío en el resto."),
-  quickReplies: z.array(z.string()).catch([]).describe("2 a 4 respuestas rápidas que el usuario podría tocar (máx. 6 palabras cada una)."),
+  quickReplies: z
+    .array(z.string())
+    .catch([])
+    .describe("2 a 4 respuestas rápidas que el usuario podría tocar (máx. 6 palabras cada una). Cuando 'ready' está lleno, incluye 'Crear mi página'."),
   ready: z
     .object({
       pageType: z.enum(PAGE_TYPES).catch("servicios"),
@@ -250,7 +260,9 @@ export async function websiteCreationTurn(
     history.length === 0
       ? "(Aún no hay mensajes: es el primer turno. Saluda por el nombre del negocio, di en una frase lo que entendiste de él a partir de sus datos y propón 2 o 3 ideas de página.)"
       : history.map((m) => `${m.role === "user" ? "CLIENTE" : "TÚ"}: ${m.text}`).join("\n");
-  const prompt = `Eres el director creativo de una agencia de diseño web con IA y estás conversando por chat con el dueño de un negocio para crear una página web. Tu trabajo: entender qué necesita, proponer ideas concretas basadas en lo que YA cargó en la plataforma y llegar rápido a un brief listo. Pregunta solo lo que de verdad falte (máximo una pregunta por turno). Cuando haya suficiente, llena "ready" y dile que puede tocar "Crear página".
+  const prompt = `Eres el director creativo de una agencia de diseño web con IA y estás conversando por chat con el dueño de un negocio para crear su página web. Le hablas a él directamente, de tú, con un tono cálido, seguro e inspirador: que sienta que su negocio merece una página de primer nivel y que está a un minuto de tenerla. Nada de jerga (no digas brief, CTA, landing, lead, captación, funnel, conversión): habla de clientes, mensajes, citas, ventas y pedidos.
+
+Tu trabajo: entender qué necesita, proponer ideas concretas basadas en lo que YA cargó en la plataforma y llegar rápido a un plan listo. Pregunta solo lo que de verdad falte (máximo una pregunta por turno, fácil de responder). Cuando haya suficiente, llena "ready" y dile que a la derecha ya puede ver cómo queda su página, elegir el estilo y tocar "Crear mi página".
 
 DATOS QUE YA TIENE EN LA PLATAFORMA
 - Negocio: ${ctx.businessName} (${INDUSTRY_LABELS[ctx.industry] ?? "otro"})

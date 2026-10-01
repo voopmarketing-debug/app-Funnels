@@ -1,5 +1,6 @@
 import { uploadAttachment } from "@/lib/attachments";
 import { INDUSTRY_LABELS, INDUSTRY_DIRECTION } from "@/lib/websiteGenerator";
+import { recordImage } from "@/lib/aiUsage";
 
 const OPENAI_API_BASE = "https://api.openai.com/v1";
 
@@ -58,7 +59,11 @@ Debe ser una FOTOGRAFÍA realista de alta calidad — nunca una ilustración, re
       return null;
     }
 
-    const data = (await response.json()) as { data?: { b64_json?: string }[] };
+    const data = (await response.json()) as {
+      data?: { b64_json?: string }[];
+      usage?: { input_tokens?: number; output_tokens?: number };
+    };
+    await recordImage(data.usage);
     const b64 = data.data?.[0]?.b64_json;
     if (!b64) return null;
 

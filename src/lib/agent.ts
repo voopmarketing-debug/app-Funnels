@@ -18,6 +18,7 @@ import {
 } from "@/lib/ai";
 import type { AIAgent, Business, Conversation, Message } from "@prisma/client";
 import { synthesizeVoiceNote, transcribeVoiceNote } from "@/lib/tts";
+import { withAiUsage } from "@/lib/aiUsage";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { getAccountAddonCapacity } from "@/lib/addons";
 import { PLAN_LIMITS } from "@/lib/plans";
@@ -220,7 +221,9 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
           // Meta never sends a caption for voice notes, so without this the
           // AI would see an empty message and have no idea what was said.
           try {
-            const transcript = await transcribeVoiceNote({ bytes, mimeType: meta.mimeType });
+            const transcript = await withAiUsage(business.id, "VOICE_IN", () =>
+              transcribeVoiceNote({ bytes, mimeType: meta.mimeType }),
+            );
             if (transcript) messageContent = transcript;
           } catch (err) {
             console.error("Failed to transcribe inbound voice note:", err);
@@ -464,7 +467,7 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
     let voiceNote: { url: string; sizeBytes: number } | null = null;
     if (!toolMedia && ctx.replyAsVoiceNote && reply) {
       try {
-        const audioBytes = await synthesizeVoiceNote(reply);
+        const audioBytes = await withAiUsage(business.id, "VOICE_OUT", () => synthesizeVoiceNote(reply));
         const { url, size } = await uploadAttachment({
           bytes: audioBytes,
           filename: `respuesta-${Date.now()}.ogg`,

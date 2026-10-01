@@ -24,7 +24,15 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
     input: 4 / PER_MILLION,
     output: 20 / PER_MILLION,
     cacheWrite: (4 / PER_MILLION) * 2,
-    cacheRead: (4 / PER_MILLION) * 0.1,
+    // Opus 5.5 reads cache at 0.05x input, not the usual 0.1x.
+    cacheRead: (4 / PER_MILLION) * 0.05,
+  },
+  // The economical option for replies (agency-selectable per agent).
+  "claude-haiku-4-5": {
+    input: 1 / PER_MILLION,
+    output: 5 / PER_MILLION,
+    cacheWrite: (1 / PER_MILLION) * 2,
+    cacheRead: (1 / PER_MILLION) * 0.1,
   },
   // Kept so diagnoses generated before the switch to Opus 5.5 still price.
   "claude-opus-5": {
@@ -34,6 +42,12 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
     cacheRead: (5 / PER_MILLION) * 0.1,
   },
 };
+
+MODEL_PRICING["claude-haiku-4-5-20251001"] = MODEL_PRICING["claude-haiku-4-5"];
+
+export function hasModelPricing(model: string): boolean {
+  return model in MODEL_PRICING;
+}
 
 export type MessageUsage = {
   model: string | null;

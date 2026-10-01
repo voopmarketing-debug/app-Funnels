@@ -24,6 +24,7 @@ import {
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
 import { generateHeroImage } from "@/lib/websiteHeroImage";
+import { withAiUsage } from "@/lib/aiUsage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
@@ -1485,7 +1486,7 @@ export async function generateSalesDiagnosis(businessId: string): Promise<SalesD
 
   let result;
   try {
-    result = await runSalesDiagnosis(businessId);
+    result = await withAiUsage(businessId, "DIAGNOSIS", () => runSalesDiagnosis(businessId));
   } catch {
     // Claude/API failures land here — surfaced as a plain message in the UI
     // rather than crashing the whole analytics page.
@@ -1934,7 +1935,7 @@ export async function createWebsitePage(
       buildSalesContext(businessId, business.agent?.diagnosisReport),
     ]);
 
-    const [content, aiImageUrl] = await Promise.all([
+    const [content, aiImageUrl] = await withAiUsage(businessId, "WEBSITE", () => Promise.all([
       generateWebsiteContent({
         businessName: business.name,
         industry: business.industry,
@@ -1955,7 +1956,7 @@ export async function createWebsitePage(
         industry: business.industry,
         description: business.agent?.systemPrompt ?? "",
       }),
-    ]);
+    ]));
     await recordWebsiteGeneration(businessId);
 
     const slug = await generateUniqueWebsiteSlug(business.name, name, existingCount === 0);
@@ -2009,7 +2010,7 @@ export async function regenerateWebsitePage(
     ]);
     const existingContent = WebsiteContentSchema.safeParse(website.content);
 
-    const [content, aiImageUrl] = await Promise.all([
+    const [content, aiImageUrl] = await withAiUsage(businessId, "WEBSITE", () => Promise.all([
       generateWebsiteContent({
         businessName: business.name,
         industry: business.industry,
@@ -2030,7 +2031,7 @@ export async function regenerateWebsitePage(
         industry: business.industry,
         description: business.agent?.systemPrompt ?? "",
       }),
-    ]);
+    ]));
     await recordWebsiteGeneration(businessId);
 
     const generatedAt = new Date();
@@ -2103,7 +2104,7 @@ export async function applyWebsitePrompt(
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
     const currentContent = WebsiteContentSchema.parse(website.content);
 
-    const updated = await applyWebsiteEdit(currentContent, trimmed);
+    const updated = await withAiUsage(businessId, "WEBSITE", () => applyWebsiteEdit(currentContent, trimmed));
     await recordWebsiteGeneration(businessId);
 
     await prisma.website.update({
@@ -2678,7 +2679,7 @@ export async function websiteCreationChat(
 
     const ctx = await buildWebsiteV2Context(businessId, { withNumber: false });
     const trimmed = history.slice(-16).map((m) => ({ role: m.role, text: m.text.slice(0, 1500) }));
-    return { ok: true, turn: await websiteCreationTurn(ctx, trimmed) };
+    return { ok: true, turn: await withAiUsage(businessId, "WEBSITE", () => websiteCreationTurn(ctx, trimmed)) };
   } catch (err) {
     return builderError(`websiteCreationChat(${businessId})`, err);
   }
@@ -2686,7 +2687,17 @@ export async function websiteCreationChat(
 
 export async function createWebsitePageV2(
   businessId: string,
-  input: { name?: string; purpose?: string; brief?: string; pageType?: PageType | null; style?: StyleKey | null; ctaUrl?: string },
+  input: {
+    name?: string;
+    purpose?: string;
+    brief?: string;
+    pageType?: PageType | null;
+    style?: StyleKey | null;
+    ctaUrl?: string;
+    // Typed in the creation studio when the business has no WhatsApp
+    // connected and the owner has no phone on file yet.
+    whatsappNumber?: string;
+  },
 ): Promise<BuilderResult<{ id: string }>> {
   try {
     const session = await auth();
@@ -2694,12 +2705,25 @@ export async function createWebsitePageV2(
     await requireBusinessMembership(session.user.id, businessId);
     await assertWebsiteGenerationAllowed(businessId);
 
+    if (input.whatsappNumber?.trim()) {
+      const digits = input.whatsappNumber.replace(/\D/g, "");
+      if (digits.length < 8 || digits.length > 15) {
+        return { ok: false, error: "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567" };
+      }
+      // Saved as the owner's phone (only when empty) so this and future
+      // pages, and the rest of the platform, have it.
+      const owner = await prisma.membership.findFirst({ where: { businessId, role: "OWNER" }, select: { user: { select: { id: true, phone: true } } } });
+      if (owner && !owner.user.phone?.trim()) {
+        await prisma.user.update({ where: { id: owner.user.id }, data: { phone: `+${digits}` } });
+      }
+    }
+
     const ctx = await buildWebsiteV2Context(businessId);
     const existingCount = await prisma.website.count({ where: { businessId } });
     const name = input.name?.trim().slice(0, 80) || (existingCount === 0 ? "Sitio principal" : `Página ${existingCount + 1}`);
     const ctaUrl = input.ctaUrl && /^https?:\/\//i.test(input.ctaUrl.trim()) ? input.ctaUrl.trim() : null;
 
-    const [content, aiImageUrl] = await Promise.all([
+    const [content, aiImageUrl] = await withAiUsage(businessId, "WEBSITE", () => Promise.all([
       generateWebsiteContentV2({
         ...ctx,
         purpose: input.purpose?.trim() || null,
@@ -2709,7 +2733,7 @@ export async function createWebsitePageV2(
         ctaUrl,
       }),
       ctx.photoCount > 0 ? Promise.resolve(null) : generateHeroImage({ businessName: ctx.businessName, industry: ctx.industry, description: ctx.description }),
-    ]);
+    ]));
     if (ctaUrl) content.heroCtaUrl = ctaUrl;
     await recordWebsiteGeneration(businessId);
 
@@ -2751,7 +2775,7 @@ export async function applyWebsitePromptV2(
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
     const current = WebsiteContentV2Schema.parse(website.content);
     const products = await getCatalogProducts(businessId);
-    const updated = await applyWebsiteEditV2(current, trimmed, products);
+    const updated = await withAiUsage(businessId, "WEBSITE", () => applyWebsiteEditV2(current, trimmed, products));
     await recordWebsiteGeneration(businessId);
     await prisma.website.update({ where: { id: websiteId }, data: { content: updated } });
     revalidatePath(`/dashboard/businesses/${businessId}/website`);
@@ -2772,14 +2796,16 @@ export async function regenerateWebsitePageV2(businessId: string, websiteId: str
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
     const ctx = await buildWebsiteV2Context(businessId);
     const previous = isV2Content(website.content) ? WebsiteContentV2Schema.safeParse(website.content) : null;
-    const content = await generateWebsiteContentV2({
-      ...ctx,
-      purpose: website.purpose,
-      designPrompt: website.designPrompt,
-      pageType: previous?.success ? previous.data.pageType : null,
-      style: previous?.success ? previous.data.style : null,
-      ctaUrl: previous?.success ? previous.data.heroCtaUrl : null,
-    });
+    const content = await withAiUsage(businessId, "WEBSITE", () =>
+      generateWebsiteContentV2({
+        ...ctx,
+        purpose: website.purpose,
+        designPrompt: website.designPrompt,
+        pageType: previous?.success ? previous.data.pageType : null,
+        style: previous?.success ? previous.data.style : null,
+        ctaUrl: previous?.success ? previous.data.heroCtaUrl : null,
+      }),
+    );
     await recordWebsiteGeneration(businessId);
     await prisma.website.update({
       where: { id: websiteId },

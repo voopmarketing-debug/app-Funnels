@@ -13,7 +13,7 @@ import {
   type WebsiteContentV2,
 } from "@/lib/websiteContentV2";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
-import { StyleThumb } from "@/components/StyleThumb";
+import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 
 type Tab = "chat" | "diseno" | "secciones" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
@@ -295,7 +295,7 @@ export function WebsiteBuilder({
                       onClick={() => runDesign("Cambiando estilo…", { style: k as StyleKey })}
                       className={`overflow-hidden rounded-lg border-2 text-left transition disabled:opacity-60 ${content.style === k ? "border-accent" : "border-border hover:border-border-strong"}`}
                     >
-                      <StyleThumb style={k as StyleKey} className="h-20" />
+                      <ScaledPagePreview src={`/dashboard/businesses/${businessId}/website/muestra?style=${k}&type=${content.pageType}`} aspect={0.62} title={`Estilo ${STYLE_INFO[k as StyleKey].label}`} />
                       <p className="truncate px-2 py-1.5 text-[12px] font-semibold">{STYLE_INFO[k as StyleKey].label}</p>
                     </button>
                   ))}

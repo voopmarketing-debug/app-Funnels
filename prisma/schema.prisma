@@ -33,7 +33,7 @@ model Business {
   // needed only for message-template management (Meta scopes templates to
   // the WABA, not the phone number). Not secret, so not encrypted, same as
   // wabaPhoneNumberId.
-  wabaId String?
+  wabaId            String?
 
   // What kind of business this is, so the AI agent can tailor its answers
   // (e.g. "clinica" vs "ecommerce" call for very different context).
@@ -71,17 +71,18 @@ model Business {
   whatsappHealthMessage   String?
   whatsappHealthCheckedAt DateTime?
 
-  memberships    Membership[]
-  agent          AIAgent?
-  conversations  Conversation[]
-  pipelineStages PipelineStage[]
-  pipelines      Pipeline[]
-  broadcasts     Broadcast[]
+  memberships      Membership[]
+  agent            AIAgent?
+  conversations    Conversation[]
+  pipelineStages   PipelineStage[]
+  pipelines        Pipeline[]
+  broadcasts       Broadcast[]
   messageTemplates MessageTemplate[]
-  websites       Website[]
-  agentMedia     AgentMedia[]
-  products       Product[]
-  notifications  Notification[]
+  websites         Website[]
+  agentMedia       AgentMedia[]
+  products         Product[]
+  aiUsage          AiUsage[]
+  notifications    Notification[]
 }
 
 // A photo or document (product shot, PDF catalog, etc.) the client uploads
@@ -139,8 +140,8 @@ enum PlanTier {
 
 // Links a platform user to a business (a user can manage multiple businesses).
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
+  id           String         @id @default(cuid())
+  email        String         @unique
   // Contact/WhatsApp number for the agency to reach this person directly —
   // separate from wabaPhoneNumberId on Business, which is the Meta WhatsApp
   // Business API config for their bot, not a way to contact them.
@@ -158,7 +159,7 @@ model User {
   linkedin     String?
   passwordHash String
   name         String?
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime       @default(now())
   memberships  Membership[]
   addons       AccountAddon[]
 
@@ -166,6 +167,11 @@ model User {
   // emailed to the user (never the raw token) so a DB read alone can't be
   // used to reset a password; resetTokenExpiresAt bounds how long it's
   // valid. Both cleared once used.
+  // What this account actually pays per month in USD, when it differs from
+  // the plan's list price (launch offer, negotiated deal). Null = list price
+  // (PLAN_PRICE_USD in lib/plans.ts). Only used by the agency's Rentabilidad
+  // page.
+  monthlyPriceUsd     Float?
   resetTokenHash      String?   @unique
   resetTokenExpiresAt DateTime?
 }
@@ -248,40 +254,40 @@ model PipelineStage {
 
 // One WhatsApp conversation thread with an end customer of a business.
 model Conversation {
-  id             String   @id @default(cuid())
-  businessId     String
-  customerPhone  String
-  customerName   String?
+  id                 String    @id @default(cuid())
+  businessId         String
+  customerPhone      String
+  customerName       String?
   // Optional contact data the business owner fills in by hand (lead panel,
   // "Agregar contacto") or brings in via CSV import — WhatsApp only ever
   // gives us the phone and a profile name.
-  customerEmail  String?
-  stageId        String
+  customerEmail      String?
+  stageId            String
   // When true, the AI agent stays silent on new messages in this specific
   // conversation — for when the business owner wants to take over one chat
   // by hand without touching the agent for everyone else.
-  aiPaused       Boolean  @default(false)
-  lastMessageAt  DateTime @default(now())
+  aiPaused           Boolean   @default(false)
+  lastMessageAt      DateTime  @default(now())
   // Automatic reply retries (see lib/replyRecovery.ts): how many times in a
   // row the AI reply to this conversation's latest customer message failed
   // or wasn't delivered, and when the last attempt started (so two runs
   // never retry the same conversation at once). Reset on a delivered reply.
   replyAttempts      Int       @default(0)
   lastReplyAttemptAt DateTime?
-  createdAt      DateTime @default(now())
+  createdAt          DateTime  @default(now())
   // Null = nobody on the team has opened this conversation yet, so every
   // customer message counts as unread (see crm/page.tsx, which bumps this
   // to now() whenever someone opens the chat) — powers the WhatsApp-style
   // unread badge/highlight on the conversation list.
-  lastReadAt     DateTime?
+  lastReadAt         DateTime?
 
   // Freeform labels the business/agency sets on this lead (e.g. "Empresa",
   // "Cotización") — shown as chips in the lead detail panel. Not tied to
   // pipeline stage, which already tracks funnel position on its own.
-  tags        String[] @default([])
+  tags            String[]  @default([])
   // Manually-set summary of the lead shown in the detail panel — e.g. what
   // the AI agent picked up on, or a note the business owner typed in.
-  notes       String?  @db.Text
+  notes           String?   @db.Text
   // Set either by hand from the detail panel (see updateConversationDetails
   // in lib/actions.ts) or automatically by the AI agent when it detects the
   // customer confirming a concrete date/time in the chat itself (see the
@@ -291,10 +297,10 @@ model Conversation {
   appointmentAt   DateTime?
   appointmentNote String?
 
-  business       Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  stage          PipelineStage    @relation(fields: [stageId], references: [id])
-  messages       Message[]
-  notifications  Notification[]
+  business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  stage           PipelineStage    @relation(fields: [stageId], references: [id])
+  messages        Message[]
+  notifications   Notification[]
   broadcastClicks BroadcastClick[]
 
   @@unique([businessId, customerPhone])
@@ -362,10 +368,10 @@ model Message {
   // media URL, since those expire after a few minutes, so an inbound
   // attachment is downloaded and re-uploaded immediately in the webhook
   // handler before this row is written.
-  mediaUrl      String?
-  mediaType     String? // "image" | "audio" | "document" | "video"
-  mediaMimeType String?
-  mediaFilename String?
+  mediaUrl       String?
+  mediaType      String? // "image" | "audio" | "document" | "video"
+  mediaMimeType  String?
+  mediaFilename  String?
   mediaSizeBytes Int?
 
   // Set only on a message created by lib/actions.ts's sendBroadcast — lets a
@@ -455,11 +461,11 @@ model Website {
   whatsappNumber String
 
   model        String?
-  customDomain String? @unique
+  customDomain String?  @unique
   generatedAt  DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business     Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   events       WebsiteEvent[]
   leads        WebsiteLead[]
   agendaConfig AgendaConfig?
@@ -535,7 +541,7 @@ model Professional {
   // their own embudo. SetNull (not Cascade) so deleting a pipeline just
   // drops the assignment, never the professional or their appointment
   // history.
-  pipelineId String?
+  pipelineId     String?
 
   createdAt DateTime @default(now())
 
@@ -617,10 +623,10 @@ model WebsiteLead {
 // user-agent capture, just enough to answer "is this page getting visits,
 // and are people clicking through to WhatsApp/the agenda link."
 model WebsiteEvent {
-  id        String   @id @default(cuid())
-  websiteId String
-  type      String // "view" | "cta_click"
-  label     String? // which button, e.g. "hero" | "header" | "contact" — null for "view"
+  id          String   @id @default(cuid())
+  websiteId   String
+  type        String // "view" | "cta_click"
+  label       String? // which button, e.g. "hero" | "header" | "contact" — null for "view"
   // Where a cta_click actually sent the visitor — "whatsapp" or "agenda"
   // (any external ctaUrl override) — kept separate from `label` since the
   // client asked for these never to be combined into one "clicks" number.
@@ -646,12 +652,12 @@ enum TemplateStatus {
 // Meta owns the actual approval — this row mirrors their status, refreshed
 // on demand (no template-status webhook wired up).
 model MessageTemplate {
-  id         String   @id @default(cuid())
-  businessId String
-  name       String // Meta's template name: lowercase, underscores only
-  language   String // e.g. "es", "es_CO", "en_US"
-  category   String // "MARKETING" | "UTILITY"
-  bodyText   String   @db.Text
+  id             String  @id @default(cuid())
+  businessId     String
+  name           String // Meta's template name: lowercase, underscores only
+  language       String // e.g. "es", "es_CO", "en_US"
+  category       String // "MARKETING" | "UTILITY"
+  bodyText       String  @db.Text
   // Optional image shown above the body — stored here as our own hosted
   // (Vercel Blob) URL, used both to redisplay it in the UI and to fill in
   // the header when sending an approved template (see whatsapp.ts). Meta
@@ -661,11 +667,11 @@ model MessageTemplate {
   // Up to 2 CTA/URL buttons: [{ type: "URL", text, url }, ...]
   buttons        Json?
 
-  status           TemplateStatus @default(PENDING)
-  metaTemplateId   String? // id Meta assigns once created
-  rejectionReason  String?        @db.Text
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  status          TemplateStatus @default(PENDING)
+  metaTemplateId  String? // id Meta assigns once created
+  rejectionReason String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -797,4 +803,30 @@ model AccountAddon {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status, expiresAt])
+}
+
+// AI spend that is NOT a WhatsApp reply (replies keep their token usage on
+// Message itself): sales diagnoses, website generation/edits/creation chat,
+// voice-note transcription and spoken replies, and generated images. One
+// row per provider call, priced at write time (see lib/aiUsage.ts), so the
+// agency's Rentabilidad page can show each client's full AI cost.
+model AiUsage {
+  id               String   @id @default(cuid())
+  businessId       String
+  kind             String // DIAGNOSIS | WEBSITE | VOICE_IN | VOICE_OUT | IMAGE
+  provider         String // anthropic | openai
+  model            String
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  // Non-token units for OpenAI audio: seconds transcribed / characters spoken.
+  units            Float?
+  costUsd          Float
+  createdAt        DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([createdAt])
 }

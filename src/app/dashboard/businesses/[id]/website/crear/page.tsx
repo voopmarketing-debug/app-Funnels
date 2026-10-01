@@ -9,9 +9,16 @@ export default async function CreateWebsitePage({ params }: { params: Promise<{ 
   if (!session?.user?.id) return null;
   const membership = await prisma.membership.findUnique({
     where: { userId_businessId: { userId: session.user.id, businessId: id } },
-    include: { business: { select: { name: true } } },
+    include: { business: { select: { name: true, wabaAccessToken: true, wabaPhoneNumberId: true } } },
   });
   if (!membership) notFound();
-  const productCount = await prisma.product.count({ where: { businessId: id, active: true } });
-  return <CreationStudio businessId={id} businessName={membership.business.name} productCount={productCount} />;
+  const [productCount, owner] = await Promise.all([
+    prisma.product.count({ where: { businessId: id, active: true } }),
+    prisma.membership.findFirst({ where: { businessId: id, role: "OWNER" }, select: { user: { select: { phone: true } } } }),
+  ]);
+  // Every button on the page leads to WhatsApp: without a connected line or
+  // a phone on the owner's profile, the studio asks for the number up front
+  // instead of failing at the very end.
+  const hasWhatsapp = !!(membership.business.wabaAccessToken && membership.business.wabaPhoneNumberId) || !!owner?.user.phone?.trim();
+  return <CreationStudio businessId={id} businessName={membership.business.name} productCount={productCount} needsWhatsapp={!hasWhatsapp} />;
 }

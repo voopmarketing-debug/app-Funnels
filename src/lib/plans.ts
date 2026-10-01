@@ -60,3 +60,20 @@ export function planUsageStatus(used: number, limit: number | null): PlanUsageSt
   if (ratio >= 0.8) return "warning";
   return "good";
 }
+
+// Monthly list price per plan in USD — mirrors the landing page (src/app/
+// page.tsx, #precios). Used by the agency's Rentabilidad page as each
+// account's revenue unless the account has its own User.monthlyPriceUsd.
+export const PLAN_PRICE_USD: Record<PlanTier, number> = {
+  STARTER: 97,
+  PRO: 297,
+  SCALE: 597,
+};
+
+// Which models the agency can pick for a client's WhatsApp replies (see
+// setAgentModel in lib/actions.ts). Haiku answers at roughly half the cost
+// per message; Sonnet is the default and the better closer.
+export const AGENT_MODELS = [
+  { id: "claude-sonnet-5", label: "Sonnet 5 · calidad máxima" },
+  { id: "claude-haiku-4-5", label: "Haiku 4.5 · económico" },
+] as const;

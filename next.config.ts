@@ -44,6 +44,13 @@ const nextConfig: NextConfig = {
         source: "/sitio/:slug*",
         headers: [{ key: "Content-Security-Policy", value: SITE_CSP }],
       },
+      {
+        // The creation studio's style previews: an example site page shown
+        // in an iframe inside the dashboard, so it needs the site policy
+        // (frameable by our own origin, no scripts), not the app's.
+        source: "/dashboard/businesses/:id/website/muestra",
+        headers: [{ key: "Content-Security-Policy", value: SITE_CSP }],
+      },
     ];
   },
 };
