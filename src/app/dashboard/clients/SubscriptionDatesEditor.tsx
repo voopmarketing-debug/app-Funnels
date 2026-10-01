@@ -63,7 +63,7 @@ export function SubscriptionDatesEditor({
           value={start}
           onChange={(e) => setStart(e.target.value)}
           aria-label="Inicio de membresía"
-          className="fl-mono w-[8.5rem] rounded border border-border bg-background px-1.5 py-1 text-[11px] text-ink outline-none focus:border-accent"
+          className="fl-mono w-[8.5rem] rounded border border-border bg-background px-1.5 py-1 text-[13px] text-ink outline-none focus:border-accent"
         />
         <span className="text-ink-faint">→</span>
         <input
@@ -71,12 +71,12 @@ export function SubscriptionDatesEditor({
           value={end}
           onChange={(e) => setEnd(e.target.value)}
           aria-label="Vence"
-          className="fl-mono w-[8.5rem] rounded border border-border bg-background px-1.5 py-1 text-[11px] text-ink outline-none focus:border-accent"
+          className="fl-mono w-[8.5rem] rounded border border-border bg-background px-1.5 py-1 text-[13px] text-ink outline-none focus:border-accent"
         />
       </div>
       <div className="flex items-center gap-2">
         {style && (
-          <span className="flex items-center gap-1 text-[11px]" style={{ color: style.text }}>
+          <span className="flex items-center gap-1 text-[13px]" style={{ color: style.text }}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.dot }} />
             {style.label}
           </span>
@@ -86,12 +86,12 @@ export function SubscriptionDatesEditor({
             type="button"
             disabled={isPending}
             onClick={handleSave}
-            className="rounded bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            className="rounded bg-accent px-2 py-0.5 text-[13px] font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
           >
             {isPending ? "Guardando..." : "Guardar"}
           </button>
         )}
-        {error && <span className="text-[11px] text-error">{error}</span>}
+        {error && <span className="text-[13px] text-error">{error}</span>}
       </div>
     </div>
   );

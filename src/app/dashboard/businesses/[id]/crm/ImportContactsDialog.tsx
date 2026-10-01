@@ -126,15 +126,15 @@ function ImportForm({
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="rounded-md border border-border bg-background p-3">
             <p className="text-xl font-bold text-accent">{result.created}</p>
-            <p className="text-[11px] text-ink-muted">nuevos</p>
+            <p className="text-[13px] text-ink-muted">nuevos</p>
           </div>
           <div className="rounded-md border border-border bg-background p-3">
             <p className="text-xl font-bold text-ink">{result.updated}</p>
-            <p className="text-[11px] text-ink-muted">actualizados</p>
+            <p className="text-[13px] text-ink-muted">actualizados</p>
           </div>
           <div className="rounded-md border border-border bg-background p-3">
             <p className={`text-xl font-bold ${result.skipped.length ? "text-error" : "text-ink"}`}>{result.skipped.length}</p>
-            <p className="text-[11px] text-ink-muted">con problemas</p>
+            <p className="text-[13px] text-ink-muted">con problemas</p>
           </div>
         </div>
         {result.skipped.length > 0 && (
@@ -147,7 +147,7 @@ function ImportForm({
             {result.skipped.length > 50 && <li>…y {result.skipped.length - 50} más</li>}
           </ul>
         )}
-        <p className="text-[11px] text-ink-faint">
+        <p className="text-[13px] text-ink-faint">
           Los contactos que ya existían conservaron su etapa y sus datos; solo se completaron los campos vacíos y se sumaron etiquetas.
         </p>
         <div className="flex justify-end">
@@ -173,7 +173,7 @@ function ImportForm({
       </div>
 
       <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full text-left text-[11px]">
+        <table className="w-full text-left text-[13px]">
           <thead className="bg-surface-2 text-ink-muted">
             <tr>
               {IMPORT_TEMPLATE_HEADERS.map((h) => (
@@ -195,7 +195,7 @@ function ImportForm({
           </tbody>
         </table>
       </div>
-      <ul className="space-y-0.5 text-[11px] text-ink-faint">
+      <ul className="space-y-0.5 text-[13px] text-ink-faint">
         <li>• Teléfono con indicativo del país (ej. +57…). Sin indicativo se usa el de abajo.</li>
         <li>• Varias etiquetas en la misma celda, separadas por punto y coma (;).</li>
         <li>• Un teléfono que ya está en el CRM no se duplica: se completan sus datos vacíos.</li>

@@ -106,7 +106,7 @@ function ContactForm(props: Props & { onClose: () => void }) {
             placeholder="+57 300 123 4567"
             className={inputClass}
           />
-          <span className="block text-[11px] text-ink-faint">Sin indicativo se asume Colombia (+57).</span>
+          <span className="block text-[13px] text-ink-faint">Sin indicativo se asume Colombia (+57).</span>
         </label>
       )}
 

@@ -142,7 +142,7 @@ function BroadcastDialogContent({
             </option>
           ))}
         </select>
-        <p className="text-[11px] text-ink-faint">
+        <p className="text-[13px] text-ink-faint">
           {recipientCount} {recipientCount === 1 ? "destinatario" : "destinatarios"}
           {mode === "template" &&
             recipientCount > 0 &&
@@ -172,7 +172,7 @@ function BroadcastDialogContent({
             Plantilla aprobada
           </button>
         </div>
-        <p className="text-[11px] text-ink-faint">
+        <p className="text-[13px] text-ink-faint">
           {mode === "free"
             ? "Solo les llega a quienes te escribieron en las últimas 24 horas."
             : "Le llega a todos, incluso contactos fríos — pero el texto es fijo, no se puede editar aquí."}
@@ -204,7 +204,7 @@ function BroadcastDialogContent({
               accept="image/*,application/pdf"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-ink outline-none file:mr-2 file:rounded file:border-0 file:bg-accent file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent-ink"
             />
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-[13px] text-ink-faint">
               Se manda como foto/documento con el mensaje de arriba como pie de foto. Fotos hasta 5 MB, PDFs hasta 20 MB.
             </p>
           </div>
@@ -219,7 +219,7 @@ function BroadcastDialogContent({
               placeholder="https://tu-sitio.com/promo"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
             />
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-[13px] text-ink-faint">
               Si lo pones, se agrega al final del mensaje como un link propio — así sabrás cuántos y quiénes le dieron
               clic (lo ves en la pestaña Difusiones).
             </p>

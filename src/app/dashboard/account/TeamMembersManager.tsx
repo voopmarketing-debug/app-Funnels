@@ -107,7 +107,7 @@ export function TeamMembersManager({ businesses }: { businesses: TeamBusiness[] 
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-ink">{member.name ?? member.email}</p>
-                <p className="fl-mono truncate text-[11px] text-ink-faint">{member.email}</p>
+                <p className="fl-mono truncate text-[13px] text-ink-faint">{member.email}</p>
               </div>
               <button
                 type="button"

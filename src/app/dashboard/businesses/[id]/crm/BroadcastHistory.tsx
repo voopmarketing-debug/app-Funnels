@@ -27,7 +27,7 @@ function formatDate(date: Date): string {
 function Metric({ label, value, tone }: { label: string; value: number | string; tone?: "good" | "bad" }) {
   return (
     <div className="rounded-md border border-border bg-background px-3 py-2">
-      <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">{label}</p>
+      <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">{label}</p>
       <p className={`text-lg font-bold ${tone === "bad" ? "text-error" : tone === "good" ? "text-accent" : "text-ink"}`}>
         {value}
       </p>
@@ -55,7 +55,7 @@ export function BroadcastHistory({ broadcasts }: { broadcasts: BroadcastRow[] })
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-ink">{b.message}</p>
-              <p className="fl-mono mt-0.5 text-[11px] text-ink-faint">
+              <p className="fl-mono mt-0.5 text-[13px] text-ink-faint">
                 {formatDate(b.createdAt)} · {b.stageName ?? "Todo el pipeline"}
               </p>
             </div>
@@ -75,7 +75,7 @@ export function BroadcastHistory({ broadcasts }: { broadcasts: BroadcastRow[] })
           </div>
 
           {b.failedAfterSend > 0 && (
-            <p className="text-[11px] text-error">
+            <p className="text-[13px] text-error">
               {b.failedAfterSend} {b.failedAfterSend === 1 ? "mensaje falló" : "mensajes fallaron"} después de
               aceptarse (número inválido, WhatsApp desinstalado, etc.) — no cuenta como &quot;no enviado&quot;
               porque Meta sí lo intentó entregar.

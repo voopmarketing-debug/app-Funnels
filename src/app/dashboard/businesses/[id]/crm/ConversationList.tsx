@@ -122,7 +122,7 @@ export function ConversationList({
               >
                 {f.label}
                 {f.id !== "all" && counts[f.id] > 0 && (
-                  <span className={`fl-mono text-[10px] ${active ? "opacity-80" : "text-ink-faint"}`}>{counts[f.id]}</span>
+                  <span className={`fl-mono text-[12px] ${active ? "opacity-80" : "text-ink-faint"}`}>{counts[f.id]}</span>
                 )}
               </button>
             );
@@ -160,7 +160,7 @@ export function ConversationList({
                   <p className={`min-w-0 flex-1 truncate text-sm ${isUnread ? "font-bold text-ink" : "font-semibold text-ink"}`}>
                     {contactLabel(c.customerName, c.customerPhone)}
                   </p>
-                  <span className={`flex-none text-[11px] ${isUnread ? "font-semibold text-accent" : "text-ink-faint"}`}>
+                  <span className={`flex-none text-[13px] ${isUnread ? "font-semibold text-accent" : "text-ink-faint"}`}>
                     {formatTime(c.lastMessageAt)}
                   </span>
                 </div>
@@ -169,13 +169,13 @@ export function ConversationList({
                     {preview || "Sin mensajes"}
                   </p>
                   {isUnread && (
-                    <span className="fl-mono flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink">
+                    <span className="fl-mono flex h-[18px] min-w-[18px] flex-none items-center justify-center rounded-full bg-accent px-1 text-[12px] font-bold text-accent-ink">
                       {c.unreadCount > 9 ? "9+" : c.unreadCount}
                     </span>
                   )}
                 </div>
                 {stage && (
-                  <p className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-ink-faint">
+                  <p className="mt-1 flex items-center gap-1.5 text-[12px] uppercase tracking-wide text-ink-faint">
                     {style && <span className={`h-1.5 w-1.5 flex-none rounded-full ${style.dot}`} />}
                     <span className="truncate">{stage.name}</span>
                   </p>

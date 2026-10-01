@@ -42,6 +42,16 @@ export default async function ConversationPage({
   // embudo in the dropdown (see StageSelector) since two different embudos
   // can have same-named stages (e.g. both have "Nuevo").
   const stages = stagesRaw.map((s) => ({ id: s.id, name: s.name, pipelineName: s.pipeline.name }));
+  const current = stagesRaw.find((s) => s.id === conversation.stageId);
+  const sameFunnel = current ? stagesRaw.filter((s) => s.pipelineId === current.pipelineId) : [];
+  const stageProgress = current
+    ? {
+        name: current.name,
+        index: sameFunnel.findIndex((s) => s.id === current.id),
+        total: sameFunnel.length,
+        pipelineName: current.pipeline.name,
+      }
+    : null;
 
   return (
     <div className="fl-card mx-auto flex h-[calc(100vh-8rem)] max-w-5xl overflow-hidden">
@@ -71,6 +81,7 @@ export default async function ConversationPage({
         notes={conversation.notes}
         appointmentAt={conversation.appointmentAt}
         appointmentNote={conversation.appointmentNote}
+        stage={stageProgress}
       />
     </div>
   );

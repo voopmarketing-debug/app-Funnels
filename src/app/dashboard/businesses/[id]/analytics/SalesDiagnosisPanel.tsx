@@ -36,7 +36,7 @@ function ScoreMeter({ score }: { score: number }) {
       <div className="h-2 w-24 overflow-hidden rounded-full" style={{ backgroundColor: track }}>
         <div className="h-full rounded-full" style={{ width: `${(score / 10) * 100}%`, backgroundColor: fill }} />
       </div>
-      <span className="fl-mono text-[11px] font-semibold" style={{ color: fill }}>
+      <span className="fl-mono text-[13px] font-semibold" style={{ color: fill }}>
         {score} / 10
       </span>
     </div>
@@ -151,7 +151,7 @@ export function SalesDiagnosisPanel({
               {isPending ? "Analizando..." : current ? "Actualizar diagnóstico" : "Generar diagnóstico"}
             </button>
           </div>
-          {isPending && <p className="text-[11px] text-ink-faint">Puede tardar hasta 30 segundos — está leyendo tus conversaciones a fondo.</p>}
+          {isPending && <p className="text-[13px] text-ink-faint">Puede tardar hasta 30 segundos — está leyendo tus conversaciones a fondo.</p>}
         </div>
       </div>
 
@@ -172,7 +172,7 @@ export function SalesDiagnosisPanel({
           >
             <ScoreMeter score={current.diagnosis.puntuacion} />
             <div className="min-w-0 flex-1 basis-40">
-              <p className="fl-mono text-[11px] tracking-wide text-ink-faint">
+              <p className="fl-mono text-[13px] tracking-wide text-ink-faint">
                 Generado el {formatDate(current.generatedAt)}
               </p>
               <p className="truncate text-sm text-ink-muted">{current.diagnosis.resumen}</p>
@@ -221,7 +221,7 @@ export function SalesDiagnosisPanel({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide" style={{ color: "var(--accent-hover)" }}>
+                <h3 className="mb-2 fl-mono text-[13px] uppercase tracking-wide" style={{ color: "var(--accent-hover)" }}>
                   Fortalezas
                 </h3>
                 <ul className="space-y-2">
@@ -237,7 +237,7 @@ export function SalesDiagnosisPanel({
               </div>
 
               <div>
-                <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide text-error">Debilidades</h3>
+                <h3 className="mb-2 fl-mono text-[13px] uppercase tracking-wide text-error">Debilidades</h3>
                 <ul className="space-y-2">
                   {current.diagnosis.debilidades.map((item, i) => (
                     <li key={i} className="flex gap-2 text-sm text-ink-muted">
@@ -250,13 +250,13 @@ export function SalesDiagnosisPanel({
             </div>
 
             <div>
-              <h3 className="mb-2 fl-mono text-[11px] uppercase tracking-wide text-ink-muted">
+              <h3 className="mb-2 fl-mono text-[13px] uppercase tracking-wide text-ink-muted">
                 Recomendaciones para vender más
               </h3>
               <ol className="space-y-2">
                 {current.diagnosis.recomendaciones.map((item, i) => (
                   <li key={i} className="flex gap-2.5 text-sm text-ink-muted">
-                    <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">
+                    <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[13px] font-bold text-accent-ink">
                       {i + 1}
                     </span>
                     <span>{item}</span>

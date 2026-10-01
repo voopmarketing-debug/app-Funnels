@@ -232,7 +232,7 @@ async function BusinessOverview({ businessId, role, now }: { businessId: string;
             <span className={`h-2.5 w-2.5 rounded-full ${agentOn && healthy ? "bg-accent" : "animate-pulse bg-error"}`} />
             {!connected ? "Sin conectar" : !agentOn ? "Apagado" : healthy ? "Activo" : "Revisar"}
           </span>
-          <span className="text-[11px] text-ink-faint">
+          <span className="text-[13px] text-ink-faint">
             {!connected ? "Conecta tu WhatsApp" : !agentOn ? "La IA no está respondiendo" : healthy ? "Respondiendo 24/7" : "Hay un problema de conexión"}
           </span>
         </Link>
@@ -256,7 +256,7 @@ async function BusinessOverview({ businessId, role, now }: { businessId: string;
                 className={`flex items-start gap-3 rounded-lg border p-3 ${s.done ? "border-border bg-surface-2/50" : "border-border-strong"}`}
               >
                 <span
-                  className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-bold ${
+                  className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full text-[13px] font-bold ${
                     s.done ? "bg-accent text-accent-ink" : "border-2 border-border-strong text-transparent"
                   }`}
                   aria-hidden="true"
@@ -343,7 +343,7 @@ async function PlanCard({
     <section className="fl-card-hero space-y-4 p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ink">Plan {PLAN_LABELS[planTier]}</h2>
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${active ? "bg-accent/15 text-accent" : "bg-error/15 text-error"}`}>
+        <span className={`rounded-full px-2 py-0.5 text-[13px] font-semibold ${active ? "bg-accent/15 text-accent" : "bg-error/15 text-error"}`}>
           {active ? "Activo" : "Vencido"}
         </span>
       </div>
@@ -417,7 +417,7 @@ function SummaryTile({
     <Link href={href} className="fl-card fl-card-interactive flex flex-col justify-between gap-2 p-4">
       <span className="text-xs font-medium text-ink-muted">{label}</span>
       <span className={`text-2xl font-bold ${tone === "warn" ? "text-[#fab219]" : "text-ink"}`}>{value.toLocaleString("es-CO")}</span>
-      <span className="text-[11px] text-ink-faint">{hint}</span>
+      <span className="text-[13px] text-ink-faint">{hint}</span>
     </Link>
   );
 }

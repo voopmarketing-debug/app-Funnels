@@ -18,8 +18,8 @@
   --border-strong: #3d3d3d;
 
   --ink: #f5f5f0;
-  --ink-muted: #8a8a86;
-  --ink-faint: #5a5a56;
+  --ink-muted: #a8a8a2;
+  --ink-faint: #7d7d77;
 
   --accent: #b5ff2b;
   --accent-hover: #8fd400;
@@ -48,8 +48,8 @@
   --border-strong: #cbcbc2;
 
   --ink: #16160f;
-  --ink-muted: #63635a;
-  --ink-faint: #919186;
+  --ink-muted: #4f4f47;
+  --ink-faint: #74746a;
 
   --accent: #5c8a00;
   --accent-hover: #4a7000;
@@ -82,6 +82,17 @@
 
   --font-sans: var(--font-montserrat);
   --font-mono: var(--font-jetbrains-mono);
+}
+
+/* Readability (Kommo-like): the two smallest steps of the type scale are a
+ * notch bigger than Tailwind's defaults — xs ≈ 13.6px and sm ≈ 15.3px at
+ * the 17px root below — since that's where most labels, hints and table
+ * text live. */
+@theme {
+  --text-xs: 0.8rem;
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.9rem;
+  --text-sm--line-height: 1.5;
 }
 
 html {

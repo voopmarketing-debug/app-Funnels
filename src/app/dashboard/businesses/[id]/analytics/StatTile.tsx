@@ -67,7 +67,7 @@ export function StatTile({
         {sublabel && (
           <span
             title={sublabel}
-            className="fl-mono min-w-0 truncate rounded-full px-2 py-0.5 text-[10px] font-semibold"
+            className="fl-mono min-w-0 truncate rounded-full px-2 py-0.5 text-[12px] font-semibold"
             style={{ backgroundColor: `rgba(var(${toneStyle.glowVar}), 0.14)`, color: glow }}
           >
             {sublabel}

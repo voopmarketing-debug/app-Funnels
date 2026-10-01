@@ -66,7 +66,7 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-ink">{item.label}</p>
-                <p className="fl-mono truncate text-[11px] text-ink-faint">
+                <p className="fl-mono truncate text-[13px] text-ink-faint">
                   {item.filename ?? (item.mediaType === "document" ? "documento" : "foto")} · {formatSize(item.sizeBytes)}
                 </p>
               </div>
@@ -117,7 +117,7 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
               {isSubmitting ? "Subiendo..." : "+ Agregar"}
             </button>
           </div>
-          <p className="text-[11px] text-ink-faint">
+          <p className="text-[13px] text-ink-faint">
             Fotos hasta 5 MB, PDFs hasta 20 MB — máximo {MAX_AGENT_MEDIA_PER_BUSINESS} archivos, deja solo tus
             productos más top.
           </p>

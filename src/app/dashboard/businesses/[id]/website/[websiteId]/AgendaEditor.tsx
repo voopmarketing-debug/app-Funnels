@@ -210,7 +210,7 @@ export function AgendaEditor({
 
               <div className="grid grid-cols-7 gap-1">
                 {MONTH_DAY_LABELS.map((d) => (
-                  <div key={d} className="fl-mono py-1 text-center text-[10px] uppercase tracking-wide text-ink-faint">
+                  <div key={d} className="fl-mono py-1 text-center text-[12px] uppercase tracking-wide text-ink-faint">
                     {d}
                   </div>
                 ))}
@@ -277,7 +277,7 @@ export function AgendaEditor({
                             </p>
                             <p className="truncate text-sm font-medium text-ink">{a.name}</p>
                             <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
-                            {a.professional && <p className="truncate text-[11px] text-ink-faint">{a.professional.name}</p>}
+                            {a.professional && <p className="truncate text-[13px] text-ink-faint">{a.professional.name}</p>}
                           </div>
                           {wa && (
                             <a
@@ -302,7 +302,7 @@ export function AgendaEditor({
 
         <Section title="Notificaciones y zona horaria" defaultOpen>
           <div className="space-y-1">
-            <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">
+            <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">
               Correo para avisos de nuevas citas
             </label>
             <input
@@ -312,14 +312,14 @@ export function AgendaEditor({
               placeholder="tu@negocio.com"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
             />
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-[13px] text-ink-faint">
               Cada vez que alguien agenda aquí, te llega un correo a esta dirección — y la persona que agendó recibe
               su propia confirmación si dejó su correo.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">Zona horaria</label>
+              <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Zona horaria</label>
               <select
                 value={config.timezone}
                 onChange={(e) => setConfig((c) => ({ ...c, timezone: e.target.value }))}
@@ -333,7 +333,7 @@ export function AgendaEditor({
               </select>
             </div>
             <div className="space-y-1">
-              <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">Duración de la cita</label>
+              <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Duración de la cita</label>
               <select
                 value={config.slotMinutes}
                 onChange={(e) => setConfig((c) => ({ ...c, slotMinutes: Number(e.target.value) }))}
@@ -348,7 +348,7 @@ export function AgendaEditor({
             </div>
           </div>
           <div className="space-y-1">
-            <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">Color principal</label>
+            <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Color principal</label>
             <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
               <input
                 type="color"
@@ -393,7 +393,7 @@ export function AgendaEditor({
         <div className="fl-card space-y-3 p-4">
           <h2 className="text-sm font-semibold text-ink">Citas</h2>
           <div className="rounded-md border border-border bg-background p-3">
-            <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Total agendadas</p>
+            <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Total agendadas</p>
             <p className="text-2xl font-bold text-ink">{totalAppointments}</p>
           </div>
         </div>
@@ -407,12 +407,12 @@ export function AgendaEditor({
                 return (
                   <div key={a.id} className="flex items-start justify-between gap-2 rounded-md border border-border bg-background p-3">
                     <div className="min-w-0">
-                      <p className="fl-mono text-[10px] font-bold" style={{ color: accent }}>
+                      <p className="fl-mono text-[12px] font-bold" style={{ color: accent }}>
                         <ClientDate date={a.startsAt} options={{ day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }} />
                       </p>
                       <p className="truncate text-sm font-medium text-ink">{a.name}</p>
                       <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
-                      {a.professional && <p className="truncate text-[11px] text-ink-faint">{a.professional.name}</p>}
+                      {a.professional && <p className="truncate text-[13px] text-ink-faint">{a.professional.name}</p>}
                     </div>
                     {wa && (
                       <a
@@ -458,7 +458,7 @@ export function AgendaEditor({
               {copied ? "✓" : "Copiar"}
             </button>
           </div>
-          <p className="text-[11px] text-ink-faint">
+          <p className="text-[13px] text-ink-faint">
             Pega este link como &quot;Link del botón&quot; en otra página para que el botón lleve directo a agendar.
           </p>
         </div>
@@ -607,7 +607,7 @@ function ProfessionalRow({
       />
       {pipelines.length > 1 && (
         <div className="space-y-1">
-          <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">Su embudo (CRM)</label>
+          <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Su embudo (CRM)</label>
           <select
             value={form.pipelineId ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, pipelineId: e.target.value || null }))}
@@ -620,7 +620,7 @@ function ProfessionalRow({
               </option>
             ))}
           </select>
-          <p className="text-[11px] text-ink-faint">
+          <p className="text-[13px] text-ink-faint">
             Cuando alguien agende con {form.name || "este profesional"}, el contacto cae directo en este embudo del
             CRM en vez del general.
           </p>

@@ -47,7 +47,7 @@ export function WebsitePagesList({
                 <EyeIcon />
               </span>
               <div>
-                <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Visitas totales</p>
+                <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Visitas totales</p>
                 <p className="text-xl font-bold text-ink">{stats.totalViews}</p>
               </div>
             </div>
@@ -56,7 +56,7 @@ export function WebsitePagesList({
                 <CursorIcon />
               </span>
               <div>
-                <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a WhatsApp</p>
+                <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Clics a WhatsApp</p>
                 <p className="text-xl font-bold text-accent">{stats.totalClicksWhatsapp}</p>
               </div>
             </div>
@@ -65,7 +65,7 @@ export function WebsitePagesList({
                 <CursorIcon />
               </span>
               <div>
-                <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a agenda/link</p>
+                <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Clics a agenda/link</p>
                 <p className="text-xl font-bold text-[rgb(var(--glow-secondary))]">{stats.totalClicksAgenda}</p>
               </div>
             </div>
@@ -74,7 +74,7 @@ export function WebsitePagesList({
                 <FormIcon />
               </span>
               <div>
-                <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Registros</p>
+                <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Registros</p>
                 <p className="text-xl font-bold text-ink">{stats.totalLeads}</p>
               </div>
             </div>
@@ -271,7 +271,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
                 className="group/name flex max-w-full items-center gap-1.5 text-left"
               >
                 {page.pageType === "agenda" && (
-                  <span className="fl-mono flex-none rounded-full bg-[rgba(var(--glow-secondary),0.15)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--glow-secondary))]">
+                  <span className="fl-mono flex-none rounded-full bg-[rgba(var(--glow-secondary),0.15)] px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--glow-secondary))]">
                     Agenda
                   </span>
                 )}
@@ -309,7 +309,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
           {publicUrl}
         </a>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-[11px]">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-[13px]">
           <span className="fl-mono flex items-center gap-1 text-ink-muted">
             <EyeIcon /> {page.viewCount}
           </span>

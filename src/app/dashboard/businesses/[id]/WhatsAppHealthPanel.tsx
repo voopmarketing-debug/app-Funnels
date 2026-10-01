@@ -139,7 +139,7 @@ export function WhatsAppHealthPanel({
       {reconnected && <p className="text-xs text-accent">✓ Reconectado. Pídele a alguien que escriba de nuevo para confirmar.</p>}
       {error && <p className="text-xs font-medium text-error">{error}</p>}
 
-      <p className="text-[11px] text-ink-faint">
+      <p className="text-[13px] text-ink-faint">
         Se revisa sola todos los días. Si algo falla, te avisamos en la campana y por correo.
       </p>
     </section>

@@ -99,10 +99,10 @@ function TemplateCard({ businessId, template }: { businessId: string; template: 
     <div className="fl-card space-y-2 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="fl-mono text-sm font-semibold text-ink">{template.name}</p>
-        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[template.status]}`}>
+        <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-semibold ${STATUS_STYLE[template.status]}`}>
           {STATUS_LABEL[template.status]}
         </span>
-        <span className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">
+        <span className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">
           {template.category} · {template.language}
         </span>
         {template.status === "PENDING" && (
@@ -168,7 +168,7 @@ function TemplateMessagePreview({
             <p className="whitespace-pre-wrap break-words text-[13px] leading-snug text-white">
               {bodyText.trim() || "Escribe el mensaje para verlo aquí..."}
             </p>
-            <p className="mt-1 text-right text-[10px] text-white/60">10:42 a. m. ✓✓</p>
+            <p className="mt-1 text-right text-[12px] text-white/60">10:42 a. m. ✓✓</p>
           </div>
           {buttons.length > 0 && (
             <div className="border-t border-white/15">
@@ -274,7 +274,7 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
               placeholder="promo_octubre"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
             />
-            <p className="text-[11px] text-ink-faint">Solo minúsculas y guiones bajos — Meta lo exige así.</p>
+            <p className="text-[13px] text-ink-faint">Solo minúsculas y guiones bajos — Meta lo exige así.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -331,7 +331,7 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
             <label htmlFor="headerImage" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
               Imagen de encabezado (opcional)
             </label>
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-[13px] text-ink-faint">
               Aparece arriba del mensaje, igual que en Kommo — no es obligatoria.
             </p>
             <input
@@ -371,7 +371,7 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
                 />
               </div>
             ))}
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-[13px] text-ink-faint">
               Cada botón abre ese enlace cuando el cliente lo toca en WhatsApp. Llena texto y enlace juntos, o deja
               ambos vacíos para no usar ese botón.
             </p>

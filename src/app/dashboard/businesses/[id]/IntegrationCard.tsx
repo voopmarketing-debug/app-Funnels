@@ -93,7 +93,7 @@ export function IntegrationCard({
         <div className="flex items-center gap-2">
           <h3 className="truncate text-sm font-semibold text-ink">{title}</h3>
           {required && !done && (
-            <span className="flex-none rounded-full bg-accent/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-accent">
+            <span className="flex-none rounded-full bg-accent/15 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent">
               Obligatorio
             </span>
           )}

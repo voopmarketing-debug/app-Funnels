@@ -138,7 +138,7 @@ export function ConversationThread({
     <div className="flex h-full min-h-0 flex-col">
       {/* Two rows on a phone (who → actions) so the name, phone and buttons
           never overlap; a single row from md up, same as before. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface px-3 py-2.5 md:flex-nowrap md:px-4 md:py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface px-3 py-2.5 md:px-4 md:py-3">
         {mobileBackHref && (
           <Link
             href={mobileBackHref}
@@ -149,7 +149,7 @@ export function ConversationThread({
           </Link>
         )}
         <Avatar initial={customerInitial} variant="customer" />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[9rem] flex-1">
           <h2 className="truncate text-base font-bold md:text-lg">{label}</h2>
           {label !== phoneLabel && <p className="fl-mono truncate text-xs tracking-wide text-ink-muted">{phoneLabel}</p>}
         </div>
@@ -184,7 +184,7 @@ export function ConversationThread({
           const showDay = !prev || bogotaDayKey(prev.createdAt) !== bogotaDayKey(message.createdAt);
           const daySeparator = showDay && (
             <div className="flex justify-center py-1">
-              <span className="rounded-full border border-border bg-surface px-3 py-0.5 text-[11px] font-medium capitalize text-ink-muted shadow-sm">
+              <span className="rounded-full border border-border bg-surface px-3 py-0.5 text-[13px] font-medium capitalize text-ink-muted shadow-sm">
                 {dayLabel(message.createdAt, todayKey, yesterdayKey)}
               </span>
             </div>
@@ -207,7 +207,7 @@ export function ConversationThread({
                   {reason && <p className="mt-0.5 text-ink-muted">{reason}</p>}
                   <details className="mt-1 text-left">
                     <summary className="cursor-pointer text-center text-ink-faint hover:text-ink-muted">Ver detalle técnico</summary>
-                    <p className="fl-mono mt-1 break-all text-[10px] text-ink-muted">{message.content}</p>
+                    <p className="fl-mono mt-1 break-all text-[12px] text-ink-muted">{message.content}</p>
                   </details>
                   {index === messages.length - 1 && <RetryReplyButton businessId={businessId} conversationId={conversationId} />}
                 </div>
@@ -263,12 +263,12 @@ export function ConversationThread({
                   {(!hasMedia || !isPlaceholderCaption) && message.content && (
                     <p className="whitespace-pre-wrap break-words text-ink">{message.content}</p>
                   )}
-                  <p className="-mb-0.5 mt-0.5 flex items-center justify-end gap-1 text-[10px] text-ink-faint">
+                  <p className="-mb-0.5 mt-0.5 flex items-center justify-end gap-1 text-[12px] text-ink-faint">
                     {formatMessageTime(message.createdAt)}
                     {isOutbound && <DeliveryTicks status={message.deliveryStatus} />}
                   </p>
                   {failed && (
-                    <p className="mt-1 border-t border-error/30 pt-1 text-[11px] font-medium text-error">
+                    <p className="mt-1 border-t border-error/30 pt-1 text-[13px] font-medium text-error">
                       No entregado{message.deliveryError ? `: ${message.deliveryError}` : ""}
                     </p>
                   )}
@@ -347,7 +347,7 @@ function Avatar({ initial, variant }: { initial: string; variant: Sender }) {
   }[variant];
 
   return (
-    <div className={`fl-mono flex h-8 w-8 flex-none items-center justify-center rounded-full text-[11px] font-bold ${styles}`}>
+    <div className={`fl-mono flex h-8 w-8 flex-none items-center justify-center rounded-full text-[13px] font-bold ${styles}`}>
       {initial.slice(0, 2)}
     </div>
   );

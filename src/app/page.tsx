@@ -194,7 +194,7 @@ export default async function Home() {
                   {plan.name}
                 </p>
                 {plan.badge && (
-                  <span className="fl-mono rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-ink">
+                  <span className="fl-mono rounded-full bg-accent px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-accent-ink">
                     {plan.badge}
                   </span>
                 )}

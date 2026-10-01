@@ -54,7 +54,7 @@ export function NotificationBell({ notifications, unreadCount }: { notifications
       >
         <BellIcon />
         {unreadCount > 0 && (
-          <span className="fl-mono absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink">
+          <span className="fl-mono absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[12px] font-bold text-accent-ink">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -85,7 +85,7 @@ export function NotificationBell({ notifications, unreadCount }: { notifications
                   {!n.read && <span className="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-accent" />}
                   <span className="min-w-0 flex-1">
                     <span className="block">{n.message}</span>
-                    <span className="fl-mono mt-0.5 block text-[10px] text-ink-faint">
+                    <span className="fl-mono mt-0.5 block text-[12px] text-ink-faint">
                       {n.businessName} · {n.createdAt}
                     </span>
                   </span>

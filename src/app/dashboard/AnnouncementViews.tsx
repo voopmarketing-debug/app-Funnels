@@ -78,7 +78,7 @@ export function AnnouncementBanner({ announcement, preview = false }: { announce
       <div className="relative grid items-center gap-6 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
         <div className="space-y-3">
           {announcement.badge && (
-            <span className="inline-block rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent">
+            <span className="inline-block rounded-full bg-accent/15 px-2.5 py-1 text-[13px] font-semibold uppercase tracking-wide text-accent">
               {announcement.badge}
             </span>
           )}
@@ -121,7 +121,7 @@ export function NewsCard({ item }: { item: AnnouncementView }) {
       )}
       <div className="flex flex-1 flex-col gap-2 p-4">
         {item.badge && (
-          <span className="self-start rounded-full bg-accent-secondary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-secondary">
+          <span className="self-start rounded-full bg-accent-secondary/15 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-accent-secondary">
             {item.badge}
           </span>
         )}

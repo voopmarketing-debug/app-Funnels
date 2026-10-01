@@ -97,7 +97,7 @@ export default async function DashboardPage() {
                   <p className="font-medium">{business.name}</p>
                   {badge && (
                     <span
-                      className="fl-mono flex-none rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                      className="fl-mono flex-none rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide"
                       style={{ backgroundColor: badge.bg, color: badge.text }}
                     >
                       {badge.label}

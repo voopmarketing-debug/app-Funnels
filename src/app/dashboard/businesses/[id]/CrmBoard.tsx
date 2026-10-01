@@ -102,7 +102,7 @@ export function CrmBoard({
                         {c.customerName ?? c.customerPhone}
                       </span>
                       {c.unreadCount > 0 && (
-                        <span className="fl-mono flex h-4 min-w-4 flex-none items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink">
+                        <span className="fl-mono flex h-4 min-w-4 flex-none items-center justify-center rounded-full bg-accent px-1 text-[12px] font-bold text-accent-ink">
                           {c.unreadCount > 9 ? "9+" : c.unreadCount}
                         </span>
                       )}
@@ -113,7 +113,7 @@ export function CrmBoard({
                     value={c.stageId}
                     disabled={isPending}
                     onChange={(e) => moveToStage(c.id, e.target.value)}
-                    className="fl-mono mt-2 w-full rounded border border-border bg-surface px-1.5 py-1 text-[10px] uppercase tracking-wide text-ink-muted outline-none focus:border-accent"
+                    className="fl-mono mt-2 w-full rounded border border-border bg-surface px-1.5 py-1 text-[12px] uppercase tracking-wide text-ink-muted outline-none focus:border-accent"
                   >
                     {stages.map((opt) => (
                       <option key={opt.id} value={opt.id}>

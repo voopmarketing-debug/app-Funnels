@@ -226,7 +226,7 @@ export function WebsiteEditor({
           />
           {otherPages.length > 0 && (
             <div className="space-y-1">
-              <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">
+              <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">
                 O llévalo a otra de tus páginas
               </label>
               <select
@@ -265,7 +265,7 @@ export function WebsiteEditor({
             {content.offer.items.map((item, i) => (
               <div key={i} className="space-y-2 rounded-md border border-border p-3">
                 <div className="flex items-center justify-between">
-                  <span className="fl-mono text-[10px] uppercase text-ink-faint">Servicio {i + 1}</span>
+                  <span className="fl-mono text-[12px] uppercase text-ink-faint">Servicio {i + 1}</span>
                   {content.offer.items.length > 3 && (
                     <button
                       type="button"
@@ -328,7 +328,7 @@ export function WebsiteEditor({
             {content.howItWorks.items.map((item, i) => (
               <div key={i} className="space-y-2 rounded-md border border-border p-3">
                 <div className="flex items-center justify-between">
-                  <span className="fl-mono text-[10px] uppercase text-ink-faint">Paso {i + 1}</span>
+                  <span className="fl-mono text-[12px] uppercase text-ink-faint">Paso {i + 1}</span>
                   {content.howItWorks.items.length > 3 && (
                     <button
                       type="button"
@@ -403,7 +403,7 @@ export function WebsiteEditor({
             {content.whyUs.items.map((item, i) => (
               <div key={i} className="space-y-2 rounded-md border border-border p-3">
                 <div className="flex items-center justify-between">
-                  <span className="fl-mono text-[10px] uppercase text-ink-faint">Razón {i + 1}</span>
+                  <span className="fl-mono text-[12px] uppercase text-ink-faint">Razón {i + 1}</span>
                   {content.whyUs.items.length > 3 && (
                     <button
                       type="button"
@@ -471,7 +471,7 @@ export function WebsiteEditor({
             {content.objections.items.map((item, i) => (
               <div key={i} className="space-y-2 rounded-md border border-border p-3">
                 <div className="flex items-center justify-between">
-                  <span className="fl-mono text-[10px] uppercase text-ink-faint">Objeción {i + 1}</span>
+                  <span className="fl-mono text-[12px] uppercase text-ink-faint">Objeción {i + 1}</span>
                   {content.objections.items.length > 2 && (
                     <button
                       type="button"
@@ -565,28 +565,28 @@ export function WebsiteEditor({
         <div className="fl-card space-y-3 p-4">
           <h2 className="text-sm font-semibold text-ink">Métricas del sitio</h2>
           <div className="rounded-md border border-border bg-background p-3">
-            <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Visitas</p>
+            <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Visitas</p>
             <p className="text-2xl font-bold text-ink">{stats.totalViews}</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-md border border-border bg-background p-3">
-              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a WhatsApp</p>
+              <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Clics a WhatsApp</p>
               <p className="text-2xl font-bold text-accent">{stats.clicksWhatsapp}</p>
             </div>
             <div className="rounded-md border border-border bg-background p-3">
-              <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Clics a agenda/link</p>
+              <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Clics a agenda/link</p>
               <p className="text-2xl font-bold text-[rgb(var(--glow-secondary))]">{stats.clicksAgenda}</p>
             </div>
           </div>
-          <p className="text-[11px] text-ink-faint">
+          <p className="text-[13px] text-ink-faint">
             Van por separado a propósito: "WhatsApp" es cuando el botón usa el número del negocio; "Agenda/link" es
             cuando esta página tiene un link externo configurado (ver campo "Link del botón" arriba).
           </p>
           <div className="rounded-md border border-border bg-background p-3">
-            <p className="fl-mono text-[10px] uppercase tracking-wide text-ink-faint">Registros (datos dejados)</p>
+            <p className="fl-mono text-[12px] uppercase tracking-wide text-ink-faint">Registros (datos dejados)</p>
             <p className="text-2xl font-bold text-ink">{leads.length}</p>
           </div>
-          <p className="text-[11px] text-ink-faint">
+          <p className="text-[13px] text-ink-faint">
             Personas que llenaron el formulario "Déjanos tus datos" de esta página. No incluye lo que agenden en un
             link externo de agenda — eso vive fuera de esta app y solo vemos el clic, no el registro.
           </p>
@@ -612,7 +612,7 @@ export function WebsiteEditor({
                 <div key={lead.id} className="rounded-md border border-border bg-background p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm font-medium text-ink">{lead.name}</p>
-                    <p className="fl-mono flex-none text-[10px] text-ink-faint">
+                    <p className="fl-mono flex-none text-[12px] text-ink-faint">
                       <ClientDate date={lead.createdAt} options={{ day: "numeric", month: "short" }} />
                     </p>
                   </div>
@@ -722,7 +722,7 @@ function TextField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">{label}</label>
+      <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">{label}</label>
       <input
         value={value}
         placeholder={placeholder}
@@ -736,7 +736,7 @@ function TextField({
 function TextAreaField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div className="space-y-1">
-      <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">{label}</label>
+      <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">{label}</label>
       <textarea
         value={value}
         rows={3}
@@ -750,7 +750,7 @@ function TextAreaField({ label, value, onChange }: { label: string; value: strin
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div className="space-y-1">
-      <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">{label}</label>
+      <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">{label}</label>
       <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
         <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="h-6 w-8 flex-none cursor-pointer bg-transparent" />
         <input
@@ -779,7 +779,7 @@ function SelectField({
 }) {
   return (
     <div className="space-y-1">
-      <label className="fl-mono text-[10px] tracking-wide text-ink-muted uppercase">{label}</label>
+      <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}

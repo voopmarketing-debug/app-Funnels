@@ -240,7 +240,7 @@ export function EmojiPicker({
           <div ref={scrollRef} className="relative h-64 overflow-y-auto overscroll-contain px-1.5 pb-2">
             {sections.map((s) => (
               <section key={s.id} data-emoji-section={s.id}>
-                <h4 className="sticky top-0 bg-surface px-1 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                <h4 className="sticky top-0 bg-surface px-1 pb-1 pt-2 text-[12px] font-semibold uppercase tracking-wide text-ink-faint">
                   {s.label}
                 </h4>
                 <div className="grid grid-cols-8 gap-0.5">

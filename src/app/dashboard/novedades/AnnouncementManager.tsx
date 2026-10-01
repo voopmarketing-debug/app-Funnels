@@ -133,7 +133,7 @@ function AnnouncementList({
 
   return (
     <section className="space-y-2">
-      <h2 className="fl-mono text-[11px] font-semibold uppercase tracking-wide text-ink-faint">{title}</h2>
+      <h2 className="fl-mono text-[13px] font-semibold uppercase tracking-wide text-ink-faint">{title}</h2>
       {items.length === 0 ? (
         <p className="fl-card p-4 text-sm text-ink-muted">{empty}</p>
       ) : (
@@ -152,7 +152,7 @@ function AnnouncementList({
                   <p className="truncate text-sm font-semibold text-ink">{a.title}</p>
                   <p className="truncate text-xs text-ink-muted">{a.body}</p>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.className}`}>{status.label}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[13px] font-semibold ${status.className}`}>{status.label}</span>
                 <div className="flex flex-none items-center gap-1">
                   <IconButton label="Subir" disabled={i === 0} onClick={() => run(() => moveAnnouncement(a.id, "up"))}>
                     ↑
@@ -333,7 +333,7 @@ function AnnouncementEditor({ draft, onDone }: { draft: Draft; onDone: () => voi
             <input type="datetime-local" name="endsAt" defaultValue={toLocalInput(draft.endsAt)} className={input} />
           </label>
         </div>
-        <p className="text-[11px] text-ink-faint">Déjalas vacías para mostrarlo desde ya y sin fecha de fin.</p>
+        <p className="text-[13px] text-ink-faint">Déjalas vacías para mostrarlo desde ya y sin fecha de fin.</p>
 
         <label className="flex items-center gap-2 text-sm text-ink">
           <input type="checkbox" name="published" defaultChecked={draft.published} className="h-4 w-4 accent-[var(--accent)]" />
@@ -357,7 +357,7 @@ function AnnouncementEditor({ draft, onDone }: { draft: Draft; onDone: () => voi
       </form>
 
       <div className="space-y-2">
-        <p className="fl-mono text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Vista previa</p>
+        <p className="fl-mono text-[13px] font-semibold uppercase tracking-wide text-ink-faint">Vista previa</p>
         {draft.kind === "BANNER" ? (
           <AnnouncementBanner announcement={previewView} preview />
         ) : (

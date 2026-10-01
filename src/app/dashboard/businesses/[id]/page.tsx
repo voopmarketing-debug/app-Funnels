@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getBusinessAnalytics, getActiveContactsThisMonth } from "@/lib/analytics";
+import { getBusinessAnalytics, getActiveContactsThisMonth, isDateRangeKey, type DateRangeKey } from "@/lib/analytics";
+import { RangePills } from "./analytics/RangePills";
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
@@ -61,8 +62,25 @@ function awaitingReplyStatus(count: number): Status {
   return "critical";
 }
 
-export default async function BusinessPage({ params }: { params: Promise<{ id: string }> }) {
+const RANGE_PHRASE: Record<DateRangeKey, string> = {
+  today: "hoy",
+  yesterday: "ayer",
+  "7d": "en los últimos 7 días",
+  "15d": "en los últimos 15 días",
+  "30d": "en el último mes",
+};
+
+export default async function BusinessPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ range?: string }>;
+}) {
   const { id } = await params;
+  const { range } = await searchParams;
+  // "Rendimiento" opens on today's numbers; the pills switch the period.
+  const rangeKey: DateRangeKey = range && isDateRangeKey(range) ? range : "today";
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -80,7 +98,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   const canManageBusiness = membership.role !== "MEMBER";
 
   const [analytics, activeContacts, agentMedia, approvedTemplates, websiteCount, teamMembers] = await Promise.all([
-    getBusinessAnalytics(id),
+    getBusinessAnalytics(id, rangeKey),
     getActiveContactsThisMonth(id),
     canManageBusiness
       ? prisma.agentMedia.findMany({
@@ -103,6 +121,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   const whatsappBroken = whatsappConnected && business.whatsappHealthOk === false;
   const promptReady = (business.agent?.systemPrompt?.trim().length ?? 0) >= 120;
   const hasConversations = analytics.totalConversations > 0;
+  const period = RANGE_PHRASE[rangeKey];
   const setupSteps = [
     { id: "whatsapp", done: whatsappConnected, title: "Conecta tu WhatsApp", body: "Los datos que te da Meta para tu número." },
     { id: "instrucciones", done: promptReady, title: "Entrena a tu agente", body: "Qué vendes, precios y cómo debe responder." },
@@ -346,7 +365,10 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
       {!healthProblem && healthPanel}
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold">Rendimiento</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Rendimiento</h2>
+          <RangePills value={rangeKey} />
+        </div>
         {canManageBusiness && (
           <PlanUsageCard
             businessId={id}
@@ -359,9 +381,10 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
         )}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile
-            label="Contactos totales"
-            value={String(analytics.totalConversations)}
-            description="Cuántas personas distintas te han escrito por WhatsApp en total, desde siempre."
+            label="Contactos nuevos"
+            value={String(analytics.newConversations)}
+            sublabel={`${analytics.totalConversations.toLocaleString("es-CO")} en total`}
+            description={`Personas que te escribieron por primera vez ${period}.`}
             tone="accent"
             icon={<ChatIcon />}
           />
@@ -369,7 +392,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
             label="Tiempo de respuesta"
             value={formatMinutes(analytics.responseTime.avgMinutes)}
             status={responseTimeStatus(analytics.responseTime.avgMinutes)}
-            description="En promedio, cuánto tarda en llegar una respuesta después de que un cliente escribe. Entre menos, mejor experiencia para el cliente."
+            description={`En promedio ${period}, cuánto tardó en llegar una respuesta después de que un cliente escribió. Entre menos, mejor.`}
             tone="amber"
             icon={<ClockIcon />}
           />
@@ -378,14 +401,14 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
             value={formatPercent(analytics.automationRate)}
             sublabel="de respuestas sin humano"
             status={automationStatus(analytics.automationRate)}
-            description="De cada 100 respuestas enviadas, cuántas las contestó la IA sola, sin que nadie de tu equipo interviniera a mano."
+            description={`De cada 100 respuestas enviadas ${period}, cuántas las contestó la IA sola, sin que nadie de tu equipo interviniera.`}
             tone="secondary"
             icon={<BoltIcon />}
           />
           <StatTile
             label="Esperando respuesta"
             value={String(analytics.awaitingReply)}
-            sublabel="conversaciones sin contestar"
+            sublabel="ahora mismo"
             status={awaitingReplyStatus(analytics.awaitingReply)}
             description="Conversaciones donde el cliente escribió último y todavía nadie —ni la IA ni una persona— le ha contestado."
             tone="blue"

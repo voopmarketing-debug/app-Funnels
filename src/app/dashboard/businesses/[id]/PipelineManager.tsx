@@ -164,7 +164,7 @@ function PipelineSection({
           className="w-full flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-sm font-semibold text-ink outline-none focus:border-accent"
         />
         {pipeline.isDefault && (
-          <span className="fl-mono flex-none rounded-full bg-accent/15 px-2 py-0.5 text-[10px] text-accent">
+          <span className="fl-mono flex-none rounded-full bg-accent/15 px-2 py-0.5 text-[12px] text-accent">
             Principal
           </span>
         )}

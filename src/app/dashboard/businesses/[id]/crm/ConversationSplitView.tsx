@@ -54,6 +54,10 @@ export function ConversationSplitView({
   // exactly like before this change.
   const showListOnMobile = !selectedConversationId;
 
+  const stageIndex = selectedConversation ? stages.findIndex((s) => s.id === selectedConversation.stageId) : -1;
+  const stageProgress =
+    stageIndex >= 0 ? { name: stages[stageIndex].name, index: stageIndex, total: stages.length } : null;
+
   return (
     // Mobile: an open chat fills the screen under the top bar (the CRM page
     // hides its own header while a chat is open — see crm/page.tsx), and
@@ -117,6 +121,7 @@ export function ConversationSplitView({
             notes={selectedConversation.notes}
             appointmentAt={selectedConversation.appointmentAt}
             appointmentNote={selectedConversation.appointmentNote}
+            stage={stageProgress}
           />
         </div>
       )}

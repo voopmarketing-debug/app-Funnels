@@ -46,7 +46,7 @@ export function AgentForm({
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="min-w-0 space-y-1">
-          <label htmlFor="industry" className="fl-mono block truncate text-[10px] tracking-wide text-ink-muted uppercase">
+          <label htmlFor="industry" className="fl-mono block truncate text-[12px] tracking-wide text-ink-muted uppercase">
             Tipo de negocio
           </label>
           <select
@@ -64,7 +64,7 @@ export function AgentForm({
         </div>
 
         <div className="min-w-0 space-y-1">
-          <label htmlFor="tone" className="fl-mono block truncate text-[10px] tracking-wide text-ink-muted uppercase">
+          <label htmlFor="tone" className="fl-mono block truncate text-[12px] tracking-wide text-ink-muted uppercase">
             Tono del agente
           </label>
           <select
@@ -82,7 +82,7 @@ export function AgentForm({
         </div>
 
         <div className="min-w-0 space-y-1">
-          <label htmlFor="replyLength" className="fl-mono block truncate text-[10px] tracking-wide text-ink-muted uppercase">
+          <label htmlFor="replyLength" className="fl-mono block truncate text-[12px] tracking-wide text-ink-muted uppercase">
             Largo de respuestas
           </label>
           <select

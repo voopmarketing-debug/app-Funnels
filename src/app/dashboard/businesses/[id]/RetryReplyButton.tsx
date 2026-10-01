@@ -29,7 +29,7 @@ export function RetryReplyButton({ businessId, conversationId }: { businessId: s
       >
         {isPending ? "Respondiendo..." : "↻ Reintentar respuesta ahora"}
       </button>
-      {error && <p className="text-[11px] text-error">{error}</p>}
+      {error && <p className="text-[13px] text-error">{error}</p>}
     </div>
   );
 }

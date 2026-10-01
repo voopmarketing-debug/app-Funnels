@@ -49,10 +49,10 @@ function WindowCountdown({ expiresAt }: { expiresAt: string }) {
   return (
     <span
       title="Tiempo que queda para responder con mensajes libres. Después, WhatsApp solo permite plantillas aprobadas."
-      className={`whitespace-nowrap text-[11px] ${urgent ? "font-semibold text-error" : "text-ink-faint"}`}
+      className={`whitespace-nowrap text-[13px] ${urgent ? "font-semibold text-error" : "text-ink-faint"}`}
     >
-      <span className="hidden lg:inline">La ventana de respuesta cierra en </span>
-      <span className="lg:hidden">⏱ </span>
+      <span className="hidden 2xl:inline">La ventana de respuesta cierra en </span>
+      <span className="2xl:hidden">⏱ </span>
       {hours}h {String(minutes).padStart(2, "0")}m
     </span>
   );
@@ -310,7 +310,7 @@ export function ManualMessageForm({
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="border-t border-border bg-surface p-2 md:p-3">
       {!windowOpen && (
-        <p className="mb-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-[11px] text-accent">
+        <p className="mb-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-[13px] text-accent">
           Pasaron más de 24h desde el último mensaje del cliente — usa el botón{" "}
           <span className="font-semibold">📋 Plantilla</span> de arriba para reabrir la conversación.
         </p>
@@ -320,7 +320,7 @@ export function ManualMessageForm({
           quiet row underneath with the 24h window countdown and Enviar. */}
       <div className="rounded-xl border border-border bg-background transition focus-within:border-accent/60">
         {recipientLabel && !isRecording && (
-          <p className="hidden truncate px-3 pt-2 text-[11px] text-ink-faint md:block">
+          <p className="hidden truncate px-3 pt-2 text-[13px] text-ink-faint md:block">
             Responder a <span className="font-semibold text-ink-muted">{recipientLabel}</span> por WhatsApp
           </p>
         )}
@@ -401,7 +401,7 @@ export function ManualMessageForm({
               onChange={(e) => handleMicChange(e.target.value)}
               title="Micrófono para las notas de voz"
               aria-label="Micrófono para las notas de voz"
-              className="fl-mono ml-1 hidden max-w-[150px] truncate bg-transparent text-[10px] text-ink-faint outline-none hover:text-ink-muted md:block"
+              className="fl-mono ml-1 hidden max-w-[150px] truncate bg-transparent text-[12px] text-ink-faint outline-none hover:text-ink-muted md:block"
             >
               <option value="">🎙️ Micrófono por defecto</option>
               {micDevices.map((d) => (
@@ -411,7 +411,7 @@ export function ManualMessageForm({
               ))}
             </select>
           )}
-          <div className="ml-auto flex items-center gap-2 pl-2">
+          <div className="ml-auto flex min-w-0 items-center gap-2 pl-2">
             {windowOpen && windowExpiresAt && !isRecording && <WindowCountdown expiresAt={windowExpiresAt} />}
             {!isRecording && (
               <button
@@ -435,7 +435,7 @@ export function ManualMessageForm({
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
             <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${uploadPercent}%` }} />
           </div>
-          <span className="fl-mono flex-none text-[10px] text-ink-muted">
+          <span className="fl-mono flex-none text-[12px] text-ink-muted">
             Subiendo {pendingFileName} · {uploadPercent}%
           </span>
         </div>
@@ -445,9 +445,9 @@ export function ManualMessageForm({
       ) : state.error ? (
         <p className="mt-1.5 px-1 text-xs font-medium text-error">⚠ No se pudo enviar: {state.error}</p>
       ) : isUploading ? null : pendingFileName ? (
-        <p className="fl-mono mt-1.5 px-1 text-[10px] text-ink-faint">Adjunto: {pendingFileName}</p>
+        <p className="fl-mono mt-1.5 px-1 text-[12px] text-ink-faint">Adjunto: {pendingFileName}</p>
       ) : (
-        <p className="fl-mono mt-1 hidden px-1 text-[10px] text-ink-faint md:block">
+        <p className="fl-mono mt-1 hidden px-1 text-[12px] text-ink-faint md:block">
           Enter envía · Shift+Enter nueva línea · {SIZE_HINT}
         </p>
       )}
