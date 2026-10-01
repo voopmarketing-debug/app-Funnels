@@ -53,36 +53,49 @@ const FAQ = [
 const PLANS = [
   {
     name: "Starter",
-    badge: "Oferta de lanzamiento",
-    price: "$150",
-    priceSuffix: "USD / trimestre",
-    strikePrice: "$450",
-    billingNote: "Se cobra automáticamente cada trimestre (vía Hotmart) — no es un pago único.",
-    billingDetail:
-      "El plan normal es $150 USD/mes ($450 USD por trimestre). Por el lanzamiento del software, tu trimestre completo queda en $150 USD en vez de $450 USD, y ese precio se mantiene en cada cobro automático mientras la oferta esté activa.",
+    price: "$97",
+    priceSuffix: "USD / mes",
+    billingNote: "Se cobra automáticamente cada mes. Cancelas cuando quieras.",
     contacts: "400 clientes atendidos por IA al mes",
     features: [
       "Contactos ilimitados en tu CRM",
       "1 línea de WhatsApp (un negocio)",
+      "Hasta 3 personas de tu equipo",
       "Agente con memoria completa de la conversación",
-      "CRM personalizable por etapas",
+      "CRM por etapas, difusiones y plantillas de WhatsApp",
+      "Sitios web y páginas de venta creados con IA",
       "Dashboard de KPIs + diagnóstico de ventas con IA",
-      "Soporte de lunes a viernes por WhatsApp con un agente especializado",
-      "Sesión de onboarding y acompañamiento",
+      "Soporte de lunes a viernes por WhatsApp y sesión de onboarding",
     ],
     highlight: true,
     ctaLabel: "Crear mi cuenta",
     ctaHref: "/register",
   },
   {
+    name: "Pro",
+    price: "$297",
+    priceSuffix: "USD / mes",
+    billingNote: "Se cobra automáticamente cada mes. Cancelas cuando quieras.",
+    contacts: "1.200 clientes atendidos por IA al mes",
+    features: [
+      "Todo lo del plan Starter",
+      "Hasta 3 líneas de WhatsApp (sedes, marcas o vendedores)",
+      "Hasta 10 personas de tu equipo",
+      "Para negocios con anuncios y volumen alto de mensajes",
+      "Acompañamiento prioritario por WhatsApp",
+    ],
+    highlight: false,
+    ctaLabel: "Quiero el plan Pro",
+    ctaHref: SUPPORT_WHATSAPP_LINK,
+  },
+  {
     name: "Consultoría",
-    price: "Llave en mano",
-    priceSuffix: "",
-    billingNote: "Agenda una llamada y nosotros implementamos todo por ti, de principio a fin.",
-    billingDetail: "",
+    price: "$597+",
+    priceSuffix: "USD / mes",
+    billingNote: "Desde $597 USD al mes, más implementación. Agenda una llamada y nosotros lo hacemos todo por ti, de principio a fin.",
     contacts: "Clientes atendidos por IA y líneas a la medida de tu volumen",
     features: [
-      "Todo lo del plan Starter, con cupo de IA y líneas a tu medida",
+      "Todo lo del plan Pro, con cupo de IA y líneas a tu medida",
       "Desarrollo a medida: lo que tu negocio necesite, hecho para ti",
       "Lo implementamos nosotros, de punta a punta",
       "Gerente de cuenta dedicado + soporte por WhatsApp",
@@ -188,12 +201,12 @@ export default async function Home() {
       <section id="precios" className="relative mx-auto max-w-5xl px-6 py-16">
         <h2 className="text-center text-2xl font-bold">Planes</h2>
         <p className="mx-auto mt-2 max-w-xl text-center text-sm text-ink-muted">
-          Pago trimestral (cada 3 meses), débito automático — sin sorpresas mes a mes. Tu CRM guarda
+          Pago mensual con débito automático; cancelas cuando quieras. Tu CRM guarda
           contactos ilimitados; el cupo del plan es cuántos clientes distintos atiende tu agente de IA
           cada mes, con todas las respuestas que necesiten. Precios de referencia en USD.
         </p>
 
-        <div className="mx-auto mt-8 grid max-w-3xl gap-6 sm:grid-cols-2">
+        <div className="mx-auto mt-8 grid max-w-5xl gap-6 md:grid-cols-3">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
@@ -203,44 +216,13 @@ export default async function Home() {
                 <p className={`fl-mono text-xs uppercase tracking-wide ${plan.highlight ? "text-accent" : "text-ink-muted"}`}>
                   {plan.name}
                 </p>
-                {plan.badge && (
-                  <span className="fl-mono rounded-full bg-accent px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide text-accent-ink">
-                    {plan.badge}
-                  </span>
-                )}
               </div>
 
               <div className="mt-2 flex flex-wrap items-baseline gap-2">
                 <p className="text-3xl font-bold">{plan.price}</p>
                 {plan.priceSuffix && <p className="text-base font-semibold text-ink-muted">{plan.priceSuffix}</p>}
               </div>
-              {plan.strikePrice && (
-                <p className="mt-1 text-sm text-ink-muted">
-                  Antes <span className="line-through">{plan.strikePrice}</span> — precio de lanzamiento
-                </p>
-              )}
               <p className="mt-1 text-sm text-ink-muted">{plan.billingNote}</p>
-              {plan.billingDetail && (
-                <details className="group mt-1">
-                  <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-ink-faint transition hover:text-ink-muted [&::-webkit-details-marker]:hidden">
-                    ¿Por qué {plan.strikePrice ? "no " + plan.strikePrice : "así"}?
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      className="h-3 w-3 flex-none transition-transform group-open:rotate-180"
-                    >
-                      <path
-                        d="M5 7.5 10 12.5 15 7.5"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </summary>
-                  <p className="mt-1 text-xs text-ink-muted">{plan.billingDetail}</p>
-                </details>
-              )}
 
               <p className="mt-4 rounded-md bg-background px-3 py-2 text-sm font-medium text-ink">
                 {plan.contacts}

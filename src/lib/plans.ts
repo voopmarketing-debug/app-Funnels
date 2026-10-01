@@ -7,8 +7,9 @@ import type { PlanTier } from "@prisma/client";
 // for a human instead) — see the plan-limit check in handleIncomingMessage.
 // These numbers are chosen so AI cost (see src/lib/ai.ts's prompt caching)
 // stays profitable against each plan's quarterly price even in a worst-case
-// usage pattern, not just on average — PRO's 1,200 leaves ~14% margin on
-// Anthropic cost alone even in that worst case; STARTER's 400 leaves ~43%.
+// usage pattern, not just on average. At the monthly prices on the landing
+// page (Starter US$97, Pro US$297), a client that uses its whole quota
+// (~US$0.12 of AI per contact) still leaves ~50% after Hotmart's fee.
 export const PLAN_LIMITS: Record<PlanTier, number | null> = {
   STARTER: 400,
   PRO: 1200,

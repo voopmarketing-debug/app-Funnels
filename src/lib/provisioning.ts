@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
+import type { PlanTier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { sendEmail } from "@/lib/email";
@@ -42,6 +43,7 @@ export async function provisionClientFromPurchase(input: {
   email: string;
   phone: string;
   industry?: string;
+  planTier?: PlanTier;
 }): Promise<ProvisionResult> {
   const email = input.email.trim().toLowerCase();
   const businessName = input.businessName.trim() || "Mi negocio";
@@ -79,6 +81,7 @@ export async function provisionClientFromPurchase(input: {
         slug: `${slugify(businessName)}-${Math.random().toString(36).slice(2, 7)}`,
         industry,
         subscriptionStartedAt: new Date(),
+        ...(input.planTier ? { planTier: input.planTier } : {}),
         agent: { create: { systemPrompt: "" } },
       },
     });

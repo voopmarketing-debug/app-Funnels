@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseHotmartPurchase } from "@/lib/hotmart";
+import { parseHotmartPurchase, planTierFromProductName } from "@/lib/hotmart";
 import { provisionClientFromPurchase } from "@/lib/provisioning";
 import { safeEqual } from "@/lib/crypto";
 
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       businessName: purchase.name || purchase.productName || "Nuevo negocio",
       email: purchase.email,
       phone: purchase.phone,
+      planTier: planTierFromProductName(purchase.productName),
     });
 
     if (result.status === "error") {

@@ -2,6 +2,8 @@
 // real delivery (Hotmart's webhook settings page has a "Testar" / send-test
 // button) before relying on this in production, since payloads have drifted
 // across Hotmart API versions before.
+import type { PlanTier } from "@prisma/client";
+
 export type HotmartPurchase = {
   event: string;
   email: string;
@@ -37,4 +39,16 @@ export function parseHotmartPurchase(payload: unknown): HotmartPurchase | null {
   const productName = typeof product?.name === "string" ? product.name : "";
 
   return { event, email, name, phone, productName };
+}
+
+/**
+ * Which plan a Hotmart product sells, from its name — the Hotmart product
+ * for each plan must carry the plan's name ("… Pro", "… Scale"). Anything
+ * else (including the Starter product) provisions the default Starter plan;
+ * the agency can still change it from Clientes.
+ */
+export function planTierFromProductName(productName: string): PlanTier | undefined {
+  if (/\bscale\b/i.test(productName)) return "SCALE";
+  if (/\bpro\b/i.test(productName)) return "PRO";
+  return undefined;
 }
