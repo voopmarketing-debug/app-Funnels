@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseHotmartPurchase, planTierFromProductName } from "@/lib/hotmart";
-import { provisionClientFromPurchase } from "@/lib/provisioning";
+import { parseHotmartPurchase } from "@/lib/hotmart";
+import { applyHotmartPayment } from "@/lib/payments";
 import { safeEqual } from "@/lib/crypto";
 
 // Hotmart sends a shared "Hottok" value on every webhook call (set once
@@ -23,27 +23,18 @@ export async function POST(req: NextRequest) {
   const purchase = parseHotmartPurchase(payload);
 
   if (!purchase) {
-    // Not an event we act on (e.g. PURCHASE_CANCELED, PURCHASE_REFUNDED) —
-    // acknowledge so Hotmart doesn't retry, but do nothing.
+    // Not an event we act on (e.g. SUBSCRIPTION_CANCELLATION: the paid
+    // period simply runs out) — acknowledge so Hotmart doesn't retry.
     return NextResponse.json({ received: true, actioned: false });
   }
 
   try {
-    const result = await provisionClientFromPurchase({
-      businessName: purchase.name || purchase.productName || "Nuevo negocio",
-      email: purchase.email,
-      phone: purchase.phone,
-      planTier: planTierFromProductName(purchase.productName),
-    });
-
-    if (result.status === "error") {
-      console.error("Failed to provision client from Hotmart purchase:", result.message, purchase);
-    }
+    const result = await applyHotmartPayment(purchase);
+    if (result.status === "ignored") console.warn("Hotmart payment not applied:", result.reason, purchase.transaction);
+    return NextResponse.json({ received: true, actioned: result.status });
   } catch (err) {
-    console.error("Failed to provision client from Hotmart purchase:", err, purchase);
-    // Still 200 — Hotmart would otherwise retry indefinitely on our own bug,
-    // and we already logged it for manual follow-up.
+    console.error("Failed to apply Hotmart payment:", err, purchase.transaction);
+    // 500 so Hotmart retries: the claim was released, so the retry applies it.
+    return new NextResponse("Error applying payment", { status: 500 });
   }
-
-  return NextResponse.json({ received: true, actioned: true });
 }

@@ -1,27 +1,13 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { findPack } from "@/lib/addonPacks";
-import { AddonGrantCell } from "./AddonGrantCell";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { PLAN_LABELS } from "@/lib/plans";
-import { ResetPasswordButton } from "./ResetPasswordButton";
-import { SubscriptionDatesEditor } from "./SubscriptionDatesEditor";
+import { findPack } from "@/lib/addonPacks";
+import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_USD, TEAM_MEMBER_LIMITS, LINE_LIMITS } from "@/lib/plans";
 import { CreateClientForm } from "./CreateClientForm";
+import { ClientsList, type ClientRow } from "./ClientsList";
 
-const EXPIRING_SOON_DAYS = 7;
-
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "short", year: "numeric" }).format(date);
-}
-
-function subscriptionStatus(endsAt: Date | null): "active" | "expiring" | "expired" | "unset" {
-  if (!endsAt) return "unset";
-  const daysLeft = (endsAt.getTime() - Date.now()) / 86_400_000;
-  if (daysLeft < 0) return "expired";
-  if (daysLeft <= EXPIRING_SOON_DAYS) return "expiring";
-  return "active";
-}
+const DAY_MS = 86_400_000;
 
 export default async function ClientsPage() {
   const session = await auth();
@@ -32,93 +18,172 @@ export default async function ClientsPage() {
     select: { businessId: true },
   });
   if (adminMemberships.length === 0) notFound();
-
   const businessIds = adminMemberships.map((m) => m.businessId);
 
-  const owners = await prisma.membership.findMany({
-    where: { businessId: { in: businessIds }, role: "OWNER" },
-    include: { user: true, business: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const now = new Date();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
-  const activeAddons = await prisma.accountAddon.findMany({
-    where: { userId: { in: owners.map((o) => o.userId) }, status: "ACTIVE", expiresAt: { gt: new Date() } },
-    orderBy: { expiresAt: "asc" },
-  });
-  const addonsByUser = new Map<string, typeof activeAddons>();
-  for (const a of activeAddons) addonsByUser.set(a.userId, [...(addonsByUser.get(a.userId) ?? []), a]);
+  const [owners, contactRows, activityRows, teamRows, websiteRows] = await Promise.all([
+    prisma.membership.findMany({
+      // The agency's own account isn't a client.
+      where: { businessId: { in: businessIds }, role: "OWNER", userId: { not: session.user.id } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        createdAt: true,
+        user: { select: { id: true, name: true, email: true, phone: true, city: true, country: true, monthlyPriceUsd: true } },
+        business: {
+          select: {
+            id: true,
+            name: true,
+            planTier: true,
+            subscriptionStartedAt: true,
+            subscriptionEndsAt: true,
+            wabaPhoneNumberId: true,
+            wabaAccessToken: true,
+          },
+        },
+      },
+    }),
+    prisma.$queryRaw<{ businessId: string; contacts: bigint }[]>`
+      SELECT c."businessId", COUNT(DISTINCT m."conversationId") AS "contacts"
+      FROM "Message" m JOIN "Conversation" c ON c."id" = m."conversationId"
+      WHERE c."businessId" IN (${Prisma.join(businessIds)}) AND m."role" = 'CUSTOMER' AND m."createdAt" >= ${startOfMonth}
+      GROUP BY c."businessId"`,
+    prisma.$queryRaw<{ businessId: string; last: Date }[]>`
+      SELECT c."businessId", MAX(m."createdAt") AS "last"
+      FROM "Message" m JOIN "Conversation" c ON c."id" = m."conversationId"
+      WHERE c."businessId" IN (${Prisma.join(businessIds)})
+      GROUP BY c."businessId"`,
+    prisma.membership.groupBy({ by: ["businessId"], where: { businessId: { in: businessIds }, role: "MEMBER" }, _count: true }),
+    prisma.website.groupBy({ by: ["businessId"], where: { businessId: { in: businessIds } }, _count: true }),
+  ]);
+
+  const userIds = [...new Set(owners.map((o) => o.user.id))];
+  const emails = [...new Set(owners.map((o) => o.user.email.toLowerCase()))];
+  const [activeAddons, payments] = await Promise.all([
+    prisma.accountAddon.findMany({
+      where: { userId: { in: userIds }, status: "ACTIVE", expiresAt: { gt: now } },
+      orderBy: { expiresAt: "asc" },
+    }),
+    prisma.paymentEvent.findMany({
+      where: { email: { in: emails }, action: "grant" },
+      orderBy: { createdAt: "desc" },
+      select: { email: true, createdAt: true },
+    }),
+  ]);
+
+  const contactsBy = new Map(contactRows.map((r) => [r.businessId, Number(r.contacts)]));
+  const activityBy = new Map(activityRows.map((r) => [r.businessId, r.last]));
+  const teamBy = new Map(teamRows.map((r) => [r.businessId, r._count]));
+  const websitesBy = new Map(websiteRows.map((r) => [r.businessId, r._count]));
+  const lastPaymentBy = new Map<string, Date>();
+  for (const p of payments) if (!lastPaymentBy.has(p.email)) lastPaymentBy.set(p.email, p.createdAt);
+
+  // One row per client account (an owner can run several WhatsApp lines).
+  const rows = new Map<string, ClientRow>();
+  for (const { user, business, createdAt } of owners) {
+    let row = rows.get(user.id);
+    if (!row) {
+      row = {
+        userId: user.id,
+        name: user.name ?? business.name,
+        email: user.email,
+        phone: user.phone,
+        location: [user.city, user.country].filter(Boolean).join(", ") || null,
+        joinedAt: createdAt.toISOString(),
+        planTier: business.planTier,
+        planLabel: PLAN_LABELS[business.planTier],
+        priceUsd: user.monthlyPriceUsd ?? PLAN_PRICE_USD[business.planTier],
+        customPrice: user.monthlyPriceUsd !== null,
+        endsAt: null,
+        startedAt: null,
+        contacts: 0,
+        contactLimit: PLAN_LIMITS[business.planTier],
+        lineLimit: LINE_LIMITS[business.planTier],
+        teamLimit: TEAM_MEMBER_LIMITS[business.planTier],
+        team: 0,
+        websites: 0,
+        lastActivity: null,
+        lastPayment: lastPaymentBy.get(user.email.toLowerCase())?.toISOString() ?? null,
+        lines: [],
+        addons: (activeAddons.filter((a) => a.userId === user.id)).map((a) => ({
+          id: a.id,
+          title: findPack(a.packKey)?.title ?? a.packKey,
+          expiresAt: a.expiresAt ? a.expiresAt.toISOString() : "",
+          quantity: a.quantity,
+          kind: a.kind,
+        })),
+      };
+      rows.set(user.id, row);
+    }
+    if (new Date(row.joinedAt) > createdAt) row.joinedAt = createdAt.toISOString();
+    const last = activityBy.get(business.id);
+    if (last && (!row.lastActivity || last.toISOString() > row.lastActivity)) row.lastActivity = last.toISOString();
+    if (business.subscriptionEndsAt && (!row.endsAt || business.subscriptionEndsAt.toISOString() > row.endsAt)) row.endsAt = business.subscriptionEndsAt.toISOString();
+    if (business.subscriptionStartedAt && (!row.startedAt || business.subscriptionStartedAt.toISOString() < row.startedAt)) row.startedAt = business.subscriptionStartedAt.toISOString();
+    row.contacts += contactsBy.get(business.id) ?? 0;
+    row.team += teamBy.get(business.id) ?? 0;
+    row.websites += websitesBy.get(business.id) ?? 0;
+    row.lines.push({
+      businessId: business.id,
+      name: business.name,
+      whatsappConnected: !!(business.wabaPhoneNumberId && business.wabaAccessToken),
+      startedAt: business.subscriptionStartedAt?.toISOString() ?? null,
+      endsAt: business.subscriptionEndsAt?.toISOString() ?? null,
+    });
+  }
+  // Packs add capacity on top of the plan.
+  for (const row of rows.values()) {
+    if (row.contactLimit !== null) row.contactLimit += row.addons.filter((a) => a.kind === "CONTACTS").reduce((s, a) => s + a.quantity, 0);
+  }
+
+  const list = [...rows.values()];
+  // Negative (or -0.x) once the end has passed: expired, even if only by minutes.
+  const daysLeft = (iso: string | null) => {
+    if (!iso) return null;
+    const diff = new Date(iso).getTime() - now.getTime();
+    return diff <= 0 ? -1 : Math.ceil(diff / DAY_MS);
+  };
+  const summary = {
+    total: list.length,
+    active: list.filter((r) => (daysLeft(r.endsAt) ?? 1) > 7).length,
+    expiring: list.filter((r) => {
+      const d = daysLeft(r.endsAt);
+      return d !== null && d >= 0 && d <= 7;
+    }).length,
+    expired: list.filter((r) => (daysLeft(r.endsAt) ?? 0) < 0).length,
+    mrr: list.filter((r) => (daysLeft(r.endsAt) ?? 1) >= 0).reduce((s, r) => s + r.priceUsd, 0),
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold">Clientes</h1>
-          <p className="text-sm text-ink-muted">
-            Datos personales que cada cliente registró al crear su cuenta — úsalos para contactarlo o
-            para entrar a probar su cuenta con sus credenciales si lo necesita.
+          <h1 className="text-2xl font-bold">Clientes</h1>
+          <p className="max-w-2xl text-sm text-ink-muted">
+            Quién te paga, hasta cuándo y cómo usa la plataforma. Las membresías se activan y renuevan solas con cada pago de Hotmart.
           </p>
         </div>
         <CreateClientForm />
       </div>
 
-      {owners.length === 0 ? (
-        <p className="text-sm text-ink-muted">Todavía no hay clientes registrados.</p>
-      ) : (
-        <div className="fl-card overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border bg-surface text-xs uppercase tracking-wide text-ink-muted">
-                <th className="px-4 py-3 font-medium">Nombre</th>
-                <th className="px-4 py-3 font-medium">Correo</th>
-                <th className="px-4 py-3 font-medium">Teléfono</th>
-                <th className="px-4 py-3 font-medium">Negocio</th>
-                <th className="px-4 py-3 font-medium">Plan</th>
-                <th className="px-4 py-3 font-medium">Membresía (inicio → vence)</th>
-                <th className="px-4 py-3 font-medium">Paquetes</th>
-                <th className="px-4 py-3 font-medium">Registrado</th>
-                <th className="px-4 py-3 font-medium">Contraseña</th>
-              </tr>
-            </thead>
-            <tbody>
-              {owners.map(({ user, business, createdAt }) => (
-                <tr key={business.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 text-ink">{user.name ?? "—"}</td>
-                  <td className="px-4 py-3 text-ink-muted">{user.email}</td>
-                  <td className="px-4 py-3 text-ink-muted">{user.phone ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <Link href={`/dashboard/businesses/${business.id}`} className="text-accent hover:underline">
-                      {business.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-ink-muted">{PLAN_LABELS[business.planTier]}</td>
-                  <td className="px-4 py-3">
-                    <SubscriptionDatesEditor
-                      businessId={business.id}
-                      startedAt={business.subscriptionStartedAt}
-                      endsAt={business.subscriptionEndsAt}
-                      status={subscriptionStatus(business.subscriptionEndsAt)}
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <AddonGrantCell
-                      ownerUserId={user.id}
-                      active={(addonsByUser.get(user.id) ?? []).map((a) => ({
-                        id: a.id,
-                        title: findPack(a.packKey)?.title ?? a.packKey,
-                        expiresAt: a.expiresAt ? formatDate(a.expiresAt) : "",
-                      }))}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-ink-muted">{formatDate(createdAt)}</td>
-                  <td className="px-4 py-3">
-                    <ResetPasswordButton userId={user.id} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {[
+          { label: "Clientes", value: summary.total.toLocaleString("es-CO"), hint: "Cuentas registradas" },
+          { label: "Activos", value: summary.active.toLocaleString("es-CO"), hint: "Con membresía al día", tone: "text-[var(--status-good)]" },
+          { label: "Por vencer", value: summary.expiring.toLocaleString("es-CO"), hint: "En los próximos 7 días", tone: summary.expiring ? "text-[var(--status-warn)]" : "" },
+          { label: "Vencidos", value: summary.expired.toLocaleString("es-CO"), hint: "Sin acceso al panel", tone: summary.expired ? "text-[var(--status-bad)]" : "" },
+          { label: "Ingreso mensual", value: `US$${summary.mrr.toLocaleString("es-CO")}`, hint: "Clientes activos (aprox.)" },
+        ].map((t) => (
+          <div key={t.label} className="fl-card p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t.label}</p>
+            <p className={`mt-1 text-2xl font-bold tabular-nums ${t.tone ?? "text-ink"}`}>{t.value}</p>
+            <p className="text-xs text-ink-muted">{t.hint}</p>
+          </div>
+        ))}
+      </section>
+
+      <ClientsList rows={list} nowIso={now.toISOString()} />
     </div>
   );
 }

@@ -835,3 +835,19 @@ model AiUsage {
   @@index([businessId, createdAt])
   @@index([createdAt])
 }
+
+// Payment webhooks already applied (Hotmart sends several events per
+// purchase — PURCHASE_APPROVED, then PURCHASE_COMPLETE after the guarantee
+// period — and retries deliveries), so a payment extends a subscription
+// exactly once. action: "grant" | "revoke".
+model PaymentEvent {
+  id          String   @id @default(cuid())
+  provider    String
+  transaction String
+  action      String
+  event       String
+  email       String
+  createdAt   DateTime @default(now())
+
+  @@unique([provider, transaction, action])
+}
