@@ -653,6 +653,9 @@ model Broadcast {
   id              String    @id @default(cuid())
   businessId      String
   stageId         String? // null = every conversation in the business
+  // Set when the broadcast went to a filtered selection from the CRM
+  // (e.g. "Sin respuesta · #VIP") instead of a whole stage/pipeline.
+  audienceLabel   String?
   message         String    @db.Text
   // Optional image/document attached to a free-form broadcast (see
   // sendBroadcast in lib/actions.ts) — not supported for template broadcasts,

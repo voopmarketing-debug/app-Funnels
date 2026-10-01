@@ -11,18 +11,28 @@ const INITIAL_STATE: DialogState = { error: null, result: null };
 // (or all of it) and compose one message sent to every matching contact.
 type BroadcastTemplate = { id: string; name: string; bodyText: string };
 
+// A filtered audience from the CRM's "Buscar y filtrar" — replaces the
+// stage picker with exactly those contacts.
+export type BroadcastAudience = { ids: string[]; label: string };
+
 export function BroadcastDialog({
   businessId,
   stages,
   templates,
   stageCounts,
   totalConversations,
+  audience = null,
+  triggerLabel = "📢 Difusión",
+  triggerClassName = "rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent",
 }: {
   businessId: string;
   stages: { id: string; name: string }[];
   templates: BroadcastTemplate[];
   stageCounts: Record<string, number>;
   totalConversations: number;
+  audience?: BroadcastAudience | null;
+  triggerLabel?: string;
+  triggerClassName?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [formKey, setFormKey] = useState(0);
@@ -35,9 +45,9 @@ export function BroadcastDialog({
           setFormKey((k) => k + 1);
           dialogRef.current?.showModal();
         }}
-        className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+        className={triggerClassName}
       >
-        📢 Difusión
+        {triggerLabel}
       </button>
 
       <dialog ref={dialogRef} className="fl-card-hero w-full max-w-md p-0">
@@ -48,6 +58,7 @@ export function BroadcastDialog({
           templates={templates}
           stageCounts={stageCounts}
           totalConversations={totalConversations}
+          audience={audience}
           onClose={() => dialogRef.current?.close()}
         />
       </dialog>
@@ -61,6 +72,7 @@ function BroadcastDialogContent({
   templates,
   stageCounts,
   totalConversations,
+  audience,
   onClose,
 }: {
   businessId: string;
@@ -68,12 +80,13 @@ function BroadcastDialogContent({
   templates: BroadcastTemplate[];
   stageCounts: Record<string, number>;
   totalConversations: number;
+  audience: BroadcastAudience | null;
   onClose: () => void;
 }) {
   const [mode, setMode] = useState<"free" | "template">("free");
   const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id);
   const [stageId, setStageId] = useState("all");
-  const recipientCount = stageId === "all" ? totalConversations : (stageCounts[stageId] ?? 0);
+  const recipientCount = audience ? audience.ids.length : stageId === "all" ? totalConversations : (stageCounts[stageId] ?? 0);
   const estimatedCost = recipientCount * WHATSAPP_MARKETING_MESSAGE_COST_USD;
   const [state, formAction, isPending] = useActionState<DialogState, FormData>(async (_prev, formData) => {
     try {
@@ -119,7 +132,7 @@ function BroadcastDialogContent({
       <div className="space-y-1">
         <h2 className="text-lg font-bold text-ink">Mensaje de difusión</h2>
         <p className="text-sm text-ink-muted">
-          Se envía a todos los contactos de la etapa que elijas, o de todo el pipeline. WhatsApp solo permite
+          {audience ? "Se envía a los contactos que filtraste." : "Se envía a todos los contactos de la etapa que elijas, o de todo el pipeline."} WhatsApp solo permite
           mensajes libres a quien te escribió en las últimas 24 horas — a los demás puede que no les llegue.
         </p>
       </div>
@@ -128,20 +141,28 @@ function BroadcastDialogContent({
         <label htmlFor="stageId" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
           Destinatarios
         </label>
-        <select
-          id="stageId"
-          name="stageId"
-          value={stageId}
-          onChange={(e) => setStageId(e.target.value)}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        >
-          <option value="all">Todo el pipeline ({totalConversations})</option>
-          {stages.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} ({stageCounts[s.id] ?? 0})
-            </option>
-          ))}
-        </select>
+        {audience ? (
+          <div className="rounded-md border border-accent/40 bg-accent/5 px-3 py-2 text-sm text-ink">
+            <input type="hidden" name="conversationIds" value={JSON.stringify(audience.ids)} />
+            <input type="hidden" name="audienceLabel" value={audience.label} />
+            Contactos filtrados: <span className="font-semibold">{audience.label}</span>
+          </div>
+        ) : (
+          <select
+            id="stageId"
+            name="stageId"
+            value={stageId}
+            onChange={(e) => setStageId(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+          >
+            <option value="all">Todo el pipeline ({totalConversations})</option>
+            {stages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({stageCounts[s.id] ?? 0})
+              </option>
+            ))}
+          </select>
+        )}
         <p className="text-[13px] text-ink-faint">
           {recipientCount} {recipientCount === 1 ? "destinatario" : "destinatarios"}
           {mode === "template" &&

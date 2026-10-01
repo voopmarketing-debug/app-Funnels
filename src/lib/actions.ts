@@ -943,15 +943,30 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
     }
   }
 
+  // A filtered selection from the CRM (search + filters) arrives as an
+  // explicit id list; it's re-scoped to this business so a tampered list
+  // can't reach anyone else's contacts.
+  let selectedIds: string[] | null = null;
+  const idsRaw = String(formData.get("conversationIds") ?? "").trim();
+  if (idsRaw) {
+    const parsed: unknown = JSON.parse(idsRaw);
+    if (!Array.isArray(parsed) || parsed.some((v) => typeof v !== "string")) throw new Error("Selección inválida");
+    if (parsed.length === 0) throw new Error("No hay contactos en el filtro");
+    if (parsed.length > 5000) throw new Error("Máximo 5.000 contactos por difusión");
+    selectedIds = parsed as string[];
+  }
+  const audienceLabel = selectedIds ? String(formData.get("audienceLabel") ?? "").trim().slice(0, 200) || "Selección filtrada" : null;
+
   const conversations = await prisma.conversation.findMany({
-    where: { businessId, ...(stageId ? { stageId } : {}) },
+    where: { businessId, ...(selectedIds ? { id: { in: selectedIds } } : stageId ? { stageId } : {}) },
     select: { id: true, customerPhone: true },
   });
 
   const broadcast = await prisma.broadcast.create({
     data: {
       businessId,
-      stageId,
+      stageId: selectedIds ? null : stageId,
+      audienceLabel,
       message,
       mediaUrl: media?.url,
       mediaType: media?.type,

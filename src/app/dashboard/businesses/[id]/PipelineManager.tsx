@@ -37,12 +37,8 @@ export function PipelineManager({ businessId, pipelines }: { businessId: string;
   }
 
   return (
-    <details className="fl-card p-4">
-      <summary className="cursor-pointer fl-mono text-xs tracking-wide text-ink-muted uppercase">
-        Editar embudos y etapas del CRM ({pipelines.length})
-      </summary>
-
-      <p className="mt-3 text-sm text-ink-muted">
+    <div>
+      <p className="text-sm text-ink-muted">
         Cada embudo es un tablero de leads aparte — crea uno por vendedor para que cada quien trabaje solo lo suyo,
         aunque todos compartan el mismo número de WhatsApp. Los leads nuevos siempre entran al embudo principal;
         desde ahí se mueven a mano al embudo de quien los va a atender.
@@ -72,7 +68,7 @@ export function PipelineManager({ businessId, pipelines }: { businessId: string;
         </button>
       </form>
       {createError && <p className="mt-1 text-xs text-error">{createError}</p>}
-    </details>
+    </div>
   );
 }
 

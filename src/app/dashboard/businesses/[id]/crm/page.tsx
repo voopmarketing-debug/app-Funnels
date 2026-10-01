@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { isReplyWindowOpen } from "@/lib/messageWindow";
 import { PipelineManager } from "../PipelineManager";
-import { CrmBoard } from "../CrmBoard";
-import { ContactsTable } from "../ContactsTable";
+import { CrmWorkspace } from "./CrmWorkspace";
+import { PipelineSettingsButton } from "./PipelineSettingsButton";
 import { CrmTabs } from "./CrmTabs";
 import { PipelineSwitcher } from "./PipelineSwitcher";
 import { ConversationSplitView } from "./ConversationSplitView";
@@ -66,7 +67,7 @@ export default async function CrmPage({
       orderBy: { lastMessageAt: "desc" },
       // Lista is the contacts directory (and its CSV export), so it gets a
       // much larger window than the chat list and the board.
-      take: tab === "list" ? 2000 : 50,
+      take: tab === "list" ? 2000 : tab === "board" ? 500 : 50,
       select: {
         id: true,
         customerName: true,
@@ -75,6 +76,9 @@ export default async function CrmPage({
         stageId: true,
         lastMessageAt: true,
         lastReadAt: true,
+        createdAt: true,
+        tags: true,
+        appointmentAt: true,
       },
     }),
     prisma.membership.findMany({
@@ -117,14 +121,17 @@ export default async function CrmPage({
 
   // Last message of each chat for the list's preview line ("IA: Claro, …"),
   // like Kommo/WhatsApp — only the chat tab shows it.
+  // DISTINCT ON in SQL — Prisma's `distinct` would pull every message of
+  // every listed chat into memory first, too much for the 2,000-row Lista.
+  const conversationIds = conversations.map((c) => c.id);
   const lastMessages =
-    tab === "chat"
-      ? await prisma.message.findMany({
-          where: { conversationId: { in: conversations.map((c) => c.id) } },
-          orderBy: { createdAt: "desc" },
-          distinct: ["conversationId"],
-          select: { conversationId: true, content: true, role: true, sentByHuman: true, mediaType: true },
-        })
+    tab !== "broadcasts" && conversationIds.length > 0
+      ? await prisma.$queryRaw<
+          { conversationId: string; content: string; role: "AGENT" | "CUSTOMER"; sentByHuman: boolean; mediaType: string | null }[]
+        >`SELECT DISTINCT ON ("conversationId") "conversationId", LEFT("content", 160) AS "content", "role", "sentByHuman", "mediaType"
+          FROM "Message"
+          WHERE "conversationId" IN (${Prisma.join(conversationIds)})
+          ORDER BY "conversationId", "createdAt" DESC`
       : [];
   const lastMessageByConversation = new Map(
     lastMessages.map((m) => [
@@ -146,6 +153,9 @@ export default async function CrmPage({
     lastMessageAt: c.lastMessageAt.toISOString(),
     unreadCount: unreadCountByConversation.get(c.id) ?? 0,
     lastMessage: lastMessageByConversation.get(c.id) ?? null,
+    createdAt: c.createdAt.toISOString(),
+    tags: c.tags,
+    appointmentAt: c.appointmentAt?.toISOString() ?? null,
   }));
 
   // Only queried when the Difusiones tab is actually open — every other tab
@@ -174,6 +184,7 @@ export default async function CrmPage({
         id: true,
         message: true,
         stageId: true,
+        audienceLabel: true,
         totalRecipients: true,
         sentCount: true,
         failedCount: true,
@@ -206,7 +217,7 @@ export default async function CrmPage({
     broadcastsView = broadcasts.map((b) => ({
       id: b.id,
       message: b.message,
-      stageName: b.stageId ? (stageNameById.get(b.stageId) ?? null) : null,
+      stageName: b.audienceLabel ?? (b.stageId ? (stageNameById.get(b.stageId) ?? null) : null),
       totalRecipients: b.totalRecipients,
       sentCount: b.sentCount,
       failedCount: b.failedCount,
@@ -266,9 +277,6 @@ export default async function CrmPage({
         </div>
       </div>
 
-      {/* Editing embudos/etapas is board work — kept off the chat tab so the
-          inbox gets the full height of the screen, Kommo-style. */}
-      {tab !== "chat" && <PipelineManager businessId={id} pipelines={allPipelines} />}
 
       <div className="space-y-3">
         <div className={`${hideChromeOnMobile ? "hidden md:flex" : "flex"} flex-wrap items-center justify-between gap-2`}>
@@ -284,6 +292,11 @@ export default async function CrmPage({
           <div className="flex flex-wrap items-center gap-2">
             <ContactFormDialog mode="create" businessId={id} stages={stages} />
             <ImportContactsDialog businessId={id} stages={stages} />
+            {/* Embudos/etapas live behind a button now — a big card on top
+                of the board pushed the actual pipeline below the fold. */}
+            <PipelineSettingsButton count={allPipelines.length}>
+              <PipelineManager businessId={id} pipelines={allPipelines} />
+            </PipelineSettingsButton>
             <BroadcastDialog
               businessId={id}
               stages={stages}
@@ -294,8 +307,17 @@ export default async function CrmPage({
           </div>
         </div>
 
-        {tab === "board" && <CrmBoard businessId={id} stages={stages} conversations={conversationSummaries} />}
-        {tab === "list" && <ContactsTable businessId={id} stages={stages} conversations={conversationSummaries} />}
+        {(tab === "board" || tab === "list") && (
+          <CrmWorkspace
+            view={tab}
+            businessId={id}
+            stages={stages}
+            conversations={conversationSummaries}
+            templates={approvedTemplates}
+            stageCounts={stageCountMap}
+            totalConversations={totalConversations}
+          />
+        )}
         {tab === "broadcasts" && <BroadcastHistory broadcasts={broadcastsView} />}
         {tab === "chat" && (
           <ConversationSplitView
