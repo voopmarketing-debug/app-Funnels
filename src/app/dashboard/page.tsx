@@ -9,6 +9,9 @@ import { SUPPORT_WHATSAPP_LINK, supportWhatsAppLink } from "@/lib/constants";
 import { contactLabel } from "@/lib/contactDisplay";
 import { AnnouncementBanner, NewsCard, type AnnouncementView } from "./AnnouncementViews";
 import { BusinessPicker } from "./BusinessPicker";
+import { getAccountAddonCapacity } from "@/lib/addons";
+import { findPack } from "@/lib/addonPacks";
+import { AddonStore } from "@/components/AddonStore";
 
 const TZ = "America/Bogota";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -216,6 +219,7 @@ async function BusinessOverview({ businessId, role, now }: { businessId: string;
 
   return (
     <>
+      {canSeePlan && <PlanLimitAlert businessId={businessId} ownerUserId={owner?.userId ?? null} planTier={business.planTier} />}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryTile
           href={`${base}/crm?tab=chat`}
@@ -314,6 +318,59 @@ async function BusinessOverview({ businessId, role, now }: { businessId: string;
   );
 }
 
+// Upsell at the moment it matters: from 80% of the month's contacts, and
+// louder at 100% (the agent stops answering NEW contacts until more
+// capacity is added — see the plan check in lib/agent.ts).
+async function PlanLimitAlert({
+  businessId,
+  ownerUserId,
+  planTier,
+}: {
+  businessId: string;
+  ownerUserId: string | null;
+  planTier: keyof typeof PLAN_LIMITS;
+}) {
+  const base = PLAN_LIMITS[planTier];
+  if (base === null) return null;
+  const [contacts, addons] = await Promise.all([
+    ownerUserId ? getAccountActiveContactsThisMonth(ownerUserId) : getActiveContactsThisMonth(businessId),
+    ownerUserId ? getAccountAddonCapacity(ownerUserId) : Promise.resolve({ extraContacts: 0 }),
+  ]);
+  const limit = base + addons.extraContacts;
+  const ratio = contacts / limit;
+  if (ratio < 0.8) return null;
+  const full = ratio >= 1;
+
+  return (
+    <section
+      className={`flex flex-wrap items-center gap-3 rounded-xl border p-4 ${
+        full ? "border-error/50 bg-error/10" : "border-[#fab219]/50 bg-[#fab219]/10"
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-semibold ${full ? "text-error" : "text-ink"}`}>
+          {full
+            ? `Llegaste al límite: ${contacts.toLocaleString("es-CO")} de ${limit.toLocaleString("es-CO")} contactos este mes`
+            : `Vas en ${contacts.toLocaleString("es-CO")} de ${limit.toLocaleString("es-CO")} contactos este mes`}
+        </p>
+        <p className="text-xs text-ink-muted">
+          {full
+            ? "Tu agente ya no responde a contactos nuevos. Agrega un paquete y vuelve a responder al instante."
+            : "Cuando llegues al límite, tu agente dejará de responder a contactos nuevos. Amplía tu capacidad antes."}
+        </p>
+      </div>
+      <div className="flex-none">
+        <AddonStore
+          businessId={businessId}
+          kind="CONTACTS"
+          label="Agregar contactos"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
+        />
+      </div>
+    </section>
+  );
+}
+
 async function PlanCard({
   businessId,
   ownerUserId,
@@ -331,13 +388,20 @@ async function PlanCard({
   teamMembers: number;
   now: Date;
 }) {
-  const [contacts, lines] = await Promise.all([
+  const [contacts, lines, addons] = await Promise.all([
     ownerUserId ? getAccountActiveContactsThisMonth(ownerUserId) : getActiveContactsThisMonth(businessId),
     ownerUserId ? prisma.membership.count({ where: { userId: ownerUserId, role: "OWNER" } }) : Promise.resolve(1),
+    ownerUserId ? getAccountAddonCapacity(ownerUserId) : Promise.resolve({ extraContacts: 0, extraLines: 0, active: [] }),
   ]);
   const active = isSubscriptionActive(endsAt);
   const daysLeft = endsAt ? Math.max(0, Math.ceil((endsAt.getTime() - now.getTime()) / DAY_MS)) : null;
   const totalDays = startedAt && endsAt ? Math.max(1, Math.round((endsAt.getTime() - startedAt.getTime()) / DAY_MS)) : null;
+  // Plan + active packs — the same totals the agent enforces.
+  const baseContacts = PLAN_LIMITS[planTier];
+  const contactLimit = baseContacts === null ? null : baseContacts + addons.extraContacts;
+  const baseLines = LINE_LIMITS[planTier];
+  const lineLimit = baseLines === null ? null : baseLines + addons.extraLines;
+  const contactRatio = contactLimit ? contacts / contactLimit : 0;
 
   return (
     <section className="fl-card-hero space-y-4 p-4">
@@ -357,27 +421,42 @@ async function PlanCard({
       )}
       <UsageBar
         label="Contactos activos este mes"
-        value={`${contacts.toLocaleString("es-CO")} / ${PLAN_LIMITS[planTier]?.toLocaleString("es-CO") ?? "∞"}`}
-        percent={PLAN_LIMITS[planTier] ? (contacts / PLAN_LIMITS[planTier]!) * 100 : 0}
-        tone={PLAN_LIMITS[planTier] && contacts / PLAN_LIMITS[planTier]! >= 0.8 ? "warn" : "ok"}
+        value={`${contacts.toLocaleString("es-CO")} / ${contactLimit?.toLocaleString("es-CO") ?? "∞"}`}
+        percent={contactLimit ? contactRatio * 100 : 0}
+        tone={contactRatio >= 0.8 ? "warn" : "ok"}
       />
       <UsageBar
         label="Líneas de WhatsApp"
-        value={`${lines} / ${LINE_LIMITS[planTier] ?? "∞"}`}
-        percent={LINE_LIMITS[planTier] ? (lines / LINE_LIMITS[planTier]!) * 100 : 0}
+        value={`${lines} / ${lineLimit ?? "∞"}`}
+        percent={lineLimit ? (lines / lineLimit) * 100 : 0}
       />
       <UsageBar
         label="Miembros del equipo"
         value={`${teamMembers} / ${TEAM_MEMBER_LIMITS[planTier] ?? "∞"}`}
         percent={TEAM_MEMBER_LIMITS[planTier] ? (teamMembers / TEAM_MEMBER_LIMITS[planTier]!) * 100 : 0}
       />
+      {addons.active.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-accent/30 bg-accent/5 p-2.5">
+          <p className="text-xs font-semibold text-accent">Paquetes activos</p>
+          {addons.active.map((a) => (
+            <p key={a.id} className="flex justify-between gap-2 text-xs text-ink-muted">
+              <span>{findPack(a.packKey)?.title ?? `+${a.quantity}`}</span>
+              <span>
+                vence{" "}
+                {new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short" }).format(a.expiresAt)}
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
+      {contactLimit !== null && <AddonStore businessId={businessId} label="Comprar más contactos" />}
       <a
         href={supportWhatsAppLink(active ? "Hola, quiero mejorar mi plan de Funnels Labs" : "Hola, quiero renovar mi plan de Funnels Labs")}
         target="_blank"
         rel="noopener noreferrer"
         className="block rounded-md border border-border-strong px-3 py-2 text-center text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
       >
-        {active ? "Mejorar mi plan" : "Renovar mi plan"}
+        {active ? "Cambiar de plan" : "Renovar mi plan"}
       </a>
     </section>
   );

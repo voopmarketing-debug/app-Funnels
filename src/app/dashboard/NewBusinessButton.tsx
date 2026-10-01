@@ -5,6 +5,7 @@ import { useRef } from "react";
 import type { PlanTier } from "@prisma/client";
 import { PLAN_LABELS } from "@/lib/plans";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { AddonStore } from "@/components/AddonStore";
 
 const BUTTON_CLASS =
   "rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover";
@@ -18,11 +19,14 @@ export function NewBusinessButton({
   limit,
   count,
   planTier,
+  billingBusinessId = null,
 }: {
   atLimit: boolean;
   limit: number | null;
   count: number;
   planTier: PlanTier;
+  // Any business this account owns — used to buy an extra line from here.
+  billingBusinessId?: string | null;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -49,16 +53,24 @@ export function NewBusinessButton({
             <h2 className="text-lg font-bold text-ink">Llegaste al límite de tu plan</h2>
             <p className="text-sm text-ink-muted">
               Tu plan <span className="font-semibold text-ink">{PLAN_LABELS[planTier]}</span> permite hasta {limit}{" "}
-              {limit === 1 ? "línea" : "líneas"} de WhatsApp, y ya tienes {count}. Actualiza de plan o escríbenos y
-              te ayudamos a agregar más.
+              {limit === 1 ? "línea" : "líneas"} de WhatsApp, y ya tienes {count}. Agrega una línea más y crea tu nuevo
+              agente al instante.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            {billingBusinessId && (
+              <AddonStore
+                businessId={billingBusinessId}
+                kind="LINE"
+                label="Agregar una línea"
+                className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
+              />
+            )}
             <a
               href={SUPPORT_WHATSAPP_LINK}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
+              className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink transition hover:border-accent"
             >
               Hablar con soporte
             </a>

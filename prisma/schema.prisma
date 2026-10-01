@@ -133,6 +133,7 @@ model User {
   name         String?
   createdAt    DateTime     @default(now())
   memberships  Membership[]
+  addons       AccountAddon[]
 
   // Password reset flow: resetTokenHash stores a SHA-256 hash of the token
   // emailed to the user (never the raw token) so a DB read alone can't be
@@ -743,4 +744,30 @@ model Announcement {
   updatedAt DateTime  @updatedAt
 
   @@index([kind, published])
+}
+
+// Extra capacity bought on top of the plan (see lib/addons.ts): a pack of
+// monthly contacts or an extra WhatsApp line, valid for 30 days from
+// activation. Belongs to the account (the OWNER user), since plan limits
+// are pooled per account across all its lines. PENDING rows are created
+// when checkout starts; the Mercado Pago webhook flips them to ACTIVE (its
+// id travels as the payment's external_reference), or the agency activates
+// one by hand (source MANUAL).
+model AccountAddon {
+  id          String    @id @default(cuid())
+  userId      String
+  packKey     String
+  kind        String // "CONTACTS" | "LINE"
+  quantity    Int
+  priceCop    Int
+  status      String    @default("PENDING") // PENDING | ACTIVE | CANCELED
+  source      String    @default("MERCADOPAGO") // MERCADOPAGO | MANUAL
+  mpPaymentId String?   @unique
+  activatedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
 }

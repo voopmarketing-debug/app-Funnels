@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { findPack } from "@/lib/addonPacks";
+import { AddonGrantCell } from "./AddonGrantCell";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LABELS } from "@/lib/plans";
@@ -39,6 +41,13 @@ export default async function ClientsPage() {
     orderBy: { createdAt: "desc" },
   });
 
+  const activeAddons = await prisma.accountAddon.findMany({
+    where: { userId: { in: owners.map((o) => o.userId) }, status: "ACTIVE", expiresAt: { gt: new Date() } },
+    orderBy: { expiresAt: "asc" },
+  });
+  const addonsByUser = new Map<string, typeof activeAddons>();
+  for (const a of activeAddons) addonsByUser.set(a.userId, [...(addonsByUser.get(a.userId) ?? []), a]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -65,6 +74,7 @@ export default async function ClientsPage() {
                 <th className="px-4 py-3 font-medium">Negocio</th>
                 <th className="px-4 py-3 font-medium">Plan</th>
                 <th className="px-4 py-3 font-medium">Membresía (inicio → vence)</th>
+                <th className="px-4 py-3 font-medium">Paquetes</th>
                 <th className="px-4 py-3 font-medium">Registrado</th>
                 <th className="px-4 py-3 font-medium">Contraseña</th>
               </tr>
@@ -87,6 +97,16 @@ export default async function ClientsPage() {
                       startedAt={business.subscriptionStartedAt}
                       endsAt={business.subscriptionEndsAt}
                       status={subscriptionStatus(business.subscriptionEndsAt)}
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <AddonGrantCell
+                      ownerUserId={user.id}
+                      active={(addonsByUser.get(user.id) ?? []).map((a) => ({
+                        id: a.id,
+                        title: findPack(a.packKey)?.title ?? a.packKey,
+                        expiresAt: a.expiresAt ? formatDate(a.expiresAt) : "",
+                      }))}
                     />
                   </td>
                   <td className="px-4 py-3 text-ink-muted">{formatDate(createdAt)}</td>

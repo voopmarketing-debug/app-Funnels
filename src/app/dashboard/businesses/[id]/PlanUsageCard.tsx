@@ -6,6 +6,7 @@ import { updateBusinessPlan } from "@/lib/actions";
 import { PLAN_TIERS, PLAN_LABELS, type PlanUsageStatus } from "@/lib/plans";
 import type { PlanTier } from "@prisma/client";
 import { RingStat } from "@/components/RingStat";
+import { AddonStore } from "@/components/AddonStore";
 
 const STATUS_STYLES: Record<PlanUsageStatus, { bar: string; label: string; text: string }> = {
   good: { bar: "#0ca30c", label: "Bien", text: "#0ca30c" },
@@ -82,6 +83,15 @@ export function PlanUsageCard({
           {used} / {limit === null ? "∞" : limit} contactos este mes
         </p>
       </div>
+      {limit !== null && (
+        <div className="w-full flex-none sm:w-auto">
+          <AddonStore
+            businessId={businessId}
+            label="Comprar más contactos"
+            className="w-full rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover sm:w-auto"
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { PlanTier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { LINE_LIMITS } from "@/lib/plans";
+import { getAccountAddonCapacity } from "@/lib/addons";
 
 const TIER_RANK: Record<PlanTier, number> = { STARTER: 0, PRO: 1, SCALE: 2 };
 
@@ -30,6 +31,8 @@ export async function getAccountLineStatus(userId: string): Promise<AccountLineS
     "STARTER",
   );
 
-  const limit = LINE_LIMITS[planTier];
+  // Extra lines bought as packs (lib/addons.ts) stack on the plan's own.
+  const baseLimit = LINE_LIMITS[planTier];
+  const limit = baseLimit === null ? null : baseLimit + (await getAccountAddonCapacity(userId)).extraLines;
   return { count, limit, planTier, atLimit: limit !== null && count >= limit };
 }

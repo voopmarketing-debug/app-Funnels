@@ -19,6 +19,7 @@ import {
 import type { AIAgent, Business, Conversation, Message } from "@prisma/client";
 import { synthesizeVoiceNote, transcribeVoiceNote } from "@/lib/tts";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
+import { getAccountAddonCapacity } from "@/lib/addons";
 import { PLAN_LIMITS } from "@/lib/plans";
 import { contactLabel } from "@/lib/contactDisplay";
 import Anthropic from "@anthropic-ai/sdk";
@@ -167,7 +168,10 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       const activeContacts = ownerMembership
         ? await getAccountActiveContactsThisMonth(ownerMembership.userId)
         : await getActiveContactsThisMonth(business.id);
-      if (activeContacts >= planLimit) overPlanLimit = true;
+      // Contact packs bought on top of the plan (see lib/addons.ts) raise
+      // the cap the moment their payment is approved.
+      const extraContacts = ownerMembership ? (await getAccountAddonCapacity(ownerMembership.userId)).extraContacts : 0;
+      if (activeContacts >= planLimit + extraContacts) overPlanLimit = true;
     }
   }
 

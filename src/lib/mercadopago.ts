@@ -36,11 +36,64 @@ async function mpGet(path: string): Promise<Record<string, unknown> | null> {
   return res.json();
 }
 
+export type MpPayment = {
+  id: string;
+  approved: boolean;
+  payer: MpPayer;
+  externalReference: string | null;
+  amount: number;
+  currency: string;
+  description: string;
+};
+
 /** For a one-time payment notification (type: "payment"). */
-export async function fetchMpPayment(id: string): Promise<{ approved: boolean; payer: MpPayer } | null> {
+export async function fetchMpPayment(id: string): Promise<MpPayment | null> {
   const payment = await mpGet(`/v1/payments/${id}`);
   if (!payment) return null;
-  return { approved: payment.status === "approved", payer: (payment.payer as MpPayer) ?? {} };
+  return {
+    id: String(payment.id ?? id),
+    approved: payment.status === "approved",
+    payer: (payment.payer as MpPayer) ?? {},
+    externalReference: typeof payment.external_reference === "string" ? payment.external_reference : null,
+    amount: typeof payment.transaction_amount === "number" ? payment.transaction_amount : 0,
+    currency: typeof payment.currency_id === "string" ? payment.currency_id : "",
+    description: typeof payment.description === "string" ? payment.description : "",
+  };
+}
+
+/**
+ * A one-off Checkout Pro link for one specific purchase. external_reference
+ * carries our own id, so when the payment is approved the webhook knows
+ * exactly which account and pack it was for — no matching by email needed.
+ */
+export async function createMpCheckoutLink(params: {
+  title: string;
+  priceCop: number;
+  externalReference: string;
+  payerEmail?: string;
+  backUrl: string;
+}): Promise<string | null> {
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) return null;
+  const host = process.env.APP_HOST ?? "agente.funnelslabs.app";
+  const res = await fetch(`${MP_API}/checkout/preferences`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      items: [{ title: params.title, quantity: 1, unit_price: params.priceCop, currency_id: "COP" }],
+      external_reference: params.externalReference,
+      notification_url: `https://${host}/api/webhooks/mercadopago`,
+      back_urls: { success: params.backUrl, pending: params.backUrl, failure: params.backUrl },
+      auto_return: "approved",
+      ...(params.payerEmail ? { payer: { email: params.payerEmail } } : {}),
+    }),
+  });
+  if (!res.ok) {
+    console.error("Mercado Pago preference error", res.status, await res.text());
+    return null;
+  }
+  const data = (await res.json()) as { init_point?: string };
+  return data.init_point ?? null;
 }
 
 /** For a subscription notification (type: "subscription_preapproval" / "preapproval"). */

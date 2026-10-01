@@ -70,6 +70,7 @@ export default async function DashboardPage() {
           limit={lineStatus.limit}
           count={lineStatus.count}
           planTier={lineStatus.planTier}
+          billingBusinessId={memberships.find((m) => m.role === "OWNER")?.business.id ?? null}
         />
       </div>
 

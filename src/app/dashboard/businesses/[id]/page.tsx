@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessAnalytics, getActiveContactsThisMonth, isDateRangeKey, type DateRangeKey } from "@/lib/analytics";
 import { RangePills } from "./analytics/RangePills";
+import { getAccountAddonCapacity, getBusinessOwnerId } from "@/lib/addons";
+import { findPack } from "@/lib/addonPacks";
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
@@ -75,10 +77,10 @@ export default async function BusinessPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; compra?: string }>;
 }) {
   const { id } = await params;
-  const { range } = await searchParams;
+  const { range, compra } = await searchParams;
   // "Rendimiento" opens on today's numbers; the pills switch the period.
   const rangeKey: DateRangeKey = range && isDateRangeKey(range) ? range : "today";
   const session = await auth();
@@ -112,8 +114,15 @@ export default async function BusinessPage({
     prisma.membership.count({ where: { businessId: id, role: "MEMBER" } }),
   ]);
 
-  const planLimit = PLAN_LIMITS[business.planTier];
+  // Plan + active packs, counted per account like the agent does.
+  const ownerId = await getBusinessOwnerId(id);
+  const addonCapacity = ownerId ? await getAccountAddonCapacity(ownerId) : null;
+  const basePlanLimit = PLAN_LIMITS[business.planTier];
+  const planLimit = basePlanLimit === null ? null : basePlanLimit + (addonCapacity?.extraContacts ?? 0);
   const planStatus = planUsageStatus(activeContacts, planLimit);
+  // Back from Mercado Pago (?compra=<pack id>): say whether it's active yet.
+  const purchase =
+    compra && ownerId ? await prisma.accountAddon.findFirst({ where: { id: compra, userId: ownerId }, select: { status: true, packKey: true } }) : null;
   const canEditPlan = membership.role === "ADMIN";
 
   // Same "done" rules as Inicio's "Primeros pasos" checklist.
@@ -193,6 +202,18 @@ export default async function BusinessPage({
           </Link>
         </div>
       </header>
+
+      {purchase && (
+        <div
+          className={`rounded-xl border p-4 text-sm ${
+            purchase.status === "ACTIVE" ? "border-accent/50 bg-accent/10 text-ink" : "border-border bg-surface text-ink-muted"
+          }`}
+        >
+          {purchase.status === "ACTIVE"
+            ? `✅ ¡Listo! Tu paquete ${findPack(purchase.packKey)?.title ?? ""} ya está activo y sumado a tu plan.`
+            : "⏳ Estamos confirmando tu pago con Mercado Pago. En cuanto se apruebe, el paquete se activa solo y te avisamos en la campana (recarga en un minuto)."}
+        </div>
+      )}
 
       {canManageBusiness && !setupDone && (
         <section className="fl-card-hero p-4 md:p-5">
