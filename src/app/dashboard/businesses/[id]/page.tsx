@@ -13,6 +13,18 @@ import { StatTile } from "./analytics/StatTile";
 import { ChatIcon, ClockIcon, BoltIcon, HourglassIcon } from "./analytics/StatIcons";
 import { WhatsAppHealthPanel } from "./WhatsAppHealthPanel";
 import { isRecentWebhookError } from "@/lib/whatsappHealth";
+import { IntegrationCard, type IntegrationStatus } from "./IntegrationCard";
+import { WhatsAppLogo, SparkLogo, CatalogLogo, TemplateLogo, WebsiteLogo, TeamLogo } from "./IntegrationLogos";
+
+// Fixed brand tiles — same in light and dark, like Kommo's integration logos.
+const TILE = {
+  whatsapp: "linear-gradient(135deg, #128c4a, #0b5d32)",
+  ai: "linear-gradient(135deg, #8b5cf6, #5b21b6)",
+  catalog: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+  templates: "linear-gradient(135deg, #14b8a6, #0f766e)",
+  website: "linear-gradient(135deg, #f59e0b, #c2410c)",
+  team: "linear-gradient(135deg, #ec4899, #9d174d)",
+};
 
 function formatPercent(value: number | null): string {
   return value === null ? "—" : `${Math.round(value)}%`;
@@ -67,7 +79,7 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
   // entirely for them, not just visually hidden.
   const canManageBusiness = membership.role !== "MEMBER";
 
-  const [analytics, activeContacts, agentMedia] = await Promise.all([
+  const [analytics, activeContacts, agentMedia, approvedTemplates, websiteCount, teamMembers] = await Promise.all([
     getBusinessAnalytics(id),
     getActiveContactsThisMonth(id),
     canManageBusiness
@@ -77,77 +89,40 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           select: { id: true, label: true, mediaType: true, filename: true, sizeBytes: true, url: true },
         })
       : Promise.resolve([]),
+    prisma.messageTemplate.count({ where: { businessId: id, status: "APPROVED" } }),
+    prisma.website.count({ where: { businessId: id } }),
+    prisma.membership.count({ where: { businessId: id, role: "MEMBER" } }),
   ]);
 
   const planLimit = PLAN_LIMITS[business.planTier];
   const planStatus = planUsageStatus(activeContacts, planLimit);
   const canEditPlan = membership.role === "ADMIN";
 
-  return (
-    <div className="space-y-6 md:space-y-8">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold">{business.name}</h1>
-          <p className="fl-mono break-all text-xs tracking-wide text-ink-muted">
-            WhatsApp: {business.wabaPhoneNumberId}
-          </p>
-        </div>
-        {/* On phones the shortcuts scroll sideways in one row instead of
-            pushing the page wider than the screen. */}
-        <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] md:gap-3 md:overflow-visible md:pb-0">
-          <Link
-            href={`/dashboard/businesses/${id}/crm`}
-            className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
-          >
-            Ver CRM
-          </Link>
-          <Link
-            href={`/dashboard/businesses/${id}/analytics`}
-            className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
-          >
-            Ver KPIs
-          </Link>
-          <Link
-            href={`/dashboard/businesses/${id}/templates`}
-            className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
-          >
-            Plantillas
-          </Link>
-          <Link
-            href={`/dashboard/businesses/${id}/website`}
-            className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
-          >
-            Sitio web
-          </Link>
-          {canManageBusiness && (
-            <Link
-              href="/dashboard/account"
-              className="flex-none whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-ink transition hover:border-accent"
-            >
-              Equipo
-            </Link>
-          )}
-          {canManageBusiness && (
-            <div className="order-first flex-none whitespace-nowrap md:order-none">
-              <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
-            </div>
-          )}
-        </div>
-      </div>
+  // Same "done" rules as Inicio's "Primeros pasos" checklist.
+  const whatsappConnected = !!business.wabaPhoneNumberId && !!business.wabaAccessToken;
+  const whatsappBroken = whatsappConnected && business.whatsappHealthOk === false;
+  const promptReady = (business.agent?.systemPrompt?.trim().length ?? 0) >= 120;
+  const hasConversations = analytics.totalConversations > 0;
+  const setupSteps = [
+    { id: "whatsapp", done: whatsappConnected, title: "Conecta tu WhatsApp", body: "Los datos que te da Meta para tu número." },
+    { id: "instrucciones", done: promptReady, title: "Entrena a tu agente", body: "Qué vendes, precios y cómo debe responder." },
+    { id: null, done: hasConversations, title: "Haz una prueba", body: "Escríbele \"Hola\" a tu número desde otro celular." },
+  ];
+  const setupDone = setupSteps.every((step) => step.done);
 
-      {canManageBusiness && (
-        <PlanUsageCard
-          businessId={id}
-          planTier={business.planTier}
-          used={activeContacts}
-          limit={planLimit}
-          status={planStatus}
-          canEditPlan={canEditPlan}
-        />
-      )}
+  const whatsappStatus: IntegrationStatus = whatsappBroken
+    ? { tone: "warn", label: "Revisar conexión" }
+    : whatsappConnected
+      ? { tone: "done", label: "Conectado" }
+      : { tone: "todo", label: "Sin conectar" };
 
-      {canManageBusiness && business.wabaPhoneNumberId && (
-        <WhatsAppHealthPanel
+  // The health panel is reassurance when all is well (shown under the
+  // connections) and an alarm when it isn't (moved to the top).
+  const healthProblem =
+    whatsappBroken || (business.webhookErrorAt !== null && isRecentWebhookError(business.webhookErrorAt));
+  const healthPanel =
+    canManageBusiness && business.wabaPhoneNumberId ? (
+      <WhatsAppHealthPanel
           businessId={id}
           lastWebhookAt={business.lastWebhookAt}
           webhookError={isRecentWebhookError(business.webhookErrorAt) ? business.webhookError : null}
@@ -156,62 +131,203 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           healthMessage={business.whatsappHealthMessage}
           healthCheckedAt={business.whatsappHealthCheckedAt}
         />
+    ) : null;
+
+  const shortcutClass =
+    "flex-none whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm font-medium text-ink-muted transition hover:border-accent hover:text-ink";
+
+  return (
+    <div className="space-y-6 md:space-y-8">
+      <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-xl text-white [&_svg]:h-6 [&_svg]:w-6"
+            style={{ background: TILE.ai }}
+          >
+            <SparkLogo />
+          </span>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-bold">{business.name}</h1>
+            <p className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <span
+                className={`h-1.5 w-1.5 flex-none rounded-full ${
+                  whatsappBroken ? "bg-error" : whatsappConnected ? "bg-accent" : "bg-ink-faint"
+                }`}
+              />
+              {whatsappBroken ? "WhatsApp con problemas" : whatsappConnected ? "WhatsApp conectado" : "WhatsApp sin conectar"}
+            </p>
+          </div>
+        </div>
+        {/* On phones the shortcuts scroll sideways in one row instead of
+            pushing the page wider than the screen. */}
+        <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] md:overflow-visible md:pb-0">
+          {canManageBusiness && (
+            <div className="order-first flex-none whitespace-nowrap md:order-last">
+              <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
+            </div>
+          )}
+          <Link href={`/dashboard/businesses/${id}/crm`} className={shortcutClass}>
+            Conversaciones
+          </Link>
+          <Link href={`/dashboard/businesses/${id}/analytics`} className={shortcutClass}>
+            KPIs
+          </Link>
+        </div>
+      </header>
+
+      {canManageBusiness && !setupDone && (
+        <section className="fl-card-hero p-4 md:p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-base font-semibold">Pon a funcionar tu agente</h2>
+            <p className="text-xs text-ink-muted">
+              {setupSteps.filter((step) => step.done).length} de {setupSteps.length} pasos listos
+            </p>
+          </div>
+          <ol className="mt-4 grid gap-3 md:grid-cols-3">
+            {setupSteps.map((step, index) => {
+              const isNext = !step.done && setupSteps.slice(0, index).every((prev) => prev.done);
+              return (
+                <li
+                  key={step.title}
+                  className={`flex items-start gap-3 rounded-xl border p-3 ${
+                    isNext ? "border-accent/50 bg-accent/5" : "border-border bg-surface/60"
+                  }`}
+                >
+                  <span
+                    className={`fl-mono flex h-7 w-7 flex-none items-center justify-center rounded-full text-xs font-bold ${
+                      step.done ? "bg-accent text-accent-ink" : isNext ? "border-2 border-accent text-accent" : "border border-border text-ink-faint"
+                    }`}
+                  >
+                    {step.done ? "✓" : index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold ${step.done ? "text-ink-muted line-through decoration-ink-faint" : "text-ink"}`}>
+                      {step.title}
+                    </p>
+                    <p className="text-xs text-ink-muted">{step.body}</p>
+                    {isNext && step.id && (
+                      <a
+                        href={`#${step.id}`}
+                        className="mt-2 inline-block rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition hover:bg-accent-hover"
+                      >
+                        Empezar
+                      </a>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
       )}
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile
-          label="Contactos totales"
-          value={String(analytics.totalConversations)}
-          description="Cuántas personas distintas te han escrito por WhatsApp en total, desde siempre."
-          tone="accent"
-          icon={<ChatIcon />}
-        />
-        <StatTile
-          label="Tiempo de respuesta"
-          value={formatMinutes(analytics.responseTime.avgMinutes)}
-          status={responseTimeStatus(analytics.responseTime.avgMinutes)}
-          description="En promedio, cuánto tarda en llegar una respuesta después de que un cliente escribe. Entre menos, mejor experiencia para el cliente."
-          tone="amber"
-          icon={<ClockIcon />}
-        />
-        <StatTile
-          label="Automatización IA"
-          value={formatPercent(analytics.automationRate)}
-          sublabel="de respuestas sin humano"
-          status={automationStatus(analytics.automationRate)}
-          description="De cada 100 respuestas enviadas, cuántas las contestó la IA sola, sin que nadie de tu equipo interviniera a mano."
-          tone="secondary"
-          icon={<BoltIcon />}
-        />
-        <StatTile
-          label="Esperando respuesta"
-          value={String(analytics.awaitingReply)}
-          sublabel="conversaciones sin contestar"
-          status={awaitingReplyStatus(analytics.awaitingReply)}
-          description="Conversaciones donde el cliente escribió último y todavía nadie —ni la IA ni una persona— le ha contestado."
-          tone="blue"
-          icon={<HourglassIcon />}
-        />
-      </section>
+      {healthProblem && healthPanel}
 
       {canManageBusiness ? (
-        <div className="grid items-start gap-6 lg:grid-cols-2">
-          <AgentForm
-            businessId={id}
-            systemPrompt={business.agent?.systemPrompt ?? ""}
-            tone={business.agent?.tone ?? "cercano"}
-            replyLength={business.agent?.replyLength ?? "breve"}
-            industry={business.industry}
-          />
-
-          <WabaCredentialsForm
-            businessId={id}
-            wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""}
-            wabaId={business.wabaId ?? ""}
-          />
-
-          <AgentMediaManager businessId={id} media={agentMedia} />
-        </div>
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Conexiones del agente</h2>
+            <p className="text-xs text-ink-muted">
+              Todo lo que tu agente necesita para vender. Empieza por lo <span className="font-semibold text-accent">obligatorio</span>.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <IntegrationCard
+              id="whatsapp"
+              title="WhatsApp Business"
+              description="Conecta tu número con los datos que te da Meta para que el agente reciba y responda mensajes."
+              logo={<WhatsAppLogo />}
+              logoBackground={TILE.whatsapp}
+              status={whatsappStatus}
+              actionLabel={whatsappConnected ? "Configurar" : "Conectar"}
+              required
+              dialogTitle="Conectar WhatsApp Business"
+            >
+              <WabaCredentialsForm
+                businessId={id}
+                wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""}
+                wabaId={business.wabaId ?? ""}
+              />
+            </IntegrationCard>
+            <IntegrationCard
+              id="instrucciones"
+              title="Instrucciones del agente"
+              description="Qué vendes, precios, horarios y cómo debe hablarle la IA a tus clientes."
+              logo={<SparkLogo />}
+              logoBackground={TILE.ai}
+              status={promptReady ? { tone: "done", label: "Entrenado" } : { tone: "todo", label: "Sin entrenar" }}
+              actionLabel={promptReady ? "Editar" : "Entrenar"}
+              required
+              dialogTitle="Instrucciones del agente de IA"
+            >
+              <AgentForm
+                businessId={id}
+                systemPrompt={business.agent?.systemPrompt ?? ""}
+                tone={business.agent?.tone ?? "cercano"}
+                replyLength={business.agent?.replyLength ?? "breve"}
+                industry={business.industry}
+              />
+            </IntegrationCard>
+            <IntegrationCard
+              id="catalogo"
+              title="Fotos y catálogo"
+              description="Fotos de productos o un PDF que la IA envía sola cuando un cliente los pide."
+              logo={<CatalogLogo />}
+              logoBackground={TILE.catalog}
+              status={
+                agentMedia.length > 0
+                  ? { tone: "done", label: `${agentMedia.length} ${agentMedia.length === 1 ? "archivo" : "archivos"}` }
+                  : { tone: "todo", label: "Sin archivos" }
+              }
+              actionLabel={agentMedia.length > 0 ? "Administrar" : "Agregar"}
+              dialogTitle="Fotos y catálogo para la IA"
+            >
+              <AgentMediaManager businessId={id} media={agentMedia} />
+            </IntegrationCard>
+            <IntegrationCard
+              id="plantillas"
+              title="Plantillas de WhatsApp"
+              description="Mensajes aprobados por Meta para escribir después de 24 h y enviar difusiones."
+              logo={<TemplateLogo />}
+              logoBackground={TILE.templates}
+              status={
+                approvedTemplates > 0
+                  ? { tone: "done", label: `${approvedTemplates} ${approvedTemplates === 1 ? "aprobada" : "aprobadas"}` }
+                  : { tone: "todo", label: business.wabaId ? "Ninguna aprobada" : "Requiere WABA ID" }
+              }
+              actionLabel={approvedTemplates > 0 ? "Ver plantillas" : "Crear"}
+              href={`/dashboard/businesses/${id}/templates`}
+            />
+            <IntegrationCard
+              id="sitio-web"
+              title="Sitio web y agenda"
+              description="Una página hecha con IA y un calendario de citas que llevan clientes a tu WhatsApp."
+              logo={<WebsiteLogo />}
+              logoBackground={TILE.website}
+              status={
+                websiteCount > 0
+                  ? { tone: "done", label: `${websiteCount} ${websiteCount === 1 ? "página" : "páginas"}` }
+                  : { tone: "todo", label: "Sin páginas" }
+              }
+              actionLabel={websiteCount > 0 ? "Ver páginas" : "Crear"}
+              href={`/dashboard/businesses/${id}/website`}
+            />
+            <IntegrationCard
+              id="equipo"
+              title="Equipo de ventas"
+              description="Invita a tus vendedores para que atiendan conversaciones desde el CRM."
+              logo={<TeamLogo />}
+              logoBackground={TILE.team}
+              status={
+                teamMembers > 0
+                  ? { tone: "done", label: `${teamMembers} ${teamMembers === 1 ? "vendedor" : "vendedores"}` }
+                  : { tone: "todo", label: "Solo tú" }
+              }
+              actionLabel={teamMembers > 0 ? "Administrar" : "Invitar"}
+              href="/dashboard/account"
+            />
+          </div>
+        </section>
       ) : (
         <div className="fl-card p-6 text-center">
           <p className="text-sm text-ink">
@@ -226,6 +342,57 @@ export default async function BusinessPage({ params }: { params: Promise<{ id: s
           </Link>
         </div>
       )}
+
+      {!healthProblem && healthPanel}
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">Rendimiento</h2>
+        {canManageBusiness && (
+          <PlanUsageCard
+            businessId={id}
+            planTier={business.planTier}
+            used={activeContacts}
+            limit={planLimit}
+            status={planStatus}
+            canEditPlan={canEditPlan}
+          />
+        )}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile
+            label="Contactos totales"
+            value={String(analytics.totalConversations)}
+            description="Cuántas personas distintas te han escrito por WhatsApp en total, desde siempre."
+            tone="accent"
+            icon={<ChatIcon />}
+          />
+          <StatTile
+            label="Tiempo de respuesta"
+            value={formatMinutes(analytics.responseTime.avgMinutes)}
+            status={responseTimeStatus(analytics.responseTime.avgMinutes)}
+            description="En promedio, cuánto tarda en llegar una respuesta después de que un cliente escribe. Entre menos, mejor experiencia para el cliente."
+            tone="amber"
+            icon={<ClockIcon />}
+          />
+          <StatTile
+            label="Automatización IA"
+            value={formatPercent(analytics.automationRate)}
+            sublabel="de respuestas sin humano"
+            status={automationStatus(analytics.automationRate)}
+            description="De cada 100 respuestas enviadas, cuántas las contestó la IA sola, sin que nadie de tu equipo interviniera a mano."
+            tone="secondary"
+            icon={<BoltIcon />}
+          />
+          <StatTile
+            label="Esperando respuesta"
+            value={String(analytics.awaitingReply)}
+            sublabel="conversaciones sin contestar"
+            status={awaitingReplyStatus(analytics.awaitingReply)}
+            description="Conversaciones donde el cliente escribió último y todavía nadie —ni la IA ni una persona— le ha contestado."
+            tone="blue"
+            icon={<HourglassIcon />}
+          />
+        </div>
+      </section>
     </div>
   );
 }

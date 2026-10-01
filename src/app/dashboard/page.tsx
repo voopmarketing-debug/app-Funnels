@@ -192,15 +192,15 @@ async function BusinessOverview({ businessId, role, now }: { businessId: string;
   const healthy = connected && business.whatsappHealthOk !== false;
 
   const steps = [
-    { done: connected, title: "Conecta tu WhatsApp", body: "Pega el Phone Number ID y el token de Meta.", href: base, cta: "Conectar" },
+    { done: connected, title: "Conecta tu WhatsApp", body: "Pega el Phone Number ID y el token de Meta.", href: `${base}#whatsapp`, cta: "Conectar" },
     {
       done: (business.agent?.systemPrompt?.trim().length ?? 0) >= 120,
       title: "Entrena a tu agente",
       body: "Cuéntale a la IA qué vendes, precios y cómo responder.",
-      href: base,
+      href: `${base}#instrucciones`,
       cta: "Escribir instrucciones",
     },
-    { done: mediaCount > 0, title: "Sube fotos o tu catálogo", body: "La IA podrá enviarlos cuando un cliente los pida.", href: base, cta: "Subir archivos" },
+    { done: mediaCount > 0, title: "Sube fotos o tu catálogo", body: "La IA podrá enviarlos cuando un cliente los pida.", href: `${base}#catalogo`, cta: "Subir archivos" },
     { done: websiteCount > 0, title: "Crea tu página web", body: "Una landing hecha con IA que lleva clientes a tu WhatsApp.", href: `${base}/website`, cta: "Crear página" },
     {
       done: approvedTemplates > 0,

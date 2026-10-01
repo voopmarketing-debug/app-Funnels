@@ -5,11 +5,6 @@ import { useRouter } from "next/navigation";
 import { addAgentMedia, deleteAgentMedia } from "@/lib/actions";
 import { MAX_AGENT_MEDIA_PER_BUSINESS } from "@/lib/attachments";
 
-// Distinct from --glow-secondary (agent instructions) and the custom
-// WhatsApp green (credentials) so all three collapsible cards on this page
-// read as separate things at a glance.
-const TONE_VAR = "--glow-blue";
-
 export type AgentMediaItem = {
   id: string;
   label: string;
@@ -54,37 +49,7 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
   }
 
   return (
-    <details
-      className="group self-start overflow-hidden rounded-2xl border p-4"
-      style={{
-        borderColor: `rgba(var(${TONE_VAR}), 0.28)`,
-        background: `radial-gradient(120% 140% at 100% 0%, rgba(var(${TONE_VAR}), 0.16), transparent 60%), var(--surface)`,
-      }}
-    >
-      <summary className="flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
-        <span
-          className="flex h-8 w-8 flex-none items-center justify-center rounded-xl"
-          style={{ backgroundColor: `rgba(var(${TONE_VAR}), 0.16)`, color: `rgba(var(${TONE_VAR}), 1)` }}
-        >
-          <PhotoIcon />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="fl-mono block text-xs tracking-wide text-ink uppercase">
-            Fotos y catálogo para la IA ({media.length}/{MAX_AGENT_MEDIA_PER_BUSINESS})
-          </span>
-          <span className="mt-0.5 block text-xs normal-case text-ink-faint group-open:hidden">
-            Haz clic para subir fotos o un PDF que la IA pueda enviar por WhatsApp.
-          </span>
-        </span>
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          className="h-4 w-4 flex-none transition-transform group-open:rotate-180"
-          style={{ color: `rgba(var(${TONE_VAR}), 1)` }}
-        >
-          <path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </summary>
+    <div className="space-y-4">
 
       <p className="mt-4 text-sm text-ink">
         Sube fotos de tus productos o un PDF (catálogo, ficha técnica, lista de precios). La IA decide por su cuenta
@@ -159,7 +124,7 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
           {error && <p className="text-xs text-error">{error}</p>}
         </form>
       )}
-    </details>
+    </div>
   );
 }
 

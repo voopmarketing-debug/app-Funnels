@@ -2,7 +2,6 @@
 
 import { useActionState } from "react";
 import { updateWabaCredentials } from "@/lib/actions";
-import { WhatsAppSmallIcon } from "./analytics/StatIcons";
 
 // WhatsApp's own brand green — deliberately not one of the shared KPI
 // tones (accent/secondary/amber/blue), so this card reads as "WhatsApp"
@@ -45,37 +44,7 @@ export function WabaCredentialsForm({
   );
 
   return (
-    <details
-      className="group self-start overflow-hidden rounded-2xl border p-4"
-      style={{
-        borderColor: `rgba(${WHATSAPP_GREEN}, 0.28)`,
-        background: `radial-gradient(120% 140% at 100% 0%, rgba(${WHATSAPP_GREEN}, 0.16), transparent 60%), var(--surface)`,
-      }}
-    >
-      <summary className="flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden">
-        <span
-          className="flex h-8 w-8 flex-none items-center justify-center rounded-xl"
-          style={{ backgroundColor: `rgba(${WHATSAPP_GREEN}, 0.16)`, color: `rgba(${WHATSAPP_GREEN}, 1)` }}
-        >
-          <WhatsAppSmallIcon />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="fl-mono block text-xs tracking-wide text-ink uppercase">
-            Credenciales de WhatsApp — paso obligatorio
-          </span>
-          <span className="mt-0.5 block text-xs normal-case text-ink-faint group-open:hidden">
-            Haz clic para configurar el Phone Number ID y el token que te da Meta.
-          </span>
-        </span>
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          className="h-4 w-4 flex-none transition-transform group-open:rotate-180"
-          style={{ color: `rgba(${WHATSAPP_GREEN}, 1)` }}
-        >
-          <path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </summary>
+    <div className="space-y-4">
 
       <p className="mt-4 text-sm text-ink">
         Sin esto bien puesto, tu agente de IA <strong>no puede enviar ni recibir</strong> mensajes
@@ -187,6 +156,6 @@ export function WabaCredentialsForm({
           </div>
         )}
       </form>
-    </details>
+    </div>
   );
 }
