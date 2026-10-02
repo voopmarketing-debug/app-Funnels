@@ -77,7 +77,8 @@ export function SalesDiagnosisPanel({
   // Collapsed by default so a returning visit doesn't add a wall of text to
   // an already-long page — but pops open right after a fresh generation, so
   // the thing you just asked for is the thing you see.
-  const [expanded, setExpanded] = useState(false);
+  const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("todo");
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   function handleGenerate() {
     setNotice(null);
@@ -85,7 +86,7 @@ export function SalesDiagnosisPanel({
       const result: SalesDiagnosisResult = await generateSalesDiagnosis(businessId);
       if (result.status === "ok") {
         setCurrent({ diagnosis: result.diagnosis, generatedAt: result.generatedAt });
-        setExpanded(true);
+        setTab("todo");
       } else if (result.status === "insufficient_data") {
         setNotice(
           "Todavía no hay suficientes conversaciones reales para un diagnóstico útil. Necesitas al menos unas cuantas conversaciones con varios mensajes cada una.",
@@ -100,109 +101,133 @@ export function SalesDiagnosisPanel({
   const verdict = d ? scoreVerdict(d.puntuacion) : null;
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-ink">Diagnóstico de ventas</h2>
-          <p className="max-w-2xl text-sm text-ink-muted">
-            La IA lee tus conversaciones reales de WhatsApp y te dice qué mejorar para vender más.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {current && (
+    <section className="fl-ai-frame rounded-[1.35rem] p-[1.5px]">
+      <div className="space-y-4 rounded-[1.3rem] bg-surface p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="fl-ai-badge flex h-10 w-10 flex-none items-center justify-center rounded-xl text-lg text-white">✦</span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold leading-tight text-ink">Diagnóstico de ventas con IA</h2>
+              <p className="text-sm text-ink-muted">La IA leyó tus conversaciones reales y te dice qué mejorar para vender más.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {current && (
+              <button
+                type="button"
+                onClick={() => downloadDiagnosisPdf(businessName, current.diagnosis, current.generatedAt)}
+                className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold text-ink transition hover:border-accent"
+              >
+                <DownloadIcon /> PDF
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => downloadDiagnosisPdf(businessName, current.diagnosis, current.generatedAt)}
-              className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold text-ink transition hover:border-accent"
+              onClick={handleGenerate}
+              disabled={isPending}
+              className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
             >
-              <DownloadIcon /> PDF
+              {isPending && <span className="h-2 w-2 animate-pulse rounded-full bg-accent-ink" />}
+              {isPending ? "Analizando…" : current ? "Actualizar" : "Generar diagnóstico"}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={isPending}
-            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
-          >
-            {isPending && <span className="h-2 w-2 animate-pulse rounded-full bg-accent-ink" />}
-            {isPending ? "Analizando…" : current ? "Actualizar" : "Generar diagnóstico"}
-          </button>
+          </div>
         </div>
-      </div>
 
-      {isPending && <p className="text-sm text-ink-muted">Puede tardar hasta 30 segundos: está leyendo tus conversaciones a fondo.</p>}
-      {notice && <p className="rounded-lg border border-border-strong bg-surface-2 p-3 text-sm text-ink">{notice}</p>}
+        {isPending && (
+          <p className="flex items-center gap-2 text-sm text-ink-muted">
+            <span className="fl-ai-badge h-2 w-2 animate-ping rounded-full" />
+            Leyendo tus conversaciones a fondo. Tarda hasta 30 segundos.
+          </p>
+        )}
+        {notice && <p className="rounded-lg border border-border-strong bg-surface-2 p-3 text-sm text-ink">{notice}</p>}
 
-      {!current && !notice && !isPending && (
-        <div className="fl-card p-5 text-sm text-ink-muted">
-          Todavía no tienes un diagnóstico. Genéralo y la IA te dirá qué está funcionando, qué te está costando ventas y qué hacer primero.
-        </div>
-      )}
+        {!current && !notice && !isPending && (
+          <p className="text-sm text-ink-muted">
+            Todavía no tienes un diagnóstico. Genéralo y la IA te dirá qué está funcionando, qué te está costando ventas y qué hacer primero.
+          </p>
+        )}
 
-      {d && verdict && current && (
-        <>
-          {/* Score + summary: the one thing to read */}
-          <div className="fl-card flex flex-col gap-5 p-5 md:flex-row md:items-center">
-            <ScoreRing score={d.puntuacion} color={verdict.color} />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: verdict.bg, color: verdict.text }}>
-                  {verdict.label}
-                </span>
-                <span className="text-xs text-ink-muted">Generado el {formatDate(current.generatedAt)}</span>
+        {d && verdict && current && (
+          <>
+            {/* Score + verdict + summary, compact: the summary folds after 3 lines. */}
+            <div className="flex gap-4 rounded-2xl bg-surface-2/60 p-4">
+              <ScoreRing score={d.puntuacion} color={verdict.color} />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: verdict.bg, color: verdict.text }}>
+                    {verdict.label}
+                  </span>
+                  <span className="text-xs text-ink-muted">{formatDate(current.generatedAt)}</span>
+                </div>
+                <p className={`text-[15px] leading-relaxed text-ink ${summaryOpen ? "" : "line-clamp-3"}`}>{d.resumen}</p>
+                <button type="button" onClick={() => setSummaryOpen((v) => !v)} className="py-1 text-sm font-semibold text-accent">
+                  {summaryOpen ? "Ver menos" : "Leer resumen completo"}
+                </button>
               </div>
-              <p className="text-[15px] leading-relaxed text-ink">{d.resumen}</p>
             </div>
-          </div>
 
-          {/* The first thing to do */}
-          {d.recomendaciones[0] && (
-            <div className="rounded-2xl border-2 border-accent/50 bg-accent/10 p-5">
-              <p className="text-xs font-bold uppercase tracking-wide text-accent">Empieza por aquí</p>
-              <p className="mt-1.5 text-[15px] font-medium leading-relaxed text-ink">{d.recomendaciones[0]}</p>
+            {d.recomendaciones[0] && (
+              <div className="flex gap-3 rounded-2xl border border-accent/40 bg-accent/10 p-4">
+                <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-ink">1</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-accent">Empieza por aquí</p>
+                  <p className="mt-0.5 text-[15px] font-medium leading-relaxed text-ink">{d.recomendaciones[0]}</p>
+                </div>
+              </div>
+            )}
+
+            {/* One list at a time instead of three stacked: much less scroll. */}
+            <div>
+              <div role="tablist" aria-label="Detalle del diagnóstico" className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1">
+                {TABS.map((t) => {
+                  const count = t.key === "fix" ? d.debilidades.length : t.key === "todo" ? Math.max(0, d.recomendaciones.length - 1) : d.fortalezas.length;
+                  const active = tab === t.key;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setTab(t.key)}
+                      className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 py-2.5 text-[13px] font-semibold transition sm:text-sm ${
+                        active ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+                      }`}
+                    >
+                      <span className={`hidden h-2 w-2 flex-none rounded-full sm:block ${t.dot}`} />
+                      <span className="truncate">{t.label}</span>
+                      <span className="flex-none text-xs font-normal text-ink-muted">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <ul role="tabpanel" className="mt-3 divide-y divide-border">
+                {/* "Qué hacer" continues after the first step, already shown in "Empieza por aquí". */}
+                {(tab === "fix" ? d.debilidades : tab === "todo" ? d.recomendaciones.slice(1) : d.fortalezas).map((item, i) => (
+                  <li key={`${tab}-${i}`} className="flex gap-3 py-3 text-sm leading-relaxed text-ink first:pt-1 last:pb-0">
+                    {tab === "todo" ? (
+                      <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">{i + 2}</span>
+                    ) : tab === "fix" ? (
+                      <span className="mt-2 h-2 w-2 flex-none rounded-full bg-error" />
+                    ) : (
+                      <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[#0ca30c]/15 text-[11px] font-bold text-[var(--status-good)]">✓</span>
+                    )}
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <DiagnosisList
-              title="Qué te está costando ventas"
-              subtitle="Lo que pasó en tus conversaciones reales"
-              tone="bad"
-              items={d.debilidades}
-            />
-            <DiagnosisList
-              title="Qué hacer para vender más"
-              subtitle="En orden de prioridad"
-              tone="todo"
-              items={d.recomendaciones}
-              numbered
-            />
-          </div>
-
-          <details open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)} className="fl-card group p-5">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
-              <span>
-                <span className="block text-sm font-semibold text-ink">Lo que ya haces bien ({d.fortalezas.length})</span>
-                <span className="block text-xs text-ink-muted">Mantén esto: está funcionando</span>
-              </span>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="flex-none text-ink-muted transition-transform group-open:rotate-180">
-                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </summary>
-            <ul className="mt-4 divide-y divide-border">
-              {d.fortalezas.map((item, i) => (
-                <li key={i} className="flex gap-3 py-3 text-sm leading-relaxed text-ink first:pt-0 last:pb-0">
-                  <span className="mt-1 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-[#0ca30c]/15 text-[11px] font-bold text-[var(--status-good)]">✓</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </section>
   );
 }
+
+const TABS = [
+  { key: "todo", label: "Qué hacer", dot: "bg-accent" },
+  { key: "fix", label: "Te cuesta", dot: "bg-error" },
+  { key: "good", label: "Lo bueno", dot: "bg-[#0ca30c]" },
+] as const;
 
 function scoreVerdict(score: number): { label: string; color: string; bg: string; text: string } {
   if (score >= 8) return { label: "Tu agente vende muy bien", color: "#0ca30c", bg: "rgba(12,163,12,0.12)", text: "var(--status-good)" };
@@ -214,48 +239,15 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
   const r = 34;
   const c = 2 * Math.PI * r;
   return (
-    <div className="relative h-24 w-24 flex-none" role="img" aria-label={`Puntuación ${score} de 10`}>
+    <div className="relative h-16 w-16 flex-none md:h-20 md:w-20" role="img" aria-label={`Puntuación ${score} de 10`}>
       <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
         <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" style={{ stroke: "var(--surface-2)" }} />
         <circle cx="40" cy="40" r={r} fill="none" strokeWidth="7" strokeLinecap="round" stroke={color} strokeDasharray={`${(score / 10) * c} ${c}`} />
       </svg>
       <span className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold tabular-nums text-ink">{score}</span>
+        <span className="text-xl font-bold tabular-nums text-ink md:text-2xl">{score}</span>
         <span className="text-[11px] text-ink-muted">de 10</span>
       </span>
-    </div>
-  );
-}
-
-function DiagnosisList({
-  title,
-  subtitle,
-  items,
-  tone,
-  numbered = false,
-}: {
-  title: string;
-  subtitle: string;
-  items: string[];
-  tone: "bad" | "todo";
-  numbered?: boolean;
-}) {
-  return (
-    <div className="fl-card p-5">
-      <h3 className="text-sm font-semibold text-ink">{title}</h3>
-      <p className="text-xs text-ink-muted">{subtitle}</p>
-      <ul className="mt-4 divide-y divide-border">
-        {items.map((item, i) => (
-          <li key={i} className="flex gap-3 py-3 text-sm leading-relaxed text-ink first:pt-0 last:pb-0">
-            {numbered ? (
-              <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">{i + 1}</span>
-            ) : (
-              <span className={`mt-2 h-2 w-2 flex-none rounded-full ${tone === "bad" ? "bg-error" : "bg-accent"}`} />
-            )}
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
