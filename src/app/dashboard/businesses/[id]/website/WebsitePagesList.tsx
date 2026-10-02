@@ -275,7 +275,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
                 type="button"
                 onClick={startEditingName}
                 title="Renombrar esta página — por ejemplo, qué paso de tu embudo es"
-                className="group/name flex max-w-full items-center gap-1.5 text-left"
+                className="group/name flex max-w-full items-center gap-1.5 py-1 text-left"
               >
                 {page.pageType === "agenda" && (
                   <span className="fl-mono flex-none rounded-full bg-[rgba(var(--glow-secondary),0.15)] px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--glow-secondary))]">
@@ -283,7 +283,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
                   </span>
                 )}
                 <span className="truncate font-semibold text-ink">{page.name}</span>
-                <PencilIcon className="flex-none text-ink-faint opacity-0 transition group-hover/name:opacity-100" />
+                <PencilIcon className="flex-none text-ink-faint opacity-0 transition group-hover/name:opacity-100 [@media(pointer:coarse)]:opacity-100" />
               </button>
             )}
             {renameError && <p className="mt-0.5 text-xs text-error">{renameError}</p>}
@@ -300,9 +300,9 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
                 });
               }
             }}
-            className="flex-none text-xs text-ink-faint hover:text-error"
+            className="-mr-2 -mt-1 flex-none rounded-md px-2 py-2 text-xs text-ink-muted hover:text-error disabled:opacity-60"
           >
-            Eliminar
+            {isDeleting ? "Eliminando…" : "Eliminar"}
           </button>
         </div>
 
@@ -311,7 +311,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="fl-mono block truncate text-xs text-accent hover:underline"
+          className="fl-mono block truncate py-1.5 text-xs text-accent hover:underline"
         >
           {publicUrl}
         </a>

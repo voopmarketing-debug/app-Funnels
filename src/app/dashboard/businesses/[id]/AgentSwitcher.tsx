@@ -24,7 +24,7 @@ export function AgentSwitcher({
     <select
       value={currentId}
       onChange={(e) => router.push(`/dashboard/businesses/${e.target.value}/${section}`)}
-      className="fl-mono w-full max-w-[14rem] rounded-md border border-border bg-surface px-2 py-1.5 text-xs uppercase tracking-wide text-ink outline-none focus:border-accent"
+      className="fl-mono w-full max-w-[14rem] rounded-md border border-border bg-surface px-2 py-2.5 text-xs uppercase sm:py-1.5 tracking-wide text-ink outline-none focus:border-accent"
     >
       {businesses.map((b) => (
         <option key={b.id} value={b.id}>

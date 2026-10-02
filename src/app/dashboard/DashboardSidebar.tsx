@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
@@ -267,14 +267,34 @@ export function DashboardSidebar({
   // notification bell), so mobile doesn't need a second header row.
   mobileActions?: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const realPathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  // The item just tapped, highlighted right away (before the next page has
+  // loaded) so the tap visibly registers.
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const pathname = pendingPath ?? realPathname;
 
-  // Closes the drawer automatically after tapping a link (route changes),
-  // instead of leaving it open over the newly-navigated page.
-  useEffect(() => {
+  // Route changed: close the drawer and drop the optimistic highlight
+  // (adjusted during render, React's pattern for state derived from props).
+  const [lastPathname, setLastPathname] = useState(realPathname);
+  if (lastPathname !== realPathname) {
+    setLastPathname(realPathname);
     setMobileOpen(false);
-  }, [pathname]);
+    setPendingPath(null);
+  }
+
+  // Any link tapped in the menu: close the drawer at once (not when the next
+  // page finishes loading) and highlight the destination. Runs in the
+  // bubble phase, after <Link> has started its client-side navigation —
+  // unmounting the drawer before that would turn it into a full reload.
+  function handleNavTap(e: React.MouseEvent) {
+    const link = (e.target as Element).closest("a");
+    if (!link || link.target === "_blank") return;
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    setMobileOpen(false);
+    if (url.pathname !== realPathname) setPendingPath(url.pathname);
+  }
 
   return (
     <>
@@ -291,7 +311,7 @@ export function DashboardSidebar({
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Abrir menú"
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-border text-ink-muted transition hover:border-accent hover:text-accent"
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-border text-ink-muted transition hover:border-accent hover:text-accent"
           >
             <MenuIcon />
           </button>
@@ -304,7 +324,7 @@ export function DashboardSidebar({
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} aria-hidden="true" />
-          <aside className="relative flex h-full w-64 flex-col gap-2 bg-surface py-5 shadow-xl">
+          <aside onClick={handleNavTap} className="relative flex h-full w-64 flex-col gap-2 bg-surface py-5 shadow-xl">
             <div className="mb-2 flex items-center justify-between px-4">
               <Link href="/dashboard" className="flex items-center gap-2.5">
                 <FunnelsLogoMark className="h-6 w-6 flex-none" />
@@ -326,7 +346,7 @@ export function DashboardSidebar({
 
       {/* Desktop sidebar — identical to before, just now explicitly hidden
           below md so it doesn't fight the mobile top bar above for space. */}
-      <aside className="hidden min-h-screen w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5 md:flex">
+      <aside onClick={handleNavTap} className="hidden min-h-screen w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5 md:flex">
         <Link href="/dashboard" className="mb-4 flex items-center gap-2.5 px-4">
           <FunnelsLogoMark className="h-6 w-6 flex-none" />
           <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>

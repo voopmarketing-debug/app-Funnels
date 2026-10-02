@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { NavProgress } from "@/components/NavProgress";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardSidebar } from "./DashboardSidebar";
@@ -87,6 +89,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex min-h-screen flex-col md:flex-row">
       <div className="fl-ambient-bg" />
       <NotificationSoundPoller />
+      <Suspense fallback={null}>
+        <NavProgress />
+      </Suspense>
       <DashboardSidebar
         isAgencyAdmin={isAgencyAdmin}
         primaryBusinessId={primaryBusiness?.businessId ?? null}

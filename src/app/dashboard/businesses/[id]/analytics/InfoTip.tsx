@@ -28,7 +28,7 @@ export function InfoTip({ text, label }: { text: string; label: string }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`Qué significa ${label}`}
-        className="flex h-5 w-5 items-center justify-center rounded-full text-ink-faint transition hover:bg-surface-2 hover:text-ink"
+        className="fl-hit flex h-6 w-6 items-center justify-center rounded-full text-ink-faint transition hover:bg-surface-2 hover:text-ink"
       >
         <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
           <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.6" />

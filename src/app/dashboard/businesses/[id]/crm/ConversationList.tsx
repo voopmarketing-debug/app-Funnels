@@ -80,7 +80,7 @@ export function ConversationList({
                 title={f.hint}
                 onClick={() => setFilter(f.id)}
                 aria-pressed={active}
-                className={`flex flex-none items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                className={`flex flex-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition sm:py-1 ${
                   active ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-muted hover:text-ink"
                 }`}
               >

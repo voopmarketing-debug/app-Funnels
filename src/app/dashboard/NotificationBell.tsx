@@ -50,7 +50,7 @@ export function NotificationBell({ notifications, unreadCount }: { notifications
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Notificaciones"
-        className="relative flex h-8 w-8 items-center justify-center rounded-full text-ink-muted transition hover:bg-surface hover:text-ink"
+        className="relative flex h-10 w-10 items-center justify-center rounded-full text-ink-muted transition hover:bg-surface hover:text-ink"
       >
         <BellIcon />
         {unreadCount > 0 && (

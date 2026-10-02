@@ -33,7 +33,7 @@ export function RangePills({ value }: { value: DateRangeKey }) {
             role="radio"
             aria-checked={active}
             onClick={() => startTransition(() => router.push(`${pathname}?range=${pill.key}`, { scroll: false }))}
-            className={`flex-none whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+            className={`flex-none whitespace-nowrap rounded-md px-3 py-2.5 text-xs font-semibold transition sm:py-1.5 ${
               active ? "bg-accent text-accent-ink shadow-sm" : "text-ink-muted hover:text-ink"
             }`}
           >

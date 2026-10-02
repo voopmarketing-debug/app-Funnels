@@ -272,7 +272,7 @@ async function BusinessOverview({ businessId, role, now }: { businessId: string;
                   {!s.done && (
                     <>
                       <p className="text-xs text-ink-muted">{s.body}</p>
-                      <Link href={s.href} className="mt-1 inline-block text-xs font-semibold text-accent hover:underline">
+                      <Link href={s.href} className="mt-0.5 inline-block py-2 text-sm font-semibold text-accent hover:underline">
                         {s.cta} →
                       </Link>
                     </>
@@ -534,7 +534,7 @@ function HelpCard({ icon, title, body, cta, href }: { icon: string; title: strin
       <div className="space-y-1">
         <h3 className="text-sm font-semibold text-ink">{title}</h3>
         <p className="text-xs text-ink-muted">{body}</p>
-        <a href={href} target="_blank" rel="noopener noreferrer" className="inline-block pt-1 text-xs font-semibold text-accent hover:underline">
+        <a href={href} target="_blank" rel="noopener noreferrer" className="inline-block py-2 text-sm font-semibold text-accent hover:underline">
           {cta} →
         </a>
       </div>
