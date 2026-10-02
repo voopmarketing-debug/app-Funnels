@@ -1,26 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+
+// After this long with the next page still not on screen, load it the
+// classic way (a full page load) — exactly what refreshing did by hand
+// when a navigation got stuck (e.g. a server that was asleep and took too
+// long to answer the in-app request).
+const STUCK_AFTER_MS = 6000;
+
+function stillLoading(): boolean {
+  return !!document.querySelector("[data-loading-skeleton]");
+}
 
 /**
  * A thin bar at the top of the screen that appears the instant a link is
- * tapped and disappears when the next page is on screen — so a tap always
- * shows a response, even on a slow phone or connection.
+ * tapped and stays until the next page is really on screen — and a
+ * watchdog that never lets a navigation hang.
  */
 export function NavProgress() {
   const pathname = usePathname();
   const search = useSearchParams().toString();
   const [active, setActive] = useState(false);
+  const pending = useRef<{ from: string; to: string; timer: ReturnType<typeof setTimeout> } | null>(null);
 
+  // The route changed: hide the bar once the page (not its skeleton) shows.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the route changed: navigation done
-    setActive(false);
+    let id: ReturnType<typeof setInterval> | undefined;
+    const settle = () => {
+      if (stillLoading()) return false;
+      setActive(false);
+      return true;
+    };
+    if (!settle()) id = setInterval(() => settle() && clearInterval(id), 150);
+    return () => clearInterval(id);
   }, [pathname, search]);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const link = (e.target as Element | null)?.closest?.("a");
       if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
       const url = new URL(link.href, window.location.href);
@@ -29,17 +47,28 @@ export function NavProgress() {
       // API routes are full page loads, not in-app navigations.
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
       if (url.pathname.startsWith("/sitio") || url.pathname.startsWith("/api")) return;
+
       setActive(true);
+      if (pending.current) clearTimeout(pending.current.timer);
+      const from = window.location.pathname + window.location.search;
+      const to = url.pathname + url.search;
+      pending.current = {
+        from,
+        to,
+        timer: setTimeout(() => {
+          const here = window.location.pathname + window.location.search;
+          // Never left the page, or arrived but only the skeleton is showing.
+          if (here === from || stillLoading()) window.location.assign(to);
+          pending.current = null;
+        }, STUCK_AFTER_MS),
+      };
     }
     document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      if (pending.current) clearTimeout(pending.current.timer);
+    };
   }, []);
-
-  useEffect(() => {
-    if (!active) return;
-    const id = setTimeout(() => setActive(false), 15000);
-    return () => clearTimeout(id);
-  }, [active]);
 
   return (
     <div

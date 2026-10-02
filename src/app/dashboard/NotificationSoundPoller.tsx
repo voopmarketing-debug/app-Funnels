@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getUnreadNotificationCount } from "@/lib/actions";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -55,7 +54,12 @@ export function NotificationSoundPoller() {
     async function poll() {
       let count: number;
       try {
-        count = await getUnreadNotificationCount();
+        // Skip while the tab is in the background; a plain fetch (not a
+        // Server Action) so it never holds up a page navigation.
+        if (document.visibilityState === "hidden") return;
+        const res = await fetch("/api/live/notifications", { cache: "no-store" });
+        if (!res.ok) return;
+        count = ((await res.json()) as { count: number }).count;
       } catch {
         return; // transient error — next tick tries again
       }

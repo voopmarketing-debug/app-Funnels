@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getConversationActivitySignature } from "@/lib/actions";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -23,7 +22,11 @@ export function CrmLivePoller({ businessId }: { businessId: string }) {
     async function poll() {
       let signature: string;
       try {
-        signature = await getConversationActivitySignature(businessId);
+        if (document.visibilityState === "hidden") return;
+        // A plain fetch, not a Server Action: never holds up navigation.
+        const res = await fetch(`/api/live/activity/${businessId}`, { cache: "no-store" });
+        if (!res.ok) return;
+        signature = ((await res.json()) as { signature: string }).signature;
       } catch {
         return; // transient error — next tick tries again
       }

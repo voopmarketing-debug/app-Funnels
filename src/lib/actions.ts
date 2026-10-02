@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { maybeRetryPendingReplies, retryConversationNow } from "@/lib/replyRecovery";
+import { retryConversationNow } from "@/lib/replyRecovery";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -2557,50 +2557,6 @@ export async function markAllNotificationsRead(): Promise<void> {
   revalidatePath("/dashboard", "layout");
 }
 
-/**
- * A cheap "has anything changed" fingerprint for a business's conversations
- * — polled client-side (see CrmLivePoller) so the CRM's chat list and open
- * thread update live instead of needing a manual page reload. Just a count +
- * a max timestamp, not the actual data, so polling it every few seconds is
- * inexpensive; the client only re-fetches the real data (via router.refresh)
- * when this signature actually changes.
- */
-export async function getConversationActivitySignature(businessId: string): Promise<string> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
-  await requireBusinessMembership(session.user.id, businessId);
-
-  // While someone has the CRM open, this poll also nudges the unanswered-
-  // chat recovery for this business (throttled to once a minute, runs after
-  // the response so the poll stays fast).
-  after(() => maybeRetryPendingReplies([businessId]).catch((err) => console.error("Reply recovery (poll) failed:", err)));
-
-  const result = await prisma.conversation.aggregate({
-    where: { businessId },
-    _max: { lastMessageAt: true },
-    _count: { _all: true },
-  });
-  return `${result._count._all}:${result._max.lastMessageAt?.getTime() ?? 0}`;
-}
-
-/**
- * Cheap unread-notification count across every business this user belongs
- * to — polled client-side (see NotificationSoundPoller) so a sound alert can
- * fire the moment a new customer message/appointment notification lands,
- * without needing WebSockets. Just a count, not the notifications
- * themselves, so polling it every few seconds is inexpensive.
- */
-export async function getUnreadNotificationCount(): Promise<number> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
-
-  const businessIds = (
-    await prisma.membership.findMany({ where: { userId: session.user.id }, select: { businessId: true } })
-  ).map((m) => m.businessId);
-  if (businessIds.length === 0) return 0;
-
-  return prisma.notification.count({ where: { businessId: { in: businessIds }, readAt: null } });
-}
 
 // ---------------------------------------------------------------------------
 // Website builder v2 (see lib/websiteContentV2.ts): pages with page types,

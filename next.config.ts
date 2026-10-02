@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
   // practical ceiling for anything uploaded through a Server Action.
   experimental: {
     serverActions: { bodySizeLimit: "4mb" },
+    // Pages visited in the last 30 s open instantly from the client cache
+    // (going back and forth between CRM, KPIs and Inicio) instead of
+    // asking the server again every time.
+    staleTimes: { dynamic: 30 },
   },
   // ffmpeg-static ships a native binary (voice-note conversion, see
   // lib/audioConvert.ts) — keep it out of the server bundle and make sure
