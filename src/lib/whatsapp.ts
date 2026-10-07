@@ -509,6 +509,13 @@ function describeNonTextMessage(msg: Record<string, unknown>): string | null {
     }
     case "sticker":
       return "[Sticker]";
+    case "unsupported":
+      // Meta delivers some WhatsApp features only inside the app (error
+      // 131051 "Message type unknown"): view-once photos/videos, polls,
+      // events, edited messages, video notes… The API gets no content, so
+      // say what it probably was and how to get it — this text is also what
+      // the AI reads, so it asks the customer to resend it.
+      return "[El cliente envió algo que WhatsApp no deja ver fuera de su app (por ejemplo una foto o video de «ver una vez», una encuesta, un evento o un mensaje editado). Pídele que lo reenvíe como texto, foto o audio normal.]";
     default:
       return `[Mensaje de tipo "${typeof msg.type === "string" ? msg.type : "desconocido"}" que no se puede mostrar aquí; revísalo en WhatsApp]`;
   }

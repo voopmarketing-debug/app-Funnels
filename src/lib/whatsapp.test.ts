@@ -96,6 +96,7 @@ describe("parseInboundMessages", () => {
                   }),
                   msg("w5", { type: "sticker", sticker: { id: "s1" } }),
                   msg("w6", { type: "reaction", reaction: { emoji: "👍", message_id: "w1" } }),
+                  msg("w7", { type: "unsupported", errors: [{ code: 131051, title: "Message type unknown" }] }),
                 ],
               },
             },
@@ -110,6 +111,7 @@ describe("parseInboundMessages", () => {
       "[Ubicación compartida: Oficina] https://maps.google.com/?q=4.6,-74.08",
       "[Contacto compartido: Ana +57 300 111 2233]",
       "[Sticker]",
+      "[El cliente envió algo que WhatsApp no deja ver fuera de su app (por ejemplo una foto o video de «ver una vez», una encuesta, un evento o un mensaje editado). Pídele que lo reenvíe como texto, foto o audio normal.]",
     ]);
   });
 
