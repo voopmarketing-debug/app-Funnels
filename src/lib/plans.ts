@@ -86,3 +86,7 @@ export const AGENT_MODELS = [
   { id: "claude-sonnet-5", label: "Sonnet 5 · calidad máxima" },
   { id: "claude-haiku-4-5", label: "Haiku 4.5 · económico" },
 ] as const;
+
+// Free days a self-registered account gets after registering its card in
+// Mercado Pago (see app/activar). The first charge happens when it ends.
+export const TRIAL_DAYS = Number(process.env.TRIAL_DAYS) || 7;

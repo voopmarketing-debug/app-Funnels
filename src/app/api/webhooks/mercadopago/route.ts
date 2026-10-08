@@ -120,32 +120,42 @@ export async function POST(req: NextRequest) {
       // The client authorized a monthly subscription: activate right away.
       // Later monthly charges arrive as subscription_authorized_payment.
       const sub = await fetchMpPreapproval(notification.id);
-      if (sub?.approved && sub.email) {
+      // Created from the app's trial page: our account id rides along, so it
+      // lands on the right account even if they paid with another email.
+      const accountEmail = sub?.externalReference?.startsWith("user:")
+        ? (await prisma.user.findUnique({ where: { id: sub.externalReference.slice(5) }, select: { email: true } }))?.email
+        : undefined;
+      const email = accountEmail ?? sub?.email;
+      if (sub?.approved && email) {
         const plan = mpPlanFor(sub.reason, sub.amount) ?? { planTier: "STARTER" as const, months: 1 };
         await applySubscriptionCharge({
           provider: "mercadopago",
           transaction: `preapproval:${sub.id}`,
           action: "grant",
           event: "preapproval.authorized",
-          email: sub.email,
+          email,
           name: "",
           phone: "",
           productName: sub.reason,
           planTier: plan.planTier,
           chargeDate: sub.createdAt,
+          trialDays: sub.trialDays || undefined,
         });
       }
     } else if (notification.type === "subscription_authorized_payment") {
       const charge = await fetchMpAuthorizedPayment(notification.id);
       const sub = charge?.approved && charge.preapprovalId ? await fetchMpPreapproval(charge.preapprovalId) : null;
-      if (charge && sub?.email) {
+      const accountEmail = sub?.externalReference?.startsWith("user:")
+        ? (await prisma.user.findUnique({ where: { id: sub.externalReference.slice(5) }, select: { email: true } }))?.email
+        : undefined;
+      if (charge && sub && (accountEmail ?? sub.email)) {
         const plan = mpPlanFor(sub.reason, sub.amount) ?? { planTier: "STARTER" as const, months: 1 };
         await applySubscriptionCharge({
           provider: "mercadopago",
           transaction: `authorized:${charge.id}`,
           action: "grant",
           event: "subscription_authorized_payment",
-          email: sub.email,
+          email: (accountEmail ?? sub.email)!,
           name: "",
           phone: "",
           productName: sub.reason,

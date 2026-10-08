@@ -30,8 +30,9 @@ export default function RegisterPage() {
         </div>
 
         <div className="space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-accent">Paso 1 de 2</p>
           <h1 className="text-xl font-bold">Crea tu cuenta</h1>
-          <p className="text-sm text-ink-muted">Tu agente de IA para WhatsApp, en minutos.</p>
+          <p className="text-sm text-ink-muted">Tu agente de IA para WhatsApp, en minutos. Luego activas tu prueba gratis.</p>
         </div>
 
         <div className="space-y-1">

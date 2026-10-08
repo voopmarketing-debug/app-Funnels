@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { NavProgress } from "@/components/NavProgress";
 import { auth, signOut } from "@/auth";
@@ -24,6 +25,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const isAgencyAdmin = session?.user?.id
     ? (await prisma.membership.findFirst({ where: { userId: session.user.id, role: "ADMIN" }, select: { id: true } })) !== null
     : false;
+
+  // Self-registered accounts can't use the dashboard until they register a
+  // card in Mercado Pago (free trial) — see app/activar.
+  if (session?.user?.id && !isAgencyAdmin) {
+    const me = await prisma.user.findUnique({ where: { id: session.user.id }, select: { activationRequired: true } });
+    if (me?.activationRequired) redirect("/activar");
+  }
 
   // Every business this user has any access to (owner, agency, or invited
   // teammate) — a MEMBER sees appointment notifications for their own leads

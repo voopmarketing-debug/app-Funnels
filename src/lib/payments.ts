@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email";
 import { provisionClientFromPurchase } from "@/lib/provisioning";
 import type { PlanTier } from "@prisma/client";
 import {
+  RENEWAL_GRACE_DAYS,
   billingMonthsFromProductName,
   extendSubscriptionEnd,
   planTierFromProductName,
@@ -30,6 +31,8 @@ export type SubscriptionCharge = {
   // When the provider says which plan it is; otherwise read from productName.
   planTier?: PlanTier;
   chargeDate?: Date;
+  // A free trial instead of a paid period: access for this many days.
+  trialDays?: number;
 };
 
 export type PaymentResult =
@@ -127,7 +130,9 @@ async function grant(purchase: SubscriptionCharge, email: string): Promise<Payme
   // One subscription covers every line the account owns: all of them end on
   // the same date, the latest one any of them already had.
   const latestEnd = businesses.reduce<Date | null>((max, b) => (b.subscriptionEndsAt && (!max || b.subscriptionEndsAt > max) ? b.subscriptionEndsAt : max), null);
-  const endsAt = extendSubscriptionEnd(latestEnd, months, purchase.chargeDate ?? now);
+  const endsAt = purchase.trialDays
+    ? trialEnd(latestEnd, purchase.trialDays, purchase.chargeDate ?? now)
+    : extendSubscriptionEnd(latestEnd, months, purchase.chargeDate ?? now);
   const restarting = !latestEnd || latestEnd <= now;
 
   await prisma.$transaction(
@@ -143,7 +148,14 @@ async function grant(purchase: SubscriptionCharge, email: string): Promise<Payme
     ),
   );
 
-  await alertAgency(newAccount ? `Nuevo cliente: ${purchase.name || email}` : `Pago recibido: ${purchase.name || email}`, [
+  // A self-registered account waiting on its card can use the dashboard now.
+  const owner = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, activationRequired: true } });
+  if (owner?.activationRequired) {
+    await prisma.user.update({ where: { id: owner.id }, data: { activationRequired: false } });
+    await sendWelcomeEmail(email, owner.name ?? purchase.name, endsAt, !!purchase.trialDays);
+  }
+
+  await alertAgency(newAccount ? `Nuevo cliente: ${purchase.name || email}` : purchase.trialDays ? `Prueba gratis iniciada: ${purchase.name || email}` : `Pago recibido: ${purchase.name || email}`, [
     `${newAccount ? "Se creó la cuenta y se activó" : "Se renovó"} automáticamente la membresía de <b>${purchase.name || email}</b> (${email}).`,
     `Producto: ${purchase.productName || "—"}${planTier ? ` · Plan ${PLAN_LABELS[planTier]}` : ""}`,
     `Activa hasta el <b>${formatDate(endsAt)}</b>. Negocios: ${businesses.map((b) => b.name).join(", ")}.`,
@@ -151,6 +163,27 @@ async function grant(purchase: SubscriptionCharge, email: string): Promise<Payme
   ]);
 
   return { status: "activated", businessIds, endsAt, newAccount };
+}
+
+function trialEnd(currentEnd: Date | null, trialDays: number, start: Date): Date {
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + trialDays + RENEWAL_GRACE_DAYS);
+  return currentEnd && currentEnd > end ? new Date(currentEnd) : end;
+}
+
+async function sendWelcomeEmail(email: string, name: string, endsAt: Date, trial: boolean): Promise<void> {
+  const host = process.env.APP_HOST ?? "agente.funnelslabs.app";
+  await sendEmail({
+    to: email,
+    subject: trial ? "Tu prueba gratis de Funnels Labs ya empezó" : "Tu cuenta de Funnels Labs ya está activa",
+    html: `
+      <p>Hola${name ? ` ${name}` : ""},</p>
+      <p>${trial ? "Tu prueba gratis ya está activa" : "Tu cuenta ya está activa"}. Entra con el correo y la contraseña que creaste:</p>
+      <p><a href="https://${host}/login">Iniciar sesión en Funnels Labs</a></p>
+      ${trial ? `<p>Tu prueba va hasta el ${formatDate(endsAt)}. Ese día se hace el primer cobro a la tarjeta que registraste; puedes cancelar antes desde Mercado Pago.</p>` : ""}
+      <p>¿Necesitas ayuda para conectar tu WhatsApp? Respóndenos este correo o escríbenos por WhatsApp.</p>
+    `,
+  }).catch((err) => console.error("Failed to send welcome email:", err));
 }
 
 async function revoke(purchase: SubscriptionCharge, email: string): Promise<PaymentResult> {

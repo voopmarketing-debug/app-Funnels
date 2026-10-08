@@ -1,12 +1,12 @@
 "use server";
 
 import crypto from "node:crypto";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { retryConversationNow } from "@/lib/replyRecovery";
 import bcrypt from "bcryptjs";
-import { auth } from "@/auth";
+import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { buildTrackedLink } from "@/lib/broadcastTracking";
@@ -168,6 +168,9 @@ export async function registerBusiness(
         phone,
         passwordHash,
         name,
+        // Must register a card in Mercado Pago (free trial) before using
+        // the dashboard — see app/activar.
+        activationRequired: true,
         memberships: { create: { role: "OWNER", businessId: business.id } },
       },
     });
@@ -190,6 +193,15 @@ export async function registerBusiness(
     industria: industryLabel,
   });
 
+  // Signed in right away and sent to register their card (free trial).
+  try {
+    await signIn("credentials", { email, password, redirectTo: "/activar" });
+  } catch (err) {
+    // signIn signals its redirect by throwing (rethrown here); anything else
+    // falls back to the login page, which also leads to /activar.
+    unstable_rethrow(err);
+    console.error("Auto sign-in after registration failed:", err);
+  }
   redirect("/login?registered=1");
 }
 

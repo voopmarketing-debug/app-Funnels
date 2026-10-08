@@ -112,6 +112,10 @@ export type MpPreapproval = {
   amount: number;
   frequencyMonths: number;
   createdAt: Date;
+  // Our own id, when the subscription was created from the app ("user:<id>").
+  externalReference: string | null;
+  // Free days before the first charge (0 when there is no trial).
+  trialDays: number;
 };
 
 /** For a subscription notification (type: "subscription_preapproval" / "preapproval"). */
@@ -130,7 +134,58 @@ export async function fetchMpPreapproval(id: string): Promise<MpPreapproval | nu
     amount: typeof recurring.transaction_amount === "number" ? recurring.transaction_amount : 0,
     frequencyMonths: frequencyType === "months" ? Math.max(1, frequency) : 1,
     createdAt: typeof sub.date_created === "string" ? new Date(sub.date_created) : new Date(),
+    externalReference: typeof sub.external_reference === "string" && sub.external_reference ? sub.external_reference : null,
+    trialDays: trialDaysOf(recurring.free_trial),
   };
+}
+
+function trialDaysOf(freeTrial: unknown): number {
+  if (typeof freeTrial !== "object" || freeTrial === null) return 0;
+  const t = freeTrial as { frequency?: unknown; frequency_type?: unknown };
+  const n = typeof t.frequency === "number" ? t.frequency : 0;
+  return t.frequency_type === "months" ? n * 30 : n;
+}
+
+/**
+ * A monthly subscription with a free trial, created for one specific
+ * account: the person registers their card on Mercado Pago's page
+ * (init_point) and nothing is charged until the trial ends. external_reference
+ * ties it back to the account even if they pay with another email.
+ */
+export async function createMpTrialSubscription(params: {
+  reason: string;
+  amountCop: number;
+  trialDays: number;
+  payerEmail: string;
+  externalReference: string;
+  backUrl: string;
+}): Promise<{ initPoint: string } | { error: string }> {
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) return { error: "Mercado Pago no está configurado" };
+  const res = await fetch(`${MP_API}/preapproval`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      reason: params.reason,
+      external_reference: params.externalReference,
+      payer_email: params.payerEmail,
+      back_url: params.backUrl,
+      status: "pending",
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: params.amountCop,
+        currency_id: "COP",
+        ...(params.trialDays > 0 ? { free_trial: { frequency: params.trialDays, frequency_type: "days" } } : {}),
+      },
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { init_point?: string; message?: string };
+  if (!res.ok || !data.init_point) {
+    console.error("Mercado Pago preapproval error", res.status, data);
+    return { error: data.message ?? `Mercado Pago respondió ${res.status}` };
+  }
+  return { initPoint: data.init_point };
 }
 
 /**

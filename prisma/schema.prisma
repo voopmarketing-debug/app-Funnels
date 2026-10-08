@@ -177,6 +177,11 @@ model User {
   // (PLAN_PRICE_USD in lib/plans.ts). Only used by the agency's Rentabilidad
   // page.
   monthlyPriceUsd     Float?
+  // Self-registered accounts must register a card in Mercado Pago (free
+  // trial) before using the dashboard — see app/activar. Cleared when the
+  // subscription is authorized (lib/payments.ts). Accounts created by the
+  // agency or by a payment never need it.
+  activationRequired  Boolean   @default(false)
   resetTokenHash      String?   @unique
   resetTokenExpiresAt DateTime?
 }
