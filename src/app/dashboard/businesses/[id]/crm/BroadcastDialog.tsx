@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
-import { sendBroadcast, type BroadcastResult } from "@/lib/actions";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { getBroadcastUsageForDialog, sendBroadcast, type BroadcastResult } from "@/lib/actions";
 import { WHATSAPP_MARKETING_MESSAGE_COST_USD } from "@/lib/constants";
 
-type DialogState = { error: string | null; result: BroadcastResult | null };
+type DialogState = { error: string | null; result: Exclude<BroadcastResult, { error: string }> | null };
 const INITIAL_STATE: DialogState = { error: null, result: null };
 
 // Entry point for mass-messaging: opens a dialog to pick a pipeline stage
@@ -88,9 +88,22 @@ function BroadcastDialogContent({
   const [stageId, setStageId] = useState("all");
   const recipientCount = audience ? audience.ids.length : stageId === "all" ? totalConversations : (stageCounts[stageId] ?? 0);
   const estimatedCost = recipientCount * WHATSAPP_MARKETING_MESSAGE_COST_USD;
+  const [usage, setUsage] = useState<{ used: number; limit: number | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getBroadcastUsageForDialog(businessId)
+      .then((u) => !cancelled && setUsage(u))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId]);
+  const left = usage?.limit != null ? Math.max(0, usage.limit - usage.used) : null;
+  const overQuota = left !== null && recipientCount > left;
   const [state, formAction, isPending] = useActionState<DialogState, FormData>(async (_prev, formData) => {
     try {
       const result = await sendBroadcast(businessId, formData);
+      if ("error" in result) return { error: result.error, result: null };
       return { error: null, result };
     } catch (err) {
       return { error: err instanceof Error ? err.message : "No se pudo enviar la difusión", result: null };
@@ -169,6 +182,31 @@ function BroadcastDialogContent({
             recipientCount > 0 &&
             ` — costo estimado de Meta: ~$${estimatedCost.toFixed(2)} USD ($${WHATSAPP_MARKETING_MESSAGE_COST_USD} USD/mensaje, tarifa de plantillas de marketing en Colombia — puede variar según tu cuenta).`}
         </p>
+        {usage?.limit != null && left !== null && (
+          <div className="space-y-1 pt-1">
+            <div className="flex justify-between text-[12px]">
+              <span className="text-ink-muted">Envíos masivos este mes</span>
+              <span className={`font-semibold ${overQuota || usage.used / usage.limit >= 0.8 ? "text-[var(--status-warn)]" : "text-ink"}`}>
+                {usage.used.toLocaleString("es-CO")} de {usage.limit.toLocaleString("es-CO")}
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-border">
+              <div
+                className={`h-full rounded-full ${usage.used / usage.limit >= 0.8 ? "bg-[var(--status-warn)]" : "bg-accent"}`}
+                style={{ width: `${Math.min(100, (usage.used / usage.limit) * 100)}%` }}
+              />
+            </div>
+            {overQuota ? (
+              <p className="text-[12px] text-[var(--status-warn)]">
+                Te quedan {left.toLocaleString("es-CO")} envíos este mes. Elige un grupo más pequeño o escríbenos para ampliarlo.
+              </p>
+            ) : (
+              usage.used / usage.limit >= 0.8 && (
+                <p className="text-[12px] text-[var(--status-warn)]">Vas en más del 80 % de tus envíos del mes. Se renuevan el día 1.</p>
+              )
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-1">
@@ -288,7 +326,7 @@ function BroadcastDialogContent({
         </button>
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || overQuota}
           className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
         >
           {isPending ? "Enviando..." : "Enviar difusión"}

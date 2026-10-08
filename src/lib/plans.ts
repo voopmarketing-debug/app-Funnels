@@ -49,6 +49,23 @@ export const TEAM_MEMBER_LIMITS: Record<PlanTier, number | null> = {
   SCALE: null,
 };
 
+// Fair-use cap on CRM contacts per WhatsApp line. Sold as "contactos
+// ilimitados": storing a contact costs next to nothing (AI replies are what
+// cost, capped by PLAN_LIMITS), so this only stops abuse. Contacts who write
+// in on WhatsApp are always saved; the cap applies to adding/importing.
+export const CONTACT_LIMITS: Record<PlanTier, number | null> = {
+  STARTER: 20000,
+  PRO: 50000,
+  SCALE: null,
+};
+
+// Mass-message (difusión) recipients per WhatsApp line per calendar month.
+export const BROADCAST_LIMITS: Record<PlanTier, number | null> = {
+  STARTER: 2000,
+  PRO: 10000,
+  SCALE: null,
+};
+
 export const PLAN_TIERS: PlanTier[] = ["STARTER", "PRO", "SCALE"];
 
 export type PlanUsageStatus = "good" | "warning" | "critical" | "unlimited";
@@ -90,3 +107,6 @@ export const AGENT_MODELS = [
 // Free days a self-registered account gets after registering its card in
 // Mercado Pago (see app/activar). The first charge happens when it ends.
 export const TRIAL_DAYS = Number(process.env.TRIAL_DAYS) || 7;
+// Only this plan can be started as a self-serve free trial; Pro and Scale
+// are sold and set up with the team.
+export const TRIAL_PLAN: PlanTier = "STARTER";

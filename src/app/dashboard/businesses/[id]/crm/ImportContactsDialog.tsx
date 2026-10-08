@@ -141,7 +141,7 @@ function ImportForm({
           <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-border bg-background p-3 text-xs text-ink-muted">
             {result.skipped.slice(0, 50).map((s, i) => (
               <li key={i}>
-                <span className="fl-mono text-ink-faint">Fila {s.row}:</span> {s.reason}
+                {s.row > 0 && <span className="fl-mono text-ink-faint">Fila {s.row}:</span>} {s.reason}
               </li>
             ))}
             {result.skipped.length > 50 && <li>…y {result.skipped.length - 50} más</li>}

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { TRIAL_DAYS } from "@/lib/plans";
 
 const SEGMENTS = [
   {
@@ -26,7 +27,15 @@ const SEGMENTS = [
 const FAQ = [
   {
     q: "¿Cuántos contactos puedo tener?",
-    a: "Ilimitados. Tu CRM guarda todos tus contactos y conversaciones sin tope. Lo que el plan cuenta es cuántos clientes distintos atiende tu agente de IA en el mes (400 en Starter), y a cada uno le responde todas las veces que haga falta.",
+    a: "Ilimitados. Tu CRM guarda tus contactos y conversaciones (con una política de uso justo de 20.000 contactos en Starter y 50.000 en Pro, que casi ningún negocio alcanza). Lo que el plan cuenta es cuántos clientes distintos atiende tu agente de IA en el mes (400 en Starter), y a cada uno le responde todas las veces que haga falta.",
+  },
+  {
+    q: "¿Cómo funciona la prueba gratis?",
+    a: `El plan Starter tiene ${TRIAL_DAYS} días gratis. Creas tu cuenta, registras tu tarjeta en Mercado Pago y empiezas de inmediato; no se cobra nada hasta que termina la prueba y puedes cancelar antes cuando quieras. Los planes Pro y Consultoría se activan con nuestro equipo.`,
+  },
+  {
+    q: "¿Cuántos mensajes masivos puedo enviar?",
+    a: "Starter incluye 2.000 envíos de difusión al mes y Pro 10.000, por línea de WhatsApp. Se renuevan el día 1 de cada mes.",
   },
   {
     q: "¿Qué pasa si llego al límite del mes?",
@@ -55,10 +64,11 @@ const PLANS = [
     name: "Starter",
     price: "$97",
     priceSuffix: "USD / mes",
-    billingNote: "Se cobra automáticamente cada mes. Cancelas cuando quieras.",
+    billingNote: `${TRIAL_DAYS} días gratis. Luego se cobra automáticamente cada mes; cancelas cuando quieras.`,
     contacts: "400 clientes atendidos por IA al mes",
     features: [
       "Contactos ilimitados en tu CRM",
+      "2.000 envíos masivos al mes",
       "1 línea de WhatsApp (un negocio)",
       "Hasta 3 personas de tu equipo",
       "Agente con memoria completa de la conversación",
@@ -68,7 +78,7 @@ const PLANS = [
       "Soporte de lunes a viernes por WhatsApp y sesión de onboarding",
     ],
     highlight: true,
-    ctaLabel: "Crear mi cuenta",
+    ctaLabel: `Probar ${TRIAL_DAYS} días gratis`,
     ctaHref: "/register",
   },
   {
@@ -80,6 +90,7 @@ const PLANS = [
     features: [
       "Todo lo del plan Starter",
       "Hasta 3 líneas de WhatsApp (sedes, marcas o vendedores)",
+      "10.000 envíos masivos al mes por línea",
       "Hasta 10 personas de tu equipo",
       "Para negocios con anuncios y volumen alto de mensajes",
       "Acompañamiento prioritario por WhatsApp",

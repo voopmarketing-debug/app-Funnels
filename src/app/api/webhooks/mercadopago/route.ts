@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseMpNotification, fetchMpPayment, fetchMpPreapproval, fetchMpAuthorizedPayment } from "@/lib/mercadopago";
 import { applySubscriptionCharge } from "@/lib/payments";
+import { accountForPreapproval, activateFromPreapproval, savedTrialPlanId } from "@/lib/trial";
 import { mpPlanFor } from "@/lib/mercadopagoPlans";
 import { prisma } from "@/lib/prisma";
 import { ADDON_PACKS } from "@/lib/addonPacks";
@@ -120,34 +121,39 @@ export async function POST(req: NextRequest) {
       // The client authorized a monthly subscription: activate right away.
       // Later monthly charges arrive as subscription_authorized_payment.
       const sub = await fetchMpPreapproval(notification.id);
-      // Created from the app's trial page: our account id rides along, so it
-      // lands on the right account even if they paid with another email.
-      const accountEmail = sub?.externalReference?.startsWith("user:")
-        ? (await prisma.user.findUnique({ where: { id: sub.externalReference.slice(5) }, select: { email: true } }))?.email
-        : undefined;
-      const email = accountEmail ?? sub?.email;
-      if (sub?.approved && email) {
-        const plan = mpPlanFor(sub.reason, sub.amount) ?? { planTier: "STARTER" as const, months: 1 };
-        await applySubscriptionCharge({
-          provider: "mercadopago",
-          transaction: `preapproval:${sub.id}`,
-          action: "grant",
-          event: "preapproval.authorized",
-          email,
-          name: "",
-          phone: "",
-          productName: sub.reason,
-          planTier: plan.planTier,
-          chargeDate: sub.createdAt,
-          trialDays: sub.trialDays || undefined,
-        });
+      if (sub?.approved) {
+        const account = await accountForPreapproval(sub);
+        if (account) {
+          await activateFromPreapproval(sub, account);
+        } else if (sub.planId && sub.planId === (await savedTrialPlanId())) {
+          // A free trial we can't tie to anyone (two sign-ups at once, paid
+          // with another email): the return page usually settles it; if not,
+          // the agency links it by hand.
+          await alertAgency(
+            "Prueba gratis sin cuenta asociada",
+            `Alguien registró su tarjeta para la prueba gratis (suscripción ${sub.id}${sub.email ? `, correo de Mercado Pago ${sub.email}` : ""}) pero no supimos a qué cuenta pertenece. Si un cliente te escribe porque no le activó, actívalo en Clientes.`,
+          );
+        } else if (sub.email) {
+          const plan = mpPlanFor(sub.reason, sub.amount) ?? { planTier: "STARTER" as const, months: 1 };
+          await applySubscriptionCharge({
+            provider: "mercadopago",
+            transaction: `preapproval:${sub.id}`,
+            action: "grant",
+            event: "preapproval.authorized",
+            email: sub.email,
+            name: "",
+            phone: "",
+            productName: sub.reason,
+            planTier: plan.planTier,
+            chargeDate: sub.createdAt,
+            trialDays: sub.trialDays || undefined,
+          });
+        }
       }
     } else if (notification.type === "subscription_authorized_payment") {
       const charge = await fetchMpAuthorizedPayment(notification.id);
       const sub = charge?.approved && charge.preapprovalId ? await fetchMpPreapproval(charge.preapprovalId) : null;
-      const accountEmail = sub?.externalReference?.startsWith("user:")
-        ? (await prisma.user.findUnique({ where: { id: sub.externalReference.slice(5) }, select: { email: true } }))?.email
-        : undefined;
+      const accountEmail = sub ? (await accountForPreapproval(sub))?.email : undefined;
       if (charge && sub && (accountEmail ?? sub.email)) {
         const plan = mpPlanFor(sub.reason, sub.amount) ?? { planTier: "STARTER" as const, months: 1 };
         await applySubscriptionCharge({

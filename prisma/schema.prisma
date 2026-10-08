@@ -182,6 +182,14 @@ model User {
   // subscription is authorized (lib/payments.ts). Accounts created by the
   // agency or by a payment never need it.
   activationRequired  Boolean   @default(false)
+  // The Mercado Pago subscription that pays for this account, once known.
+  // Subscriptions started from the trial plan's checkout carry no id of
+  // ours, so this is how renewals find the account (see lib/trial.ts).
+  mpPreapprovalId     String?   @unique
+  // When they last went to Mercado Pago from /activar: lets a subscription
+  // that arrives with an unknown email be matched to the one person who
+  // was checking out at that moment.
+  trialCheckoutAt     DateTime?
   resetTokenHash      String?   @unique
   resetTokenExpiresAt DateTime?
 }
@@ -855,4 +863,12 @@ model PaymentEvent {
   createdAt   DateTime @default(now())
 
   @@unique([provider, transaction, action])
+}
+
+// Small app-wide values the app manages itself (e.g. the id of the Mercado
+// Pago trial plan it created), so they don't need a redeploy to change.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

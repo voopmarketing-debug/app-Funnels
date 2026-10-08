@@ -4,43 +4,33 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { startTrialCheckout, type TrialCheckoutState } from "@/lib/trialActions";
 
-const cop = (n: number) => `$${n.toLocaleString("es-CO")}`;
-
-export function TrialForm({ plans }: { plans: { key: string; name: string; priceCop: number; detail: string }[] }) {
+export function TrialForm({ supportLink }: { supportLink: string }) {
   const [state, formAction, isPending] = useActionState<TrialCheckoutState, FormData>(startTrialCheckout, { error: null });
-  const [plan, setPlan] = useState(plans[0].key);
 
   return (
     <form action={formAction} className="space-y-3">
-      <fieldset className="space-y-2">
-        <legend className="sr-only">Elige tu plan</legend>
-        {plans.map((p) => (
-          <label
-            key={p.key}
-            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${plan === p.key ? "border-accent bg-accent/10" : "border-border hover:border-border-strong"}`}
+      {state.error && (
+        <div role="alert" className="space-y-2 rounded-xl border border-error/40 bg-error/10 p-3 text-sm">
+          <p className="font-semibold text-ink">No pudimos abrir Mercado Pago</p>
+          <p className="text-ink-muted">{state.error}</p>
+          <a
+            href={supportLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-accent hover:underline"
           >
-            <input type="radio" name="plan" value={p.key} checked={plan === p.key} onChange={() => setPlan(p.key)} className="mt-1 accent-[var(--accent)]" />
-            <span className="min-w-0 flex-1">
-              <span className="flex flex-wrap items-baseline justify-between gap-x-2">
-                <span className="font-semibold text-ink">{p.name}</span>
-                <span className="text-sm text-ink">
-                  <strong>{cop(p.priceCop)}</strong>
-                  <span className="text-ink-muted"> /mes</span>
-                </span>
-              </span>
-              <span className="block text-xs text-ink-muted">{p.detail}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
+            Escribir por WhatsApp →
+          </a>
+          {state.detail && <p className="break-words text-[11px] text-ink-faint">Código para soporte: {state.detail}</p>}
+        </div>
+      )}
       <button
         type="submit"
         disabled={isPending}
         className="w-full rounded-lg bg-accent px-4 py-3 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
       >
-        {isPending ? "Abriendo Mercado Pago…" : "Registrar mi tarjeta y empezar gratis"}
+        {isPending ? "Abriendo Mercado Pago…" : state.error ? "Intentar de nuevo" : "Registrar mi tarjeta y empezar gratis"}
       </button>
-      {state.error && <p className="text-sm text-error">{state.error}</p>}
     </form>
   );
 }

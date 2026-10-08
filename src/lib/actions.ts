@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { retryConversationNow } from "@/lib/replyRecovery";
 import bcrypt from "bcryptjs";
 import { auth, signIn } from "@/auth";
+import { getBroadcastUsage, getContactUsage, remaining } from "@/lib/crmLimits";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { buildTrackedLink } from "@/lib/broadcastTracking";
@@ -743,6 +744,11 @@ export async function createContact(
   });
   if (existing) return { ok: true, conversationId: existing.id, existed: true };
 
+  const contactUsage = await getContactUsage(businessId);
+  if (remaining(contactUsage) <= 0) {
+    return { ok: false, error: `Llegaste al máximo de ${contactUsage.limit?.toLocaleString("es-CO")} contactos de tu plan. Escríbenos para ampliarlo.` };
+  }
+
   const stageId = await resolveContactStage(businessId, data.stageId);
   const created = await prisma.conversation.create({
     data: { businessId, customerPhone: phone, customerName: name, customerEmail: email, stageId },
@@ -815,12 +821,21 @@ export async function importContacts(
   });
   const existingByPhone = new Map(existing.map((c) => [c.customerPhone, c]));
 
-  const toCreate = phones
-    .filter((p) => !existingByPhone.has(p))
-    .map((p) => {
-      const c = byPhone.get(p)!;
-      return { businessId, customerPhone: p, customerName: c.name, customerEmail: c.email, tags: c.tags, notes: c.notes, stageId };
+  const newPhones = phones.filter((p) => !existingByPhone.has(p));
+  // Fair-use cap: past it, existing contacts still get enriched but no new
+  // ones are added.
+  const contactUsage = await getContactUsage(businessId);
+  const room = remaining(contactUsage);
+  if (newPhones.length > room) {
+    skipped.push({
+      row: 0,
+      reason: `${(newPhones.length - room).toLocaleString("es-CO")} contactos nuevos no se agregaron: tu plan permite hasta ${contactUsage.limit?.toLocaleString("es-CO")} contactos. Escríbenos para ampliarlo.`,
     });
+  }
+  const toCreate = newPhones.slice(0, Number.isFinite(room) ? room : undefined).map((p) => {
+    const c = byPhone.get(p)!;
+    return { businessId, customerPhone: p, customerName: c.name, customerEmail: c.email, tags: c.tags, notes: c.notes, stageId };
+  });
   const { count: created } = await prisma.conversation.createMany({ data: toCreate, skipDuplicates: true });
 
   const updates = existing
@@ -888,7 +903,16 @@ export async function retryConversationReply(
   return result;
 }
 
-export type BroadcastResult = { totalRecipients: number; sentCount: number; failedCount: number };
+export type BroadcastResult = { totalRecipients: number; sentCount: number; failedCount: number } | { error: string };
+
+/** This month's mass-message usage for the broadcast dialog's counter. */
+export async function getBroadcastUsageForDialog(businessId: string): Promise<{ used: number; limit: number | null }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+  const { used, limit } = await getBroadcastUsage(businessId);
+  return { used, limit };
+}
 
 /**
  * Sends one message to every conversation in a business, or just the ones in
@@ -984,6 +1008,18 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
     where: { businessId, ...(selectedIds ? { id: { in: selectedIds } } : stageId ? { stageId } : {}) },
     select: { id: true, customerPhone: true },
   });
+
+  const broadcastUsage = await getBroadcastUsage(businessId);
+  const left = remaining(broadcastUsage);
+  if (conversations.length > left) {
+    const limit = broadcastUsage.limit?.toLocaleString("es-CO");
+    return {
+      error:
+        left <= 0
+          ? `Ya usaste los ${limit} envíos masivos de este mes. Se renuevan el día 1; si necesitas más, escríbenos.`
+          : `Esta difusión va a ${conversations.length.toLocaleString("es-CO")} contactos y te quedan ${left.toLocaleString("es-CO")} envíos este mes (de ${limit}). Filtra un grupo más pequeño o escríbenos para ampliarlo.`,
+    };
+  }
 
   const broadcast = await prisma.broadcast.create({
     data: {

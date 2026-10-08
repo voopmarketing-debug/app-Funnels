@@ -11,6 +11,8 @@ import { CrmTabs } from "./CrmTabs";
 import { PipelineSwitcher } from "./PipelineSwitcher";
 import { ConversationSplitView } from "./ConversationSplitView";
 import { BroadcastDialog } from "./BroadcastDialog";
+import { getContactUsage } from "@/lib/crmLimits";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { ImportContactsDialog } from "./ImportContactsDialog";
 import { ContactFormDialog } from "../ContactFormDialog";
 import { BroadcastHistory } from "./BroadcastHistory";
@@ -52,6 +54,7 @@ export default async function CrmPage({
   const selectedPipeline =
     allPipelines.find((p) => p.id === pipelineParam) ?? allPipelines.find((p) => p.isDefault) ?? allPipelines[0];
 
+  const contactUsage = await getContactUsage(id);
   const [business, conversations, accessibleBusinesses, approvedTemplates, stageCounts, totalConversations] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id }, select: { name: true } }),
     prisma.conversation.findMany({
@@ -279,6 +282,16 @@ export default async function CrmPage({
 
 
       <div className="space-y-3">
+        {contactUsage.limit !== null && contactUsage.status !== "good" && (
+          <p className={`${hideChromeOnMobile ? "hidden md:block" : ""} rounded-lg border border-[var(--status-warn)]/40 bg-[var(--status-warn)]/10 px-3 py-2 text-sm text-ink`}>
+            {contactUsage.status === "critical"
+              ? `Llegaste al máximo de ${contactUsage.limit.toLocaleString("es-CO")} contactos de tu plan: los que te escriban por WhatsApp se siguen guardando, pero ya no puedes agregar ni importar más.`
+              : `Tienes ${contactUsage.used.toLocaleString("es-CO")} de ${contactUsage.limit.toLocaleString("es-CO")} contactos de tu plan.`}{" "}
+            <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">
+              Ampliar mi plan
+            </a>
+          </p>
+        )}
         <div className={`${hideChromeOnMobile ? "hidden md:flex" : "flex"} flex-wrap items-center justify-between gap-2`}>
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             <CrmTabs activeTab={tab} />

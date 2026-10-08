@@ -4,7 +4,8 @@ import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
-import { PLAN_LIMITS, PLAN_PRICE_COP, TRIAL_DAYS } from "@/lib/plans";
+import { PLAN_LIMITS, PLAN_PRICE_COP, TRIAL_DAYS, TRIAL_PLAN, PLAN_LABELS } from "@/lib/plans";
+import { claimReturnedPreapproval } from "@/lib/trial";
 import { TrialForm, WaitForActivation } from "./TrialForm";
 
 function trialEndLabel() {
@@ -15,10 +16,15 @@ function trialEndLabel() {
 // Step 2 of signing up: register a card in Mercado Pago to start the free
 // trial (nothing is charged until it ends). The dashboard sends every
 // self-registered account here until the subscription is authorized.
-export default async function ActivarPage({ searchParams }: { searchParams: Promise<{ estado?: string }> }) {
+export default async function ActivarPage({ searchParams }: { searchParams: Promise<{ estado?: string; preapproval_id?: string }> }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?callbackUrl=/activar");
-  const { estado } = await searchParams;
+  const { estado, preapproval_id: preapprovalId } = await searchParams;
+  // Mercado Pago appends the subscription id when it sends them back: link it
+  // to whoever is signed in right away instead of waiting on the webhook.
+  if (preapprovalId && /^[\w-]{1,64}$/.test(preapprovalId)) {
+    await claimReturnedPreapproval(session.user.id, preapprovalId).catch((err) => console.error("Could not claim returned subscription:", err));
+  }
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { name: true, activationRequired: true },
@@ -60,15 +66,31 @@ export default async function ActivarPage({ searchParams }: { searchParams: Prom
             {firstChargeLabel} y puedes cancelar antes cuando quieras.
           </p>
         </div>
-        <TrialForm
-          plans={[
-            { key: "STARTER", name: "Starter", priceCop: PLAN_PRICE_COP.STARTER, detail: `${PLAN_LIMITS.STARTER} clientes atendidos por IA al mes · 1 línea` },
-            { key: "PRO", name: "Pro", priceCop: PLAN_PRICE_COP.PRO, detail: `${PLAN_LIMITS.PRO?.toLocaleString("es-CO")} clientes atendidos por IA al mes · 3 líneas` },
-          ]}
-        />
+        <div className="rounded-xl border border-accent bg-accent/10 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+            <span className="font-semibold text-ink">Plan {PLAN_LABELS[TRIAL_PLAN]}</span>
+            <span className="text-sm text-ink">
+              <strong>${PLAN_PRICE_COP[TRIAL_PLAN].toLocaleString("es-CO")}</strong>
+              <span className="text-ink-muted"> /mes después de la prueba</span>
+            </span>
+          </div>
+          <ul className="mt-2 space-y-1 text-sm text-ink-muted">
+            <li>✓ Tu agente de IA respondiendo en WhatsApp 24/7</li>
+            <li>✓ {PLAN_LIMITS[TRIAL_PLAN]} clientes atendidos por IA al mes · 1 línea</li>
+            <li>✓ CRM con contactos ilimitados</li>
+          </ul>
+        </div>
+        <TrialForm supportLink={SUPPORT_WHATSAPP_LINK} />
         <ul className="space-y-1.5 text-xs text-ink-muted">
           <li>🔒 Pago seguro con Mercado Pago. Nosotros nunca vemos tu tarjeta.</li>
           <li>📩 Al terminar te llega un correo con tu acceso.</li>
+          <li>
+            ¿Necesitas el plan Pro (más líneas y clientes)?{" "}
+            <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+              Escríbenos
+            </a>{" "}
+            y lo activamos contigo.
+          </li>
         </ul>
       </div>
     );
