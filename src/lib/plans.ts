@@ -110,3 +110,17 @@ export const TRIAL_DAYS = Number(process.env.TRIAL_DAYS) || 7;
 // Only this plan can be started as a self-serve free trial; Pro and Scale
 // are sold and set up with the team.
 export const TRIAL_PLAN: PlanTier = "STARTER";
+
+// What the Starter plan includes — shown on the pricing page and on
+// /activar, so both always list the same benefits.
+export const STARTER_FEATURES = [
+  "Agente de IA respondiendo tu WhatsApp 24/7, con memoria de cada conversación",
+  "400 clientes atendidos por IA al mes",
+  "Contactos ilimitados en tu CRM",
+  "CRM por etapas, difusiones y plantillas de WhatsApp",
+  "2.000 envíos masivos al mes",
+  "Sitios web y páginas de venta creados con IA",
+  "Dashboard de KPIs + diagnóstico de ventas con IA",
+  "1 línea de WhatsApp y hasta 3 personas de tu equipo",
+  "Soporte por WhatsApp y sesión de onboarding para conectar tu número",
+];

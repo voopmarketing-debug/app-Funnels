@@ -30,7 +30,20 @@ export default async function ClientsPage() {
       orderBy: { createdAt: "desc" },
       select: {
         createdAt: true,
-        user: { select: { id: true, name: true, email: true, phone: true, city: true, country: true, monthlyPriceUsd: true } },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            city: true,
+            country: true,
+            monthlyPriceUsd: true,
+            activationRequired: true,
+            trialCheckoutAt: true,
+            mpPreapprovalId: true,
+          },
+        },
         business: {
           select: {
             id: true,
@@ -91,6 +104,9 @@ export default async function ClientsPage() {
         phone: user.phone,
         location: [user.city, user.country].filter(Boolean).join(", ") || null,
         joinedAt: createdAt.toISOString(),
+        pendingCard: user.activationRequired,
+        checkoutOpenedAt: user.trialCheckoutAt?.toISOString() ?? null,
+        cardOnFile: !!user.mpPreapprovalId,
         planTier: business.planTier,
         planLabel: PLAN_LABELS[business.planTier],
         priceUsd: user.monthlyPriceUsd ?? PLAN_PRICE_USD[business.planTier],
@@ -138,7 +154,11 @@ export default async function ClientsPage() {
     if (row.contactLimit !== null) row.contactLimit += row.addons.filter((a) => a.kind === "CONTACTS").reduce((s, a) => s + a.quantity, 0);
   }
 
-  const list = [...rows.values()];
+  const all = [...rows.values()];
+  // Signed up but never registered a card: leads for the sales team, not
+  // clients yet (no access, no revenue).
+  const list = all.filter((r) => !r.pendingCard);
+  const pending = all.filter((r) => r.pendingCard);
   // Negative (or -0.x) once the end has passed: expired, even if only by minutes.
   const daysLeft = (iso: string | null) => {
     if (!iso) return null;
@@ -147,6 +167,7 @@ export default async function ClientsPage() {
   };
   const summary = {
     total: list.length,
+    pending: pending.length,
     active: list.filter((r) => (daysLeft(r.endsAt) ?? 1) > 7).length,
     expiring: list.filter((r) => {
       const d = daysLeft(r.endsAt);
@@ -168,23 +189,24 @@ export default async function ClientsPage() {
         <CreateClientForm />
       </div>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <section className="grid grid-cols-3 gap-2 sm:gap-3 xl:grid-cols-6">
         {[
-          { label: "Clientes", value: summary.total.toLocaleString("es-CO"), hint: "Cuentas registradas" },
+          { label: "Clientes", value: summary.total.toLocaleString("es-CO"), hint: "Con tarjeta o activados" },
+          { label: "Sin tarjeta", value: summary.pending.toLocaleString("es-CO"), hint: "Se registraron, falta cerrarlos", tone: summary.pending ? "text-accent" : "" },
           { label: "Activos", value: summary.active.toLocaleString("es-CO"), hint: "Con membresía al día", tone: "text-[var(--status-good)]" },
           { label: "Por vencer", value: summary.expiring.toLocaleString("es-CO"), hint: "En los próximos 7 días", tone: summary.expiring ? "text-[var(--status-warn)]" : "" },
           { label: "Vencidos", value: summary.expired.toLocaleString("es-CO"), hint: "Sin acceso al panel", tone: summary.expired ? "text-[var(--status-bad)]" : "" },
-          { label: "Ingreso mensual", value: `US$${summary.mrr.toLocaleString("es-CO")}`, hint: "Clientes activos (aprox.)" },
+          { label: "Ingreso / mes", value: `US$${summary.mrr.toLocaleString("es-CO")}`, hint: "Clientes activos (aprox.)" },
         ].map((t) => (
-          <div key={t.label} className="fl-card p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t.label}</p>
-            <p className={`mt-1 text-2xl font-bold tabular-nums ${t.tone ?? "text-ink"}`}>{t.value}</p>
-            <p className="text-xs text-ink-muted">{t.hint}</p>
+          <div key={t.label} className="fl-card p-3 sm:p-4">
+            <p className="truncate text-[11px] font-medium uppercase tracking-wide text-ink-muted sm:text-xs">{t.label}</p>
+            <p className={`mt-1 text-lg font-bold tabular-nums sm:text-2xl ${t.tone ?? "text-ink"}`}>{t.value}</p>
+            <p className="hidden text-xs text-ink-muted sm:block">{t.hint}</p>
           </div>
         ))}
       </section>
 
-      <ClientsList rows={list} nowIso={now.toISOString()} />
+      <ClientsList rows={all} nowIso={now.toISOString()} supportHost={process.env.APP_HOST ?? "agente.funnelslabs.app"} />
     </div>
   );
 }

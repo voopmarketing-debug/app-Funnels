@@ -4,7 +4,7 @@ import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
-import { PLAN_LIMITS, PLAN_PRICE_COP, TRIAL_DAYS, TRIAL_PLAN, PLAN_LABELS } from "@/lib/plans";
+import { PLAN_PRICE_COP, STARTER_FEATURES, TRIAL_DAYS, TRIAL_PLAN, PLAN_LABELS } from "@/lib/plans";
 import { claimReturnedPreapproval } from "@/lib/trial";
 import { TrialForm, WaitForActivation } from "./TrialForm";
 
@@ -46,7 +46,7 @@ export default async function ActivarPage({ searchParams }: { searchParams: Prom
         <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-accent-ink">✓</span>
         <h1 className="text-2xl font-bold">¡Tu prueba gratis ya empezó!</h1>
         <p className="text-sm text-ink-muted">
-          Tienes {TRIAL_DAYS} días para probar todo. Te enviamos un correo con tu acceso: entra siempre con el correo y la contraseña que creaste.
+          Tienes {TRIAL_DAYS} días para probar todo. Para volver a entrar, usa siempre el correo y la contraseña que creaste en agente.funnelslabs.app.
         </p>
         <Link href="/dashboard" className="block w-full rounded-lg bg-accent px-4 py-3 font-semibold text-accent-ink transition hover:bg-accent-hover">
           Entrar a mi panel
@@ -74,16 +74,21 @@ export default async function ActivarPage({ searchParams }: { searchParams: Prom
               <span className="text-ink-muted"> /mes después de la prueba</span>
             </span>
           </div>
-          <ul className="mt-2 space-y-1 text-sm text-ink-muted">
-            <li>✓ Tu agente de IA respondiendo en WhatsApp 24/7</li>
-            <li>✓ {PLAN_LIMITS[TRIAL_PLAN]} clientes atendidos por IA al mes · 1 línea</li>
-            <li>✓ CRM con contactos ilimitados</li>
+          <ul className="mt-3 space-y-1.5 text-sm text-ink-muted">
+            {STARTER_FEATURES.map((f) => (
+              <li key={f} className="flex gap-2">
+                <span className="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-ink" aria-hidden="true">
+                  ✓
+                </span>
+                <span>{f}</span>
+              </li>
+            ))}
           </ul>
         </div>
         <TrialForm supportLink={SUPPORT_WHATSAPP_LINK} />
         <ul className="space-y-1.5 text-xs text-ink-muted">
           <li>🔒 Pago seguro con Mercado Pago. Nosotros nunca vemos tu tarjeta.</li>
-          <li>📩 Al terminar te llega un correo con tu acceso.</li>
+          <li>✅ Al terminar vuelves aquí y entras directo a tu panel. Tu acceso siempre es el correo y la contraseña que acabas de crear.</li>
           <li>
             ¿Necesitas el plan Pro (más líneas y clientes)?{" "}
             <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">

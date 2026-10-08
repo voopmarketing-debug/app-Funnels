@@ -1604,6 +1604,13 @@ export async function updateBusinessSubscription(
       subscriptionEndsAt: dates.endsAt ? new Date(dates.endsAt) : null,
     },
   });
+  // Giving a sign-up a paid period by hand also lets them past /activar.
+  if (dates.endsAt && new Date(dates.endsAt) > new Date()) {
+    await prisma.user.updateMany({
+      where: { activationRequired: true, memberships: { some: { businessId, role: "OWNER" } } },
+      data: { activationRequired: false },
+    });
+  }
   revalidatePath("/dashboard/clients");
 }
 

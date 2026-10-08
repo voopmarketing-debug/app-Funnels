@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
-import { TRIAL_DAYS } from "@/lib/plans";
+import { STARTER_FEATURES, TRIAL_DAYS } from "@/lib/plans";
 
 const SEGMENTS = [
   {
@@ -66,17 +66,7 @@ const PLANS = [
     priceSuffix: "USD / mes",
     billingNote: `${TRIAL_DAYS} días gratis. Luego se cobra automáticamente cada mes; cancelas cuando quieras.`,
     contacts: "400 clientes atendidos por IA al mes",
-    features: [
-      "Contactos ilimitados en tu CRM",
-      "2.000 envíos masivos al mes",
-      "1 línea de WhatsApp (un negocio)",
-      "Hasta 3 personas de tu equipo",
-      "Agente con memoria completa de la conversación",
-      "CRM por etapas, difusiones y plantillas de WhatsApp",
-      "Sitios web y páginas de venta creados con IA",
-      "Dashboard de KPIs + diagnóstico de ventas con IA",
-      "Soporte de lunes a viernes por WhatsApp y sesión de onboarding",
-    ],
+    features: STARTER_FEATURES.filter((f) => !f.startsWith("400 ")),
     highlight: true,
     ctaLabel: `Probar ${TRIAL_DAYS} días gratis`,
     ctaHref: "/register",
