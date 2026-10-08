@@ -1,9 +1,12 @@
-La IA se mueve cada semana. La pregunta es si tu negocio se está moviendo con ella 👀
+La IA cambia cada semana. ¿Tu negocio va al mismo ritmo? 👀
 
-Esta semana: GPT-6 llegó a ChatGPT, WhatsApp cambió sus cobros (tranquilo, si te escriben desde un anuncio sigues con 72 h gratis) y Google se movió fuerte.
+Lo más importante de estos días:
+• GPT-6 llegó gratis a ChatGPT.
+• WhatsApp ahora cobra algunas respuestas. Si el cliente llega por un anuncio, tienes 72 horas gratis.
+• Google lanzó Gemini 4 Argon y ganó el juicio por sus resúmenes con IA.
 
-Te lo resumí en 4 slides, sin tecnicismos.
+Desliza para ver qué significa para tu negocio.
 
-¿Ya sabes cómo usar la IA en tu negocio? Comenta “IA” y te envío los links para que las pruebes 👇
+👉 Comenta “IA” y te envío los links para probarlas hoy.
 
 #emprendedoreslatam #inteligenciaartificial #funnelslabs
