@@ -109,6 +109,17 @@
   .cta-box p { font-size: 32px; font-weight: 500; line-height: 1.35; color: #d8d8d0; }
   .cta-box p b { color: var(--lime); font-weight: 800; }
   .btn { display: inline-block; margin-top: 34px; background: var(--lime); color: var(--ink); font-weight: 800; font-size: 30px; padding: 22px 46px; border-radius: 99px; }
+
+  /* Pantalla con foto: "meme" = franja de texto arriba + foto; "overlay" = foto completa con texto encima */
+  .photo { padding: 0; }
+  .photo .band { flex: none; padding: 30px 32px 22px; position: relative; z-index: 1; }
+  .photo .pic { flex: 1; position: relative; overflow: hidden; }
+  .photo .pic img, .photo.overlay > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .photo.overlay { justify-content: flex-end; }
+  .photo.overlay::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(transparent 30%, rgba(10,10,10,.75)); }
+  .photo.overlay .cap { position: relative; z-index: 2; padding: 36px 32px; text-align: center; color: #fff; }
+  .missing { background: repeating-linear-gradient(45deg, #ecebe4 0 18px, #f6f6f2 18px 36px) !important; }
+  .missing::after { content: attr(data-foto); position: absolute; inset: 18px 12px auto 12px; text-align: center; font-size: 18px; font-weight: 700; color: var(--ink-faint); z-index: 3; }
 </style>
 </head>
 <body>
@@ -135,9 +146,10 @@
   </div>
   <div class="phone p2">
     <header><span class="back">‹</span><span class="date">Septiembre 7<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
-    <div class="screen s-lilac" style="justify-content:center;text-align:center;gap:10px">
-      <div class="big" style="font-size:60px;text-transform:uppercase">Si te perdono</div>
-      <div style="font-size:34px;font-weight:600;font-style:italic">pero tiene <b style="font-weight:800">un precio</b></div>
+    <div class="screen s-lilac photo">
+      <div class="band" style="text-align:center"><div class="big" style="font-size:54px;text-transform:uppercase">Si te perdono</div>
+      <div style="font-size:30px;font-weight:600;font-style:italic">pero tiene <b style="font-weight:800">un precio</b></div></div>
+      <div class="pic" data-foto="img/01.jpg — hámster o mascota señalando"><img src="img/01.jpg" onerror="this.closest('[data-foto]').classList.add('missing');this.remove()"></div>
     </div>
   </div>
   <div class="card why"><h4>Funciona para:</h4><ul><li>Mostrar servicios</li><li>Destacar beneficios</li><li>Comunicar precios</li></ul></div>
@@ -151,8 +163,9 @@
   <div class="card note" style="font-size:25px">Este trend juega con fotos reales y sin editar para mostrar el lado más espontáneo y humano de una marca.</div>
   <div class="phone p1">
     <header><span class="back">‹</span><span class="date">Septiembre 8<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
-    <div class="screen s-lime" style="justify-content:center">
-      <div class="marker" style="font-size:66px;transform:rotate(-3deg)">La chica de Marketing no vino a trabajar !!</div>
+    <div class="screen photo overlay" data-foto="img/02.jpg — escritorio u oficina vacía, foto casual">
+      <img src="img/02.jpg" onerror="this.closest('[data-foto]').classList.add('missing');this.remove()">
+      <div class="cap"><div class="marker" style="font-size:54px;color:var(--lime);transform:rotate(-3deg)">La chica de Marketing no vino a trabajar !!</div></div>
     </div>
   </div>
   <div class="phone p2">
@@ -171,9 +184,10 @@
   <div class="card note" style="font-size:25px">Un trend cute y juguetón para mostrar productos como ese antojito que “te da penita pedir”.</div>
   <div class="phone p1">
     <header><span class="back">‹</span><span class="date">Septiembre 9<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
-    <div class="screen s-lilac" style="justify-content:center">
-      <div class="big" style="font-size:66px">Me da penita</div>
-      <div class="marker" style="font-size:50px;align-self:flex-end;margin:8px 10px 0 0">pedirte…</div>
+    <div class="screen s-lilac photo">
+      <div class="band"><div class="big" style="font-size:56px">Me da penita</div>
+      <div class="marker" style="font-size:44px;text-align:right">pedirte…</div></div>
+      <div class="pic" data-foto="img/03.jpg — perrito con cara de ternura"><img src="img/03.jpg" onerror="this.closest('[data-foto]').classList.add('missing');this.remove()"></div>
     </div>
   </div>
   <div class="phone p2">
@@ -193,9 +207,10 @@
   <div class="card note">Porque convierte lo cotidiano en algo digno de presumir.</div>
   <div class="phone p1">
     <header><span class="back">‹</span><span class="date">Septiembre 10<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
-    <div class="screen s-dark" style="justify-content:center;text-align:center;gap:24px">
-      <div style="font-size:42px;font-weight:700;font-style:italic;line-height:1.1;letter-spacing:-0.03em">It can't always be Pinterest and mood boards.</div>
-      <div style="font-size:42px;font-weight:800;font-style:italic;line-height:1.1;letter-spacing:-0.03em;color:var(--lime)">Someone's gotta hold it down on site.</div>
+    <div class="screen photo overlay" data-foto="img/04.jpg — persona trabajando: clínica, facial, obra">
+      <img src="img/04.jpg" onerror="this.closest('[data-foto]').classList.add('missing');this.remove()">
+      <div class="cap"><div style="font-size:36px;font-weight:700;font-style:italic;line-height:1.1;letter-spacing:-0.03em">It can't always be Pinterest and mood boards.</div>
+      <div style="font-size:36px;font-weight:800;font-style:italic;line-height:1.1;letter-spacing:-0.03em;color:var(--lime);margin-top:14px">Someone's gotta hold it down on site.</div></div>
     </div>
   </div>
   <div class="phone p2">

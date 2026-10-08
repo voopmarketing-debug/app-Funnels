@@ -33,6 +33,15 @@ Alterna los layouts `A` y `B` (espejo) y los fondos `glow-lime` /
 - **Capturas reales**: pon `<img src="captura.png">` dentro de `.screen`
   y se ajusta sola (object-fit: cover). Prefiere capturas reales de
   clientes cuando las haya.
+- **Fotos (humanizar)**: en cada slide, **una pantalla con foto y otra solo
+  de texto**. Dos variantes: `.screen.photo` con `.band` (franja de texto
+  arriba, tipo meme) + `.pic` con `<img>`; o `.screen.photo.overlay`
+  (foto completa con el texto encima sobre degradado oscuro). Las fotos van
+  en `carruseles/<slug>/img/NN.jpg`; si falta una, la pantalla muestra
+  rayas y el nombre del archivo esperado (`data-foto`). Prioridad: fotos
+  reales del equipo o clientes > mascotas/personas con expresión >
+  stock genérico. Pide las fotos al usuario o descárgalas de
+  Unsplash/Pexels (licencia libre) si la red lo permite.
 - `.card.note` y `.card.why` — tarjetas blancas con sombra suave.
 
 ## Reglas extra sobre `marca.md`
