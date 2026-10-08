@@ -85,6 +85,7 @@ model Business {
   messageTemplates MessageTemplate[]
   websites         Website[]
   agentMedia       AgentMedia[]
+  sales            Sale[]
   products         Product[]
   aiUsage          AiUsage[]
   notifications    Notification[]
@@ -145,28 +146,28 @@ enum PlanTier {
 
 // Links a platform user to a business (a user can manage multiple businesses).
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
+  id                String             @id @default(cuid())
+  email             String             @unique
   // Contact/WhatsApp number for the agency to reach this person directly —
   // separate from wabaPhoneNumberId on Business, which is the Meta WhatsApp
   // Business API config for their bot, not a way to contact them.
-  phone        String?
+  phone             String?
   // Fed into the AI agent's system prompt as background context (see
   // buildSystemPrompt in src/lib/ai.ts) so the bot can answer "¿dónde
   // están?" or share a social media handle without the client having to
   // type it into their own editable prompt — set once here, used by every
   // business this account owns.
-  city         String?
-  country      String?
-  facebook     String?
-  instagram    String?
-  tiktok       String?
-  linkedin     String?
-  passwordHash String
-  name         String?
-  createdAt    DateTime       @default(now())
-  memberships  Membership[]
-  addons       AccountAddon[]
+  city              String?
+  country           String?
+  facebook          String?
+  instagram         String?
+  tiktok            String?
+  linkedin          String?
+  passwordHash      String
+  name              String?
+  createdAt         DateTime           @default(now())
+  memberships       Membership[]
+  addons            AccountAddon[]
   pushSubscriptions PushSubscription[]
 
   // Password reset flow: resetTokenHash stores a SHA-256 hash of the token
@@ -321,6 +322,7 @@ model Conversation {
   messages        Message[]
   notifications   Notification[]
   broadcastClicks BroadcastClick[]
+  sales           Sale[]
 
   @@unique([businessId, customerPhone])
   @@index([stageId])
@@ -895,4 +897,30 @@ model PushSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// A closed sale, registered from the CRM (lead panel, or when a contact is
+// moved to a "won" stage). Feeds the Ventas KPIs: revenue, ticket, close
+// rate and how much the AI agent helped sell. Amounts are whole units of
+// `currency` (COP by default), like Product.price.
+model Sale {
+  id              String   @id @default(cuid())
+  businessId      String
+  conversationId  String?
+  productId       String?
+  productName     String?
+  amount          Int
+  currency        String   @default("COP")
+  note            String?
+  // The AI agent had replied in this conversation before the sale closed.
+  aiAssisted      Boolean  @default(false)
+  closedAt        DateTime @default(now())
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, closedAt])
+  @@index([conversationId])
 }
