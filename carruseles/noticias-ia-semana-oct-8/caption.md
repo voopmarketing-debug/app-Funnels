@@ -1,9 +1,9 @@
-Si tu negocio vive de WhatsApp, esta semana te interesa 👀
+La IA se mueve cada semana. La pregunta es si tu negocio se está moviendo con ella 👀
 
-Desde octubre, responder por la API de WhatsApp tiene costo después de 1,000 mensajes al mes. Lo bueno: si el cliente te escribe desde un anuncio, sigues teniendo 72 horas gratis.
+Esta semana: GPT-6 llegó a ChatGPT, WhatsApp cambió sus cobros (tranquilo, si te escriben desde un anuncio sigues con 72 h gratis) y Google se movió fuerte.
 
 Te lo resumí en 4 slides, sin tecnicismos.
 
-¿Ya estabas enterado? Dime SÍ o NO en comentarios 👇
+¿Ya sabes cómo usar la IA en tu negocio? Comenta “IA” y te escribo 👇
 
 #emprendedoreslatam #inteligenciaartificial #funnelslabs
