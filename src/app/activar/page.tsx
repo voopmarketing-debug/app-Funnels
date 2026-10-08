@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { SignupShell, CheckList } from "@/components/SignupShell";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { PLAN_PRICE_COP, STARTER_FEATURES, TRIAL_DAYS, TRIAL_PLAN, PLAN_LABELS } from "@/lib/plans";
 import { claimReturnedPreapproval } from "@/lib/trial";
@@ -57,40 +57,40 @@ export default async function ActivarPage({ searchParams }: { searchParams: Prom
     body = <WaitForActivation supportLink={SUPPORT_WHATSAPP_LINK} />;
   } else {
     body = (
-      <div className="space-y-5">
+      <div className="space-y-6">
         <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-wide text-accent">Paso 2 de 2</p>
-          <h1 className="text-2xl font-bold leading-tight">Activa tus {TRIAL_DAYS} días gratis</h1>
-          <p className="text-sm text-ink-muted">
-            Registra tu tarjeta en Mercado Pago para empezar. <strong className="text-ink">Hoy no te cobramos nada</strong>: el primer cobro es el{" "}
-            {firstChargeLabel} y puedes cancelar antes cuando quieras.
-          </p>
+          <h1 className="text-2xl font-bold leading-tight sm:text-3xl">Activa tus {TRIAL_DAYS} días gratis</h1>
+          <p className="text-sm text-ink-muted">Registra tu tarjeta en Mercado Pago y empieza ahora. Cancelas cuando quieras.</p>
         </div>
-        <div className="rounded-xl border border-accent bg-accent/10 p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-            <span className="font-semibold text-ink">Plan {PLAN_LABELS[TRIAL_PLAN]}</span>
-            <span className="text-sm text-ink">
-              <strong>${PLAN_PRICE_COP[TRIAL_PLAN].toLocaleString("es-CO")}</strong>
-              <span className="text-ink-muted"> /mes después de la prueba</span>
-            </span>
-          </div>
-          <ul className="mt-3 space-y-1.5 text-sm text-ink-muted">
-            {STARTER_FEATURES.map((f) => (
-              <li key={f} className="flex gap-2">
-                <span className="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-ink" aria-hidden="true">
-                  ✓
-                </span>
-                <span>{f}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+
+        <ol className="grid grid-cols-2 gap-2 text-sm">
+          <li className="rounded-xl border border-accent/50 bg-accent/10 p-3">
+            <span className="block text-xs text-ink-muted">Hoy</span>
+            <span className="block text-lg font-bold text-ink">$0</span>
+            <span className="block text-xs text-ink-muted">Empiezas tu prueba</span>
+          </li>
+          <li className="rounded-xl border border-border p-3">
+            <span className="block text-xs text-ink-muted">{firstChargeLabel}</span>
+            <span className="block text-lg font-bold text-ink">${PLAN_PRICE_COP[TRIAL_PLAN].toLocaleString("es-CO")}</span>
+            <span className="block text-xs text-ink-muted">Primer cobro mensual</span>
+          </li>
+        </ol>
+
+        <details className="group rounded-xl border border-border p-3 lg:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-ink">
+            Plan {PLAN_LABELS[TRIAL_PLAN]}: todo lo que incluye
+            <span className="text-accent transition group-open:rotate-180" aria-hidden="true">⌄</span>
+          </summary>
+          <CheckList items={STARTER_FEATURES} className="mt-3" />
+        </details>
+
         <TrialForm supportLink={SUPPORT_WHATSAPP_LINK} />
+
         <ul className="space-y-1.5 text-xs text-ink-muted">
           <li>🔒 Pago seguro con Mercado Pago. Nosotros nunca vemos tu tarjeta.</li>
-          <li>✅ Al terminar vuelves aquí y entras directo a tu panel. Tu acceso siempre es el correo y la contraseña que acabas de crear.</li>
+          <li>✅ Al terminar vuelves aquí y entras directo a tu panel con el correo y la contraseña que creaste.</li>
           <li>
-            ¿Necesitas el plan Pro (más líneas y clientes)?{" "}
+            ¿Necesitas el plan Pro?{" "}
             <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
               Escríbenos
             </a>{" "}
@@ -102,29 +102,35 @@ export default async function ActivarPage({ searchParams }: { searchParams: Prom
   }
 
   return (
-    <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
-      <div className="fl-ambient-bg" />
-      <div className="fl-grid-bg pointer-events-none absolute inset-0" />
-      <div className="fl-card-hero relative w-full max-w-md space-y-6 p-7">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <FunnelsLogoMark className="h-7 w-7 flex-none" />
-            <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
+    <SignupShell
+      step={user.activationRequired && estado !== "listo" ? 2 : undefined}
+      topRight={
+        <form action={logout}>
+          <button type="submit" className="text-xs text-ink-muted underline hover:text-ink">
+            Salir
+          </button>
+        </form>
+      }
+      aside={
+        <>
+          <div className="space-y-2">
+            <span className="inline-block rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-ink">{TRIAL_DAYS} días gratis</span>
+            <h2 className="text-3xl font-bold text-ink">Plan {PLAN_LABELS[TRIAL_PLAN]}</h2>
+            <p className="text-ink-muted">
+              <strong className="text-2xl text-ink">${PLAN_PRICE_COP[TRIAL_PLAN].toLocaleString("es-CO")}</strong> /mes después de la prueba
+            </p>
           </div>
-          <form action={logout}>
-            <button type="submit" className="text-xs text-ink-muted underline hover:text-ink">
-              Salir
-            </button>
-          </form>
-        </div>
-        {body}
-        <p className="text-center text-xs text-ink-muted">
-          ¿Dudas?{" "}
-          <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-            Escríbenos por WhatsApp
-          </a>
-        </p>
-      </div>
-    </main>
+          <CheckList items={STARTER_FEATURES} />
+        </>
+      }
+    >
+      {body}
+      <p className="text-center text-xs text-ink-muted">
+        ¿Dudas?{" "}
+        <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+          Escríbenos por WhatsApp
+        </a>
+      </p>
+    </SignupShell>
   );
 }

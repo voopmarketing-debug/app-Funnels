@@ -4,7 +4,8 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { registerBusiness, type RegisterState } from "@/lib/actions";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
-import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { SignupShell, TrustChips, CheckList } from "@/components/SignupShell";
+import { TRIAL_DAYS } from "@/lib/plans";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
@@ -15,24 +16,48 @@ export default function RegisterPage() {
   );
 
   return (
-    <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
-      <div className="fl-ambient-bg" />
-      <div className="fl-grid-bg pointer-events-none absolute inset-0" />
-      <ThemeToggle className="fl-nav-icon absolute right-4 top-4 z-10" />
-
-      <form
-        action={formAction}
-        className="relative w-full max-w-sm space-y-5 fl-card-hero p-7"
-      >
-        <div className="flex items-center gap-3">
-          <FunnelsLogoMark className="h-7 w-7 flex-none" />
-          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-xs font-bold uppercase tracking-wide text-accent">Paso 1 de 2</p>
-          <h1 className="text-xl font-bold">Crea tu cuenta</h1>
-          <p className="text-sm text-ink-muted">Tu agente de IA para WhatsApp, en minutos. Luego activas tu prueba gratis.</p>
+    <SignupShell
+      step={1}
+      topRight={<ThemeToggle className="fl-nav-icon" />}
+      aside={
+        <>
+          <div className="space-y-3">
+            <h2 className="text-3xl font-bold leading-tight text-ink [text-wrap:balance]">
+              Tu agente de IA vendiendo por WhatsApp, 24/7
+            </h2>
+            <p className="text-ink-muted">Responde, califica y agenda a tus clientes mientras tú te enfocas en tu negocio.</p>
+          </div>
+          <CheckList
+            items={[
+              "Responde al instante, con el tono de tu marca",
+              "CRM con embudos para no perder ningún cliente",
+              "Páginas web y KPIs creados con IA",
+              "Te acompañamos a conectar tu WhatsApp",
+            ]}
+          />
+          <ol className="space-y-3 rounded-xl border border-border bg-surface/60 p-4 text-sm">
+            {[
+              ["Crea tu cuenta", "1 minuto"],
+              [`Activa tus ${TRIAL_DAYS} días gratis`, "sin cobro hoy"],
+              ["Conectamos tu WhatsApp", "sesión de 30-45 min"],
+            ].map(([t, d], i) => (
+              <li key={t} className="flex items-center gap-3">
+                <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-accent/20 text-xs font-bold text-accent">{i + 1}</span>
+                <span className="font-medium text-ink">{t}</span>
+                <span className="ml-auto text-xs text-ink-muted">{d}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      }
+    >
+      <form action={formAction} className="space-y-5">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold">Crea tu cuenta</h1>
+          <p className="text-sm text-ink-muted">En el siguiente paso activas tu prueba gratis.</p>
+          <div className="lg:hidden">
+            <TrustChips items={[`${TRIAL_DAYS} días gratis`, "Sin cobro hoy", "Cancela cuando quieras"]} />
+          </div>
         </div>
 
         <div className="space-y-1">
@@ -154,6 +179,6 @@ export default function RegisterPage() {
           </a>
         </p>
       </form>
-    </main>
+    </SignupShell>
   );
 }

@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { SignupShell, CheckList } from "@/components/SignupShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
@@ -72,24 +72,24 @@ function LoginForm() {
   }
 
   return (
-    <main className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
-      <div className="fl-ambient-bg" />
-      <div className="fl-grid-bg pointer-events-none absolute inset-0" />
-      <ThemeToggle className="fl-nav-icon absolute right-4 top-4 z-10" />
-
-      <form
-        action={handleSubmit}
-        autoComplete="on"
-        className="fl-card-hero relative w-full max-w-sm space-y-6 p-7"
-      >
-        <div className="flex items-center gap-3">
-          <FunnelsLogoMark className="h-7 w-7 flex-none" />
-          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
-        </div>
-
+    <SignupShell
+      topRight={<ThemeToggle className="fl-nav-icon" />}
+      aside={
+        <>
+          <div className="space-y-3">
+            <h2 className="text-3xl font-bold leading-tight text-ink [text-wrap:balance]">Tu negocio, respondiendo en WhatsApp 24/7 con IA</h2>
+            <p className="text-ink-muted">Entra a tu panel para ver tus conversaciones, tu CRM y cómo va tu agente.</p>
+          </div>
+          <CheckList
+            items={["Conversaciones y CRM en un solo lugar", "KPIs y diagnóstico de ventas con IA", "Páginas web creadas con IA", "Soporte por WhatsApp cuando lo necesites"]}
+          />
+        </>
+      }
+    >
+      <form action={handleSubmit} autoComplete="on" className="space-y-6">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">Iniciar sesión</h1>
-          <p className="text-sm text-ink-muted">Tu negocio, respondiendo en WhatsApp 24/7 con IA</p>
+          <p className="text-sm text-ink-muted">Entra con el correo y la contraseña de tu cuenta.</p>
         </div>
 
         {searchParams.get("registered") === "1" && (
@@ -172,6 +172,6 @@ function LoginForm() {
           </a>
         </p>
       </form>
-    </main>
+    </SignupShell>
   );
 }
