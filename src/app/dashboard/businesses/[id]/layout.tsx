@@ -37,7 +37,11 @@ export default async function BusinessLayout({
         <h1 className="text-lg font-bold text-ink">Suscripción vencida</h1>
         <p className="text-sm text-ink-muted">
           El acceso de <strong>{membership.business.name}</strong> a Funnels Labs está pausado porque su período
-          pagado venció. Escríbenos para renovar y reactivar tu cuenta.
+          pagado venció, y tu agente dejó de responder por ahora.
+        </p>
+        <p className="text-sm text-ink-muted">
+          <strong className="text-ink">No se borró nada:</strong> tus contactos, conversaciones, embudos, páginas y la
+          configuración de tu agente siguen guardados. Apenas renueves, todo vuelve tal cual estaba.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
           <a

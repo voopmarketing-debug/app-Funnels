@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { PlanTier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { releaseOrphanAccount } from "@/lib/accounts";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { sendEmail } from "@/lib/email";
 
@@ -52,6 +53,7 @@ export async function provisionClientFromPurchase(input: {
 
   if (!email) return { status: "error", message: "Missing buyer email" };
 
+  await releaseOrphanAccount(email);
   const existing = await prisma.user.findUnique({
     where: { email },
     include: { memberships: { select: { businessId: true }, take: 1 } },

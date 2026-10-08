@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isSubscriptionActive } from "@/lib/subscription";
 import { decryptSecret } from "@/lib/crypto";
 import {
   sendWhatsAppTextMessage,
@@ -284,6 +285,13 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     // A human already took over this specific conversation — the message is
     // saved above so it shows up in the dashboard, but the AI stays quiet
     // instead of talking over them.
+    return;
+  }
+
+  if (!isSubscriptionActive(business.subscriptionEndsAt)) {
+    // Paid period over: the message is saved above (nothing is lost while
+    // they renew), but no AI reply is paid for. Not marked aiPaused, so the
+    // agent picks up again on its own the moment the subscription renews.
     return;
   }
 

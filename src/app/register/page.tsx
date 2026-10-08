@@ -109,7 +109,23 @@ export default function RegisterPage() {
           <p className="text-xs text-ink-muted">Mínimo 8 caracteres.</p>
         </div>
 
-        {state.error && <p className="text-sm text-error">{state.error}</p>}
+        {state.error === "EMAIL_TAKEN" ? (
+          <div role="alert" className="space-y-1 rounded-lg border border-error/40 bg-error/10 p-3 text-sm">
+            <p className="font-semibold text-ink">Ese correo ya tiene una cuenta</p>
+            <p className="text-ink-muted">
+              <Link href="/login" className="font-semibold text-accent hover:underline">
+                Inicia sesión
+              </Link>{" "}
+              o{" "}
+              <Link href="/forgot-password" className="font-semibold text-accent hover:underline">
+                recupera tu contraseña
+              </Link>
+              . Si quieres crear otra cuenta, usa un correo distinto.
+            </p>
+          </div>
+        ) : (
+          state.error && <p className="text-sm text-error">{state.error}</p>
+        )}
 
         <button
           type="submit"

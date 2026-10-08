@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isSubscriptionActive } from "@/lib/subscription";
 import { decryptSecret } from "@/lib/crypto";
 import { sendWhatsAppMediaMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { VISION_MEDIA_TYPES, type VisionImage } from "@/lib/ai";
@@ -79,6 +80,8 @@ type Candidate = Prisma.ConversationGetPayload<{ include: { business: { include:
 async function recoverConversation(conversation: Candidate, now: number, manual = false): Promise<boolean> {
   const { business } = conversation;
   if (!business.agent || !business.wabaAccessToken || !business.wabaPhoneNumberId) return false;
+  // Same as handleIncomingMessage: no AI replies once the paid period is over.
+  if (!isSubscriptionActive(business.subscriptionEndsAt)) return false;
 
   const recentDesc = await prisma.message.findMany({
     where: { conversationId: conversation.id },

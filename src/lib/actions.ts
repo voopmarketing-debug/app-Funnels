@@ -8,6 +8,7 @@ import { retryConversationNow } from "@/lib/replyRecovery";
 import bcrypt from "bcryptjs";
 import { auth, signIn } from "@/auth";
 import { getBroadcastUsage, getContactUsage, remaining } from "@/lib/crmLimits";
+import { releaseOrphanAccount } from "@/lib/accounts";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { buildTrackedLink } from "@/lib/broadcastTracking";
@@ -120,9 +121,8 @@ export async function registerBusiness(
     return { error: "La contraseña debe tener al menos 8 caracteres" };
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return { error: "Ya existe una cuenta con ese correo" };
+  if (!(await releaseOrphanAccount(email))) {
+    return { error: "EMAIL_TAKEN" };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -244,8 +244,7 @@ export async function createClientAccount(
     return { error: "Completa todos los campos", success: null };
   }
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
+  if (!(await releaseOrphanAccount(email))) {
     return { error: "Ya existe una cuenta con ese correo", success: null };
   }
 
@@ -1638,7 +1637,15 @@ export async function deleteBusiness(businessId: string): Promise<void> {
 
   await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
+  const owners = await prisma.membership.findMany({
+    where: { businessId, role: "OWNER", userId: { not: session.user.id } },
+    select: { user: { select: { email: true } } },
+  });
   await prisma.business.delete({ where: { id: businessId } });
+  // The agency deleting a client's last business deletes the client too, so
+  // the email is free to sign up again. A client deleting their own
+  // business keeps their login (they may create another one).
+  for (const o of owners) await releaseOrphanAccount(o.user.email);
   revalidatePath("/dashboard", "layout");
 }
 
