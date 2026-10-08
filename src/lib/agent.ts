@@ -281,6 +281,13 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     return;
   }
 
+  // A contact paused only because LAST month's plan limit ran out gets the
+  // AI back once a new month starts: the monthly quota has renewed.
+  if (conversation.aiPaused && (await pausedOnlyByPastMonthLimit(conversation.id))) {
+    await prisma.conversation.update({ where: { id: conversation.id }, data: { aiPaused: false } });
+    conversation.aiPaused = false;
+  }
+
   if (conversation.aiPaused) {
     // A human already took over this specific conversation — the message is
     // saved above so it shows up in the dashboard, but the AI stays quiet
@@ -552,6 +559,22 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
     await logInternalError(conversation.id, "WHATSAPP", err);
     throw err;
   }
+}
+
+/**
+ * True when the last plan-limit notice on this conversation is from a
+ * previous calendar month (and none this month), i.e. the AI was paused by
+ * the monthly quota, not by a person.
+ */
+async function pausedOnlyByPastMonthLimit(conversationId: string): Promise<boolean> {
+  const now = new Date();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const lastNotice = await prisma.message.findFirst({
+    where: { conversationId, role: "AGENT", content: { startsWith: "[LÍMITE DE PLAN]" } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  return !!lastNotice && lastNotice.createdAt < startOfMonth;
 }
 
 async function logPlanLimitNotice(conversationId: string, planLimit: number): Promise<void> {
