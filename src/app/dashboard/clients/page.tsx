@@ -59,16 +59,21 @@ export default async function ClientsPage() {
         },
       },
     }),
-    prisma.$queryRaw<{ businessId: string; contacts: bigint }[]>`
-      SELECT c."businessId", COUNT(DISTINCT m."conversationId") AS "contacts"
-      FROM "Message" m JOIN "Conversation" c ON c."id" = m."conversationId"
-      WHERE c."businessId" IN (${Prisma.join(businessIds)}) AND m."role" = 'CUSTOMER' AND m."createdAt" >= ${startOfMonth}
-      GROUP BY c."businessId"`,
-    prisma.$queryRaw<{ businessId: string; last: Date }[]>`
-      SELECT c."businessId", MAX(m."createdAt") AS "last"
-      FROM "Message" m JOIN "Conversation" c ON c."id" = m."conversationId"
-      WHERE c."businessId" IN (${Prisma.join(businessIds)})
-      GROUP BY c."businessId"`,
+    // Prisma.join throws on an empty list: the agency with no clients yet.
+    businessIds.length
+      ? prisma.$queryRaw<{ businessId: string; contacts: bigint }[]>`
+          SELECT c."businessId", COUNT(DISTINCT m."conversationId") AS "contacts"
+          FROM "Message" m JOIN "Conversation" c ON c."id" = m."conversationId"
+          WHERE c."businessId" IN (${Prisma.join(businessIds)}) AND m."role" = 'CUSTOMER' AND m."createdAt" >= ${startOfMonth}
+          GROUP BY c."businessId"`
+      : [],
+    businessIds.length
+      ? prisma.$queryRaw<{ businessId: string; last: Date }[]>`
+          SELECT c."businessId", MAX(m."createdAt") AS "last"
+          FROM "Message" m JOIN "Conversation" c ON c."id" = m."conversationId"
+          WHERE c."businessId" IN (${Prisma.join(businessIds)})
+          GROUP BY c."businessId"`
+      : [],
     prisma.membership.groupBy({ by: ["businessId"], where: { businessId: { in: businessIds }, role: "MEMBER" }, _count: true }),
     prisma.website.groupBy({ by: ["businessId"], where: { businessId: { in: businessIds } }, _count: true }),
   ]);
