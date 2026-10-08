@@ -4,6 +4,6 @@ Esta semana: GPT-6 llegó a ChatGPT, WhatsApp cambió sus cobros (tranquilo, si 
 
 Te lo resumí en 4 slides, sin tecnicismos.
 
-¿Ya sabes cómo usar la IA en tu negocio? Comenta “IA” y te escribo 👇
+¿Ya sabes cómo usar la IA en tu negocio? Comenta “IA” y te envío los links para que las pruebes 👇
 
 #emprendedoreslatam #inteligenciaartificial #funnelslabs
