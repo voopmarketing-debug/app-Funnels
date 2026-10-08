@@ -54,6 +54,7 @@ export function WebsiteBuilder({
   initialContent,
   stats,
   tracking,
+  initialTab = "chat",
 }: {
   businessId: string;
   websiteId: string;
@@ -63,10 +64,12 @@ export function WebsiteBuilder({
   initialContent: WebsiteContentV2;
   stats: { views: number; clicks: number; leads: number };
   tracking: { metaPixelId: string | null; googleTagId: string | null };
+  // ?tab=ajustes from the pages list's "Píxel" shortcut.
+  initialTab?: Tab;
 }) {
   const router = useRouter();
   const [content, setContent] = useState(initialContent);
-  const [tab, setTab] = useState<Tab>("chat");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [device, setDevice] = useState<Device>("desktop");
   const [previewVersion, setPreviewVersion] = useState(0);
   // Unsaved colors/fonts from the Diseño tab, shown live in the preview.

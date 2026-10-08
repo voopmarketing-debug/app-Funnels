@@ -27,6 +27,8 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
         slug: true,
         generatedAt: true,
         customDomain: true,
+        metaPixelId: true,
+        googleTagId: true,
         _count: {
           select: {
             events: { where: { type: "view" } },
@@ -45,7 +47,12 @@ export default async function WebsitePage({ params }: { params: Promise<{ id: st
     prisma.websiteLead.count({ where: { website: { businessId: id } } }),
     prisma.appointment.count({ where: { status: "confirmed", website: { businessId: id } } }),
   ]);
-  const pages = websites.map((w) => ({ ...w, viewCount: w._count.events, leadCount: w._count.leads + w._count.appointments }));
+  const pages = websites.map((w) => ({
+    ...w,
+    viewCount: w._count.events,
+    leadCount: w._count.leads + w._count.appointments,
+    hasTracking: !!(w.metaPixelId || w.googleTagId),
+  }));
   const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
 
   return (

@@ -16,6 +16,7 @@ type Page = {
   customDomain: string | null;
   viewCount: number;
   leadCount: number;
+  hasTracking: boolean;
 };
 
 export function WebsitePagesList({
@@ -327,6 +328,19 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
             <ClientDate date={page.generatedAt} options={{ day: "numeric", month: "short" }} />
           </span>
           {page.customDomain && <span className="fl-mono text-accent">{page.customDomain}</span>}
+          {/* Shortcut to the Meta Pixel / Google tag settings, which live in
+              the editor (Ajustes) and were easy to miss. */}
+          <Link
+            href={`${editHref}?tab=ajustes#pixel`}
+            title="Píxel de Meta y etiqueta de Google para medir tus anuncios"
+            className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold transition ${
+              page.hasTracking
+                ? "bg-[var(--status-good)]/15 text-[var(--status-good)] hover:bg-[var(--status-good)]/25"
+                : "border border-border-strong text-ink-muted hover:border-accent hover:text-accent"
+            }`}
+          >
+            {page.hasTracking ? "● Píxel activo" : "📈 Agregar píxel"}
+          </Link>
         </div>
       </div>
     </div>

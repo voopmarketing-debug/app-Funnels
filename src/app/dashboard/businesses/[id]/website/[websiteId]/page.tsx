@@ -16,10 +16,10 @@ export default async function WebsiteEditorPage({
   searchParams,
 }: {
   params: Promise<{ id: string; websiteId: string }>;
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; tab?: string }>;
 }) {
   const { id, websiteId } = await params;
-  const { month: monthParam } = await searchParams;
+  const { month: monthParam, tab: tabParam } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -126,6 +126,7 @@ export default async function WebsiteEditorPage({
           initialContent={v2.data}
           stats={{ views, clicks, leads: leadCount }}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
+          initialTab={tabParam === "ajustes" ? "ajustes" : "chat"}
         />
       );
     }

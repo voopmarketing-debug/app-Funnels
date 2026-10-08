@@ -37,7 +37,7 @@ export function TrackingSettings({
   const active = [saved.meta && "Meta", saved.google && "Google"].filter(Boolean) as string[];
 
   return (
-    <section className="space-y-3 rounded-lg border border-border bg-background p-3">
+    <section id="pixel" className="scroll-mt-20 space-y-3 rounded-lg border border-border bg-background p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-ink">📈 Píxel y medición para anuncios</p>
