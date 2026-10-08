@@ -16,6 +16,7 @@ Produce carruseles listos para publicar: copy + PNG por slide.
 | `assets/plantilla.html` | **Estilo clásico**: 6 tipos de slide (portada, texto, lista, dato, cita, CTA). Para listas, pasos, errores, tips. |
 | `assets/plantilla-trends.html` + `references/estilo-trends.md` | **Estilo trends/mockups**: pantallas de ejemplo + tarjetas explicativas sobre brillo lima/lila. Para trends, ideas de contenido, ejemplos, referentes. |
 | `references/noticias.md` | Carruseles de noticias de último momento (marcas e IA): cómo investigar, verificar y citar. |
+| `references/caption-viral.md` | Copy del post (caption) estilo marca viral. Siempre se entrega con las imágenes. |
 | `scripts/render.cjs` | Exporta cada `.slide` del HTML a PNG 1080×1350. |
 
 ## Flujo

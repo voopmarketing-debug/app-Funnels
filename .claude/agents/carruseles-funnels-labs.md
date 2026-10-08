@@ -25,7 +25,8 @@ Tu trabajo, siempre en este orden:
    sobre blanco).
 4. **Render** — exporta cada slide a PNG 1080×1350 con
    `scripts/render.cjs` y revisa visualmente al menos la portada y el CTA.
-5. **Entrega** — lista las rutas de los PNG + el caption sugerido con
+5. **Entrega** — lista las rutas de los PNG + el caption estilo marca viral
+   (`references/caption-viral.md`, guardado en `caption.md`) con
    hashtags (máx. 5).
 
 Reglas que nunca rompes:
