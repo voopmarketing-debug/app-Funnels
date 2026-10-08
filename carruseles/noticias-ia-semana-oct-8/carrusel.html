@@ -134,6 +134,9 @@
   .ok { color: var(--lime-dark); } .pay { background: var(--ink); color: var(--lime); padding: 2px 10px; border-radius: 8px; }
   .term { font-family: "Montserrat", monospace; font-size: 21px; line-height: 1.7; font-weight: 600; }
   .term .t { color: var(--lime); }
+
+  .ov { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .shade { position:absolute; inset:0; background: linear-gradient(rgba(10,10,10,0) 25%, rgba(10,10,10,.88) 78%); }
 </style>
 </head>
 <body>
@@ -152,8 +155,9 @@
    <div class="ui-card"><div style="font-weight:800;font-size:20px">Lista de compras</div>
    <div class="bars"><i style="height:60%"></i><i class="on" style="height:95%"></i><i style="height:45%"></i><i class="on" style="height:75%"></i><i style="height:35%"></i></div>
    <div class="stepper"><b>−</b>8 invitados<b>+</b></div></div></div></div>
-  <div class="phone p2"><header><span class="back">‹</span><span class="date">Octubre 8<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-black" style="justify-content:center;gap:18px"><div class="k" style="color:var(--lime)">Nuevo en ChatGPT</div>
-   <div class="big" style="font-size:50px">Ya no solo responde texto. Te arma <span style="color:var(--lime)">la herramienta.</span></div></div></div>
+  <div class="phone p2"><header><span class="back">‹</span><span class="date">Octubre 8<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-black" style="justify-content:flex-end;gap:14px;padding:32px"><img class="ov" src="img/01.jpg" style="object-position:center 20%"><div class="shade"></div>
+   <div class="k" style="color:var(--lime);position:relative">Nuevo en ChatGPT</div>
+   <div class="big" style="font-size:44px;position:relative;color:#fff">Ya no solo responde texto. Te arma <span style="color:var(--lime)">la herramienta.</span></div></div></div>
   <div class="card why"><h4>Por qué importa:</h4><ul><li>Tus clientes esperarán respuestas más visuales</li><li>Tu contenido compite con respuestas listas</li></ul></div>
   <div class="logo"><i></i>Funnels Labs</div>
 </section>
@@ -165,8 +169,8 @@
    <div class="row"><span>Mensaje del cliente</span><span class="ok">Gratis</span></div>
    <div class="row"><span>Tus primeras 1,000 respuestas del mes</span><span class="ok">Gratis</span></div>
    <div class="row" style="border:0"><span>De la 1,001 en adelante</span><span class="pay">Se cobra</span></div></div></div>
-  <div class="phone p2"><header><span class="back">‹</span><span class="date">Octubre 1<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-lime" style="justify-content:center"><div class="big" style="font-size:60px">Responder ya no es gratis.</div>
-   <div class="marker" style="font-size:42px;margin-top:16px">Responder mal sale caro.</div></div></div>
+  <div class="phone p2"><header><span class="back">‹</span><span class="date">Octubre 1<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-lime photo"><div class="band" style="padding:22px 28px 16px"><div class="big" style="font-size:40px">Responder ya no es gratis.</div></div>
+   <div class="pic"><img src="img/02.jpg" style="object-position:center 45%"></div></div></div>
   <div class="card why"><h4>Por qué importa:</h4><ul><li>Calcula cuántos mensajes respondes al mes</li><li>Menos ida y vuelta, más cierres</li></ul></div>
   <div class="logo"><i></i>Funnels Labs</div>
 </section>
@@ -176,7 +180,8 @@
   <div class="card note" style="font-size:23px">IA que encuentra, valida y corrige fallas de seguridad. Por ahora, solo para equipos de ciberseguridad aprobados.<span class="src">Fuente: TechRepublic · 30 sep.</span></div>
   <div class="phone p1"><header><span class="back">‹</span><span class="date">Septiembre 30<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-dark" style="justify-content:center"><div class="k" style="color:var(--lilac);margin-bottom:14px">Escaneo de seguridad</div>
    <div class="term">Vulnerabilidad encontrada <span class="t">✓</span><br>Vulnerabilidad validada <span class="t">✓</span><br>Parche aplicado <span class="t">✓</span></div></div></div>
-  <div class="phone p2"><header><span class="back">‹</span><span class="date">Septiembre 30<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-lilac" style="justify-content:center"><div class="big" style="font-size:54px">La IA también aprendió a <span style="background:var(--lime);padding:0 8px;border-radius:8px">defender.</span></div></div></div>
+  <div class="phone p2"><header><span class="back">‹</span><span class="date">Septiembre 30<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-lilac photo"><div class="band"><div class="big" style="font-size:44px">La IA también aprendió a <span style="background:var(--lime);padding:0 8px;border-radius:8px">defender.</span></div></div>
+   <div class="pic"><img src="img/03.jpg" style="object-position:center 60%"></div></div></div>
   <div class="card why"><h4>Por qué importa:</h4><ul><li>Los datos de tus clientes valen oro</li><li>Revisa quién tiene acceso a qué</li></ul></div>
   <div class="logo"><i></i>Funnels Labs</div>
 </section>
@@ -186,7 +191,8 @@
   <div class="card note" style="font-size:23px">Un juez de EE. UU. desestimó las demandas de Chegg y Penske Media contra los AI Overviews de Google. Pueden apelar.<span class="src">Fuente: TheWrap · Ars Technica</span></div>
   <div class="phone p1"><header><span class="back">‹</span><span class="date">Septiembre 30<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-paper" style="justify-content:center;gap:20px"><div class="big" style="font-size:54px">“Una expectativa no es un acuerdo.”</div>
    <div style="font-size:22px;font-weight:600;color:var(--ink-muted)">— Juez Amit Mehta</div></div></div>
-  <div class="phone p2"><header><span class="back">‹</span><span class="date">Septiembre 30<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-black" style="justify-content:center"><div class="big" style="font-size:52px">El tráfico de Google <span style="color:var(--lime)">no está garantizado.</span></div></div></div>
+  <div class="phone p2"><header><span class="back">‹</span><span class="date">Septiembre 30<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header><div class="screen s-black" style="justify-content:flex-end;padding:32px"><img class="ov" src="img/04.jpg" style="object-position:center 30%"><div class="shade"></div>
+   <div class="big" style="font-size:46px;position:relative;color:#fff">El tráfico de Google <span style="color:var(--lime)">no está garantizado.</span></div></div></div>
   <div class="card why"><h4>Por qué importa:</h4><ul><li>Construye canales propios</li><li>WhatsApp, email y comunidad</li></ul></div>
   <div class="logo"><i></i>Funnels Labs</div>
 </section>
