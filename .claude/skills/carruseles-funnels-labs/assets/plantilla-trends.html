@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Plantilla Trends — Funnels Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700;1,800&family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  /* Estilo "Trends / mockups" — ver references/estilo-trends.md */
+  :root {
+    --bg: #ffffff; --surface: #f6f6f2; --border: #e2e2db;
+    --ink: #0a0a0a; --ink-muted: #3d3d35; --ink-faint: #5c5c53;
+    --lime: #b5ff2b; --lime-dark: #5c8a00; --lilac: #c9a9ff; --violet: #7c3aed;
+    --shadow: 0 34px 60px -24px rgba(10,10,10,.28), 0 2px 6px rgba(10,10,10,.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #d9d9d2; font-family: "Montserrat", Arial, sans-serif; color: var(--ink);
+         display: flex; flex-direction: column; align-items: center; gap: 40px; padding: 40px 0; }
+
+  .slide { position: relative; width: 1080px; height: 1350px; background: var(--bg); overflow: hidden; }
+  /* Brillo de fondo: lima o lila, siempre sobre blanco */
+  .glow-lime  { background: radial-gradient(55% 45% at 78% 22%, rgba(181,255,43,.38), transparent 70%),
+                            radial-gradient(45% 40% at 10% 90%, rgba(201,169,255,.22), transparent 70%), #fff; }
+  .glow-lilac { background: radial-gradient(55% 45% at 20% 25%, rgba(201,169,255,.45), transparent 70%),
+                            radial-gradient(45% 40% at 92% 88%, rgba(181,255,43,.25), transparent 70%), #fff; }
+  /* Puntos abajo, como el referente */
+  .slide::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 360px; pointer-events: none;
+    background-image: radial-gradient(circle, #c4c4ba 1.6px, transparent 2px); background-size: 26px 26px;
+    -webkit-mask-image: linear-gradient(transparent, #000 60%); mask-image: linear-gradient(transparent, #000 60%); opacity: .7; }
+  .slide > * { position: absolute; z-index: 1; }
+
+  .num { top: 128px; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 28px; letter-spacing: -0.01em; }
+  .title { top: 168px; left: 60px; right: 60px; text-align: center; font-weight: 800; font-size: 62px; line-height: 1.02; letter-spacing: -0.045em; }
+  .title mark { background: var(--lime); color: var(--ink); padding: 0 .1em; border-radius: .12em; }
+  .logo { bottom: 48px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 12px;
+          font-weight: 800; font-size: 30px; letter-spacing: -0.02em; color: var(--ink); opacity: .55; }
+  .logo i { width: 22px; height: 22px; border-radius: 6px; background: var(--lime); display: block; opacity: 1; }
+
+  /* Mockup de pantalla */
+  .phone { width: 460px; height: 600px; background: #fff; border-radius: 34px; box-shadow: var(--shadow); overflow: hidden;
+           display: flex; flex-direction: column; }
+  .phone header { height: 92px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 30px;
+                  background: #fff; border-bottom: 1px solid var(--border); }
+  .phone header .back { font-size: 38px; font-weight: 500; color: var(--ink); line-height: 1; }
+  .phone header .date { text-align: center; font-weight: 600; font-size: 22px; letter-spacing: -0.01em; }
+  .phone header .date small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 3px; }
+  .phone header .dots { display: flex; gap: 6px; }
+  .phone header .dots b { width: 10px; height: 10px; border-radius: 99px; display: block; }
+  .phone header .dots b:nth-child(1) { background: var(--ink); }
+  .phone header .dots b:nth-child(2) { background: var(--lilac); }
+  .phone header .dots b:nth-child(3) { background: var(--lime); }
+  .screen { flex: 1; position: relative; overflow: hidden; padding: 40px 36px; display: flex; flex-direction: column; }
+  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; } /* para capturas reales */
+
+  /* Tarjetas de texto */
+  .card { background: #fff; border-radius: 30px; box-shadow: var(--shadow); padding: 30px 32px;
+          display: flex; flex-direction: column; justify-content: center; }
+  .card.note { text-align: center; font-size: 27px; font-weight: 500; line-height: 1.32; color: var(--ink); }
+  .card.why h4 { font-size: 23px; font-weight: 800; margin-bottom: 14px; }
+  .card.why li { list-style: none; display: flex; gap: 12px; align-items: flex-start; font-size: 21px; font-weight: 500; line-height: 1.3; margin-top: 8px; }
+  .card.why li::before { content: "✓"; flex: none; width: 26px; height: 26px; border-radius: 99px; background: var(--lime);
+                          font-size: 15px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+
+  /* Layout A: nota arriba-izq, pantalla arriba-der, pantalla abajo-izq, "funciona" abajo-der */
+  .A .p1 { left: 522px; top: 320px; transform: rotate(1.5deg); }
+  .A .p2 { left: 98px;  top: 580px; transform: rotate(-1.5deg); z-index: 2; }
+  .A .note { left: 98px; top: 320px; width: 390px; height: 230px; }
+  .A .why  { left: 610px; top: 960px; width: 380px; z-index: 3; }
+  /* Layout B: espejo */
+  .B .p1 { left: 98px;  top: 320px; transform: rotate(-1.5deg); }
+  .B .p2 { left: 522px; top: 580px; transform: rotate(1.5deg); z-index: 2; }
+  .B .note { left: 592px; top: 320px; width: 390px; height: 230px; }
+  .B .why  { left: 90px; top: 960px; width: 390px; z-index: 3; }
+
+  /* Contenidos de pantalla */
+  .s-black { background: var(--ink); color: #fff; }
+  .s-lime  { background: var(--lime); color: var(--ink); }
+  .s-lilac { background: var(--lilac); color: var(--ink); }
+  .s-paper { background: #fbfaf5; color: var(--ink); }
+  .s-dark  { background: linear-gradient(160deg, #3a3a36, #121210); color: #fff; }
+  .big { font-weight: 800; font-size: 52px; line-height: 1.02; letter-spacing: -0.04em; }
+  .marker { font-family: "Permanent Marker", cursive; line-height: 1.12; }
+  .k { font-weight: 800; font-size: 20px; letter-spacing: .14em; text-transform: uppercase; }
+
+  .chat { background: var(--surface); padding: 30px 24px 30px 56px; gap: 14px; justify-content: flex-end; }
+  .msg { max-width: 82%; padding: 14px 18px; border-radius: 20px; font-size: 21px; font-weight: 500; line-height: 1.3; }
+  .msg small { display: block; font-size: 12px; color: var(--ink-faint); margin-top: 4px; text-align: right; }
+  .msg.in  { background: #fff; align-self: flex-start; border-bottom-left-radius: 6px; }
+  .msg.out { background: var(--lime); align-self: flex-end; border-bottom-right-radius: 6px; }
+
+  .vs { padding: 0; }
+  .vs > div { flex: 1; padding: 30px 34px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+  .vs > div + div { border-top: 3px dashed rgba(10,10,10,.25); }
+
+  .tl li { list-style: none; display: flex; gap: 16px; font-size: 22px; font-weight: 600; line-height: 1.3; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .tl li b { flex: none; width: 80px; font-weight: 800; color: var(--violet); font-variant-numeric: tabular-nums; }
+
+  /* Portada y cierre */
+  .cover { background: radial-gradient(42% 34% at 50% 48%, rgba(181,255,43,.75), transparent 72%),
+                       radial-gradient(60% 50% at 50% 50%, rgba(201,169,255,.55), transparent 75%), #fff; }
+  .cover .logo { top: 92px; bottom: auto; opacity: .7; }
+  .cover h1 { top: 400px; left: 60px; right: 60px; text-align: center; font-weight: 800; font-size: 100px; line-height: .98; letter-spacing: -0.045em; }
+  .cover h1 em { display: block; font-style: italic; font-size: 150px; letter-spacing: -0.05em; }
+  .arrow-pill { top: 1010px; left: 490px; width: 100px; height: 54px; border: 3px solid var(--ink); border-radius: 99px;
+                display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 700; }
+  .cta-box { top: 560px; left: 140px; right: 140px; background: var(--ink); color: #fff; border-radius: 36px; padding: 56px 52px;
+             text-align: center; box-shadow: var(--shadow); }
+  .cta-box p { font-size: 32px; font-weight: 500; line-height: 1.35; color: #d8d8d0; }
+  .cta-box p b { color: var(--lime); font-weight: 800; }
+  .btn { display: inline-block; margin-top: 34px; background: var(--lime); color: var(--ink); font-weight: 800; font-size: 30px; padding: 22px 46px; border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<!-- 1. PORTADA -->
+<section class="slide cover">
+  <div class="logo"><i></i>Funnels Labs</div>
+  <h1>Lo que está <em>rompiendo Instagram</em> este mes</h1>
+  <div class="arrow-pill">→</div>
+</section>
+
+<!-- 2. TREND 01 — Layout A -->
+<section class="slide glow-lime A">
+  <div class="num">01.</div>
+  <div class="title">POV: te escriben a las 2 a.m.</div>
+  <div class="card note">Pones a tu audiencia dentro de una situación que vive todos los días.</div>
+  <div class="phone p1">
+    <header><span class="back">‹</span><span class="date">Octubre 6<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen chat">
+      <div class="msg in">Hola, ¿tienen cita para mañana?<small>2:03 a.m.</small></div>
+      <div class="msg out">¡Hola! Sí, tengo 10:00 y 12:30. ¿Cuál te acomoda?<small>2:03 a.m.</small></div>
+      <div class="msg in">10:00 porfa<small>2:04 a.m.</small></div>
+      <div class="msg out">Listo, quedaste agendada ✓<small>2:04 a.m.</small></div>
+    </div>
+  </div>
+  <div class="phone p2">
+    <header><span class="back">‹</span><span class="date">Octubre 6<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen s-black" style="justify-content:center;gap:22px">
+      <div class="marker" style="font-size:64px;color:var(--lime)">POV:</div>
+      <div class="big" style="color:#fff">Tu cliente te escribe a las 2 a.m.</div>
+      <div style="font-size:24px;font-weight:600;color:#bdbdb5">…y tu negocio le contesta.</div>
+    </div>
+  </div>
+  <div class="card why"><h4>Funciona para:</h4><ul><li>Mostrar tu producto en acción</li><li>Generar identificación</li><li>Comentarios tipo “literal yo”</li></ul></div>
+  <div class="logo"><i></i>Funnels Labs</div>
+</section>
+
+<!-- 3. TREND 02 — Layout B -->
+<section class="slide glow-lilac B">
+  <div class="num">02.</div>
+  <div class="title">Lo que pides vs. lo que recibes</div>
+  <div class="card note">Contrasta dos escenarios para que tu oferta se entienda en un segundo.</div>
+  <div class="phone p1">
+    <header><span class="back">‹</span><span class="date">Octubre 7<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen s-lilac vs">
+      <div><span class="k">Lo que pides</span><span class="big">Más seguidores</span></div>
+      <div style="background:rgba(255,255,255,.35)"><span class="k">Lo que necesitas</span><span class="big">Más clientes</span></div>
+    </div>
+  </div>
+  <div class="phone p2">
+    <header><span class="back">‹</span><span class="date">Octubre 7<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen s-lime vs">
+      <div><span class="k">Lo que pagas</span><span class="big" style="font-size:46px">Un agente de IA</span></div>
+      <div><span class="k">Lo que recibes</span><span class="big" style="font-size:46px">Respuestas 24/7 y agenda llena</span></div>
+    </div>
+  </div>
+  <div class="card why"><h4>Funciona para:</h4><ul><li>Comparar planes</li><li>Romper objeciones</li><li>Explicar tu diferencial</li></ul></div>
+  <div class="logo"><i></i>Funnels Labs</div>
+</section>
+
+<!-- 4. TREND 03 — Layout A -->
+<section class="slide glow-lime A">
+  <div class="num">03.</div>
+  <div class="title">Hecho a mano, sin editar</div>
+  <div class="card note">Textos o fotos sin producción. Se sienten reales y frenan el scroll.</div>
+  <div class="phone p1">
+    <header><span class="back">‹</span><span class="date">Octubre 8<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen s-lime" style="justify-content:center">
+      <div class="marker" style="font-size:66px;transform:rotate(-3deg)">El de marketing se fue a comer!!</div>
+    </div>
+  </div>
+  <div class="phone p2">
+    <header><span class="back">‹</span><span class="date">Octubre 8<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen s-paper" style="justify-content:center">
+      <div class="marker" style="font-size:62px;transform:rotate(-2deg)">Hoy no hay diseño.<br><span style="background:var(--lime);padding:0 8px">Hay resultados.</span></div>
+    </div>
+  </div>
+  <div class="card why"><h4>Funciona porque:</h4><ul><li>Humaniza la marca</li><li>Rompe la estética perfecta del feed</li></ul></div>
+  <div class="logo"><i></i>Funnels Labs</div>
+</section>
+
+<!-- 5. TREND 04 — Layout B -->
+<section class="slide glow-lilac B">
+  <div class="num">04.</div>
+  <div class="title">Nadie me preguntó, pero…</div>
+  <div class="card note">Un consejo que nadie pidió, dicho con confianza. Te posiciona sin sonar a clase.</div>
+  <div class="phone p1">
+    <header><span class="back">‹</span><span class="date">Octubre 9<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen s-black" style="justify-content:center">
+      <div class="big" style="font-size:64px">Nadie me <span style="color:var(--lime)">preguntó,</span> pero…</div>
+    </div>
+  </div>
+  <div class="phone p2">
+    <header><span class="back">‹</span><span class="date">Octubre 9<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen s-lilac" style="justify-content:center;gap:20px">
+      <div class="big" style="font-size:50px">…si tu lead espera tres horas, ya no es tu lead.</div>
+      <div style="font-size:22px;font-weight:600">Desliza para ver qué hacer →</div>
+    </div>
+  </div>
+  <div class="card why"><h4>Funciona porque:</h4><ul><li>Te posiciona como experto</li><li>Invita a debatir en comentarios</li></ul></div>
+  <div class="logo"><i></i>Funnels Labs</div>
+</section>
+
+<!-- 6. TREND 05 — Layout A -->
+<section class="slide glow-lime A">
+  <div class="num">05.</div>
+  <div class="title">Alguien tiene que…</div>
+  <div class="card note">Convierte lo cotidiano de tu trabajo en algo digno de presumir.</div>
+  <div class="phone p1">
+    <header><span class="back">‹</span><span class="date">Octubre 10<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen" style="background:#fff">
+      <div class="k" style="color:var(--violet);margin-bottom:10px">Un día en la clínica</div>
+      <ul class="tl">
+        <li><b>08:00</b>Las citas del día ya están confirmadas</li>
+        <li><b>13:00</b>Los seguimientos salieron solos</li>
+        <li><b>18:00</b>Nuevos leads, ya calificados</li>
+        <li><b>23:00</b>La IA sigue respondiendo</li>
+      </ul>
+    </div>
+  </div>
+  <div class="phone p2">
+    <header><span class="back">‹</span><span class="date">Octubre 10<small>10:17 AM</small></span><span class="dots"><b></b><b></b><b></b></span></header>
+    <div class="screen s-dark" style="justify-content:center;text-align:center;gap:26px">
+      <div style="font-size:44px;font-weight:700;font-style:italic;line-height:1.1;letter-spacing:-0.03em">No todos podemos ser influencers.</div>
+      <div style="font-size:44px;font-weight:800;font-style:italic;line-height:1.1;letter-spacing:-0.03em;color:var(--lime)">Alguien tiene que contestar a las 11 p.m.</div>
+    </div>
+  </div>
+  <div class="card why"><h4>Funciona porque:</h4><ul><li>Acerca la marca</li><li>Muestra el proceso real</li></ul></div>
+  <div class="logo"><i></i>Funnels Labs</div>
+</section>
+
+<!-- 7. CIERRE -->
+<section class="slide cover">
+  <div class="logo"><i></i>Funnels Labs</div>
+  <h1 style="top:220px">¿Cuál vas a <em style="font-size:120px">probar primero?</em></h1>
+  <div class="cta-box">
+    <p>Comenta el <b>número</b> y guárdalo para tu próxima semana de contenido.</p>
+    <p style="margin-top:22px">Y cuando lleguen los mensajes, que un <b>agente de IA</b> los responda 24/7.</p>
+    <span class="btn">Link en bio</span>
+  </div>
+</section>
+
+</body>
+</html>

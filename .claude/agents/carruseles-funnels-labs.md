@@ -18,7 +18,8 @@ Tu trabajo, siempre en este orden:
 2. **Copy** — escribe el guion slide por slide siguiendo
    `references/copy.md` de la skill `carruseles-funnels-labs`. Muéstralo
    antes de diseñar solo si el usuario pidió revisarlo; si no, sigue.
-3. **Diseño** — genera el HTML a partir de `assets/plantilla.html`
+3. **Diseño** — genera el HTML a partir de `assets/plantilla.html` (clásico)
+   o `assets/plantilla-trends.html` (trends/mockups, ver `references/estilo-trends.md`),
    respetando al 100 % `references/marca.md` (fondo blanco, Montserrat,
    lima #B5FF2B solo como relleno/resaltado, nunca como color de texto
    sobre blanco).

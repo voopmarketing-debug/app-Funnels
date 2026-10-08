@@ -13,18 +13,21 @@ Produce carruseles listos para publicar: copy + PNG por slide.
 |---|---|
 | `references/marca.md` | Colores, tipografía, márgenes, reglas de contraste. **Léelo siempre antes de diseñar.** |
 | `references/copy.md` | Estructuras de carrusel, fórmulas de hook y CTA, tono de voz. |
-| `assets/plantilla.html` | Plantilla con los 6 tipos de slide (portada, texto, lista, dato, cita, CTA). Cópiala y edítala. |
+| `assets/plantilla.html` | **Estilo clásico**: 6 tipos de slide (portada, texto, lista, dato, cita, CTA). Para listas, pasos, errores, tips. |
+| `assets/plantilla-trends.html` + `references/estilo-trends.md` | **Estilo trends/mockups**: pantallas de ejemplo + tarjetas explicativas sobre brillo lima/lila. Para trends, ideas de contenido, ejemplos, referentes. |
 | `scripts/render.cjs` | Exporta cada `.slide` del HTML a PNG 1080×1350. |
 
 ## Flujo
 
 1. **Brief**: tema, objetivo, audiencia, CTA. Si falta algo, asume lo más
    razonable para un negocio de LATAM y dilo en una línea.
-2. **Estructura**: elige una estructura de `references/copy.md`
+2. **Estilo y estructura**: elige el estilo (clásico o trends — si el usuario
+   manda un referente con pantallas/mockups, usa trends y lee
+   `references/estilo-trends.md`) y una estructura de `references/copy.md`
    (5–10 slides; 7 es el punto dulce).
 3. **Copy**: escribe slide por slide. Portada ≤ 10 palabras, resto ≤ 30.
    Marca con `<mark>` 1–3 palabras clave por slide (se pintan con lima).
-4. **HTML**: copia la plantilla a `carruseles/<slug>/carrusel.html`,
+4. **HTML**: copia la plantilla del estilo elegido a `carruseles/<slug>/carrusel.html`,
    borra los slides de ejemplo que no uses, duplica los que necesites y
    reemplaza el texto. No toques los tokens de `:root` salvo que el
    usuario lo pida. Actualiza el contador `01 / 07` de cada slide.
