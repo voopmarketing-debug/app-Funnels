@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { SignupShell, CheckList } from "@/components/SignupShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
@@ -45,30 +45,44 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Only our own pages (never "//other-site.com").
+  const callbackParam = searchParams.get("callbackUrl");
+  const callbackUrl = callbackParam?.startsWith("/") && !callbackParam.startsWith("//") ? callbackParam : "/dashboard";
+  // Coming back from Mercado Pago in a browser where they weren't signed in.
+  const backFromMercadoPago = callbackUrl.startsWith("/activar") && callbackUrl.includes("estado=listo");
+
   async function handleSubmit(formData: FormData) {
     setLoading(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      email: formData.get("email"),
-      password: formData.get("password"),
-      redirect: false,
-    });
-
-    setLoading(false);
+    let result: Awaited<ReturnType<typeof signIn>> | undefined;
+    try {
+      result = await signIn("credentials", {
+        email: formData.get("email"),
+        password: formData.get("password"),
+        redirect: false,
+      });
+    } catch {
+      setLoading(false);
+      setError("No pudimos conectar. Revisa tu internet e inténtalo de nuevo.");
+      return;
+    }
 
     if (result?.error) {
+      setLoading(false);
       setError("Credenciales inválidas.");
       return;
     }
 
-    router.push(searchParams.get("callbackUrl") ?? "/dashboard");
+    // A full page load, not router.push: the panel then reads the fresh
+    // session cookie on the first try (a client-side navigation could land
+    // back on this page and need a second sign-in).
+    window.location.assign(callbackUrl);
   }
 
   return (
@@ -91,6 +105,13 @@ function LoginForm() {
           <h1 className="text-xl font-bold">Iniciar sesión</h1>
           <p className="text-sm text-ink-muted">Entra con el correo y la contraseña de tu cuenta.</p>
         </div>
+
+        {backFromMercadoPago && (
+          <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-ink">
+            <strong>✅ Tu tarjeta quedó registrada.</strong> Inicia sesión con el correo y la contraseña que creaste para entrar a tu
+            panel.
+          </p>
+        )}
 
         {searchParams.get("registered") === "1" && (
           <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-accent">

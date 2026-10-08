@@ -39,6 +39,9 @@ export async function POST(req: NextRequest) {
   if (!notification) {
     return NextResponse.json({ received: true, actioned: false });
   }
+  // One line per notification, so a sign-up that didn't activate can be
+  // traced in the logs (which events arrived, and in what order).
+  console.info("[mercadopago] notification", notification.type, notification.id);
 
   try {
     if (notification.type === "payment") {
@@ -93,6 +96,12 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json({ received: true, actioned: true });
       }
+      // A $0 payment is Mercado Pago validating the card when someone starts
+      // the free trial; the subscription notification is what activates them.
+      if (payment && payment.amount <= 0) {
+        console.info("[mercadopago] card validation payment ignored", payment.id, payerEmail);
+        return NextResponse.json({ received: true, actioned: false });
+      }
       // A plan bought with a Mercado Pago link (one-time or a subscription's
       // monthly charge): create the account if new and extend its membership.
       if (payment?.approved && payerEmail) {
@@ -121,8 +130,10 @@ export async function POST(req: NextRequest) {
       // The client authorized a monthly subscription: activate right away.
       // Later monthly charges arrive as subscription_authorized_payment.
       const sub = await fetchMpPreapproval(notification.id);
+      console.info("[mercadopago] preapproval", notification.id, sub ? `status ok=${sub.approved}` : "not found");
       if (sub?.approved) {
         const account = await accountForPreapproval(sub);
+        console.info("[mercadopago] preapproval account", sub.id, account ? account.id : "none");
         if (account) {
           await activateFromPreapproval(sub, account);
         } else if (sub.planId && sub.planId === (await savedTrialPlanId())) {

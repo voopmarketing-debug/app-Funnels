@@ -5,7 +5,19 @@ import { useRouter } from "next/navigation";
 import { startTrialCheckout, type TrialCheckoutState } from "@/lib/trialActions";
 
 export function TrialForm({ supportLink }: { supportLink: string }) {
-  const [state, formAction, isPending] = useActionState<TrialCheckoutState, FormData>(startTrialCheckout, { error: null });
+  const [state, formAction, isPending] = useActionState<TrialCheckoutState, FormData>(async (prev) => {
+    try {
+      return await startTrialCheckout();
+    } catch (err) {
+      // The redirect to Mercado Pago travels as a thrown signal: let it through.
+      if (String((err as { digest?: unknown })?.digest ?? "").startsWith("NEXT_REDIRECT")) throw err;
+      // Usually this page was opened before a new version of the app went
+      // live and its button points at code that no longer exists: reload to
+      // get the current page instead of a button that silently does nothing.
+      window.location.reload();
+      return prev;
+    }
+  }, { error: null });
 
   return (
     <form action={formAction} className="space-y-3">

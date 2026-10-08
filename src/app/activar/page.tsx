@@ -18,8 +18,17 @@ function trialEndLabel() {
 // self-registered account here until the subscription is authorized.
 export default async function ActivarPage({ searchParams }: { searchParams: Promise<{ estado?: string; preapproval_id?: string }> }) {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login?callbackUrl=/activar");
   const { estado, preapproval_id: preapprovalId } = await searchParams;
+  if (!session?.user?.id) {
+    // Back from Mercado Pago in a browser without their session (e.g. the
+    // Mercado Pago app opened another one): keep where they were going, so
+    // signing in finishes the activation and the login says why it's asking.
+    const back = new URLSearchParams();
+    if (estado) back.set("estado", estado);
+    if (preapprovalId) back.set("preapproval_id", preapprovalId);
+    const target = back.size ? `/activar?${back}` : "/activar";
+    redirect(`/login?callbackUrl=${encodeURIComponent(target)}`);
+  }
   // Mercado Pago appends the subscription id when it sends them back: link it
   // to whoever is signed in right away instead of waiting on the webhook.
   if (preapprovalId && /^[\w-]{1,64}$/.test(preapprovalId)) {
