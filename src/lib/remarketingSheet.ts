@@ -19,13 +19,15 @@ export async function logRegistrationForRemarketing(data: {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    await fetch(WEBHOOK_URL, {
+    const res = await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "registration", ...data }),
       signal: controller.signal,
     });
     clearTimeout(timeout);
+    const body = await res.text().catch(() => "");
+    if (!body.includes('"ok":true')) console.error("[remarketing] Apps Script did not confirm:", res.status, body.slice(0, 300));
   } catch (error) {
     // Never let a Sheets/Apps Script hiccup block a real registration.
     console.error("[remarketing] failed to log registration to sheet", error);

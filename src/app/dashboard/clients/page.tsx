@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { findPack } from "@/lib/addonPacks";
 import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_USD, TEAM_MEMBER_LIMITS, LINE_LIMITS } from "@/lib/plans";
 import { CreateClientForm } from "./CreateClientForm";
+import { EmailCheckButton } from "./EmailCheckButton";
 import { ClientsList, type ClientRow } from "./ClientsList";
 
 const DAY_MS = 86_400_000;
@@ -186,7 +187,10 @@ export default async function ClientsPage() {
             Quién te paga, hasta cuándo y cómo usa la plataforma. Las membresías se activan y renuevan solas con cada pago de Mercado Pago.
           </p>
         </div>
-        <CreateClientForm />
+        <div className="flex flex-wrap items-start gap-2">
+          <EmailCheckButton />
+          <CreateClientForm />
+        </div>
       </div>
 
       <section className="grid grid-cols-3 gap-2 sm:gap-3 xl:grid-cols-6">

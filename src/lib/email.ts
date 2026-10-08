@@ -26,13 +26,15 @@ export async function sendEmail(options: {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    await fetch(WEBHOOK_URL, {
+    const res = await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "email", ...options }),
       signal: controller.signal,
     });
     clearTimeout(timeout);
+    const body = await res.text().catch(() => "");
+    if (!body.includes('"ok":true')) console.error("[email] Apps Script did not confirm:", res.status, body.slice(0, 300));
   } catch (error) {
     console.error("[email] failed to send", error);
   }
