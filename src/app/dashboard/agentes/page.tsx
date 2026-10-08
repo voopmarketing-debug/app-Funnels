@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isAgencyAdmin as isAgencyAccount } from "@/lib/authz";
 import { getActiveContactsThisMonth } from "@/lib/analytics";
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { getAccountLineStatus } from "@/lib/lineLimits";
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
   // they happen to be the OWNER (their own internal/demo business) rather
   // than ADMIN. A plain client can also rename, but only their own (see the
   // role === "OWNER" check where this is used below).
-  const isAgencyAdmin = adminBusinessIds.length > 0;
+  const isAgencyAdmin = adminBusinessIds.length > 0 || (await isAgencyAccount(session.user.id));
   const activeContactsEntries = await Promise.all(
     adminBusinessIds.map(async (businessId) => [businessId, await getActiveContactsThisMonth(businessId)] as const),
   );

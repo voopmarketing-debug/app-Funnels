@@ -56,7 +56,7 @@ import {
 } from "@/lib/attachments";
 import { convertToOggOpus } from "@/lib/audioConvert";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
-import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
+import { isAgencyAdmin, requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
@@ -229,11 +229,7 @@ export async function createClientAccount(
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
-  const isAgencyAdmin = await prisma.membership.findFirst({
-    where: { userId: session.user.id, role: "ADMIN" },
-    select: { id: true },
-  });
-  if (!isAgencyAdmin) throw new Error("Solo la agencia puede crear cuentas de clientes");
+  if (!(await isAgencyAdmin(session.user.id))) throw new Error("Solo la agencia puede crear cuentas de clientes");
 
   const businessName = String(formData.get("businessName") ?? "").trim();
   const clientName = String(formData.get("clientName") ?? "").trim();

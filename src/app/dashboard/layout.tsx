@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { NavProgress } from "@/components/NavProgress";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isAgencyAdmin as isAgencyAccount } from "@/lib/authz";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { NotificationBell, type NotificationItem } from "./NotificationBell";
 import { PushBanner } from "./PushNotifications";
@@ -23,9 +24,7 @@ function formatNotificationDate(date: Date): string {
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
-  const isAgencyAdmin = session?.user?.id
-    ? (await prisma.membership.findFirst({ where: { userId: session.user.id, role: "ADMIN" }, select: { id: true } })) !== null
-    : false;
+  const isAgencyAdmin = session?.user?.id ? await isAgencyAccount(session.user.id) : false;
 
   // Self-registered accounts can't use the dashboard until they register a
   // card in Mercado Pago (free trial) — see app/activar.

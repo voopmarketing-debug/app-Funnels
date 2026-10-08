@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isAgencyAdmin } from "@/lib/authz";
 import { findPack } from "@/lib/addonPacks";
 import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_USD, TEAM_MEMBER_LIMITS, LINE_LIMITS } from "@/lib/plans";
 import { CreateClientForm } from "./CreateClientForm";
@@ -18,7 +19,7 @@ export default async function ClientsPage() {
     where: { userId: session.user.id, role: "ADMIN" },
     select: { businessId: true },
   });
-  if (adminMemberships.length === 0) notFound();
+  if (adminMemberships.length === 0 && !(await isAgencyAdmin(session.user.id))) notFound();
   const businessIds = adminMemberships.map((m) => m.businessId);
 
   const now = new Date();

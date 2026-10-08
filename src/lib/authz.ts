@@ -35,14 +35,21 @@ export async function requireBusinessOwnerOrAdmin(userId: string, businessId: st
 }
 
 /**
- * The agency (Funnels Labs itself) is whoever holds an ADMIN membership on
- * any business — same definition the dashboard layout uses to show the
- * agency-only nav items. Platform-wide content like announcements is gated
- * on this, not on any single business.
+ * The agency (Funnels Labs itself): the AGENCY_ADMIN_EMAIL account, plus
+ * whoever holds an ADMIN membership on any business. The email check keeps
+ * the agency account the agency even with no clients left (e.g. after
+ * deleting every test client), when it only OWNs its own business —
+ * otherwise Clientes/Rentabilidad/Novedades vanished with the last client.
+ * Platform-wide content like announcements is gated on this, not on any
+ * single business.
  */
 export async function isAgencyAdmin(userId: string): Promise<boolean> {
   const admin = await prisma.membership.findFirst({ where: { userId, role: "ADMIN" }, select: { id: true } });
-  return admin !== null;
+  if (admin) return true;
+  const agencyEmail = process.env.AGENCY_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!agencyEmail) return false;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  return user?.email.trim().toLowerCase() === agencyEmail;
 }
 
 export async function requireAgencyAdmin(userId: string): Promise<void> {
