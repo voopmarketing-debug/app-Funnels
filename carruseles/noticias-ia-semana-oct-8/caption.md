@@ -4,6 +4,6 @@ Desde octubre, responder por la API de WhatsApp tiene costo después de 1,000 me
 
 Te lo resumí en 4 slides, sin tecnicismos.
 
-¿Cuál te preocupa más? Cuéntame en comentarios y te digo qué haría yo 👇
+¿Ya estabas enterado? Dime SÍ o NO en comentarios 👇
 
 #emprendedoreslatam #inteligenciaartificial #funnelslabs
