@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { MAX_CATALOG_PRODUCTS } from "@/lib/inventory";
 import { ProductManager, type ManagedProduct } from "./ProductManager";
 
 export default async function ProductsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +29,9 @@ export default async function ProductsPage({ params }: { params: Promise<{ id: s
     badge: p.badge,
     imageUrl: p.imageUrl,
     active: p.active,
+    trackStock: p.trackStock,
+    stock: p.stock,
+    lowStockAt: p.lowStockAt,
   }));
 
   return (
@@ -39,10 +43,10 @@ export default async function ProductsPage({ params }: { params: Promise<{ id: s
         <h1 className="mt-1 text-xl font-bold">Productos</h1>
         <p className="max-w-prose text-sm text-ink-muted">
           Tu catálogo: lo que aparece en tus páginas de tienda y de producto, con su botón de <strong className="text-ink">Pedir por WhatsApp</strong>.
-          La IA solo usa estos productos y precios, nunca los inventa.
+          Tu agente de IA también lo conoce: responde precios y no ofrece lo que esté agotado. Hasta {MAX_CATALOG_PRODUCTS} productos.
         </p>
       </div>
-      <ProductManager businessId={id} products={items} />
+      <ProductManager businessId={id} products={items} maxProducts={MAX_CATALOG_PRODUCTS} />
     </div>
   );
 }

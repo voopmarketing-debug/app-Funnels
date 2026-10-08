@@ -155,6 +155,34 @@ describe("generateAgentReply — mark_appointment tool", () => {
     expect(result.text).toBeTruthy();
   });
 
+  it("puts the catalog in the cached block, marking sold-out products without unit counts", async () => {
+    createMock.mockResolvedValueOnce({
+      content: [{ type: "text", text: "Los audífonos cuestan $299.000." }],
+      usage: { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+    });
+
+    await generateAgentReply({
+      systemPrompt: "Eres el agente de una tienda.",
+      tone: "cercano",
+      replyLength: "breve",
+      industry: "otro",
+      model: "claude-sonnet-5",
+      history: [],
+      userMessage: "¿Cuánto valen los audífonos?",
+      catalog: [
+        { name: "Audífonos Aero", price: 299000, compareAtPrice: 350000, currency: "COP", category: "Audio", description: "Bluetooth 5.3", soldOut: false },
+        { name: "Parlante Mini", price: 129000, compareAtPrice: null, currency: "COP", category: null, description: "", soldOut: true },
+      ],
+    });
+
+    const requestArg = createMock.mock.calls.at(-1)![0] as { system: { text: string; cache_control?: unknown }[] };
+    const cached = requestArg.system[0];
+    expect(cached.cache_control).toBeDefined();
+    expect(cached.text).toContain("Audífonos Aero — $299.000 (antes $350.000) · Audio · Bluetooth 5.3");
+    expect(cached.text).toContain("Parlante Mini — $129.000 · AGOTADO");
+    expect(requestArg.system[1].text).not.toContain("CATÁLOGO");
+  });
+
   it("always offers the mark_appointment tool even with no media available", async () => {
     createMock.mockResolvedValueOnce({
       content: [{ type: "text", text: "Hola, ¿en qué te ayudo?" }],

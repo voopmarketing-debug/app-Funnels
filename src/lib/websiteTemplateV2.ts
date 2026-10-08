@@ -145,10 +145,16 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       : `<div class="img-ph ${cls}" aria-hidden="true">${esc(p.name.slice(0, 1).toUpperCase())}</div>`;
   };
 
+  // Sold out (inventory at zero): a plain "Agotado" instead of the order link.
+  const orderButton = (p: CatalogProduct, cls: string, label: string) =>
+    p.soldOut ? `<span class="${cls} btn-soldout" aria-disabled="true">Agotado</span>` : `<a class="${cls}" href="${esc(orderHref(p))}">${esc(label)}</a>`;
+  const badgeHtml = (p: CatalogProduct) =>
+    p.soldOut ? `<span class="pbadge pbadge-soldout">Agotado</span>` : p.badge ? `<span class="pbadge">${esc(p.badge)}</span>` : "";
+
   const productCard = (p: CatalogProduct, featured = false) => `
-    <article class="pcard${featured ? " pcard-featured" : ""}">
+    <article class="pcard${featured ? " pcard-featured" : ""}${p.soldOut ? " pcard-soldout" : ""}">
       <div class="pcard-media">
-        ${p.badge ? `<span class="pbadge">${esc(p.badge)}</span>` : ""}
+        ${badgeHtml(p)}
         ${productImage(p)}
       </div>
       <div class="pcard-body">
@@ -156,7 +162,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         <h3>${esc(p.name)}</h3>
         ${featured && p.description ? `<p class="pdesc">${esc(p.description)}</p>` : ""}
         <div class="prow">${priceHtml(p)}</div>
-        <a class="btn btn-sm" href="${esc(orderHref(p))}">Pedir por WhatsApp</a>
+        ${orderButton(p, "btn btn-sm", "Pedir por WhatsApp")}
       </div>
     </article>`;
 
@@ -205,14 +211,14 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
 
         if (s.variant === "product" && product) {
           return `<section class="hero hero-product" id="inicio"><div class="wrap hero-product-grid">
-            <div class="hero-product-media">${product.badge ? `<span class="pbadge">${esc(product.badge)}</span>` : ""}${productImage(product, "hero-product-img")}</div>
+            <div class="hero-product-media">${badgeHtml(product)}${productImage(product, "hero-product-img")}</div>
             <div class="hero-product-info">
               ${eyebrow}
               ${h1()}
               <p class="lead">${esc(s.subheading)}</p>
               <div class="prow prow-lg">${priceHtml(product)}</div>
               ${chipsHtml}
-              <div class="hero-actions"><a class="btn btn-block" href="${esc(orderHref(product))}">${esc(s.ctaLabel)}</a>${secondaryBtn}</div>
+              <div class="hero-actions">${orderButton(product, "btn btn-block", s.ctaLabel)}${secondaryBtn}</div>
               ${badge}
             </div>
           </div></section>`;
@@ -311,7 +317,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
             <ul class="spot-bullets">${s.bullets.slice(0, 4).map((b) => `<li>${icon(b.icon)}<div><strong>${esc(b.title)}</strong><span>${esc(b.description)}</span></div></li>`).join("")}</ul>
             ${specs.length ? `<dl class="specs">${specs.map((sp) => `<div><dt>${esc(sp.label)}</dt><dd>${esc(sp.value)}</dd></div>`).join("")}</dl>` : ""}
             <div class="prow prow-lg">${priceHtml(p)}</div>
-            <a class="btn" href="${esc(orderHref(p))}">Pedir por WhatsApp</a>
+            ${orderButton(p, "btn", "Pedir por WhatsApp")}
           </div>
         </div></section>`;
       }
@@ -432,6 +438,9 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,t
 .btn-ghost{background:transparent;color:var(--text);border-color:var(--line)}
 .btn-ghost:hover{border-color:var(--text);box-shadow:none}
 .btn-sm{padding:10px 16px;font-size:14px;width:100%}
+.btn-soldout{opacity:.5;cursor:not-allowed;filter:grayscale(1)}
+.pbadge-soldout{background:#b42318!important;color:#fff!important}
+.pcard-soldout .pcard-media img{filter:grayscale(.7);opacity:.75}
 .btn-lg{padding:18px 38px;font-size:18px}
 .btn-block{width:100%}
 .btn-invert{background:var(--btn-text);color:var(--primary);border-color:var(--btn-text)}

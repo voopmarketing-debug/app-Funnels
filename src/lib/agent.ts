@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendPushToBusiness } from "@/lib/push";
+import { MAX_CATALOG_PRODUCTS } from "@/lib/inventory";
 import { isSubscriptionActive } from "@/lib/subscription";
 import { decryptSecret } from "@/lib/crypto";
 import {
@@ -414,10 +415,20 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
       content: msg.content,
     }));
 
-  const availableMedia = await prisma.agentMedia.findMany({
-    where: { businessId: business.id },
-    select: { id: true, label: true, mediaType: true },
-  });
+  const [availableMedia, products] = await Promise.all([
+    prisma.agentMedia.findMany({
+      where: { businessId: business.id },
+      select: { id: true, label: true, mediaType: true },
+    }),
+    // The catalog the agent quotes from: availability only, never units.
+    prisma.product.findMany({
+      where: { businessId: business.id, active: true },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+      take: MAX_CATALOG_PRODUCTS,
+      select: { name: true, price: true, compareAtPrice: true, currency: true, category: true, description: true, trackStock: true, stock: true },
+    }),
+  ]);
+  const catalog = products.map(({ trackStock, stock, ...p }) => ({ ...p, soldOut: trackStock && stock <= 0 }));
 
   let reply: string;
   let usage: AgentReplyUsage;
@@ -442,6 +453,7 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
       userImages: ctx.userImages,
       owner: ctx.owner,
       availableMedia,
+      catalog,
     });
     reply = result.text;
     usage = result.usage;

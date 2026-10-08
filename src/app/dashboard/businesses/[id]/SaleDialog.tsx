@@ -40,6 +40,7 @@ export function SaleDialog({
   const [productId, setProductId] = useState("");
   const [productName, setProductName] = useState("");
   const [amount, setAmount] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -66,10 +67,21 @@ export function SaleDialog({
     };
   }, [open, products, businessId, conversationId]);
 
+  const selected = products?.find((x) => x.id === productId) ?? null;
+  const qty = Math.max(1, Number(quantity) || 1);
+
   function pickProduct(id: string) {
     setProductId(id);
     const p = products?.find((x) => x.id === id);
-    if (p?.price) setAmount(String(p.price));
+    if (p?.price) setAmount(String(p.price * qty));
+  }
+
+  // The value follows the catalog price × units until they type their own.
+  function changeQuantity(value: string) {
+    const digits = digitsOnly(value).slice(0, 6);
+    setQuantity(digits);
+    const n = Math.max(1, Number(digits) || 1);
+    if (selected?.price) setAmount(String(selected.price * n));
   }
 
   function submit(e: React.FormEvent) {
@@ -78,6 +90,7 @@ export function SaleDialog({
     startTransition(async () => {
       const res = await registerSale(businessId, conversationId, {
         amount: Number(amount),
+        quantity: qty,
         productId: productId && productId !== OTHER ? productId : null,
         productName: productId === OTHER ? productName : null,
         note,
@@ -87,6 +100,7 @@ export function SaleDialog({
         return;
       }
       setAmount("");
+      setQuantity("1");
       setNote("");
       setProductName("");
       setProductId(products && products.length > 0 ? "" : OTHER);
@@ -119,6 +133,7 @@ export function SaleDialog({
                 <option key={p.id} value={p.id}>
                   {p.name}
                   {p.price ? ` · $${p.price.toLocaleString("es-CO")}` : ""}
+                  {p.stock !== null ? (p.stock <= 0 ? " · agotado" : ` · quedan ${p.stock}`) : ""}
                 </option>
               ))}
               <option value={OTHER}>Otro (escribirlo)</option>
@@ -137,20 +152,40 @@ export function SaleDialog({
           />
         )}
 
-        <label className="block space-y-1">
-          <span className="text-xs font-medium text-ink-muted">Valor de la venta *</span>
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted">$</span>
+        <div className="grid grid-cols-[6rem_minmax(0,1fr)] gap-3">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-ink-muted">Cantidad</span>
             <input
-              required
               inputMode="numeric"
-              value={withThousands(amount)}
-              onChange={(e) => setAmount(digitsOnly(e.target.value))}
-              placeholder="150.000"
-              className={`${inputClass} fl-mono pl-7 tabular-nums`}
+              value={quantity}
+              onChange={(e) => changeQuantity(e.target.value)}
+              onBlur={() => !quantity && setQuantity("1")}
+              aria-label="Cantidad de unidades"
+              className={`${inputClass} fl-mono tabular-nums`}
             />
-          </div>
-        </label>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-ink-muted">Valor total de la venta *</span>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted">$</span>
+              <input
+                required
+                inputMode="numeric"
+                value={withThousands(amount)}
+                onChange={(e) => setAmount(digitsOnly(e.target.value))}
+                placeholder="150.000"
+                className={`${inputClass} fl-mono pl-7 tabular-nums`}
+              />
+            </div>
+          </label>
+        </div>
+        {selected?.stock != null && (
+          <p className={`-mt-2 text-xs ${selected.stock < qty ? "font-medium text-[var(--status-warn)]" : "text-ink-faint"}`}>
+            {selected.stock < qty
+              ? `⚠ En tu inventario quedan ${selected.stock}. Puedes registrarla igual; el inventario quedará en 0.`
+              : `📦 Se descontarán ${qty} de tu inventario (quedan ${selected.stock}).`}
+          </p>
+        )}
 
         <label className="block space-y-1">
           <span className="text-xs font-medium text-ink-muted">Nota (opcional)</span>
@@ -158,7 +193,7 @@ export function SaleDialog({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={300}
-            placeholder="Ej. Pagó por transferencia, 2 unidades"
+            placeholder="Ej. Pagó por transferencia, envío a Medellín"
             className={inputClass}
           />
         </label>

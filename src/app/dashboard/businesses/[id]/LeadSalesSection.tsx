@@ -54,6 +54,7 @@ export function LeadSalesSection({ businessId, conversationId }: { businessId: s
               <div className="min-w-0 flex-1">
                 <p className="fl-mono text-sm font-semibold tabular-nums text-ink">{money(s.amount)}</p>
                 <p className="truncate text-xs text-ink-muted">
+                  {s.quantity > 1 ? `${s.quantity} × ` : ""}
                   {s.productName ?? "Venta"} · {new Date(s.closedAt).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}
                   {s.aiAssisted && <span className="ml-1 text-accent">· con IA</span>}
                 </p>

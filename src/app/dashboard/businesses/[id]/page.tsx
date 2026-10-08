@@ -17,7 +17,7 @@ import { ChatIcon, ClockIcon, BoltIcon, HourglassIcon } from "./analytics/StatIc
 import { WhatsAppHealthPanel } from "./WhatsAppHealthPanel";
 import { isRecentWebhookError } from "@/lib/whatsappHealth";
 import { IntegrationCard, type IntegrationStatus } from "./IntegrationCard";
-import { WhatsAppLogo, SparkLogo, CatalogLogo, TemplateLogo, WebsiteLogo, TeamLogo, ProductsLogo } from "./IntegrationLogos";
+import { WhatsAppLogo, SparkLogo, CatalogLogo, TemplateLogo, WebsiteLogo, TeamLogo, ProductsLogo, InventoryLogo } from "./IntegrationLogos";
 
 // Fixed brand tiles — same in light and dark, like Kommo's integration logos.
 const TILE = {
@@ -28,6 +28,7 @@ const TILE = {
   website: "linear-gradient(135deg, #f59e0b, #c2410c)",
   team: "linear-gradient(135deg, #ec4899, #9d174d)",
   products: "linear-gradient(135deg, #f97316, #9a3412)",
+  inventory: "linear-gradient(135deg, #64748b, #334155)",
 };
 
 function formatPercent(value: number | null): string {
@@ -100,7 +101,7 @@ export default async function BusinessPage({
   // entirely for them, not just visually hidden.
   const canManageBusiness = membership.role !== "MEMBER";
 
-  const [analytics, activeContacts, agentMedia, approvedTemplates, websiteCount, teamMembers, productCount] = await Promise.all([
+  const [analytics, activeContacts, agentMedia, approvedTemplates, websiteCount, teamMembers, productCount, stockedProducts] = await Promise.all([
     getBusinessAnalytics(id, rangeKey),
     getActiveContactsThisMonth(id),
     canManageBusiness
@@ -114,7 +115,16 @@ export default async function BusinessPage({
     prisma.website.count({ where: { businessId: id } }),
     prisma.membership.count({ where: { businessId: id, role: "MEMBER" } }),
     prisma.product.count({ where: { businessId: id } }),
+    prisma.product.findMany({ where: { businessId: id, trackStock: true }, select: { stock: true, lowStockAt: true } }),
   ]);
+  const soldOutCount = stockedProducts.filter((p) => p.stock <= 0).length;
+  const lowStockCount = stockedProducts.filter((p) => p.stock > 0 && p.stock <= p.lowStockAt).length;
+  const inventoryStatus: IntegrationStatus =
+    stockedProducts.length === 0
+      ? { tone: "todo", label: "Sin inventario" }
+      : soldOutCount + lowStockCount > 0
+        ? { tone: "warn", label: [soldOutCount && `${soldOutCount} agotado${soldOutCount === 1 ? "" : "s"}`, lowStockCount && `${lowStockCount} por agotarse`].filter(Boolean).join(" · ") }
+        : { tone: "done", label: `${stockedProducts.length} con stock` };
 
   // Plan + active packs, counted per account like the agent does.
   const ownerId = await getBusinessOwnerId(id);
@@ -339,6 +349,16 @@ export default async function BusinessPage({
               }
               actionLabel={productCount > 0 ? "Administrar" : "Agregar"}
               href={`/dashboard/businesses/${id}/productos`}
+            />
+            <IntegrationCard
+              id="inventario"
+              title="Inventario"
+              description="Unidades de cada producto: se descuentan con cada venta y te avisamos cuando algo se esté acabando."
+              logo={<InventoryLogo />}
+              logoBackground={TILE.inventory}
+              status={inventoryStatus}
+              actionLabel={stockedProducts.length > 0 ? "Ver inventario" : "Activar"}
+              href={`/dashboard/businesses/${id}/inventario`}
             />
             <IntegrationCard
               id="plantillas"

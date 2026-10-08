@@ -5,11 +5,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { cancelMpPreapproval, fetchMpPreapproval } from "@/lib/mercadopago";
 import { sendEmail } from "@/lib/email";
+import { endAtCoveredPeriod } from "@/lib/payments";
 
 /**
  * The client cancels their own Mercado Pago subscription from Mi perfil: no
  * more charges. They keep access until the period already covered (the
- * trial or the month paid) ends, and their data stays for when they return.
+ * trial or the month paid) ends, exactly, and their data stays for when
+ * they return.
  */
 export async function cancelMySubscription(): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await auth();
@@ -26,6 +28,9 @@ export async function cancelMySubscription(): Promise<{ ok: true } | { ok: false
     const res = await cancelMpPreapproval(sub.id);
     if ("error" in res) return { ok: false, error: "Mercado Pago no permitió cancelarla ahora. Inténtalo en un momento o escríbenos por WhatsApp." };
   }
+
+  // Access ends exactly when the trial or paid month does.
+  await endAtCoveredPeriod("mercadopago", sub.id, user.email);
 
   const agency = process.env.AGENCY_ADMIN_EMAIL?.trim();
   if (agency) {

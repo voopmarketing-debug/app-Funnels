@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireBusinessMembership } from "@/lib/authz";
 import type { SaleProductOption, SaleRow } from "@/lib/sales";
+import { changeStock } from "@/lib/inventory";
 
 // Sales registered by the business's team from the CRM (a contact's ficha,
 // or when a lead is moved to a "Ganado"-type stage). Results are returned
@@ -26,6 +27,7 @@ async function sessionMember(businessId: string): Promise<string | null> {
 function toRow(s: {
   id: string;
   amount: number;
+  quantity: number;
   currency: string;
   productName: string | null;
   note: string | null;
@@ -45,22 +47,26 @@ export async function getConversationSales(
     prisma.sale.findMany({
       where: { businessId, conversationId },
       orderBy: { closedAt: "desc" },
-      select: { id: true, amount: true, currency: true, productName: true, note: true, aiAssisted: true, closedAt: true },
+      select: { id: true, amount: true, quantity: true, currency: true, productName: true, note: true, aiAssisted: true, closedAt: true },
     }),
     prisma.product.findMany({
       where: { businessId, active: true },
       orderBy: { position: "asc" },
-      select: { id: true, name: true, price: true, currency: true },
+      select: { id: true, name: true, price: true, currency: true, trackStock: true, stock: true },
       take: 200,
     }),
   ]);
-  return { ok: true, sales: sales.map(toRow), products };
+  return {
+    ok: true,
+    sales: sales.map(toRow),
+    products: products.map((p) => ({ id: p.id, name: p.name, price: p.price, currency: p.currency, stock: p.trackStock ? p.stock : null })),
+  };
 }
 
 export async function registerSale(
   businessId: string,
   conversationId: string,
-  input: { amount: number; productId?: string | null; productName?: string | null; note?: string | null },
+  input: { amount: number; quantity?: number; productId?: string | null; productName?: string | null; note?: string | null },
 ): Promise<Result<{ sale: SaleRow }>> {
   const userId = await sessionMember(businessId);
   if (!userId) return { ok: false, error: "No tienes acceso a este negocio" };
@@ -68,6 +74,8 @@ export async function registerSale(
   const amount = Math.round(Number(input.amount));
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "Escribe el valor de la venta" };
   if (amount > 2_000_000_000) return { ok: false, error: "El valor es demasiado alto" };
+  const quantity = Math.round(Number(input.quantity ?? 1));
+  if (!Number.isFinite(quantity) || quantity < 1 || quantity > 100_000) return { ok: false, error: "Revisa la cantidad" };
 
   const conversation = await prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { id: true } });
   if (!conversation) return { ok: false, error: "No encontramos este contacto" };
@@ -92,23 +100,31 @@ export async function registerSale(
       conversationId,
       productId: product?.id ?? null,
       productName,
+      quantity,
       amount,
       currency: product?.currency ?? lastSale?.currency ?? "COP",
       note: input.note?.trim().slice(0, 300) || null,
       aiAssisted: !!aiReply,
       createdByUserId: userId,
     },
-    select: { id: true, amount: true, currency: true, productName: true, note: true, aiAssisted: true, closedAt: true },
+    select: { id: true, amount: true, quantity: true, currency: true, productName: true, note: true, aiAssisted: true, closedAt: true },
   });
+  // Units out of inventory (only for products that track it).
+  if (product) await changeStock(businessId, product.id, -quantity);
 
   revalidatePath(`/dashboard/businesses/${businessId}/analytics`);
+  revalidatePath(`/dashboard/businesses/${businessId}/inventario`);
   return { ok: true, sale: toRow(sale) };
 }
 
 export async function deleteSale(businessId: string, saleId: string): Promise<Result> {
   if (!(await sessionMember(businessId))) return { ok: false, error: "No tienes acceso a este negocio" };
+  const sale = await prisma.sale.findFirst({ where: { id: saleId, businessId }, select: { productId: true, quantity: true } });
   const { count } = await prisma.sale.deleteMany({ where: { id: saleId, businessId } });
   if (count === 0) return { ok: false, error: "Esa venta ya no existe" };
+  // A deleted sale gives its units back.
+  if (sale?.productId) await changeStock(businessId, sale.productId, sale.quantity);
   revalidatePath(`/dashboard/businesses/${businessId}/analytics`);
+  revalidatePath(`/dashboard/businesses/${businessId}/inventario`);
   return { ok: true };
 }

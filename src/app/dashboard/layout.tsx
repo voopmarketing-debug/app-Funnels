@@ -61,9 +61,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         // Appointment notifications point straight at the conversation;
         // metric alerts (see lib/metricAlerts.ts) have no single
         // conversation to point to, so they go to the KPIs page instead.
+        // Stock alerts go to Inventario.
         href: n.conversationId
           ? `/dashboard/businesses/${n.businessId}/conversations/${n.conversationId}`
-          : `/dashboard/businesses/${n.businessId}/analytics`,
+          : n.type === "LOW_STOCK" || n.type === "OUT_OF_STOCK"
+            ? `/dashboard/businesses/${n.businessId}/inventario`
+            : `/dashboard/businesses/${n.businessId}/analytics`,
         businessName: n.business.name,
       }));
       unreadCount = count;

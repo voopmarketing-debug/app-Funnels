@@ -204,3 +204,32 @@ async function revoke(purchase: SubscriptionCharge, email: string): Promise<Paym
   ]);
   return { status: "revoked", businessIds };
 }
+
+/**
+ * A cancelled subscription ends exactly when the period it already covered
+ * does (the trial's last day, or the paid month's), without the renewal
+ * grace days, which only exist to wait for a charge that is no longer
+ * coming. Applied once per subscription, whether it was cancelled from Mi
+ * perfil or inside Mercado Pago. Returns the new end date.
+ */
+export async function endAtCoveredPeriod(provider: PaymentProvider, subscriptionId: string, email: string): Promise<Date | null> {
+  const normalized = email.trim().toLowerCase();
+  try {
+    await prisma.paymentEvent.create({
+      data: { provider, transaction: `cancel:${subscriptionId}`, action: "revoke", event: "subscription.cancelled", email: normalized },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return null;
+    throw err;
+  }
+  const businessIds = await ownedBusinessIds(normalized);
+  const businesses = await prisma.business.findMany({ where: { id: { in: businessIds } }, select: { id: true, subscriptionEndsAt: true } });
+  const latestEnd = businesses.reduce<Date | null>((max, b) => (b.subscriptionEndsAt && (!max || b.subscriptionEndsAt > max) ? b.subscriptionEndsAt : max), null);
+  if (!latestEnd) return null;
+  const now = new Date();
+  const end = new Date(latestEnd);
+  end.setUTCDate(end.getUTCDate() - RENEWAL_GRACE_DAYS);
+  const finalEnd = end > now ? end : now;
+  await prisma.business.updateMany({ where: { id: { in: businessIds } }, data: { subscriptionEndsAt: finalEnd } });
+  return finalEnd;
+}

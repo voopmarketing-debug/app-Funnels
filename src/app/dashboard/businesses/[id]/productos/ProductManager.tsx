@@ -15,6 +15,9 @@ export type ManagedProduct = {
   badge: string | null;
   imageUrl: string | null;
   active: boolean;
+  trackStock: boolean;
+  stock: number;
+  lowStockAt: number;
 };
 
 const money = (v: number | null) => (v === null ? "" : `$${v.toLocaleString("es-CO")}`);
@@ -24,7 +27,7 @@ function safeName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "foto";
 }
 
-export function ProductManager({ businessId, products }: { businessId: string; products: ManagedProduct[] }) {
+export function ProductManager({ businessId, products, maxProducts }: { businessId: string; products: ManagedProduct[]; maxProducts: number }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [editing, setEditing] = useState<ManagedProduct | null>(null);
@@ -67,11 +70,15 @@ export function ProductManager({ businessId, products }: { businessId: string; p
           aria-label="Buscar producto"
           className="h-10 min-w-[12rem] flex-1 rounded-lg border border-border bg-surface px-3 text-base text-ink outline-none focus:border-accent md:text-sm"
         />
-        <span className="text-sm text-ink-muted">{products.length} productos</span>
+        <span className="text-sm text-ink-muted">
+          {products.length} de {maxProducts} productos
+        </span>
         <button
           type="button"
           onClick={() => open(null)}
-          className="h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
+          disabled={products.length >= maxProducts}
+          title={products.length >= maxProducts ? `Llegaste al máximo de ${maxProducts} productos: elimina los que ya no vendes` : undefined}
+          className="h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
         >
           + Agregar producto
         </button>
@@ -101,6 +108,15 @@ export function ProductManager({ businessId, products }: { businessId: string; p
                 )}
                 {p.badge && <span className="absolute left-2 top-2 rounded-full bg-ink px-2 py-0.5 text-[11px] font-bold text-background">{p.badge}</span>}
                 {!p.active && <span className="absolute right-2 top-2 rounded-full bg-error px-2 py-0.5 text-[11px] font-bold text-white">Oculto</span>}
+                {p.active && p.trackStock && (
+                  <span
+                    className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                      p.stock <= 0 ? "bg-error text-white" : p.stock <= p.lowStockAt ? "bg-[var(--status-warn)] text-black" : "bg-surface/90 text-ink"
+                    }`}
+                  >
+                    {p.stock <= 0 ? "Agotado" : `${p.stock.toLocaleString("es-CO")} und.`}
+                  </span>
+                )}
               </button>
               <div className="flex flex-1 flex-col gap-1 p-3">
                 {p.category && <p className="text-[11px] uppercase tracking-wide text-ink-faint">{p.category}</p>}
@@ -166,6 +182,9 @@ function ProductForm({
   const [category, setCategory] = useState(product?.category ?? "");
   const [badge, setBadge] = useState(product?.badge ?? "");
   const [active, setActive] = useState(product?.active ?? true);
+  const [trackStock, setTrackStock] = useState(product?.trackStock ?? false);
+  const [stock, setStock] = useState(product?.trackStock ? String(product.stock) : "");
+  const [lowStockAt, setLowStockAt] = useState(String(product?.lowStockAt ?? 5));
   const [imageUrl, setImageUrl] = useState<string | null>(product?.imageUrl ?? null);
   const [uploading, setUploading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -213,6 +232,9 @@ function ProductForm({
           badge: badge || null,
           imageUrl,
           active,
+          trackStock,
+          stock: toNumber(stock),
+          lowStockAt: toNumber(lowStockAt),
         });
         if (!result.ok) throw new Error(result.error);
         onDone();
@@ -282,6 +304,29 @@ function ProductForm({
           <span className="text-xs text-ink-muted">Etiqueta (opcional)</span>
           <input value={badge} onChange={(e) => setBadge(e.target.value)} placeholder="Nuevo, Más vendido…" maxLength={24} className={input} />
         </label>
+      </div>
+      <div className="space-y-3 rounded-lg border border-border p-3">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={trackStock} onChange={(e) => setTrackStock(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
+          📦 Controlar inventario de este producto
+        </label>
+        {trackStock ? (
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-1">
+              <span className="text-xs text-ink-muted">Unidades disponibles</span>
+              <input value={stock} onChange={(e) => setStock(e.target.value)} inputMode="numeric" placeholder="0" className={input} />
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs text-ink-muted">Avísame cuando queden</span>
+              <input value={lowStockAt} onChange={(e) => setLowStockAt(e.target.value)} inputMode="numeric" placeholder="5" className={input} />
+            </label>
+            <p className="col-span-2 text-[11px] text-ink-faint">
+              Cada venta que registres en el CRM descuenta unidades. Agotado: tu web lo muestra como agotado y tu agente no lo ofrece.
+            </p>
+          </div>
+        ) : (
+          <p className="text-[11px] text-ink-faint">Déjalo apagado para servicios o productos que no se agotan.</p>
+        )}
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />

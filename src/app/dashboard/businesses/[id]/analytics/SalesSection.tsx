@@ -146,6 +146,7 @@ export function SalesSection({ businessId, summary, period }: { businessId: stri
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-ink">{s.customer ?? "Cliente"}</p>
                         <p className="truncate text-xs text-ink-muted">
+                          {s.quantity > 1 ? `${s.quantity} × ` : ""}
                           {s.productName ?? "Venta"} ·{" "}
                           {s.closedAt.toLocaleDateString("es-CO", { day: "numeric", month: "short", timeZone: "America/Bogota" })}
                           {s.aiAssisted && <span className="text-accent"> · con IA</span>}

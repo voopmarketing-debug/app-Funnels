@@ -14,11 +14,24 @@ type StoredWebsite = {
 };
 
 export async function getCatalogProducts(businessId: string): Promise<CatalogProduct[]> {
-  return prisma.product.findMany({
+  const products = await prisma.product.findMany({
     where: { businessId, active: true },
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-    select: { id: true, name: true, description: true, price: true, compareAtPrice: true, currency: true, category: true, imageUrl: true, badge: true },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      price: true,
+      compareAtPrice: true,
+      currency: true,
+      category: true,
+      imageUrl: true,
+      badge: true,
+      trackStock: true,
+      stock: true,
+    },
   });
+  return products.map(({ trackStock, stock, ...p }) => ({ ...p, soldOut: trackStock && stock <= 0 }));
 }
 
 /**

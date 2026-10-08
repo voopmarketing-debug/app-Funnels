@@ -12,6 +12,7 @@ export function isWonStageName(name: string): boolean {
 export type SaleRow = {
   id: string;
   amount: number;
+  quantity: number;
   currency: string;
   productName: string | null;
   note: string | null;
@@ -19,4 +20,5 @@ export type SaleRow = {
   closedAt: string; // ISO
 };
 
-export type SaleProductOption = { id: string; name: string; price: number | null; currency: string };
+// stock is null for products that don't track inventory.
+export type SaleProductOption = { id: string; name: string; price: number | null; currency: string; stock: number | null };

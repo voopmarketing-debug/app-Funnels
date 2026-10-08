@@ -4,6 +4,7 @@ import { PLAN_LABELS, TEAM_MEMBER_LIMITS } from "@/lib/plans";
 import { fetchMpPreapproval } from "@/lib/mercadopago";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { SubscriptionCard } from "./SubscriptionCard";
+import { RENEWAL_GRACE_DAYS } from "@/lib/hotmart";
 import { PushSettingsCard } from "../PushNotifications";
 import { AccountForm } from "./AccountForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
@@ -64,6 +65,10 @@ export default async function AccountPage() {
     null,
   );
   const inTrial = !!sub && isInTrial(sub.createdAt, sub.trialDays);
+  // What cancelling leaves them: the covered period without the renewal
+  // grace days (already removed once it's cancelled — see endAtCoveredPeriod).
+  const coveredEnd =
+    accessEnd && sub?.status !== "cancelled" ? new Date(accessEnd.getTime() - RENEWAL_GRACE_DAYS * 86_400_000) : accessEnd;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -113,7 +118,7 @@ export default async function AccountPage() {
             <SubscriptionCard
               planLabel={planLabel ?? "Starter"}
               status={sub ? (sub.status === "cancelled" ? "cancelled" : "active") : "unknown"}
-              accessUntil={accessEnd ? fmt(accessEnd) : null}
+              accessUntil={coveredEnd ? fmt(coveredEnd) : null}
               nextCharge={sub?.nextPaymentDate && sub.status !== "cancelled" ? fmt(sub.nextPaymentDate) : null}
               inTrial={inTrial}
               supportLink={SUPPORT_WHATSAPP_LINK}

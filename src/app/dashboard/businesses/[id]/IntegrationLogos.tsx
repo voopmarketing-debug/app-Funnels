@@ -65,3 +65,12 @@ export function ProductsLogo() {
     </svg>
   );
 }
+
+export function InventoryLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className={base} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z" />
+      <path d="M3.5 7.5 12 12l8.5-4.5M12 12v9" />
+    </svg>
+  );
+}

@@ -127,6 +127,37 @@ const COMPREHENSION_RULES = [
   .map((rule) => `- ${rule}`)
   .join("\n");
 
+export type AgentCatalogItem = {
+  name: string;
+  price: number | null;
+  compareAtPrice: number | null;
+  currency: string;
+  category: string | null;
+  description: string;
+  soldOut: boolean;
+};
+
+function catalogPrice(value: number, currency: string): string {
+  return currency === "USD" ? `US$${value.toLocaleString("en-US")}` : `$${value.toLocaleString("es-CO")}`;
+}
+
+// The business's product catalog (at most MAX_CATALOG_PRODUCTS, see
+// lib/inventory.ts), part of the cached block: it only changes when the
+// catalog is edited or a product sells out or comes back — never with each
+// sale, since the exact units are deliberately left out.
+function buildCatalogBlock(catalog?: AgentCatalogItem[]): string {
+  if (!catalog || catalog.length === 0) return "";
+  const lines = catalog.map((p) => {
+    const price =
+      p.price === null
+        ? "precio a consultar"
+        : `${catalogPrice(p.price, p.currency)}${p.compareAtPrice && p.compareAtPrice > p.price ? ` (antes ${catalogPrice(p.compareAtPrice, p.currency)})` : ""}`;
+    const desc = p.description.replace(/\s+/g, " ").trim().slice(0, 140);
+    return `- ${p.name} — ${price}${p.category ? ` · ${p.category}` : ""}${desc ? ` · ${desc}` : ""}${p.soldOut ? " · AGOTADO" : ""}`;
+  });
+  return `\n\nCATÁLOGO DE PRODUCTOS (precios oficiales del negocio):\n${lines.join("\n")}\n\nReglas del catálogo: usa estos precios tal cual y no inventes productos ni precios que no estén aquí. Si algo está AGOTADO, dilo con amabilidad y ofrece una alternativa disponible parecida. Nunca menciones cuántas unidades hay en inventario.`;
+}
+
 export type OwnerContext = {
   phone?: string | null;
   city?: string | null;
@@ -179,6 +210,7 @@ function buildSystemPrompt(
   industry: string,
   history: AgentHistoryMessage[],
   owner?: OwnerContext,
+  catalog?: AgentCatalogItem[],
 ): Anthropic.TextBlockParam[] {
   const toneInstruction = TONE_INSTRUCTIONS[tone] ?? TONE_INSTRUCTIONS.cercano;
   const lengthInstruction = LENGTH_INSTRUCTIONS[replyLength] ?? LENGTH_INSTRUCTIONS.breve;
@@ -199,7 +231,7 @@ function buildSystemPrompt(
     ? ""
     : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en la transcripción de arriba, y no saludes ni te disculpes por demoras — pero mantené la calidez, no te vuelvas seco por evitar el saludo.";
 
-  const cacheableBlock = `CÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.${buildOwnerContextBlock(owner)}\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}`;
+  const cacheableBlock = `CÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.${buildOwnerContextBlock(owner)}\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${buildCatalogBlock(catalog)}`;
   const dynamicBlock = `${buildConversationState(history)}${closingReminder}`;
 
   return [
@@ -314,6 +346,7 @@ export async function generateAgentReply(params: {
   userImages?: VisionImage[];
   owner?: OwnerContext;
   availableMedia?: AvailableMedia[];
+  catalog?: AgentCatalogItem[];
 }): Promise<{ text: string; usage: AgentReplyUsage; sendMediaId?: string; appointment?: DetectedAppointment }> {
   const isFirstMessage = params.history.length === 0;
   const availableMedia = params.availableMedia ?? [];
@@ -325,6 +358,7 @@ export async function generateAgentReply(params: {
     params.industry,
     params.history,
     params.owner,
+    params.catalog,
   );
   system[system.length - 1].text += buildCurrentDateTimeBlock();
   if (availableMedia.length > 0) {

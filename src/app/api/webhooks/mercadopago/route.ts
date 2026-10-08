@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseMpNotification, fetchMpPayment, fetchMpPreapproval, fetchMpAuthorizedPayment } from "@/lib/mercadopago";
-import { applySubscriptionCharge } from "@/lib/payments";
+import { applySubscriptionCharge, endAtCoveredPeriod } from "@/lib/payments";
 import { accountForPreapproval, activateFromPreapproval, savedTrialPlanId } from "@/lib/trial";
 import { mpPlanFor } from "@/lib/mercadopagoPlans";
 import { prisma } from "@/lib/prisma";
@@ -131,6 +131,12 @@ export async function POST(req: NextRequest) {
       // Later monthly charges arrive as subscription_authorized_payment.
       const sub = await fetchMpPreapproval(notification.id);
       console.info("[mercadopago] preapproval", notification.id, sub ? `status ok=${sub.approved}` : "not found");
+      // Cancelled inside Mercado Pago (or from Mi perfil, then this is a no-op):
+      // access ends exactly when the period already covered does.
+      if (sub?.status === "cancelled") {
+        const owner = await prisma.user.findUnique({ where: { mpPreapprovalId: sub.id }, select: { email: true } });
+        if (owner) await endAtCoveredPeriod("mercadopago", sub.id, owner.email);
+      }
       if (sub?.approved) {
         const account = await accountForPreapproval(sub);
         console.info("[mercadopago] preapproval account", sub.id, account ? account.id : "none");

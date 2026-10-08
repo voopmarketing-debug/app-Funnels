@@ -23,6 +23,7 @@ export type SalesSummary = {
     id: string;
     amount: number;
     productName: string | null;
+    quantity: number;
     customer: string | null;
     conversationId: string | null;
     aiAssisted: boolean;
@@ -44,6 +45,7 @@ export async function getSalesSummary(businessId: string, rangeKey: DateRangeKey
         amount: true,
         currency: true,
         productName: true,
+        quantity: true,
         aiAssisted: true,
         closedAt: true,
         conversationId: true,
@@ -66,7 +68,7 @@ export async function getSalesSummary(businessId: string, rangeKey: DateRangeKey
   for (const s of sales) {
     const name = s.productName?.trim() || "Sin producto";
     const row = byProduct.get(name) ?? { count: 0, revenue: 0 };
-    row.count += 1;
+    row.count += s.quantity;
     row.revenue += s.amount;
     byProduct.set(name, row);
   }
@@ -92,6 +94,7 @@ export async function getSalesSummary(businessId: string, rangeKey: DateRangeKey
       id: s.id,
       amount: s.amount,
       productName: s.productName,
+      quantity: s.quantity,
       customer: s.conversation ? s.conversation.customerName || s.conversation.customerPhone : null,
       conversationId: s.conversationId,
       aiAssisted: s.aiAssisted,

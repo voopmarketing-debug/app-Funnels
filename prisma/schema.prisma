@@ -129,6 +129,12 @@ model Product {
   // Short label shown on the card, e.g. "Nuevo", "Más vendido", "-20%".
   badge          String?
   active         Boolean  @default(true)
+  // Inventory (optional, per product: services don't run out). Sales
+  // registered in the CRM discount units; lowStockAt triggers the "se está
+  // acabando" alert. The agent and the website only see sold-out or not.
+  trackStock     Boolean  @default(false)
+  stock          Int      @default(0)
+  lowStockAt     Int      @default(5)
   position       Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -909,6 +915,7 @@ model Sale {
   conversationId  String?
   productId       String?
   productName     String?
+  quantity        Int      @default(1)
   amount          Int
   currency        String   @default("COP")
   note            String?
