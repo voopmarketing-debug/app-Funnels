@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withSiteTracking } from "@/lib/siteTracking";
 import { renderStoredWebsite, resolveClickTarget } from "@/lib/websiteRender";
 import { renderAgendaHtml } from "@/lib/agendaTemplate";
 import {
@@ -38,6 +39,8 @@ export async function proxy(request: NextRequest) {
     select: {
       id: true,
       pageType: true,
+      metaPixelId: true,
+      googleTagId: true,
       content: true,
       whatsappNumber: true,
       businessId: true,
@@ -167,9 +170,13 @@ export async function proxy(request: NextRequest) {
       preview,
     });
 
-    return new NextResponse(html, {
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...customDomainSecurityHeaders() },
-    });
+    const tracked = withSiteTracking(
+      html,
+      { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...customDomainSecurityHeaders() },
+      { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
+      { preview, events: { schedule: !!(confirmedDate && confirmedTime) } },
+    );
+    return new NextResponse(tracked.html, { headers: tracked.headers });
   }
 
 
@@ -217,9 +224,13 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  return new NextResponse(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...customDomainSecurityHeaders() },
-  });
+  const tracked = withSiteTracking(
+    html,
+    { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...customDomainSecurityHeaders() },
+    { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
+    { preview: request.nextUrl.searchParams.get("preview") === "1", events: { lead: request.nextUrl.searchParams.get("registrado") === "1" } },
+  );
+  return new NextResponse(tracked.html, { headers: tracked.headers });
 }
 
 export const config = {

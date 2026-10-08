@@ -1,5 +1,6 @@
 "use client";
 
+import { TrackingSettings } from "./TrackingSettings";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -52,6 +53,7 @@ export function WebsiteBuilder({
   publicUrl,
   initialContent,
   stats,
+  tracking,
 }: {
   businessId: string;
   websiteId: string;
@@ -60,6 +62,7 @@ export function WebsiteBuilder({
   publicUrl: string;
   initialContent: WebsiteContentV2;
   stats: { views: number; clicks: number; leads: number };
+  tracking: { metaPixelId: string | null; googleTagId: string | null };
 }) {
   const router = useRouter();
   const [content, setContent] = useState(initialContent);
@@ -380,6 +383,7 @@ export function WebsiteBuilder({
                 <p className="break-all rounded-md border border-border bg-background px-2.5 py-2 text-xs">{publicUrl}</p>
               </div>
               <CtaUrlEditor value={content.heroCtaUrl} disabled={!!busy} onSave={(url) => runDesign("Guardando…", { heroCtaUrl: url })} />
+              <TrackingSettings businessId={businessId} websiteId={websiteId} metaPixelId={tracking.metaPixelId} googleTagId={tracking.googleTagId} />
               <Link href={`/dashboard/businesses/${businessId}/productos`} className="block rounded-lg border border-border bg-background p-3 text-sm hover:border-accent">
                 🛍️ <strong>Productos</strong>
                 <span className="block text-xs text-ink-muted">Agrega o edita los productos que aparecen en tu tienda.</span>

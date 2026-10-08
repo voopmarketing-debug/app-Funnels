@@ -9,6 +9,7 @@ import bcrypt from "bcryptjs";
 import { auth, signIn } from "@/auth";
 import { getBroadcastUsage, getContactUsage, remaining } from "@/lib/crmLimits";
 import { releaseOrphanAccount } from "@/lib/accounts";
+import { cleanGoogleTagId, cleanMetaPixelId } from "@/lib/siteTracking";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { buildTrackedLink } from "@/lib/broadcastTracking";
@@ -2925,4 +2926,32 @@ export async function updateWebsiteDesignV2(
   await prisma.website.update({ where: { id: websiteId }, data: { content: parsed } });
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
   return parsed;
+}
+
+export type UpdateTrackingResult =
+  | { ok: true; metaPixelId: string | null; googleTagId: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Saves the Meta Pixel / Google tag ids for one public page. Only ids are
+ * accepted — the page adds the standard snippets itself (lib/siteTracking.ts).
+ */
+export async function updateWebsiteTracking(businessId: string, websiteId: string, formData: FormData): Promise<UpdateTrackingResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Inicia sesión de nuevo" };
+  await requireBusinessMembership(session.user.id, businessId);
+
+  const rawPixel = String(formData.get("metaPixelId") ?? "").trim();
+  const rawGoogle = String(formData.get("googleTagId") ?? "").trim();
+  const metaPixelId = rawPixel ? cleanMetaPixelId(rawPixel) : null;
+  const googleTagId = rawGoogle ? cleanGoogleTagId(rawGoogle) : null;
+  if (rawPixel && !metaPixelId) {
+    return { ok: false, error: "El ID del Píxel de Meta son solo números (ej: 1234567890123456). Lo encuentras en Administrador de eventos." };
+  }
+  if (rawGoogle && !googleTagId) {
+    return { ok: false, error: "El ID de Google empieza por G- (Analytics) o AW- (Google Ads), ej: G-ABC123XYZ." };
+  }
+
+  await prisma.website.update({ where: { id: websiteId, businessId }, data: { metaPixelId, googleTagId } });
+  return { ok: true, metaPixelId, googleTagId };
 }

@@ -38,15 +38,19 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/:path*",
+        // Everything except the public pages under /sitio: those set their
+        // own headers in the route (app/sitio/[slug]/route.ts), because a
+        // page with a Meta Pixel / Google tag needs a per-response nonce in
+        // its CSP (lib/siteTracking.ts) — and a header set here would
+        // override the one the route returns.
+        source: "/:path((?!sitio/).*)",
         headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: APP_CSP }],
       },
       {
-        // Listed after the catch-all so its Content-Security-Policy value
-        // wins for this more specific path (Next.js: later matching entries
-        // override earlier ones for the same header key).
-        source: "/sitio/:slug*",
-        headers: [{ key: "Content-Security-Policy", value: SITE_CSP }],
+        // The rest of /sitio (lead form, booking and click redirects) keeps
+        // the strict site policy; the page route itself is excluded here.
+        source: "/sitio/:slug/:rest+",
+        headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: SITE_CSP }],
       },
       {
         // The creation studio's style previews: an example site page shown

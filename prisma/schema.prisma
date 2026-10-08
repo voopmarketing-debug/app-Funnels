@@ -435,6 +435,13 @@ model Website {
   // within this app, no external scheduling tool required.
   pageType String @default("landing")
 
+  // Ad tracking the client adds to run campaigns to this page: their Meta
+  // Pixel id (digits) and Google tag id (G-…/AW-…). Only validated ids are
+  // stored and the page injects the standard snippets itself (see
+  // lib/siteTracking.ts) — never free-form code.
+  metaPixelId String?
+  googleTagId String?
+
   // Client-facing label to tell pages apart in the list, e.g. "Sitio
   // principal", "Página para agendar demo".
   name String

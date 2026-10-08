@@ -1,5 +1,6 @@
 "use client";
 
+import { TrackingSettings } from "./TrackingSettings";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -87,6 +88,7 @@ export function AgendaEditor({
   publicUrl,
   generatedAt,
   customDomain,
+  tracking,
   totalAppointments,
   upcomingAppointments,
   monthStr,
@@ -100,6 +102,7 @@ export function AgendaEditor({
   publicUrl: string;
   generatedAt: Date;
   customDomain: string | null;
+  tracking: { metaPixelId: string | null; googleTagId: string | null };
   totalAppointments: number;
   upcomingAppointments: Appointment[];
   monthStr: string;
@@ -387,6 +390,7 @@ export function AgendaEditor({
         </Section>
 
         <DomainSection businessId={businessId} websiteId={websiteId} customDomain={customDomain} />
+        <TrackingSettings businessId={businessId} websiteId={websiteId} metaPixelId={tracking.metaPixelId} googleTagId={tracking.googleTagId} />
       </div>
 
       <div className="space-y-2 lg:sticky lg:top-4 lg:self-start">

@@ -85,6 +85,7 @@ export default async function WebsiteEditorPage({
             primaryColor: website.agendaConfig?.primaryColor ?? "#1f6feb",
           }}
           customDomain={website.customDomain}
+          tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
           generatedAt={website.updatedAt}
           publicUrl={`https://${appHost}/sitio/${website.slug}`}
           totalAppointments={totalAppointments}
@@ -124,6 +125,7 @@ export default async function WebsiteEditorPage({
           publicUrl={`https://${appHost}/sitio/${website.slug}`}
           initialContent={v2.data}
           stats={{ views, clicks, leads: leadCount }}
+          tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
         />
       );
     }
@@ -186,6 +188,7 @@ export default async function WebsiteEditorPage({
         websiteId={websiteId}
         content={parsedContent.data}
         customDomain={website.customDomain}
+        tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
         // updatedAt, not generatedAt: covers regenerations, AI edits and
         // manual saves alike, so the date always reflects the latest change.
         generatedAt={website.updatedAt}

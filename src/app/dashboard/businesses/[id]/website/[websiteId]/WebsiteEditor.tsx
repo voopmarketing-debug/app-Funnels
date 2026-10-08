@@ -1,5 +1,6 @@
 "use client";
 
+import { TrackingSettings } from "./TrackingSettings";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage, applyWebsitePrompt } from "@/lib/actions";
@@ -12,6 +13,7 @@ export function WebsiteEditor({
   websiteId,
   content: initialContent,
   customDomain,
+  tracking,
   generatedAt: initialGeneratedAt,
   publicUrl,
   stats,
@@ -22,6 +24,7 @@ export function WebsiteEditor({
   websiteId: string;
   content: WebsiteContent;
   customDomain: string | null;
+  tracking: { metaPixelId: string | null; googleTagId: string | null };
   generatedAt: Date;
   publicUrl: string;
   stats: { totalViews: number; clicksWhatsapp: number; clicksAgenda: number };
@@ -559,6 +562,7 @@ export function WebsiteEditor({
         </Section>
 
         <DomainSection businessId={businessId} websiteId={websiteId} customDomain={customDomain} />
+        <TrackingSettings businessId={businessId} websiteId={websiteId} metaPixelId={tracking.metaPixelId} googleTagId={tracking.googleTagId} />
       </div>
 
       <div className="space-y-2 lg:sticky lg:top-4 lg:self-start">

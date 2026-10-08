@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withSiteTracking } from "@/lib/siteTracking";
 import { renderStoredWebsite } from "@/lib/websiteRender";
 import { renderAgendaHtml } from "@/lib/agendaTemplate";
 import {
@@ -59,6 +60,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     select: {
       id: true,
       pageType: true,
+      metaPixelId: true,
+      googleTagId: true,
       content: true,
       whatsappNumber: true,
       businessId: true,
@@ -152,9 +155,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       preview,
     });
 
-    return new NextResponse(html, {
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },
-    });
+    const tracked = withSiteTracking(
+      html,
+      { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },
+      { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
+      { preview, events: { schedule: !!(confirmedDate && confirmedTime) } },
+    );
+    return new NextResponse(tracked.html, { headers: tracked.headers });
   }
 
   const html = await renderStoredWebsite(website, {
@@ -172,7 +179,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     );
   }
 
-  return new NextResponse(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },
-  });
+  const tracked = withSiteTracking(
+    html,
+    { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },
+    { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
+    { preview: preview, events: { lead: leadSubmitted } },
+  );
+  return new NextResponse(tracked.html, { headers: tracked.headers });
 }
