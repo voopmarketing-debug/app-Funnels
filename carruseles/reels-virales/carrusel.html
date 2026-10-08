@@ -67,6 +67,26 @@
   .shot { margin-top:30px; width:900px; border:6px solid var(--lime); border-radius:30px; overflow:hidden; background:#fff; }
   .shot img { display:block; width:100%; }
   .under { display:inline-block; padding-bottom:12px; background: linear-gradient(var(--lime),var(--lime)) bottom / 100% 8px no-repeat; }
+
+  .prompt { margin-top:26px; width:920px; background:#151515; color:#e8e8e2; border:6px solid var(--lime); border-radius:30px; padding:34px 40px; text-align:left; font-size:23px; line-height:1.38; font-weight:500; }
+  .prompt b { font-weight:800; color:#fff; }
+  .prompt .hl { background:var(--lime); color:#0a0a0a; font-weight:800; padding:0 6px; border-radius:6px; }
+  .prompt .vi { color:var(--lime); font-weight:800; }
+  .prompt p + p { margin-top:12px; }
+  .prompt ul { margin:6px 0 12px 4px; } .prompt li { list-style:none; display:flex; gap:12px; align-items:baseline; }
+  .prompt li::before { content:""; width:10px; height:10px; border-radius:99px; background:var(--lime); flex:none; transform:translateY(-2px); }
+
+  .notta { margin-top:30px; width:920px; background:#151515; border:6px solid var(--lime); border-radius:30px; overflow:hidden; text-align:left; }
+  .nbar { display:flex; align-items:center; gap:30px; padding:22px 28px; border-bottom:1px solid #2a2a2a; font-size:20px; font-weight:600; color:#bdbdb5; }
+  .nlogo { display:flex; align-items:center; gap:10px; font-size:30px; font-weight:800; color:#fff; margin-right:auto; letter-spacing:-0.02em; }
+  .nlogo i { font-style:normal; width:40px; height:40px; border-radius:10px; background:var(--lime); color:#0a0a0a; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:26px; }
+  .nbtn { background:var(--lime); color:#0a0a0a; font-weight:800; padding:12px 22px; border-radius:12px; }
+  .nbody { display:flex; gap:22px; padding:24px 28px 28px; }
+  .drop { flex:1; border:3px dashed #3a3a3a; border-radius:18px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; color:#fff; }
+  .tr { flex:1.15; background:#1e1e1e; border-radius:18px; padding:22px 24px; color:#fff; }
+  .tl { display:flex; gap:16px; margin-top:12px; } .tl b { font-size:17px; color:#8a8a82; font-weight:600; width:56px; flex:none; }
+  .tl span { flex:1; display:flex; flex-direction:column; gap:8px; padding-top:4px; } .tl i { display:block; height:12px; border-radius:99px; background:#3a3a3a; }
+  .tl:first-of-type i:first-child { background:var(--lime); }
 </style>
 </head>
 <body>
@@ -140,12 +160,40 @@
   <div class="check"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
     <div class="x">Obtén la<br><span class="lime">transcripción</span> del reel.</div></div>
   <div class="sub" style="font-size:42px;margin-top:30px">Sube el video a una herramienta<br>como <span class="lime">Notta.ai</span>.</div>
-  <div class="shot"><img src="img/paso4-notta.png"></div>
+  <div class="notta">
+    <div class="nbar"><span class="nlogo"><i>N</i>notta.ai</span><span>Transcripción</span><span>Resumen</span><span>Traducción</span><span class="nbtn">Subir video</span></div>
+    <div class="nbody">
+      <div class="drop"><svg width="96" height="70" viewBox="0 0 96 70"><path d="M26 62a20 20 0 0 1-2-40 26 26 0 0 1 50 4 18 18 0 0 1-2 36z" fill="#b5ff2b"/><path d="M48 52V30M38 40l10-10 10 10" fill="none" stroke="#0a0a0a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div style="font-weight:700;font-size:24px;margin-top:14px">Arrastra tu video aquí</div><div style="font-size:21px;color:#a8a8a0;margin-top:4px">o <span class="lime" style="font-weight:700">selecciona un archivo</span></div><div style="font-size:17px;color:#77776f;margin-top:10px">MP4, MOV, AVI, etc.</div></div>
+      <div class="tr"><div style="font-weight:800;font-size:25px;margin-bottom:12px">Transcripción</div>
+        <div class="tl"><b>00:00</b><span><i style="width:95%"></i><i style="width:60%"></i></span></div>
+        <div class="tl"><b>00:12</b><span><i style="width:90%"></i><i style="width:52%"></i></span></div>
+        <div class="tl"><b>00:28</b><span><i style="width:97%"></i><i style="width:70%"></i></span></div>
+        <div class="tl"><b>00:45</b><span><i style="width:85%"></i><i style="width:45%"></i></span></div></div>
+    </div></div>
   <div class="x" style="font-size:54px;margin-top:40px;line-height:1.1"><span class="under">La IA necesita entender<br>exactamente qué se dijo.</span></div>
   <div class="handle">@funnelslabs</div>
 </section>
 
-<!-- 6. CTA -->
+<!-- 6. PASO 5 -->
+<section class="slide">
+  <div class="paso"><span class="x box">PASO</span><span class="x n">5</span></div>
+  <div class="check" style="margin-top:26px"><span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+    <div class="x" style="font-size:66px">Pega la <span class="lime">transcripción</span><br>en <span class="lime">Claude.</span></div></div>
+  <div class="x" style="font-size:44px;margin-top:22px">Y usa este prompt:</div>
+  <div class="prompt">
+    <p><b>Actúa como un estratega de contenido y marca personal.</b> Voy a compartirte un reel que tuvo muchas visualizaciones.</p>
+    <p><span class="vi">Quiero que analices qué hizo que funcionara tan bien:</span></p>
+    <ul><li>Cómo captó la atención al inicio.</li><li>Cómo mantuvo el interés hasta el final.</li><li>Qué emoción despertó.</li><li>Cómo desarrolló el mensaje.</li><li>Qué hizo que las personas quisieran seguir viendo.</li></ul>
+    <p><b>Después, crea una versión <span class="hl">completamente nueva</span> para mi nicho.</b></p>
+    <p><span class="vi">No copies</span> frases. <span class="vi">No copies</span> ejemplos. <span class="vi">No repitas</span> la historia.</p>
+    <p>Quédate únicamente con la lógica y la estructura que hicieron que el contenido funcionara. Adapta el mensaje para que se sienta original, natural y alineado con mi marca.</p>
+    <p><b>Mi nicho es:</b> <span class="hl">[ESCRIBE TU NICHO]</span></p>
+  </div>
+  <div class="handle">@funnelslabs</div>
+</section>
+
+<!-- 7. CTA -->
 <section class="slide" style="justify-content:center;padding-top:0">
   <div style="margin-top:auto"></div>
   <div class="x" style="font-size:120px">Ahora sabes</div>
