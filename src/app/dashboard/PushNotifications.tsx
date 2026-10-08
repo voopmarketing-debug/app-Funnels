@@ -133,7 +133,7 @@ export function PushToggleRow() {
           disabled={busy}
           className="w-full rounded-md bg-accent px-3 py-1.5 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
         >
-          {busy ? "Activando…" : "🔔 Avisarme cuando entre un chat"}
+          {busy ? "Activando…" : "🔔 Avisarme cuando me escriban"}
         </button>
       )}
       {state === "denied" && (
@@ -207,9 +207,9 @@ export function PushSettingsCard() {
   return (
     <section className="fl-card space-y-3 p-5 sm:p-6">
       <div>
-        <h2 className="font-semibold text-ink">🔔 Avisos de chats nuevos</h2>
+        <h2 className="font-semibold text-ink">🔔 Avisos de mensajes</h2>
         <p className="text-xs text-ink-muted">
-          Te avisamos en este dispositivo cuando un cliente escribe por primera vez o cuando un chat necesita que respondas tú.
+          Te avisamos en este dispositivo cada vez que un cliente te escribe, aunque tengas el panel cerrado.
         </p>
       </div>
       {state === "loading" && <p className="text-sm text-ink-muted">Revisando…</p>}

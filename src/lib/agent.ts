@@ -272,17 +272,22 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
         message: isNewChat ? `💬 Nuevo chat de ${leadLabel}: "${excerpt}"` : `${leadLabel} te escribió: "${excerpt}"`,
       },
     });
-    // Push to the owner's devices for every new chat, and for any message
-    // the AI won't answer on its own (paused, switched off, over the limit).
+    // Push to the owner's devices for every customer message (like Kommo),
+    // worded by what it needs: a new chat, one the AI won't answer on its
+    // own (paused, switched off, over the limit), or a regular message.
+    // Tagged by conversation, so a chatty contact replaces their previous
+    // notification instead of stacking a dozen.
     const needsHuman = conversation.aiPaused || !business.agent?.enabled || overPlanLimit;
-    if (isNewChat || needsHuman) {
-      await sendPushToBusiness(business.id, {
-        title: isNewChat ? `💬 Nuevo chat · ${business.name}` : `✋ ${leadLabel} espera respuesta`,
-        body: `${isNewChat ? `${leadLabel}: ` : ""}${excerpt}`,
-        url: `/dashboard/businesses/${business.id}/conversations/${conversation.id}`,
-        tag: conversation.id,
-      }).catch((err) => console.error("[push] new-message push failed", err));
-    }
+    await sendPushToBusiness(business.id, {
+      title: isNewChat
+        ? `💬 Nuevo chat · ${business.name}`
+        : needsHuman
+          ? `✋ ${leadLabel} espera respuesta`
+          : `💬 ${leadLabel} · ${business.name}`,
+      body: isNewChat ? `${leadLabel}: ${excerpt}` : excerpt,
+      url: `/dashboard/businesses/${business.id}/conversations/${conversation.id}`,
+      tag: conversation.id,
+    }).catch((err) => console.error("[push] new-message push failed", err));
   }
 
   // Agent switched off ("Agente apagado") or never configured: the message
