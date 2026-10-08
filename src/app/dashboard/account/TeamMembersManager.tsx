@@ -58,7 +58,7 @@ export function TeamMembersManager({ businesses }: { businesses: TeamBusiness[] 
   }
 
   return (
-    <div className="fl-card max-w-sm space-y-4 p-5">
+    <div className="fl-card space-y-4 p-5 sm:p-6">
       <div>
         <h2 className="font-semibold text-ink">Equipo de ventas</h2>
         <p className="text-xs text-ink-muted">
@@ -129,58 +129,60 @@ export function TeamMembersManager({ businesses }: { businesses: TeamBusiness[] 
         </p>
       ) : (
         <form ref={formRef} action={handleInvite} className="space-y-3 border-t border-border pt-4">
-          <div className="space-y-1">
-            <label htmlFor="teamName" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-              Nombre
-            </label>
-            <input
-              id="teamName"
-              type="text"
-              name="name"
-              required
-              placeholder="Ej: Juan Pérez"
-              disabled={isSubmitting}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
-            />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <label htmlFor="teamName" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+                Nombre
+              </label>
+              <input
+                id="teamName"
+                type="text"
+                name="name"
+                required
+                placeholder="Ej: Juan Pérez"
+                disabled={isSubmitting}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="teamEmail" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+                Correo (usuario)
+              </label>
+              <input
+                id="teamEmail"
+                type="email"
+                name="email"
+                required
+                placeholder="correo@ejemplo.com"
+                disabled={isSubmitting}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="teamPassword" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
+                Contraseña
+              </label>
+              <input
+                id="teamPassword"
+                type="password"
+                name="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                placeholder="Mínimo 8 caracteres"
+                disabled={isSubmitting}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+              />
+            </div>
           </div>
-          <div className="space-y-1">
-            <label htmlFor="teamEmail" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-              Correo (usuario)
-            </label>
-            <input
-              id="teamEmail"
-              type="email"
-              name="email"
-              required
-              placeholder="correo@ejemplo.com"
-              disabled={isSubmitting}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
-            />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="teamPassword" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-              Contraseña
-            </label>
-            <input
-              id="teamPassword"
-              type="password"
-              name="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              placeholder="Mínimo 8 caracteres"
-              disabled={isSubmitting}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
-            />
-            <p className="text-xs text-ink-muted">
-              Tú eliges la contraseña — solo se usa si el correo no tiene cuenta todavía. Compártesela al vendedor
-              para que entre de una vez.
-            </p>
-          </div>
+          <p className="text-xs text-ink-muted">
+            Tú eliges la contraseña — solo se usa si el correo no tiene cuenta todavía. Compártesela al vendedor para que
+            entre de una vez.
+          </p>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            className="w-full rounded-md bg-accent sm:w-auto px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
           >
             {isSubmitting ? "Creando..." : "+ Crear usuario"}
           </button>

@@ -30,139 +30,151 @@ export function AccountForm({
   );
 
   return (
-    <form action={formAction} className="fl-card max-w-sm space-y-4 p-5">
-      <div className="space-y-1">
-        <label className="fl-mono text-xs tracking-wide text-ink-muted uppercase">Email</label>
-        <p className="rounded-md border border-border bg-background px-3 py-2 text-ink-muted">{email}</p>
-        <p className="text-xs text-ink-muted">El correo de acceso no se puede cambiar aquí.</p>
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="name" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Nombre
-        </label>
-        <input
-          id="name"
-          name="name"
-          defaultValue={name}
-          required
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="phone" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Teléfono / WhatsApp
-        </label>
-        <input
-          id="phone"
-          name="phone"
-          type="tel"
-          defaultValue={phone}
-          placeholder="+57 300 123 4567"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label htmlFor="city" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            Ciudad
-          </label>
-          <input
-            id="city"
-            name="city"
-            defaultValue={city}
-            placeholder="Bogotá"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
+    <form action={formAction} className="fl-card space-y-6 p-5 sm:p-6">
+      <section className="space-y-4">
+        <div>
+          <h2 className="font-semibold text-ink">Tus datos</h2>
+          <p className="text-xs text-ink-muted">Con estos datos te contactamos sobre tu cuenta.</p>
         </div>
-        <div className="space-y-1">
-          <label htmlFor="country" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            País
-          </label>
-          <input
-            id="country"
-            name="country"
-            defaultValue={country}
-            placeholder="Colombia"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <span className="text-xs font-medium text-ink-muted">Correo de acceso</span>
+            <p className="truncate rounded-md border border-border bg-surface-2/60 px-3 py-2 text-ink-muted" title={email}>
+              {email}
+            </p>
+            <p className="text-[11px] text-ink-faint">No se puede cambiar aquí.</p>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="name" className="text-xs font-medium text-ink-muted">
+              Nombre
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              defaultValue={name} required
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="phone" className="text-xs font-medium text-ink-muted">
+              Teléfono / WhatsApp
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              defaultValue={phone}
+              placeholder="+57 300 123 4567"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label htmlFor="city" className="text-xs font-medium text-ink-muted">
+              Ciudad
+            </label>
+            <input
+              id="city"
+              name="city"
+              type="text"
+              defaultValue={city}
+              placeholder="Bogotá"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="country" className="text-xs font-medium text-ink-muted">
+              País
+            </label>
+            <input
+              id="country"
+              name="country"
+              type="text"
+              defaultValue={country}
+              placeholder="Colombia"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="space-y-3">
-        <p className="fl-mono text-xs tracking-wide text-ink-muted uppercase">Redes sociales</p>
-
-        <div className="space-y-1">
-          <label htmlFor="instagram" className="text-xs text-ink-muted">
-            Instagram
-          </label>
-          <input
-            id="instagram"
-            name="instagram"
-            defaultValue={instagram}
-            placeholder="@negocio"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
+      <section className="space-y-4 border-t border-border pt-5">
+        <div>
+          <h2 className="font-semibold text-ink">Redes sociales</h2>
+          <p className="text-xs text-ink-muted">
+            Ciudad, país y redes le dan contexto a tu agente de IA: así responde si un cliente pregunta dónde están o si tienen
+            Instagram, sin que lo escribas en sus instrucciones.
+          </p>
         </div>
-
-        <div className="space-y-1">
-          <label htmlFor="facebook" className="text-xs text-ink-muted">
-            Facebook
-          </label>
-          <input
-            id="facebook"
-            name="facebook"
-            defaultValue={facebook}
-            placeholder="facebook.com/negocio"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label htmlFor="instagram" className="text-xs font-medium text-ink-muted">
+              Instagram
+            </label>
+            <input
+              id="instagram"
+              name="instagram"
+              type="text"
+              defaultValue={instagram}
+              placeholder="@negocio"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="facebook" className="text-xs font-medium text-ink-muted">
+              Facebook
+            </label>
+            <input
+              id="facebook"
+              name="facebook"
+              type="text"
+              defaultValue={facebook}
+              placeholder="facebook.com/negocio"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="tiktok" className="text-xs font-medium text-ink-muted">
+              TikTok
+            </label>
+            <input
+              id="tiktok"
+              name="tiktok"
+              type="text"
+              defaultValue={tiktok}
+              placeholder="@negocio"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="linkedin" className="text-xs font-medium text-ink-muted">
+              LinkedIn
+            </label>
+            <input
+              id="linkedin"
+              name="linkedin"
+              type="text"
+              defaultValue={linkedin}
+              placeholder="linkedin.com/company/negocio"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </div>
         </div>
-
-        <div className="space-y-1">
-          <label htmlFor="tiktok" className="text-xs text-ink-muted">
-            TikTok
-          </label>
-          <input
-            id="tiktok"
-            name="tiktok"
-            defaultValue={tiktok}
-            placeholder="@negocio"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label htmlFor="linkedin" className="text-xs text-ink-muted">
-            LinkedIn
-          </label>
-          <input
-            id="linkedin"
-            name="linkedin"
-            defaultValue={linkedin}
-            placeholder="linkedin.com/company/negocio"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
-        </div>
-
-        <p className="text-xs text-ink-muted">
-          Ciudad, país y redes le dan contexto a tu agente de IA — así puede responder si un cliente
-          pregunta dónde están o si tienen Instagram, sin que tengas que escribirlo tú en el prompt.
-        </p>
-      </div>
+      </section>
 
       {state.error && <p className="text-sm text-error">{state.error}</p>}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 border-t border-border pt-5">
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+          className="rounded-md bg-accent px-5 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
         >
           {isPending ? "Guardando..." : "Guardar cambios"}
         </button>
-        {state.saved && !isPending && <span className="fl-mono text-xs text-accent">✓ Guardado</span>}
+        {state.saved && !isPending && <span className="text-sm font-medium text-accent">✓ Guardado</span>}
       </div>
     </form>
   );

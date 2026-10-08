@@ -200,3 +200,50 @@ export function PushBanner() {
     </div>
   );
 }
+
+/** Card for Mi perfil: notification settings for this device. */
+export function PushSettingsCard() {
+  const { state, busy, enable, disable, test } = usePush();
+  return (
+    <section className="fl-card space-y-3 p-5 sm:p-6">
+      <div>
+        <h2 className="font-semibold text-ink">🔔 Avisos de chats nuevos</h2>
+        <p className="text-xs text-ink-muted">
+          Te avisamos en este dispositivo cuando un cliente escribe por primera vez o cuando un chat necesita que respondas tú.
+        </p>
+      </div>
+      {state === "loading" && <p className="text-sm text-ink-muted">Revisando…</p>}
+      {state === "unsupported" && <p className="text-sm text-ink-muted">Este navegador no permite avisos. Prueba con Chrome, Edge o Safari actualizado.</p>}
+      {state === "ios-install" && (
+        <p className="text-sm text-ink-muted">
+          En iPhone: toca <strong className="text-ink">Compartir → Agregar a inicio</strong>, abre la app desde ahí y vuelve aquí para activarlos.
+        </p>
+      )}
+      {state === "denied" && (
+        <p className="text-sm text-ink-muted">Bloqueaste los avisos en este navegador. Actívalos desde el candado 🔒 junto a la dirección de la página y recarga.</p>
+      )}
+      {state === "off" && (
+        <button
+          type="button"
+          onClick={enable}
+          disabled={busy}
+          className="w-full rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+        >
+          {busy ? "Activando…" : "Activar avisos en este dispositivo"}
+        </button>
+      )}
+      {state === "on" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-[var(--status-good)]/15 px-2.5 py-1 text-xs font-semibold text-[var(--status-good)]">● Activados</span>
+          <button type="button" onClick={test} className="rounded-md border border-border-strong px-3 py-1.5 text-sm font-semibold text-ink hover:border-accent">
+            Enviar uno de prueba
+          </button>
+          <button type="button" onClick={disable} disabled={busy} className="px-2 py-1.5 text-sm text-ink-muted hover:text-ink">
+            Apagar
+          </button>
+        </div>
+      )}
+      <p className="text-[11px] text-ink-faint">Actívalos en cada computador y celular donde quieras recibirlos.</p>
+    </section>
+  );
+}

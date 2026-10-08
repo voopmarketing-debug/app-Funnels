@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { TEAM_MEMBER_LIMITS } from "@/lib/plans";
+import { PLAN_LABELS, TEAM_MEMBER_LIMITS } from "@/lib/plans";
+import { PushSettingsCard } from "../PushNotifications";
 import { AccountForm } from "./AccountForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { TeamMembersManager, type TeamBusiness } from "./TeamMembersManager";
@@ -36,22 +37,65 @@ export default async function AccountPage() {
     }),
   );
 
+  const initials = (user.name ?? user.email)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+  const sinceRaw = new Intl.DateTimeFormat("es-CO", { month: "long", year: "numeric", timeZone: "America/Bogota" }).format(user.createdAt);
+  const memberSince = sinceRaw.charAt(0).toUpperCase() + sinceRaw.slice(1);
+  const businessCount = ownedMemberships.length;
+  const planLabel = ownedMemberships[0] ? PLAN_LABELS[ownedMemberships[0].business.planTier] : null;
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold">Mi perfil</h1>
-      <AccountForm
-        email={user.email}
-        name={user.name ?? ""}
-        phone={user.phone ?? ""}
-        city={user.city ?? ""}
-        country={user.country ?? ""}
-        facebook={user.facebook ?? ""}
-        instagram={user.instagram ?? ""}
-        tiktok={user.tiktok ?? ""}
-        linkedin={user.linkedin ?? ""}
-      />
-      <ChangePasswordForm />
-      <TeamMembersManager businesses={teamBusinesses} />
+    <div className="mx-auto max-w-6xl space-y-6">
+      <header className="fl-card flex flex-wrap items-center gap-4 p-5 sm:p-6">
+        <span className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl bg-accent/15 text-lg font-bold text-accent">
+          {initials || "?"}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-xl font-bold text-ink">{user.name || "Mi perfil"}</h1>
+          <p className="truncate text-sm text-ink-muted">{user.email}</p>
+        </div>
+        <dl className="flex flex-wrap gap-2 text-xs">
+          {planLabel && (
+            <div className="rounded-lg border border-border px-3 py-1.5">
+              <dt className="text-ink-muted">Plan</dt>
+              <dd className="font-semibold text-ink">{planLabel}</dd>
+            </div>
+          )}
+          <div className="rounded-lg border border-border px-3 py-1.5">
+            <dt className="text-ink-muted">Agentes</dt>
+            <dd className="font-semibold text-ink">{businessCount}</dd>
+          </div>
+          <div className="rounded-lg border border-border px-3 py-1.5">
+            <dt className="text-ink-muted">Cliente desde</dt>
+            <dd className="font-semibold text-ink">{memberSince}</dd>
+          </div>
+        </dl>
+      </header>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-6">
+          <AccountForm
+            email={user.email}
+            name={user.name ?? ""}
+            phone={user.phone ?? ""}
+            city={user.city ?? ""}
+            country={user.country ?? ""}
+            facebook={user.facebook ?? ""}
+            instagram={user.instagram ?? ""}
+            tiktok={user.tiktok ?? ""}
+            linkedin={user.linkedin ?? ""}
+          />
+          {teamBusinesses.length > 0 && <TeamMembersManager businesses={teamBusinesses} />}
+        </div>
+        <aside className="space-y-6">
+          <PushSettingsCard />
+          <ChangePasswordForm />
+        </aside>
+      </div>
     </div>
   );
 }

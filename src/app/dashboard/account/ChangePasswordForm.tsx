@@ -15,7 +15,7 @@ export function ChangePasswordForm() {
   }, [state.saved]);
 
   return (
-    <form ref={formRef} action={formAction} className="fl-card max-w-sm space-y-4 p-5">
+    <form ref={formRef} action={formAction} className="fl-card space-y-4 p-5 sm:p-6">
       <div>
         <h2 className="font-semibold text-ink">Cambiar contraseña</h2>
         <p className="text-xs text-ink-muted">
