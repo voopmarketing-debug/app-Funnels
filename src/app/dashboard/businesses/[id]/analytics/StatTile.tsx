@@ -68,7 +68,14 @@ export function StatTile({
       {hint && <p className="mt-0.5 text-xs leading-snug text-ink-muted">{hint}</p>}
 
       <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-3">
-        <p className="text-3xl font-bold tabular-nums tracking-tight text-ink">{value}</p>
+        {/* Money values ("$12.500.000") get smaller on phones so they fit the 2-column grid. */}
+        <p
+          className={`font-bold tabular-nums tracking-tight text-ink ${
+            value.length > 10 ? "text-xl sm:text-3xl" : value.length > 7 ? "text-2xl sm:text-3xl" : "text-3xl"
+          }`}
+        >
+          {value}
+        </p>
         {sublabel && <p className="text-xs text-ink-muted">{sublabel}</p>}
       </div>
 

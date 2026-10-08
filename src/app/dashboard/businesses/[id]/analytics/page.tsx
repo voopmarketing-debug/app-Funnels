@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getBusinessAnalytics, isDateRangeKey, type DateRangeKey } from "@/lib/analytics";
+import { getSalesSummary } from "@/lib/salesMetrics";
 import { StatTile } from "./StatTile";
+import { SalesSection } from "./SalesSection";
 import {
   ChatIcon,
   MessageIcon,
@@ -170,7 +172,7 @@ export default async function AnalyticsPage({
     orderBy: { createdAt: "asc" },
   });
 
-  const analytics = await getBusinessAnalytics(id, rangeKey);
+  const [analytics, sales] = await Promise.all([getBusinessAnalytics(id, rangeKey), getSalesSummary(id, rangeKey)]);
 
   const diagnosis =
     business.agent?.diagnosisReport && business.agent.diagnosisGeneratedAt
@@ -205,6 +207,8 @@ export default async function AnalyticsPage({
           </div>
         </div>
       </header>
+
+      <SalesSection businessId={id} summary={sales} period={period} />
 
       <KpiSection title="Resultados" subtitle={`Lo que de verdad importa: clientes que llegan y se convierten · ${period}`}>
         <StatTile

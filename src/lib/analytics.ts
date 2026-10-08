@@ -76,7 +76,7 @@ function startOfUtcDay(date: Date): Date {
 // "today"/"yesterday" are fixed calendar-day windows; "Nd" options are a
 // rolling window of N calendar days ending today (inclusive) — same
 // convention the dashboard used before this was configurable.
-function resolveDateRange(key: DateRangeKey, now: Date): { since: Date; until: Date } {
+export function resolveDateRange(key: DateRangeKey, now: Date): { since: Date; until: Date } {
   const startOfToday = startOfUtcDay(now);
 
   if (key === "today") return { since: startOfToday, until: now };

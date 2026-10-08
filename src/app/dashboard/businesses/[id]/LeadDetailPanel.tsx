@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateContactInfo, updateConversationDetails } from "@/lib/actions";
 import { contactInitial, contactLabel, formatPhone, isBsuid } from "@/lib/contactDisplay";
+import { LeadSalesSection } from "./LeadSalesSection";
 
 const TAG_SUGGESTIONS = ["Lead calificado", "Cliente potencial", "Cotización enviada", "Urgente"];
 
@@ -149,7 +150,7 @@ export function LeadDetailPanel({
       <button
         type="button"
         onClick={toggleCollapsed}
-        title="Mostrar la ficha del contacto (datos, etapa, cita, notas y etiquetas)"
+        title="Mostrar la ficha del contacto (datos, ventas, etapa, cita, notas y etiquetas)"
         className="group flex w-11 flex-none flex-col items-center gap-3 border-l border-border bg-surface py-4 text-ink-muted transition hover:bg-accent/10 hover:text-accent"
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-2 transition group-hover:border-accent">
@@ -305,6 +306,8 @@ export function LeadDetailPanel({
         </dl>
         {contactError && <p className="mt-1 text-[13px] text-error">{contactError}</p>}
       </section>
+
+      <LeadSalesSection businessId={businessId} conversationId={conversationId} />
 
       <section className="border-b border-border p-4">
         <div className="mb-2 flex items-center justify-between">

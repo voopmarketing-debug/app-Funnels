@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ManualMessageForm } from "./conversations/[conversationId]/ManualMessageForm";
 import { StageSelector } from "./conversations/[conversationId]/StageSelector";
+import { SaleButton } from "./SaleDialog";
 import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
 import { TemplateSendButton } from "./conversations/[conversationId]/TemplateSendButton";
 import { MessageScrollArea } from "./MessageScrollArea";
@@ -163,8 +164,13 @@ export function ConversationThread({
           <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} />
           <StageSelector businessId={businessId} conversationId={conversationId} stageId={stageId} stages={stages} />
           {/* Phones don't get the lead panel (desktop-only third column), so
-              the contact's name/email are edited from here instead. */}
-          <div className="flex-none md:hidden">
+              the contact's name/email and sales are handled from here instead. */}
+          <div className="flex flex-none gap-2 md:hidden">
+            <SaleButton
+              businessId={businessId}
+              conversationId={conversationId}
+              className="whitespace-nowrap rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+            />
             <ContactFormDialog
               mode="edit"
               businessId={businessId}

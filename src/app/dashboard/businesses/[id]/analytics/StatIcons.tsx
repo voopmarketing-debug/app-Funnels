@@ -203,3 +203,35 @@ export function RegisterFormIcon() {
     </IconBase>
   );
 }
+
+export function SalesIcon() {
+  return (
+    <IconBase>
+      <path d="M4 17l5-5 4 4 7-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 8h5v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
+export function TicketIcon() {
+  return (
+    <IconBase>
+      <path
+        d="M4 8a2 2 0 0 0 2-2h12a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H6a2 2 0 0 0-2-2V8Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M12 9.5v5M10 11h3.5a1 1 0 0 1 0 2H10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </IconBase>
+  );
+}
+
+export function BagIcon() {
+  return (
+    <IconBase>
+      <path d="M5 8h14l-1 12H6L5 8Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </IconBase>
+  );
+}
