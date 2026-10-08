@@ -118,6 +118,8 @@ export type MpPreapproval = {
   trialDays: number;
   // The subscription plan it was started from, if any.
   planId: string | null;
+  // When Mercado Pago will charge next (null once cancelled).
+  nextPaymentDate: Date | null;
 };
 
 /** For a subscription notification (type: "subscription_preapproval" / "preapproval"). */
@@ -139,6 +141,7 @@ export async function fetchMpPreapproval(id: string): Promise<MpPreapproval | nu
     externalReference: typeof sub.external_reference === "string" && sub.external_reference ? sub.external_reference : null,
     trialDays: trialDaysOf(recurring.free_trial) || deferredStartDays(sub.date_created, recurring.start_date),
     planId: typeof sub.preapproval_plan_id === "string" && sub.preapproval_plan_id ? sub.preapproval_plan_id : null,
+    nextPaymentDate: typeof sub.next_payment_date === "string" ? new Date(sub.next_payment_date) : null,
   };
 }
 
@@ -159,12 +162,12 @@ function trialDaysOf(freeTrial: unknown): number {
 
 export type MpCreateResult = { id: string; initPoint: string } | { error: string };
 
-async function mpPost(path: string, body: unknown): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
+async function mpPost(path: string, body: unknown, method: "POST" | "PUT" = "POST"): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
   if (!token) return { ok: false, error: "MERCADOPAGO_ACCESS_TOKEN no está configurado" };
   try {
     const res = await fetch(`${MP_API}${path}`, {
-      method: "POST",
+      method,
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -262,4 +265,10 @@ export async function fetchMpAuthorizedPayment(
     amount: typeof ap.transaction_amount === "number" ? ap.transaction_amount : 0,
     chargedAt: when ? new Date(when) : new Date(),
   };
+}
+
+/** Stops a subscription: Mercado Pago won't charge it again. */
+export async function cancelMpPreapproval(id: string): Promise<{ ok: true } | { error: string }> {
+  const res = await mpPost(`/preapproval/${encodeURIComponent(id)}`, { status: "cancelled" }, "PUT");
+  return res.ok ? { ok: true } : { error: res.error };
 }

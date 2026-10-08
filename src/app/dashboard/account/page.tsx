@@ -1,10 +1,18 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LABELS, TEAM_MEMBER_LIMITS } from "@/lib/plans";
+import { fetchMpPreapproval } from "@/lib/mercadopago";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { SubscriptionCard } from "./SubscriptionCard";
 import { PushSettingsCard } from "../PushNotifications";
 import { AccountForm } from "./AccountForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { TeamMembersManager, type TeamBusiness } from "./TeamMembersManager";
+
+// Still inside the free trial: no charge has happened yet.
+function isInTrial(createdAt: Date, trialDays: number): boolean {
+  return trialDays > 0 && Date.now() < createdAt.getTime() + trialDays * 86_400_000;
+}
 
 export default async function AccountPage() {
   const session = await auth();
@@ -18,7 +26,7 @@ export default async function AccountPage() {
   // onto their own personal profile page.
   const ownedMemberships = await prisma.membership.findMany({
     where: { userId: session.user.id, role: "OWNER" },
-    include: { business: { select: { id: true, name: true, planTier: true } } },
+    include: { business: { select: { id: true, name: true, planTier: true, subscriptionEndsAt: true } } },
     orderBy: { createdAt: "asc" },
   });
 
@@ -47,6 +55,15 @@ export default async function AccountPage() {
   const memberSince = sinceRaw.charAt(0).toUpperCase() + sinceRaw.slice(1);
   const businessCount = ownedMemberships.length;
   const planLabel = ownedMemberships[0] ? PLAN_LABELS[ownedMemberships[0].business.planTier] : null;
+
+  // Only accounts paying with a Mercado Pago subscription can cancel it here.
+  const sub = user.mpPreapprovalId ? await fetchMpPreapproval(user.mpPreapprovalId).catch(() => null) : null;
+  const fmt = (d: Date) => new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", timeZone: "America/Bogota" }).format(d);
+  const accessEnd = ownedMemberships.reduce<Date | null>(
+    (max, m) => (m.business.subscriptionEndsAt && (!max || m.business.subscriptionEndsAt > max) ? m.business.subscriptionEndsAt : max),
+    null,
+  );
+  const inTrial = !!sub && isInTrial(sub.createdAt, sub.trialDays);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -92,6 +109,16 @@ export default async function AccountPage() {
           {teamBusinesses.length > 0 && <TeamMembersManager businesses={teamBusinesses} />}
         </div>
         <aside className="space-y-6">
+          {user.mpPreapprovalId && (
+            <SubscriptionCard
+              planLabel={planLabel ?? "Starter"}
+              status={sub ? (sub.status === "cancelled" ? "cancelled" : "active") : "unknown"}
+              accessUntil={accessEnd ? fmt(accessEnd) : null}
+              nextCharge={sub?.nextPaymentDate && sub.status !== "cancelled" ? fmt(sub.nextPaymentDate) : null}
+              inTrial={inTrial}
+              supportLink={SUPPORT_WHATSAPP_LINK}
+            />
+          )}
           <PushSettingsCard />
           <ChangePasswordForm />
         </aside>
