@@ -46,7 +46,7 @@ export function AddonGrantCell({
           aria-label="Paquete a activar"
           className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-1 text-xs text-ink outline-none focus:border-accent"
         >
-          {ADDON_PACKS.map((p) => (
+          {ADDON_PACKS.filter((p) => !p.retired).map((p) => (
             <option key={p.key} value={p.key}>
               {p.title}
             </option>

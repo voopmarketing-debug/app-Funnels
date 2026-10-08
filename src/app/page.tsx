@@ -250,8 +250,8 @@ export default async function Home() {
         </div>
 
         <p className="mt-6 text-center text-sm text-ink-muted">
-          ¿Tu negocio atiende más clientes? Agrega paquetes de +200, +400 o +1.000 clientes atendidos
-          por IA desde tu panel y se activan al instante.{" "}
+          ¿Tu negocio atiende más clientes? Agrega paquetes desde +100 clientes atendidos por IA por
+          $89.000 COP (hasta +1.000) desde tu panel y se activan al instante.{" "}
           <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
             Escríbenos
           </a>{" "}

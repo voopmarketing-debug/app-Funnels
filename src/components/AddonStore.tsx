@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { ADDON_PACKS, ADDON_DURATION_DAYS, formatCop, type AddonKind } from "@/lib/addonPacks";
 import { startAddonCheckout } from "@/lib/addonActions";
 
@@ -25,7 +26,7 @@ export function AddonStore({
   const [isPending, startTransition] = useTransition();
   const [buyingKey, setBuyingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const packs = ADDON_PACKS.filter((p) => !kind || p.kind === kind);
+  const packs = ADDON_PACKS.filter((p) => !p.retired && (!kind || p.kind === kind));
 
   function buy(packKey: string) {
     setError(null);
@@ -93,7 +94,10 @@ export function AddonStore({
               <h3 className="text-base font-bold">{pack.title}</h3>
               <p className="text-sm text-ink-muted">{pack.description}</p>
               <p className="mt-auto pt-2 text-xl font-bold">{formatCop(pack.priceCop)}</p>
-              <p className="-mt-1 text-xs text-ink-faint">por {ADDON_DURATION_DAYS} días</p>
+              <p className="-mt-1 text-xs text-ink-faint">
+                por {ADDON_DURATION_DAYS} días
+                {pack.kind === "CONTACTS" && ` · $${Math.round(pack.priceCop / pack.quantity).toLocaleString("es-CO")} por cliente`}
+              </p>
               <button
                 type="button"
                 onClick={() => buy(pack.key)}
@@ -110,6 +114,14 @@ export function AddonStore({
         {error && <p className="px-5 pb-4 text-sm text-error">{error}</p>}
         <p className="border-t border-border px-5 py-3 text-xs text-ink-faint">
           Tu CRM guarda contactos ilimitados. El cupo cuenta cada cliente distinto que atiende la IA en el mes (con todas sus respuestas). Los paquetes se suman a tu plan mientras estén vigentes.
+          {kind !== "LINE" && (
+            <span className="mt-1 block text-ink-muted">
+              ¿Necesitas más de 500 cada mes? El plan <strong className="text-ink">Pro</strong> trae 1.200 clientes y 3 líneas por $1.190.000/mes.{" "}
+              <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">
+                Te conviene: escríbenos
+              </a>
+            </span>
+          )}
         </p>
       </dialog>
     </>

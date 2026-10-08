@@ -1,5 +1,6 @@
 "use client";
 
+import { PushToggleRow } from "./PushNotifications";
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -93,6 +94,7 @@ export function NotificationBell({ notifications, unreadCount }: { notifications
               </Link>
             ))}
           </div>
+          <PushToggleRow />
         </div>
       )}
     </div>

@@ -167,6 +167,7 @@ model User {
   createdAt    DateTime       @default(now())
   memberships  Membership[]
   addons       AccountAddon[]
+  pushSubscriptions PushSubscription[]
 
   // Password reset flow: resetTokenHash stores a SHA-256 hash of the token
   // emailed to the user (never the raw token) so a DB read alone can't be
@@ -871,4 +872,20 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// A browser/phone that asked for push notifications (new chats, messages
+// that need a person). One per device; dropped when the push service says
+// it's gone (see lib/push.ts).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

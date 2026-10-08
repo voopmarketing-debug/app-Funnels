@@ -32,7 +32,7 @@ export async function startAddonCheckout(businessId: string, packKey: string): P
   await requireBusinessOwnerOrAdmin(session.user.id, businessId);
 
   const pack = findPack(packKey);
-  if (!pack) throw new Error("Paquete no encontrado");
+  if (!pack || pack.retired) throw new Error("Paquete no encontrado");
 
   const ownerId = (await getBusinessOwnerId(businessId)) ?? session.user.id;
   const owner = await prisma.user.findUnique({ where: { id: ownerId }, select: { email: true } });
@@ -70,7 +70,7 @@ export async function grantAddonManually(ownerUserId: string, packKey: string): 
   await requireAgencyAdmin(session.user.id);
 
   const pack = findPack(packKey);
-  if (!pack) throw new Error("Paquete no encontrado");
+  if (!pack || pack.retired) throw new Error("Paquete no encontrado");
 
   const addon = await prisma.accountAddon.create({
     data: { userId: ownerUserId, packKey: pack.key, kind: pack.kind, quantity: pack.quantity, priceCop: pack.priceCop, source: "MANUAL" },

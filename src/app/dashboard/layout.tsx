@@ -6,6 +6,7 @@ import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { NotificationBell, type NotificationItem } from "./NotificationBell";
+import { PushBanner } from "./PushNotifications";
 import { NotificationSoundPoller } from "./NotificationSoundPoller";
 
 function formatNotificationDate(date: Date): string {
@@ -115,7 +116,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Mi perfil
           </Link>
         </header>
-        <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
+        <main className="min-w-0 flex-1 p-4 md:p-6">
+          <PushBanner />
+          {children}
+        </main>
       </div>
     </div>
   );

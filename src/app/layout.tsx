@@ -32,6 +32,10 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Funnels Labs — Agentes de IA para WhatsApp",
   description: "Plataforma multi-tenant de agentes de IA para WhatsApp por negocio, por Funnels Labs.",
+  // Installable on the phone's home screen (needed for push notifications
+  // on iPhone) — see app/manifest.ts.
+  appleWebApp: { capable: true, title: "Funnels Labs", statusBarStyle: "black-translucent" },
+  icons: { apple: "/apple-touch-icon.png" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { sendPushToBusiness } from "@/lib/push";
 import { isSubscriptionActive } from "@/lib/subscription";
 import { decryptSecret } from "@/lib/crypto";
 import {
@@ -261,14 +262,27 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   {
     const leadLabel = contactLabel(conversation.customerName, conversation.customerPhone);
     const excerpt = messageContent.length > 80 ? `${messageContent.slice(0, 80)}...` : messageContent;
+    // First time this person writes in: a new chat, flagged as such.
+    const isNewChat = !previousMessages.some((m) => m.role === "CUSTOMER");
     await prisma.notification.create({
       data: {
         businessId: business.id,
         conversationId: conversation.id,
-        type: "NEW_MESSAGE",
-        message: `${leadLabel} te escribió: "${excerpt}"`,
+        type: isNewChat ? "NEW_CONVERSATION" : "NEW_MESSAGE",
+        message: isNewChat ? `💬 Nuevo chat de ${leadLabel}: "${excerpt}"` : `${leadLabel} te escribió: "${excerpt}"`,
       },
     });
+    // Push to the owner's devices for every new chat, and for any message
+    // the AI won't answer on its own (paused, switched off, over the limit).
+    const needsHuman = conversation.aiPaused || !business.agent?.enabled || overPlanLimit;
+    if (isNewChat || needsHuman) {
+      await sendPushToBusiness(business.id, {
+        title: isNewChat ? `💬 Nuevo chat · ${business.name}` : `✋ ${leadLabel} espera respuesta`,
+        body: `${isNewChat ? `${leadLabel}: ` : ""}${excerpt}`,
+        url: `/dashboard/businesses/${business.id}/conversations/${conversation.id}`,
+        tag: conversation.id,
+      }).catch((err) => console.error("[push] new-message push failed", err));
+    }
   }
 
   // Agent switched off ("Agente apagado") or never configured: the message
