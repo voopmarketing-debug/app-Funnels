@@ -213,14 +213,15 @@ function TemplateMessagePreview({
   );
 }
 
-type FormState = { error: string | null; done: boolean };
+type FormState = { error: string | null; done: boolean; renamed?: { from: string; to: string } };
 const INITIAL_STATE: FormState = { error: null, done: false };
 
 function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose: () => void }) {
   const [state, formAction, isPending] = useActionState<FormState, FormData>(async (_prev, formData) => {
     try {
       const res = await createMessageTemplate(businessId, formData);
-      return res.ok ? { error: null, done: true } : { error: res.error, done: false };
+      if (!res.ok) return { error: res.error, done: false };
+      return { error: null, done: true, renamed: res.renamedFrom ? { from: res.renamedFrom, to: res.name } : undefined };
     } catch {
       return { error: "No se pudo crear la plantilla. Recarga la página e inténtalo de nuevo.", done: false };
     }
@@ -250,6 +251,12 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
             Meta la revisa y aprueba (o rechaza) — puede tardar desde minutos hasta 1-2 días. Usa "↻ Revisar estado"
             en la tarjeta para ver cuándo cambia.
           </p>
+          {state.renamed && (
+            <p className="text-sm text-ink-muted">
+              Meta todavía tiene reservado el nombre <span className="font-semibold text-ink">{state.renamed.from}</span> por una plantilla
+              que borraste, así que la creamos como <span className="font-semibold text-ink">{state.renamed.to}</span>.
+            </p>
+          )}
         </div>
         <div className="flex justify-end">
           <button

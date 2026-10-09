@@ -492,8 +492,11 @@ function parseTemplateButtons(formData: FormData): TemplateButton[] {
 
 /** Submits a new WhatsApp message template to Meta for approval — see lib/whatsapp.ts for the API call itself. */
 // Meta's most common refusals, in words a business owner can act on.
+/** Meta refuses a name it's still deleting (up to 4 weeks after a delete), in English or Spanish. */
+const isNameBeingDeleted = (message: string) => /being deleted|siendo eliminad|se est[aá] eliminando|while .*deleted/i.test(message);
+
 function friendlyTemplateError(message: string): string {
-  if (/being deleted|siendo eliminad/i.test(message)) {
+  if (isNameBeingDeleted(message)) {
     return "Meta todavía está borrando una plantilla con ese nombre (puede tardar hasta 4 semanas). Usa otro nombre, por ejemplo agregándole _2 al final.";
   }
   if (/already exists|ya existe|duplicate/i.test(message)) {
@@ -507,17 +510,20 @@ function friendlyTemplateError(message: string): string {
  * message in production (the form showed "Minified React error #441"
  * instead of Meta's reason).
  */
-export async function createMessageTemplate(businessId: string, formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function createMessageTemplate(
+  businessId: string,
+  formData: FormData,
+): Promise<{ ok: true; name: string; renamedFrom: string | null } | { ok: false; error: string }> {
   try {
-    await createMessageTemplateOrThrow(businessId, formData);
-    return { ok: true };
+    const { name, requested } = await createMessageTemplateOrThrow(businessId, formData);
+    return { ok: true, name, renamedFrom: name === requested ? null : requested };
   } catch (err) {
     console.error("createMessageTemplate failed:", err);
     return { ok: false, error: friendlyTemplateError(err instanceof Error ? err.message : "No se pudo crear la plantilla") };
   }
 }
 
-async function createMessageTemplateOrThrow(businessId: string, formData: FormData): Promise<void> {
+async function createMessageTemplateOrThrow(businessId: string, formData: FormData): Promise<{ name: string; requested: string }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
@@ -570,21 +576,39 @@ async function createMessageTemplateOrThrow(businessId: string, formData: FormDa
     headerImageHandle = metaUpload.handle;
   }
 
-  const { id: metaTemplateId, status } = await createWhatsAppTemplate({
-    wabaId: business.wabaId,
-    accessToken,
-    name,
-    language,
-    category,
-    bodyText,
-    headerImageHandle,
-    buttons,
-  });
+  // A name deleted in the last 4 weeks is still reserved in Meta: try the
+  // same name with _2, _3… instead of making the owner guess. The prefix is
+  // kept, so a "recordatorio…" template still works for reminders.
+  const taken = new Set(
+    (await prisma.messageTemplate.findMany({ where: { businessId, name: { startsWith: name } }, select: { name: true } })).map((t) => t.name),
+  );
+  const candidates = [name, ...[2, 3, 4, 5, 6].map((n) => `${name}_${n}`)].filter((n) => n === name || !taken.has(n));
+  let created: { id: string; status: string } | null = null;
+  let finalName = name;
+  for (const candidate of candidates) {
+    try {
+      created = await createWhatsAppTemplate({
+        wabaId: business.wabaId,
+        accessToken,
+        name: candidate,
+        language,
+        category,
+        bodyText,
+        headerImageHandle,
+        buttons,
+      });
+      finalName = candidate;
+      break;
+    } catch (err) {
+      if (!(err instanceof Error && isNameBeingDeleted(err.message)) || candidate === candidates.at(-1)) throw err;
+    }
+  }
+  const { id: metaTemplateId, status } = created!;
 
   await prisma.messageTemplate.create({
     data: {
       businessId,
-      name,
+      name: finalName,
       language,
       category,
       bodyText,
@@ -596,6 +620,7 @@ async function createMessageTemplateOrThrow(businessId: string, formData: FormDa
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/templates`);
+  return { name: finalName, requested: name };
 }
 
 /** Re-checks a template's approval status with Meta — there's no status-update webhook wired up, so this is a manual refresh. */
