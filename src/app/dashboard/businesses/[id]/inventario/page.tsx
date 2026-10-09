@@ -20,8 +20,9 @@ export default async function InventoryPage({ params }: { params: Promise<{ id: 
   if (!membership) notFound();
 
   const [products, sold] = await Promise.all([
+    // Services don't run out, so they never show up here.
     prisma.product.findMany({
-      where: { businessId: id },
+      where: { businessId: id, kind: "PRODUCT" },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
       select: { id: true, name: true, category: true, imageUrl: true, active: true, trackStock: true, stock: true, lowStockAt: true },
     }),

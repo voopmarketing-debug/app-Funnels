@@ -26,6 +26,8 @@ import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@
 import { getAccountAddonCapacity } from "@/lib/addons";
 import { PLAN_LIMITS } from "@/lib/plans";
 import { contactLabel } from "@/lib/contactDisplay";
+import { bookedStageAfter, resolveAutoStageMove, type FunnelStage } from "@/lib/autoStage";
+import { isWonStageName } from "@/lib/sales";
 import Anthropic from "@anthropic-ai/sdk";
 import { describeAnthropicError } from "@/lib/aiServiceHealth";
 import { reportWebhookProblem } from "@/lib/whatsappHealth";
@@ -390,6 +392,38 @@ export async function replyToConversation(ctx: ReplyContext): Promise<void> {
   }
 }
 
+async function moveLeadStage(ctx: ReplyContext, target: FunnelStage): Promise<void> {
+  const { business, conversation } = ctx;
+  // Conditional on the stage we read: if someone on the team moved the lead
+  // in the meantime, their choice wins.
+  const moved = await prisma.conversation.updateMany({
+    where: { id: conversation.id, businessId: business.id, stageId: conversation.stageId },
+    data: { stageId: target.id },
+  });
+  if (moved.count === 0) return;
+  console.log(`[agent] moved conversation ${conversation.id} to stage "${target.name}"`);
+  if (!isWonStageName(target.name)) return;
+
+  // A sale needs a human to confirm the payment and the amount, so the AI
+  // only flags it: the notification opens the chat, where "Registrar venta"
+  // is one tap away.
+  const leadLabel = contactLabel(conversation.customerName, conversation.customerPhone);
+  await prisma.notification.create({
+    data: {
+      businessId: business.id,
+      conversationId: conversation.id,
+      type: "LEAD_WON",
+      message: `🎉 ${leadLabel} confirmó su compra. Tu agente lo pasó a "${target.name}": verifica el pago y registra la venta.`,
+    },
+  });
+  await sendPushToBusiness(business.id, {
+    title: `🎉 ${leadLabel} compró · ${business.name}`,
+    body: "Verifica el pago y registra la venta en el CRM.",
+    url: `/dashboard/businesses/${business.id}/conversations/${conversation.id}`,
+    tag: `won-${conversation.id}`,
+  }).catch((err) => console.error("[push] won push failed", err));
+}
+
 export async function alertReplyGaveUp(ctx: ReplyContext, err: unknown): Promise<void> {
   const reason = (err instanceof Error ? err.message : String(err)).slice(0, 200);
   await prisma.notification.create({
@@ -415,7 +449,7 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
       content: msg.content,
     }));
 
-  const [availableMedia, products] = await Promise.all([
+  const [availableMedia, products, funnelStages] = await Promise.all([
     prisma.agentMedia.findMany({
       where: { businessId: business.id },
       select: { id: true, label: true, mediaType: true },
@@ -425,10 +459,18 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
       where: { businessId: business.id, active: true },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
       take: MAX_CATALOG_PRODUCTS,
-      select: { name: true, price: true, compareAtPrice: true, currency: true, category: true, description: true, trackStock: true, stock: true },
+      select: { name: true, price: true, compareAtPrice: true, currency: true, category: true, description: true, trackStock: true, stock: true, kind: true },
+    }),
+    // The stages of the funnel this lead is in, so the agent can move it.
+    prisma.pipelineStage.findMany({
+      where: { pipeline: { stages: { some: { id: conversation.stageId } } } },
+      orderBy: { position: "asc" },
+      select: { id: true, name: true, position: true },
     }),
   ]);
-  const catalog = products.map(({ trackStock, stock, ...p }) => ({ ...p, soldOut: trackStock && stock <= 0 }));
+  const currentStage = funnelStages.find((st) => st.id === conversation.stageId);
+  const stageNames = Array.from(new Set(funnelStages.map((st) => st.name)));
+  const catalog = products.map(({ trackStock, stock, kind, ...p }) => ({ ...p, soldOut: trackStock && stock <= 0, isService: kind === "SERVICE" }));
 
   let reply: string;
   let usage: AgentReplyUsage;
@@ -454,6 +496,7 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
       owner: ctx.owner,
       availableMedia,
       catalog,
+      funnel: currentStage ? { stages: stageNames, current: currentStage.name } : undefined,
     });
     reply = result.text;
     usage = result.usage;
@@ -486,6 +529,16 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
           },
         });
       }
+    }
+
+    // Keep the CRM funnel current without anyone dragging cards: the stage
+    // the AI chose, or else the funnel's "Agendado"-type stage when it just
+    // booked an appointment. Never fails the reply.
+    const target =
+      (result.stage ? resolveAutoStageMove(funnelStages, conversation.stageId, result.stage) : null) ??
+      (result.appointment ? bookedStageAfter(funnelStages, conversation.stageId) : null);
+    if (target) {
+      await moveLeadStage(ctx, target).catch((err) => console.error("[agent] auto stage move failed", err));
     }
   } catch (err) {
     // Surface the failure straight into the conversation thread in the

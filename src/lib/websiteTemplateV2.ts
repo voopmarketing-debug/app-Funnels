@@ -163,7 +163,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         <h3>${esc(p.name)}</h3>
         ${featured && p.description ? `<p class="pdesc">${esc(p.description)}</p>` : ""}
         <div class="prow">${priceHtml(p)}</div>
-        ${orderButton(p, "btn btn-sm", "Pedir por WhatsApp")}
+        ${orderButton(p, "btn btn-sm", p.isService ? "Agendar por WhatsApp" : "Pedir por WhatsApp")}
       </div>
     </article>`;
 
@@ -318,7 +318,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
             <ul class="spot-bullets">${s.bullets.slice(0, 4).map((b) => `<li>${icon(b.icon)}<div><strong>${esc(b.title)}</strong><span>${esc(b.description)}</span></div></li>`).join("")}</ul>
             ${specs.length ? `<dl class="specs">${specs.map((sp) => `<div><dt>${esc(sp.label)}</dt><dd>${esc(sp.value)}</dd></div>`).join("")}</dl>` : ""}
             <div class="prow prow-lg">${priceHtml(p)}</div>
-            ${orderButton(p, "btn", "Pedir por WhatsApp")}
+            ${orderButton(p, "btn", p.isService ? "Agendar por WhatsApp" : "Pedir por WhatsApp")}
           </div>
         </div></section>`;
       }

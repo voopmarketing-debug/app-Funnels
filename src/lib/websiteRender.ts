@@ -29,9 +29,10 @@ export async function getCatalogProducts(businessId: string): Promise<CatalogPro
       badge: true,
       trackStock: true,
       stock: true,
+      kind: true,
     },
   });
-  return products.map(({ trackStock, stock, ...p }) => ({ ...p, soldOut: trackStock && stock <= 0 }));
+  return products.map(({ trackStock, stock, kind, ...p }) => ({ ...p, soldOut: trackStock && stock <= 0, isService: kind === "SERVICE" }));
 }
 
 /**
@@ -104,11 +105,11 @@ export async function resolveClickTarget(
   if (productId) {
     const product = await prisma.product.findFirst({
       where: { id: productId, businessId: website.businessId, active: true },
-      select: { name: true, price: true, currency: true },
+      select: { name: true, price: true, currency: true, kind: true },
     });
     if (product) {
       const price = product.price !== null ? ` (${formatMoney(product.price, product.currency)})` : "";
-      const text = `Hola, quiero pedir: ${product.name}${price}`;
+      const text = `Hola, quiero ${product.kind === "SERVICE" ? "agendar" : "pedir"}: ${product.name}${price}`;
       return { target: `${wa}?text=${encodeURIComponent(text)}`, destination: "whatsapp" };
     }
   }

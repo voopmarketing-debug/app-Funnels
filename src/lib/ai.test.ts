@@ -262,3 +262,69 @@ describe("generateAgentReply — photos and empty content", () => {
     expect(blocks.at(-1)).toEqual({ type: "text", text: "¿Cuánto cuesta algo así?" });
   });
 });
+
+describe("generateAgentReply — move_lead_stage tool", () => {
+  const base = {
+    systemPrompt: "Eres el agente de una tienda.",
+    tone: "cercano",
+    replyLength: "breve",
+    industry: "otro",
+    model: "claude-sonnet-5",
+    history: [{ role: "user" as const, content: "Hola, ¿cuánto vale la camiseta?" }],
+    userMessage: "Listo, ya te transferí",
+    funnel: { stages: ["Nuevo", "En conversación", "Interesado", "Ganado", "Perdido"], current: "Interesado" },
+  };
+  const usage = { input_tokens: 100, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+
+  it("offers the funnel's stages, tells the model where the lead is, and returns the chosen stage", async () => {
+    createMock.mockReset();
+    createMock.mockResolvedValueOnce({
+      content: [
+        { type: "text", text: "¡Gracias! Ya mismo preparamos tu pedido." },
+        { type: "tool_use", id: "toolu_1", name: "move_lead_stage", input: { stage: "Ganado" } },
+      ],
+      usage,
+    });
+    const result = await generateAgentReply(base);
+    expect(result.stage).toBe("Ganado");
+    expect(createMock).toHaveBeenCalledTimes(1);
+    const req = createMock.mock.calls[0][0] as { tools: { name: string; input_schema: { properties: { stage?: { enum: string[] } } } }[]; system: { text: string }[] };
+    const tool = req.tools.find((t) => t.name === "move_lead_stage");
+    expect(tool?.input_schema.properties.stage?.enum).toEqual(base.funnel.stages);
+    expect(req.system[1].text).toContain('ETAPA ACTUAL DEL CLIENTE EN EL EMBUDO: "Interesado"');
+  });
+
+  it("ignores a stage that isn't in the funnel", async () => {
+    createMock.mockReset();
+    createMock.mockResolvedValueOnce({
+      content: [
+        { type: "text", text: "Perfecto." },
+        { type: "tool_use", id: "toolu_1", name: "move_lead_stage", input: { stage: "VIP" } },
+      ],
+      usage,
+    });
+    expect((await generateAgentReply(base)).stage).toBeUndefined();
+  });
+
+  it("asks for the text when the model only moved the stage, instead of sending a filler", async () => {
+    createMock.mockReset();
+    createMock
+      .mockResolvedValueOnce({ content: [{ type: "tool_use", id: "toolu_1", name: "move_lead_stage", input: { stage: "Ganado" } }], usage })
+      .mockResolvedValueOnce({ content: [{ type: "text", text: "¡Gracias por tu compra!" }], usage });
+    const result = await generateAgentReply(base);
+    expect(result.text).toBe("¡Gracias por tu compra!");
+    expect(result.stage).toBe("Ganado");
+    expect(result.usage.inputTokens).toBe(200);
+    const second = createMock.mock.calls[1][0] as { tool_choice: { type: string }; messages: { role: string; content: unknown }[] };
+    expect(second.tool_choice).toEqual({ type: "none" });
+    expect(second.messages.at(-1)).toEqual({ role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_1", content: "Listo." }] });
+  });
+
+  it("doesn't offer the tool without a funnel", async () => {
+    createMock.mockReset();
+    createMock.mockResolvedValueOnce({ content: [{ type: "text", text: "Hola" }], usage });
+    await generateAgentReply({ ...base, funnel: undefined });
+    const req = createMock.mock.calls[0][0] as { tools: { name: string }[] };
+    expect(req.tools.map((t) => t.name)).not.toContain("move_lead_stage");
+  });
+});

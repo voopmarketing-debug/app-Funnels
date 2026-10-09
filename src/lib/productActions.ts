@@ -8,6 +8,7 @@ import { verifyChatUpload } from "@/lib/attachments";
 import { MAX_CATALOG_PRODUCTS, changeStock, notifyStockLevel } from "@/lib/inventory";
 
 export type ProductInput = {
+  kind: "PRODUCT" | "SERVICE";
   name: string;
   description: string;
   price: number | null;
@@ -28,9 +29,11 @@ const units = (v: number | null, fallback: number) => (v === null || !Number.isF
 
 function clean(input: ProductInput) {
   const name = input.name.trim().slice(0, 120);
-  if (!name) throw new Error("Ponle un nombre al producto");
+  const isService = input.kind === "SERVICE";
+  if (!name) throw new Error(isService ? "Ponle un nombre al servicio" : "Ponle un nombre al producto");
   const money = (v: number | null) => (v === null || !Number.isFinite(v) || v < 0 ? null : Math.round(Math.min(v, 2_000_000_000)));
   return {
+    kind: isService ? ("SERVICE" as const) : ("PRODUCT" as const),
     name,
     description: input.description.trim().slice(0, 1200),
     price: money(input.price),
@@ -38,7 +41,8 @@ function clean(input: ProductInput) {
     category: input.category?.trim().slice(0, 60) || null,
     badge: input.badge?.trim().slice(0, 24) || null,
     active: input.active,
-    trackStock: input.trackStock,
+    // Services don't run out.
+    trackStock: !isService && input.trackStock,
     stock: units(input.stock, 0),
     lowStockAt: units(input.lowStockAt, 5),
   };
@@ -91,7 +95,7 @@ async function saveProductOrThrow(businessId: string, productId: string | null, 
   } else {
     const count = await prisma.product.count({ where: { businessId } });
     if (count >= MAX_PRODUCTS) {
-      throw new Error(`Tu catálogo llegó al máximo de ${MAX_PRODUCTS} productos. Elimina u oculta los que ya no vendes para agregar nuevos.`);
+      throw new Error(`Tu catálogo llegó al máximo de ${MAX_PRODUCTS} productos y servicios. Elimina los que ya no vendes para agregar nuevos.`);
     }
     const imageUrl = await resolveImage(businessId, input.imageUrl, null);
     await prisma.product.create({ data: { ...data, imageUrl, businessId, position: count } });
@@ -140,8 +144,9 @@ export async function adjustStock(
   }
   const n = Math.round(Number(value));
   if (!Number.isFinite(n) || n < 0 || n > 1_000_000) return { ok: false, error: "Escribe un número de unidades válido" };
-  const product = await prisma.product.findFirst({ where: { id: productId, businessId }, select: { trackStock: true, stock: true } });
+  const product = await prisma.product.findFirst({ where: { id: productId, businessId }, select: { trackStock: true, stock: true, kind: true } });
   if (!product) return { ok: false, error: "Ese producto ya no existe" };
+  if (product.kind === "SERVICE") return { ok: false, error: "Los servicios no llevan inventario" };
   if (!product.trackStock) await prisma.product.update({ where: { id: productId }, data: { trackStock: true, stock: 0 } });
   const current = product.trackStock ? product.stock : 0;
   const stock = await changeStock(businessId, productId, mode === "add" ? n : n - current);
@@ -157,7 +162,8 @@ export async function setTrackStock(businessId: string, productId: string, track
   } catch {
     return { ok: false, error: "No tienes acceso a este negocio" };
   }
-  await prisma.product.updateMany({ where: { id: productId, businessId }, data: { trackStock } });
+  // Services never track stock.
+  await prisma.product.updateMany({ where: { id: productId, businessId, ...(trackStock && { kind: "PRODUCT" as const }) }, data: { trackStock } });
   revalidatePath(`/dashboard/businesses/${businessId}/inventario`);
   revalidatePath(`/dashboard/businesses/${businessId}/productos`);
   return { ok: true };

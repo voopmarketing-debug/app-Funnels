@@ -21,6 +21,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ id: s
   });
   const items: ManagedProduct[] = products.map((p) => ({
     id: p.id,
+    kind: p.kind,
     name: p.name,
     description: p.description,
     price: p.price,
@@ -40,10 +41,10 @@ export default async function ProductsPage({ params }: { params: Promise<{ id: s
         <Link href={`/dashboard/businesses/${id}`} className="text-sm text-ink-muted underline hover:text-ink">
           ← {membership.business.name}
         </Link>
-        <h1 className="mt-1 text-xl font-bold">Productos</h1>
+        <h1 className="mt-1 text-xl font-bold">Productos y servicios</h1>
         <p className="max-w-prose text-sm text-ink-muted">
-          Tu catálogo: lo que aparece en tus páginas de tienda y de producto, con su botón de <strong className="text-ink">Pedir por WhatsApp</strong>.
-          Tu agente de IA también lo conoce: responde precios y no ofrece lo que esté agotado. Hasta {MAX_CATALOG_PRODUCTS} productos.
+          Tu catálogo: lo que aparece en tus páginas de tienda y de producto, con su botón para pedir o agendar por WhatsApp. Tu agente de IA
+          también lo conoce: responde precios y no ofrece lo que esté agotado. Hasta {MAX_CATALOG_PRODUCTS} en total.
         </p>
       </div>
       <ProductManager businessId={id} products={items} maxProducts={MAX_CATALOG_PRODUCTS} />

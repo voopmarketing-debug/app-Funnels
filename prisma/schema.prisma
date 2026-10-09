@@ -119,6 +119,10 @@ model Product {
   id             String   @id @default(cuid())
   businessId     String
   name           String
+  // A physical product or a service (consulta, clase, sesión…): services
+  // never track inventory, and the website/agent offer to book them
+  // instead of to "order" them.
+  kind           ProductKind @default(PRODUCT)
   description    String   @default("")
   // Whole pesos (or the business's currency units) — no cents needed.
   price          Int?
@@ -142,6 +146,11 @@ model Product {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, active, position])
+}
+
+enum ProductKind {
+  PRODUCT
+  SERVICE
 }
 
 enum PlanTier {

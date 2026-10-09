@@ -300,6 +300,8 @@ export type CatalogProduct = {
   badge: string | null;
   // Tracks inventory and has no units left: shown as "Agotado", no order button.
   soldOut?: boolean;
+  // A service (consulta, clase…): "Agendar" instead of "Pedir".
+  isService?: boolean;
 };
 
 export function formatMoney(value: number, currency: string): string {

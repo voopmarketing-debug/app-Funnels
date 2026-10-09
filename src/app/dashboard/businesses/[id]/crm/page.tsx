@@ -278,6 +278,10 @@ export default async function CrmPage({
           <h1 className="text-xl font-bold">CRM</h1>
           <AgentSwitcher businesses={accessibleBusinesses.map((m) => m.business)} currentId={id} section="crm" />
         </div>
+        <p className="mt-1 text-sm text-ink-muted">
+          <span aria-hidden="true">🤖 </span>Tu agente de IA mueve a cada cliente de etapa solo, según cómo va la conversación: cuando muestra interés,
+          agenda o confirma su compra. Tú puedes moverlo a mano cuando quieras; el agente nunca lo regresa.
+        </p>
       </div>
 
 

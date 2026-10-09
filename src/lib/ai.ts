@@ -135,6 +135,7 @@ export type AgentCatalogItem = {
   category: string | null;
   description: string;
   soldOut: boolean;
+  isService?: boolean;
 };
 
 function catalogPrice(value: number, currency: string): string {
@@ -153,9 +154,9 @@ function buildCatalogBlock(catalog?: AgentCatalogItem[]): string {
         ? "precio a consultar"
         : `${catalogPrice(p.price, p.currency)}${p.compareAtPrice && p.compareAtPrice > p.price ? ` (antes ${catalogPrice(p.compareAtPrice, p.currency)})` : ""}`;
     const desc = p.description.replace(/\s+/g, " ").trim().slice(0, 140);
-    return `- ${p.name} — ${price}${p.category ? ` · ${p.category}` : ""}${desc ? ` · ${desc}` : ""}${p.soldOut ? " · AGOTADO" : ""}`;
+    return `- ${p.isService ? "[servicio] " : ""}${p.name} — ${price}${p.category ? ` · ${p.category}` : ""}${desc ? ` · ${desc}` : ""}${p.soldOut ? " · AGOTADO" : ""}`;
   });
-  return `\n\nCATÁLOGO DE PRODUCTOS (precios oficiales del negocio):\n${lines.join("\n")}\n\nReglas del catálogo: usa estos precios tal cual y no inventes productos ni precios que no estén aquí. Si algo está AGOTADO, dilo con amabilidad y ofrece una alternativa disponible parecida. Nunca menciones cuántas unidades hay en inventario.`;
+  return `\n\nCATÁLOGO DE PRODUCTOS Y SERVICIOS (precios oficiales del negocio):\n${lines.join("\n")}\n\nReglas del catálogo: usa estos precios tal cual y no inventes productos ni precios que no estén aquí. Lo marcado [servicio] se agenda (cita, sesión, clase), no se envía: guía al cliente a elegir fecha y hora. Si algo está AGOTADO, dilo con amabilidad y ofrece una alternativa disponible parecida. Nunca menciones cuántas unidades hay en inventario.`;
 }
 
 export type OwnerContext = {
@@ -333,6 +334,32 @@ function buildCurrentDateTimeBlock(): string {
 
 export type DetectedAppointment = { at: string; note: string };
 
+const MOVE_STAGE_TOOL_NAME = "move_lead_stage";
+
+// The lead's funnel stages, so the agent keeps the CRM up to date by itself
+// as the chat advances. Stage names are the business's own (custom per
+// funnel), so the description explains how to read them. The names only
+// change when the business edits its funnel, so the tool stays inside the
+// cached prefix; where the lead is right now goes in the dynamic block.
+// What moves are allowed (forward only, never out of a won stage) is
+// enforced in lib/autoStage.ts, not trusted to the model.
+function buildMoveStageTool(stageNames: string[]): Anthropic.Tool {
+  return {
+    name: MOVE_STAGE_TOOL_NAME,
+    description:
+      "Mueve al cliente a otra etapa del embudo de ventas (CRM) cuando la conversación avanzó de verdad, para que el equipo sepa en qué va sin leer el chat. Úsala SIEMPRE además de tu respuesta de texto, nunca en lugar de ella, y solo cuando cambie la etapa (no la repitas si ya está ahí). Cómo leer las etapas: las de conversación o contacto inicial = ya está hablando contigo; las de interés o calificado = mostró interés concreto (preguntó precio, disponibilidad, formas de pago o cómo comprar); las de agendado, cita o reserva = confirmó fecha y hora; las de ganado, vendido o cerrado = confirmó la compra o dijo que ya pagó; las de perdido = dijo claramente que no le interesa o que compró en otro lado (no por un 'lo voy a pensar'). Si ninguna etapa encaja claramente, no la uses.",
+    input_schema: {
+      type: "object",
+      properties: {
+        stage: { type: "string", enum: stageNames, description: "Nombre EXACTO de la etapa a la que pasa el cliente." },
+      },
+      required: ["stage"],
+    },
+  };
+}
+
+export type LeadFunnel = { stages: string[]; current: string };
+
 export async function generateAgentReply(params: {
   systemPrompt: string;
   tone: string;
@@ -347,7 +374,8 @@ export async function generateAgentReply(params: {
   owner?: OwnerContext;
   availableMedia?: AvailableMedia[];
   catalog?: AgentCatalogItem[];
-}): Promise<{ text: string; usage: AgentReplyUsage; sendMediaId?: string; appointment?: DetectedAppointment }> {
+  funnel?: LeadFunnel;
+}): Promise<{ text: string; usage: AgentReplyUsage; sendMediaId?: string; appointment?: DetectedAppointment; stage?: string }> {
   const isFirstMessage = params.history.length === 0;
   const availableMedia = params.availableMedia ?? [];
 
@@ -364,8 +392,13 @@ export async function generateAgentReply(params: {
   if (availableMedia.length > 0) {
     system[system.length - 1].text += buildAvailableMediaBlock(availableMedia);
   }
+  const funnel = params.funnel && params.funnel.stages.length >= 2 ? params.funnel : undefined;
+  if (funnel) {
+    system[system.length - 1].text += `\n\nETAPA ACTUAL DEL CLIENTE EN EL EMBUDO: "${funnel.current}". Si con este mensaje avanzó (o se perdió), muévelo con la herramienta ${MOVE_STAGE_TOOL_NAME}.`;
+  }
 
   const tools: Anthropic.Tool[] = [buildMarkAppointmentTool()];
+  if (funnel) tools.push(buildMoveStageTool(funnel.stages));
   if (availableMedia.length > 0) tools.push(buildSendMediaTool(availableMedia));
 
   // The API rejects any turn with empty content ("user messages must have
@@ -385,7 +418,7 @@ export async function generateAgentReply(params: {
     { type: "text", text: userText },
   ];
 
-  const response = await anthropic.messages.create({
+  const request = {
     model: params.model,
     max_tokens: MAX_TOKENS_BY_LENGTH[params.replyLength] ?? 300,
     // Writing one short WhatsApp reply from an already-specified business
@@ -401,23 +434,51 @@ export async function generateAgentReply(params: {
     // models that accept it.
     ...(params.model.startsWith("claude-haiku") ? {} : { output_config: { effort: "low" as const } }),
     system,
-    messages: [...history, { role: "user", content: userContent }],
     tools,
-  });
+  };
+  const messages: Anthropic.MessageParam[] = [...history, { role: "user", content: userContent }];
+  const response = await anthropic.messages.create({ ...request, messages });
 
-  const textBlock = response.content.find((block) => block.type === "text");
   const toolUseBlocks = response.content.filter(
     (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
   );
   const mediaBlock = toolUseBlocks.find((block) => block.name === SEND_MEDIA_TOOL_NAME);
   const appointmentBlock = toolUseBlocks.find((block) => block.name === MARK_APPOINTMENT_TOOL_NAME);
+  const stageBlock = toolUseBlocks.find((block) => block.name === MOVE_STAGE_TOOL_NAME);
+  const usage = {
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+    cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+  };
 
-  // A tool-use turn can come back with no text block at all (Claude decided
-  // the file speaks for itself, or the whole turn was just marking an
-  // appointment) — that's fine as long as some tool fired; only a genuinely
-  // empty reply (no text AND no tool call) is an error.
-  const rawText = textBlock && textBlock.type === "text" ? textBlock.text : "";
-  if (!rawText && !mediaBlock && !appointmentBlock) {
+  let rawText = textOf(response.content);
+  // A turn that only marked an appointment or moved the stage still owes
+  // the customer an answer: hand the tool results back and ask for the
+  // text alone (tool_choice none), instead of sending a canned filler.
+  // (A file sent with send_media can speak for itself.)
+  if (!rawText && !mediaBlock && toolUseBlocks.length > 0) {
+    const followUp = await anthropic.messages.create({
+      ...request,
+      tool_choice: { type: "none" },
+      messages: [
+        ...messages,
+        { role: "assistant", content: response.content },
+        {
+          role: "user",
+          content: toolUseBlocks.map((block) => ({ type: "tool_result" as const, tool_use_id: block.id, content: "Listo." })),
+        },
+      ],
+    });
+    rawText = textOf(followUp.content);
+    usage.inputTokens += followUp.usage.input_tokens;
+    usage.outputTokens += followUp.usage.output_tokens;
+    usage.cacheCreationInputTokens += followUp.usage.cache_creation_input_tokens ?? 0;
+    usage.cacheReadInputTokens += followUp.usage.cache_read_input_tokens ?? 0;
+  }
+
+  // Only a genuinely empty reply (no text AND no tool call) is an error.
+  if (!rawText && !mediaBlock && !appointmentBlock && !stageBlock) {
     throw new Error("Claude did not return a text response");
   }
 
@@ -436,15 +497,22 @@ export async function generateAgentReply(params: {
     }
   }
 
+  const stageInput = stageBlock?.input as { stage?: unknown } | undefined;
+  const stage = typeof stageInput?.stage === "string" && funnel?.stages.includes(stageInput.stage) ? stageInput.stage : undefined;
+
   return {
     text: stripGreetings(rawText, isFirstMessage),
     sendMediaId: sendMediaId && availableMedia.some((m) => m.id === sendMediaId) ? sendMediaId : undefined,
     appointment,
-    usage: {
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
-      cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
-    },
+    stage,
+    usage,
   };
+}
+
+function textOf(content: Anthropic.ContentBlock[]): string {
+  return content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("\n")
+    .trim();
 }
