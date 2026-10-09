@@ -23,6 +23,9 @@ function formatNotificationDate(date: Date): string {
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
+  // Signed out, expired, or ended by a password change on another device:
+  // straight to the login instead of an empty panel.
+  if (!session?.user?.id) redirect("/login");
 
   const isAgencyAdmin = session?.user?.id ? await isAgencyAccount(session.user.id) : false;
 

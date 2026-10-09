@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { submitAgendaBooking, previewAgendaBookingOutcome } from "@/lib/agendaBooking";
+import { blockedBookingOutcome, publicFormBlock } from "@/lib/abuseGuard";
 
 // Handles an agenda page's booking form (see lib/agendaTemplate.ts's
 // .booking-form) — books the slot and emails both sides (see
@@ -32,17 +33,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   const formData = await req.formData();
+  // Bots (hidden field) and floods from one IP don't reach the calendar.
+  const block = preview ? null : await publicFormBlock(formData, req.headers, website.id, "booking");
 
   const outcome = preview
     ? previewAgendaBookingOutcome(formData)
-    : await submitAgendaBooking({
-        websiteId: website.id,
-        businessName: website.business.name,
-        notificationEmail: website.agendaConfig.notificationEmail,
-        formData,
-        slotMinutes: website.agendaConfig.slotMinutes,
-        professionals: website.agendaConfig.professionals,
-      });
+    : block
+      ? blockedBookingOutcome(block, formData)
+      : await submitAgendaBooking({
+          websiteId: website.id,
+          businessName: website.business.name,
+          notificationEmail: website.agendaConfig.notificationEmail,
+          formData,
+          slotMinutes: website.agendaConfig.slotMinutes,
+          professionals: website.agendaConfig.professionals,
+        });
 
   const url = new URL(`/sitio/${slug}`, req.url);
   if (preview) url.searchParams.set("preview", "1");

@@ -14,6 +14,7 @@ import {
 } from "@/lib/agenda";
 import { submitAgendaBooking, previewAgendaBookingOutcome } from "@/lib/agendaBooking";
 import { captureWebsiteLead } from "@/lib/websiteLeads";
+import { blockedBookingOutcome, publicFormBlock } from "@/lib/abuseGuard";
 import { customDomainSecurityHeaders } from "@/lib/securityHeaders";
 
 // Hosts this app already answers for on purpose — everything else that
@@ -83,17 +84,20 @@ export async function proxy(request: NextRequest) {
     // root-relative "/reservar" action since a custom domain has no slug.
     if (request.nextUrl.pathname === "/reservar" && request.method === "POST") {
       const formData = await request.formData();
+      const block = preview ? null : await publicFormBlock(formData, request.headers, website.id, "booking");
 
       const outcome = preview
         ? previewAgendaBookingOutcome(formData)
-        : await submitAgendaBooking({
-            websiteId: website.id,
-            businessName: website.business.name,
-            notificationEmail: website.agendaConfig.notificationEmail,
-            formData,
-            slotMinutes: website.agendaConfig.slotMinutes,
-            professionals: website.agendaConfig.professionals,
-          });
+        : block
+          ? blockedBookingOutcome(block, formData)
+          : await submitAgendaBooking({
+              websiteId: website.id,
+              businessName: website.business.name,
+              notificationEmail: website.agendaConfig.notificationEmail,
+              formData,
+              slotMinutes: website.agendaConfig.slotMinutes,
+              professionals: website.agendaConfig.professionals,
+            });
 
       const url = new URL("/", request.url);
       if (preview) url.searchParams.set("preview", "1");
@@ -184,7 +188,8 @@ export async function proxy(request: NextRequest) {
   // a root-relative "/registro" action since a custom domain has no slug.
   if (request.nextUrl.pathname === "/registro" && request.method === "POST") {
     const formData = await request.formData();
-    const ok = await captureWebsiteLead(website.id, formData);
+    const block = await publicFormBlock(formData, request.headers, website.id, "lead");
+    const ok = block === "bot" ? true : block === "limited" ? false : await captureWebsiteLead(website.id, formData);
     const url = new URL("/", request.url);
     if (ok) url.searchParams.set("registrado", "1");
     return NextResponse.redirect(url, { status: 303 });

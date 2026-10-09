@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { retryConversationNow } from "@/lib/replyRecovery";
 import bcrypt from "bcryptjs";
-import { auth, signIn } from "@/auth";
+import { auth, signIn, signOut } from "@/auth";
 import { getBroadcastUsage, getContactUsage, remaining } from "@/lib/crmLimits";
 import { releaseOrphanAccount } from "@/lib/accounts";
 import { cleanGoogleTagId, cleanMetaPixelId } from "@/lib/siteTracking";
@@ -56,6 +56,8 @@ import {
 } from "@/lib/attachments";
 import { convertToOggOpus } from "@/lib/audioConvert";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
+import { clientIpFrom, isHoneypotFilled, overLimit } from "@/lib/abuseGuard";
+import { headers } from "next/headers";
 import { isAgencyAdmin, requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
@@ -98,6 +100,10 @@ function sanitizePhone(value: string): string {
 
 export type RegisterState = { error: string | null };
 
+// Sign-ups from one IP per hour (an office or family can share one).
+const REGISTER_MAX_PER_IP = 5;
+const REGISTER_WINDOW_MS = 60 * 60 * 1000;
+
 /**
  * Public self-registration: a new client creates their own login and their
  * first business in one step. WhatsApp credentials are deliberately not
@@ -115,11 +121,17 @@ export async function registerBusiness(
   const password = String(formData.get("password") ?? "");
   const industry = String(formData.get("industry") ?? "otro");
 
+  // Bots: a filled hidden field, or too many sign-ups from one network.
+  if (isHoneypotFilled(formData)) return { error: "No pudimos crear la cuenta. Inténtalo de nuevo." };
   if (!name || !email || !phone || !password) {
     return { error: "Completa todos los campos" };
   }
   if (password.length < 8) {
     return { error: "La contraseña debe tener al menos 8 caracteres" };
+  }
+  const ip = clientIpFrom(await headers());
+  if (await overLimit(`register:${ip}`, REGISTER_MAX_PER_IP, REGISTER_WINDOW_MS)) {
+    return { error: "Se crearon demasiadas cuentas desde tu conexión. Espera una hora o escríbenos por WhatsApp." };
   }
 
   if (!(await releaseOrphanAccount(email))) {
@@ -1733,7 +1745,7 @@ export async function resetPassword(
   const passwordHash = await bcrypt.hash(password, 12);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null, sessionVersion: { increment: 1 } },
   });
 
   redirect("/login?reset=1");
@@ -1815,9 +1827,12 @@ export async function changeOwnPassword(
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null, sessionVersion: { increment: 1 } },
   });
 
+  // Every session ends with the old password, this one included: sign in
+  // again with the new one (the login page says the password was updated).
+  await signOut({ redirectTo: "/login?reset=1" });
   return { error: null, saved: true };
 }
 
@@ -1852,7 +1867,7 @@ export async function adminResetUserPassword(targetUserId: string): Promise<{ pa
 
   await prisma.user.update({
     where: { id: targetUserId },
-    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+    data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null, sessionVersion: { increment: 1 } },
   });
 
   return { password: newPassword };

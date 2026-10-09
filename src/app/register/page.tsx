@@ -8,6 +8,7 @@ import { SignupShell, TrustChips, CheckList } from "@/components/SignupShell";
 import { TRIAL_DAYS } from "@/lib/plans";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { HONEYPOT_FIELD } from "@/lib/honeypot";
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState<RegisterState, FormData>(
@@ -51,7 +52,14 @@ export default function RegisterPage() {
         </>
       }
     >
-      <form action={formAction} className="space-y-5">
+      <form action={formAction} className="relative space-y-5">
+        {/* Honeypot: invisible to people, filled by bots (see lib/honeypot.ts). */}
+        <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+          <label>
+            No llenar este campo
+            <input type="text" name={HONEYPOT_FIELD} tabIndex={-1} autoComplete="off" />
+          </label>
+        </div>
         <div className="space-y-2">
           <h1 className="text-2xl font-bold">Crea tu cuenta</h1>
           <p className="text-sm text-ink-muted">En el siguiente paso activas tu prueba gratis.</p>

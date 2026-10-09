@@ -170,6 +170,9 @@ model User {
   tiktok            String?
   linkedin          String?
   passwordHash      String
+  // Bumped on every password change/reset: sessions signed with an older
+  // value stop working (see the jwt callback in src/auth.ts).
+  sessionVersion    Int                @default(0)
   name              String?
   createdAt         DateTime           @default(now())
   memberships       Membership[]

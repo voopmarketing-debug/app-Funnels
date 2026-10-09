@@ -30,12 +30,25 @@ export async function getVapidKeys(): Promise<VapidKeys> {
   return cached;
 }
 
+// Only the browsers' own push services: the server POSTs to a subscription's
+// endpoint every time it notifies, so it must never point anywhere else.
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /\.push\.apple\.com$/, /\.notify\.windows\.com$/];
+
+export function isPushServiceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && PUSH_HOSTS.some((host) => host.test(url.hostname));
+  } catch {
+    return false;
+  }
+}
+
 export type PushPayload = { title: string; body: string; url: string; tag?: string };
 
 /** Sends to every device of these users; forgets devices the push service no longer knows. */
 export async function sendPushToUsers(userIds: string[], payload: PushPayload): Promise<void> {
   if (userIds.length === 0) return;
-  const subs = await prisma.pushSubscription.findMany({ where: { userId: { in: userIds } } });
+  const subs = (await prisma.pushSubscription.findMany({ where: { userId: { in: userIds } } })).filter((s) => isPushServiceUrl(s.endpoint));
   if (subs.length === 0) return;
   const keys = await getVapidKeys();
   const host = process.env.APP_HOST ?? "agente.funnelslabs.app";

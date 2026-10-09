@@ -1,3 +1,4 @@
+import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS, type WebsiteContent } from "@/lib/websiteContent";
 
 function escapeHtml(text: string): string {
@@ -336,7 +337,7 @@ ${fontLink(fonts)}
         ctx.leadSubmitted
           ? `<p class="lead-thanks">¡Listo! Ya tenemos tus datos, te contactamos muy pronto.</p>`
           : `<p>Te escribimos apenas los recibamos.</p>
-      <form class="lead-form" method="POST" action="${escapeHtml(registroAction)}">
+      <form class="lead-form" method="POST" action="${escapeHtml(registroAction)}">${HONEYPOT_HTML}
         <input type="text" name="name" placeholder="Tu nombre" maxlength="120" required>
         <input type="text" name="contact" placeholder="Tu WhatsApp o teléfono" maxlength="120" required>
         <textarea name="message" placeholder="Cuéntanos qué necesitas (opcional)" rows="2" maxlength="500"></textarea>

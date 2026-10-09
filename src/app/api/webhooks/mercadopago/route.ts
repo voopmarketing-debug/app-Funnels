@@ -7,9 +7,12 @@ import { prisma } from "@/lib/prisma";
 import { ADDON_PACKS } from "@/lib/addonPacks";
 import { activateAddon } from "@/lib/addons";
 import { sendEmail } from "@/lib/email";
+import { verifyMpSignature } from "@/lib/mercadopagoSignature";
+import { maskEmail } from "@/lib/logPrivacy";
 
 async function alertAgency(subject: string, detail: string) {
-  console.error(subject, detail);
+  // The detail (with the client's email) goes only in the email, not the logs.
+  console.error("[mercadopago]", subject);
   const to = process.env.AGENCY_ADMIN_EMAIL?.trim();
   if (to) await sendEmail({ to, subject, html: `<p>${detail}</p>` }).catch(() => {});
 }
@@ -18,13 +21,28 @@ function fullName(payer: { first_name?: string; last_name?: string }): string {
   return [payer.first_name, payer.last_name].filter(Boolean).join(" ");
 }
 
-// Mercado Pago has no shared-secret header like Hotmart's Hottok — the real
-// safety check is that we always re-fetch the resource from MP's own API
-// with our access token before provisioning anything (see mercadopago.ts).
+// Two checks: the x-signature HMAC (when MERCADOPAGO_WEBHOOK_SECRET is set —
+// the webhook's "clave secreta" in Mercado Pago), and, always, re-fetching
+// the resource from MP's own API with our access token before provisioning
+// anything (see mercadopago.ts), so a forged body can't grant anything.
 export async function POST(req: NextRequest) {
   if (!process.env.MERCADOPAGO_ACCESS_TOKEN) {
     console.error("MERCADOPAGO_ACCESS_TOKEN is not configured; rejecting webhook delivery.");
     return new NextResponse("Server misconfigured", { status: 500 });
+  }
+
+  const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET?.trim();
+  if (webhookSecret) {
+    const valid = verifyMpSignature({
+      signatureHeader: req.headers.get("x-signature"),
+      requestId: req.headers.get("x-request-id"),
+      dataId: req.nextUrl.searchParams.get("data.id"),
+      secret: webhookSecret,
+    });
+    if (!valid) {
+      console.warn("[mercadopago] webhook rejected: invalid x-signature", req.nextUrl.search);
+      return new NextResponse("Invalid signature", { status: 401 });
+    }
   }
 
   let body: unknown = {};
@@ -99,7 +117,7 @@ export async function POST(req: NextRequest) {
       // A $0 payment is Mercado Pago validating the card when someone starts
       // the free trial; the subscription notification is what activates them.
       if (payment && payment.amount <= 0) {
-        console.info("[mercadopago] card validation payment ignored", payment.id, payerEmail);
+        console.info("[mercadopago] card validation payment ignored", payment.id, maskEmail(payerEmail));
         return NextResponse.json({ received: true, actioned: false });
       }
       // A plan bought with a Mercado Pago link (one-time or a subscription's

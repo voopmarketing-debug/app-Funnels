@@ -1,3 +1,5 @@
+import { maskEmail } from "@/lib/logPrivacy";
+
 // Sends via the same Google Apps Script Web App used for the remarketing
 // Sheet (src/lib/remarketingSheet.ts) — Apps Script sends mail through
 // OAuth-authorized MailApp under the hood, so it works even on accounts
@@ -19,7 +21,7 @@ export async function sendEmail(options: {
   icsFilename?: string;
 }): Promise<void> {
   if (!WEBHOOK_URL) {
-    console.error("[email] GOOGLE_APPS_SCRIPT_WEBHOOK_URL not configured — email not sent:", options.to, options.subject);
+    console.error("[email] GOOGLE_APPS_SCRIPT_WEBHOOK_URL not configured — email not sent:", maskEmail(options.to), options.subject);
     return;
   }
 

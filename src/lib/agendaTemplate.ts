@@ -1,3 +1,4 @@
+import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
 import { ANY_PROFESSIONAL_ID } from "@/lib/agendaAvailability";
 
@@ -102,7 +103,7 @@ export function renderAgendaHtml(params: {
       <a class="back" href="${escapeHtml(backToSlotsHref)}">‹ Elegir otro horario</a>
       <p class="selected-slot">${formatDateLabel(params.dateStr)} a las ${escapeHtml(params.timeStr)}${withProfessional}</p>
       ${params.bookingError ? `<p class="booking-error">${escapeHtml(params.bookingError)}</p>` : ""}
-      <form class="booking-form" method="POST" action="${escapeHtml(formAction)}">
+      <form class="booking-form" method="POST" action="${escapeHtml(formAction)}">${HONEYPOT_HTML}
         <input type="hidden" name="date" value="${escapeHtml(params.dateStr)}">
         <input type="hidden" name="time" value="${escapeHtml(params.timeStr)}">
         ${effectiveProfessionalId ? `<input type="hidden" name="professional" value="${escapeHtml(effectiveProfessionalId)}">` : ""}

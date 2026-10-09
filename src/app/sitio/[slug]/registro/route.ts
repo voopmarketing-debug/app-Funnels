@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { captureWebsiteLead } from "@/lib/websiteLeads";
+import { publicFormBlock } from "@/lib/abuseGuard";
 
 // Handles the lead-capture form's POST (see lib/websiteTemplate.ts's
 // .lead-form) — saves a WebsiteLead, then redirects back to the page so a
@@ -18,7 +19,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   const formData = await req.formData();
-  const ok = preview ? true : await captureWebsiteLead(website.id, formData);
+  // A bot (hidden field filled) sees the usual "gracias" but nothing is
+  // saved; past the per-IP limit, nothing is saved either.
+  const block = preview ? null : await publicFormBlock(formData, req.headers, website.id, "lead");
+  const ok = preview || block === "bot" ? true : block === "limited" ? false : await captureWebsiteLead(website.id, formData);
 
   const url = new URL(`/sitio/${slug}`, req.url);
   if (ok) url.searchParams.set("registrado", "1");

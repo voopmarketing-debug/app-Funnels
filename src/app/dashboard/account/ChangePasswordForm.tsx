@@ -19,7 +19,8 @@ export function ChangePasswordForm() {
       <div>
         <h2 className="font-semibold text-ink">Cambiar contraseña</h2>
         <p className="text-xs text-ink-muted">
-          Si la agencia te dio una contraseña temporal, aquí puedes cambiarla por una tuya.
+          Si la agencia te dio una contraseña temporal, aquí puedes cambiarla por una tuya. Al cambiarla se cierra tu sesión en
+          todos tus dispositivos y entras de nuevo con la nueva.
         </p>
       </div>
 

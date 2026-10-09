@@ -1,3 +1,4 @@
+import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS } from "@/lib/websiteContent";
 import { readableTextColor, sanitizeHexColor } from "@/lib/websiteTemplate";
 import {
@@ -179,7 +180,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   const leadFormHtml = (buttonLabel: string) =>
     ctx.leadSubmitted
       ? `<p class="lead-ok">¡Listo! Recibimos tus datos y te escribimos muy pronto.</p>`
-      : `<form class="lead-form" method="POST" action="${esc(registroAction)}">
+      : `<form class="lead-form" method="POST" action="${esc(registroAction)}">${HONEYPOT_HTML}
           <input type="text" name="name" placeholder="Tu nombre" maxlength="120" required>
           <input type="text" name="contact" placeholder="Tu WhatsApp o teléfono" maxlength="120" required>
           <textarea name="message" placeholder="Cuéntanos qué necesitas (opcional)" rows="2" maxlength="500"></textarea>
