@@ -18,6 +18,7 @@ import {
   sendWhatsAppMediaMessage,
   sendWhatsAppTemplateMessage,
   createWhatsAppTemplate,
+  deleteWhatsAppTemplate,
   fetchWhatsAppTemplateStatus,
   fetchWhatsAppDisplayNumber,
   verifyWabaConnection,
@@ -572,6 +573,37 @@ export async function createMessageTemplate(businessId: string, formData: FormDa
 }
 
 /** Re-checks a template's approval status with Meta — there's no status-update webhook wired up, so this is a manual refresh. */
+/** Deletes a template here and in Meta, so it stops showing in difusiones and the reminder sweep. */
+export async function deleteMessageTemplate(businessId: string, templateId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Inicia sesión de nuevo" };
+  try {
+    await requireBusinessMembership(session.user.id, businessId);
+  } catch {
+    return { ok: false, error: "No tienes acceso a este negocio" };
+  }
+  const [business, template] = await Promise.all([
+    prisma.business.findUnique({ where: { id: businessId }, select: { wabaId: true, wabaAccessToken: true } }),
+    prisma.messageTemplate.findFirst({ where: { id: templateId, businessId } }),
+  ]);
+  if (!template) return { ok: true };
+  if (business?.wabaId && business.wabaAccessToken) {
+    try {
+      await deleteWhatsAppTemplate({
+        wabaId: business.wabaId,
+        accessToken: decryptSecret(business.wabaAccessToken),
+        name: template.name,
+        metaTemplateId: template.metaTemplateId,
+      });
+    } catch (err) {
+      return { ok: false, error: `Meta no dejó eliminarla: ${err instanceof Error ? err.message.slice(0, 200) : "error"}` };
+    }
+  }
+  await prisma.messageTemplate.deleteMany({ where: { id: templateId, businessId } });
+  revalidatePath(`/dashboard/businesses/${businessId}/templates`);
+  return { ok: true };
+}
+
 export async function refreshTemplateStatus(businessId: string, templateId: string): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");

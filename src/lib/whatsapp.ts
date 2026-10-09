@@ -381,6 +381,22 @@ export async function createWhatsAppTemplate(params: {
   return { id: data.id, status: data.status ?? "PENDING" };
 }
 
+/**
+ * Deletes a template in Meta. With its id only that language version goes;
+ * by name alone, every language of that name. A template Meta no longer has
+ * counts as deleted.
+ */
+export async function deleteWhatsAppTemplate(params: { wabaId: string; accessToken: string; name: string; metaTemplateId?: string | null }): Promise<void> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/message_templates`);
+  url.searchParams.set("name", params.name);
+  if (params.metaTemplateId) url.searchParams.set("hsm_id", params.metaTemplateId);
+  const response = await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${params.accessToken}` } });
+  if (response.ok) return;
+  const body = await response.text();
+  if (response.status === 404 || /does not exist|not found|no existe/i.test(body)) return;
+  throw new Error(parseMetaErrorMessage(response.status, body));
+}
+
 /** Looks up a template's current review status by name — no status-update webhook is wired up, so this is polled on demand. */
 export async function fetchWhatsAppTemplateStatus(params: {
   wabaId: string;

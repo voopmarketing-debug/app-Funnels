@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { createMessageTemplate, refreshTemplateStatus } from "@/lib/actions";
+import { createMessageTemplate, deleteMessageTemplate, refreshTemplateStatus } from "@/lib/actions";
 
 type TemplateButton = { type: "URL"; text: string; url: string };
 
@@ -94,6 +94,17 @@ export function TemplateManager({
 
 function TemplateCard({ businessId, template }: { businessId: string; template: Template }) {
   const [isPending, startTransition] = useTransition();
+  const [isDeleting, startDelete] = useTransition();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function remove() {
+    if (!confirm(`¿Eliminar la plantilla "${template.name}"? También se borra en Meta y ya no podrás usarla en difusiones. Si la vuelves a necesitar, tendrás que crearla y esperar la aprobación de nuevo.`)) return;
+    setDeleteError(null);
+    startDelete(async () => {
+      const res = await deleteMessageTemplate(businessId, template.id);
+      if (!res.ok) setDeleteError(res.error);
+    });
+  }
 
   return (
     <div className="fl-card space-y-2 p-4">
@@ -115,6 +126,18 @@ function TemplateCard({ businessId, template }: { businessId: string; template: 
             {isPending ? "Consultando..." : "↻ Revisar estado"}
           </button>
         )}
+        <button
+          type="button"
+          onClick={remove}
+          disabled={isDeleting}
+          aria-label={`Eliminar plantilla ${template.name}`}
+          title="Eliminar plantilla"
+          className={`${template.status === "PENDING" ? "" : "ml-auto "}flex h-8 w-8 items-center justify-center rounded-md text-ink-faint transition hover:bg-error/10 hover:text-error disabled:opacity-50`}
+        >
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+          </svg>
+        </button>
       </div>
       {template.headerImageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -125,6 +148,7 @@ function TemplateCard({ businessId, template }: { businessId: string; template: 
         />
       )}
       <p className="whitespace-pre-wrap text-sm text-ink-muted">{template.bodyText}</p>
+      {deleteError && <p className="text-sm text-error">⚠ {deleteError}</p>}
       {template.buttons.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-1">
           {template.buttons.map((btn, i) => (
