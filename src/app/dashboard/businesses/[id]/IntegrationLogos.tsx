@@ -74,3 +74,12 @@ export function InventoryLogo() {
     </svg>
   );
 }
+
+export function SocialLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className={base} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 19V11M10 19V5M16 19v-6M22 19H2" />
+      <circle cx="16" cy="8" r="2.2" />
+    </svg>
+  );
+}

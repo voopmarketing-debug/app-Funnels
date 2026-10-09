@@ -13,6 +13,9 @@
 
   /* KPI status pill text (good / attention / needs work). */
   --status-good: #5fd35f;
+  /* Social charts (Redes sociales): Facebook / Instagram, validated for CVD on dark. */
+  --series-fb: #5b6cf0;
+  --series-ig: #e2559c;
   --status-warn: #fbc04d;
   --status-bad: #ff8080;
 
@@ -47,6 +50,8 @@
   color-scheme: light;
 
   --status-good: #157a15;
+  --series-fb: #4457e0;
+  --series-ig: #c93d84;
   --status-warn: #8f5a00;
   --status-bad: #b42828;
 

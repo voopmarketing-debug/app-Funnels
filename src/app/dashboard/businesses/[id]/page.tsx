@@ -17,7 +17,7 @@ import { ChatIcon, ClockIcon, BoltIcon, HourglassIcon } from "./analytics/StatIc
 import { WhatsAppHealthPanel } from "./WhatsAppHealthPanel";
 import { isRecentWebhookError } from "@/lib/whatsappHealth";
 import { IntegrationCard, type IntegrationStatus } from "./IntegrationCard";
-import { WhatsAppLogo, SparkLogo, CatalogLogo, TemplateLogo, WebsiteLogo, TeamLogo, ProductsLogo, InventoryLogo } from "./IntegrationLogos";
+import { WhatsAppLogo, SparkLogo, CatalogLogo, TemplateLogo, WebsiteLogo, TeamLogo, ProductsLogo, InventoryLogo, SocialLogo } from "./IntegrationLogos";
 
 // Fixed brand tiles — same in light and dark, like Kommo's integration logos.
 const TILE = {
@@ -25,6 +25,7 @@ const TILE = {
   ai: "linear-gradient(135deg, #8b5cf6, #5b21b6)",
   catalog: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
   templates: "linear-gradient(135deg, #14b8a6, #0f766e)",
+  social: "linear-gradient(135deg, #5b6cf0, #c93d84)",
   website: "linear-gradient(135deg, #f59e0b, #c2410c)",
   team: "linear-gradient(135deg, #ec4899, #9d174d)",
   products: "linear-gradient(135deg, #f97316, #9a3412)",
@@ -101,7 +102,7 @@ export default async function BusinessPage({
   // entirely for them, not just visually hidden.
   const canManageBusiness = membership.role !== "MEMBER";
 
-  const [analytics, activeContacts, agentMedia, approvedTemplates, websiteCount, teamMembers, productCount, stockedProducts] = await Promise.all([
+  const [analytics, activeContacts, agentMedia, approvedTemplates, websiteCount, teamMembers, productCount, stockedProducts, social] = await Promise.all([
     getBusinessAnalytics(id, rangeKey),
     getActiveContactsThisMonth(id),
     canManageBusiness
@@ -116,6 +117,7 @@ export default async function BusinessPage({
     prisma.membership.count({ where: { businessId: id, role: "MEMBER" } }),
     prisma.product.count({ where: { businessId: id } }),
     prisma.product.findMany({ where: { businessId: id, trackStock: true }, select: { stock: true, lowStockAt: true } }),
+    prisma.socialConnection.findUnique({ where: { businessId: id }, select: { fbPageId: true, igUserId: true, adAccountId: true } }),
   ]);
   const soldOutCount = stockedProducts.filter((p) => p.stock <= 0).length;
   const lowStockCount = stockedProducts.filter((p) => p.stock > 0 && p.stock <= p.lowStockAt).length;
@@ -211,6 +213,9 @@ export default async function BusinessPage({
           </Link>
           <Link href={`/dashboard/businesses/${id}/analytics`} className={shortcutClass}>
             KPIs
+          </Link>
+          <Link href={`/dashboard/businesses/${id}/redes`} className={shortcutClass}>
+            Redes
           </Link>
         </div>
       </header>
@@ -387,6 +392,20 @@ export default async function BusinessPage({
               }
               actionLabel={websiteCount > 0 ? "Ver páginas" : "Crear"}
               href={`/dashboard/businesses/${id}/website`}
+            />
+            <IntegrationCard
+              id="redes"
+              title="Redes sociales"
+              description="Métricas de tu Facebook, Instagram y anuncios de Meta: seguidores, publicaciones, gasto, CPM y CPC."
+              logo={<SocialLogo />}
+              logoBackground={TILE.social}
+              status={
+                social && (social.fbPageId || social.adAccountId)
+                  ? { tone: "done", label: [social.fbPageId && "Facebook", social.igUserId && "Instagram", social.adAccountId && "Ads"].filter(Boolean).join(" · ") }
+                  : { tone: "todo", label: "Sin conectar" }
+              }
+              actionLabel={social ? "Ver métricas" : "Conectar"}
+              href={`/dashboard/businesses/${id}/redes`}
             />
             <IntegrationCard
               id="equipo"

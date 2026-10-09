@@ -87,6 +87,7 @@ model Business {
   agentMedia       AgentMedia[]
   sales            Sale[]
   products         Product[]
+  socialConnection SocialConnection?
   aiUsage          AiUsage[]
   notifications    Notification[]
 }
@@ -947,4 +948,54 @@ model Sale {
 
   @@index([businessId, closedAt])
   @@index([conversationId])
+}
+
+// Meta (Facebook Page, its Instagram account and an ad account) connected
+// through Facebook Login for the "Redes sociales" module (lib/metaSocial.ts).
+// Tokens are encrypted (lib/crypto.ts). The page token doesn't expire; the
+// user token (needed for ads) lasts ~60 days, then the module asks to
+// reconnect.
+model SocialConnection {
+  id                 String    @id @default(cuid())
+  businessId         String    @unique
+  userAccessToken    String?   @db.Text
+  userTokenExpiresAt DateTime?
+  fbPageId           String?
+  fbPageName         String?
+  pageAccessToken    String?   @db.Text
+  igUserId           String?
+  igUsername         String?
+  adAccountId        String?
+  adAccountName      String?
+  adCurrency         String?
+  connectedByUserId  String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+// Short-lived copy of what Meta answered for one view (range + section), so
+// moving around the module doesn't call Meta again every time.
+model SocialMetricCache {
+  id         String   @id @default(cuid())
+  businessId String
+  key        String
+  data       Json
+  fetchedAt  DateTime @default(now())
+
+  @@unique([businessId, key])
+}
+
+// Followers per network per day, recorded whenever the module syncs: Meta
+// only returns today's follower total (Instagram keeps 30 days of daily
+// changes), so the history is built from the day the account is connected.
+model SocialFollowerSnapshot {
+  id         String   @id @default(cuid())
+  businessId String
+  network    String // "facebook" | "instagram"
+  date       DateTime @db.Date
+  followers  Int
+
+  @@unique([businessId, network, date])
 }

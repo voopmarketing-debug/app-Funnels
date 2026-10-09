@@ -92,6 +92,14 @@ function WebsiteIcon() {
   );
 }
 
+function SocialIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <path d="M5 19v-7M11 19V6M17 19v-5M3 19h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function UserIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
@@ -201,6 +209,16 @@ function NavLinks({
           >
             <WebsiteIcon />
             Sitio web
+          </Link>
+        )}
+        {primaryBusinessId && (
+          <Link
+            href={`/dashboard/businesses/${primaryBusinessId}/redes`}
+            className="fl-nav-item"
+            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/redes`)}
+          >
+            <SocialIcon />
+            Redes sociales
           </Link>
         )}
         {primaryBusinessId && (
