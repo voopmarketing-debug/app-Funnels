@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
+import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
 import { updateAgent } from "@/lib/actions";
 import { TONE_OPTIONS, LENGTH_OPTIONS, INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
@@ -26,13 +27,35 @@ export function AgentForm({
     },
     { saved: false },
   );
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  function applyTemplate() {
+    const el = promptRef.current;
+    if (!el) return;
+    if (el.value.trim() && !confirm("Esto reemplaza las instrucciones actuales por la plantilla maestra (aún no se guarda). ¿Continuar?")) return;
+    el.value = AGENT_PROMPT_TEMPLATE;
+    el.focus();
+    el.setSelectionRange(0, 0);
+    el.scrollTop = 0;
+  }
 
   return (
     <div className="space-y-4">
 
       <form action={formAction} className="mt-4 space-y-4">
       <div className="space-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-ink-muted">Reemplaza cada [ ... ] con la información real de tu negocio y borra lo que no aplique.</p>
+          <button
+            type="button"
+            onClick={applyTemplate}
+            className="rounded-md border border-border-strong px-2.5 py-1 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+          >
+            📋 Usar plantilla maestra
+          </button>
+        </div>
         <textarea
+          ref={promptRef}
           id="systemPrompt"
           name="systemPrompt"
           aria-label="Instrucciones del agente de IA"
