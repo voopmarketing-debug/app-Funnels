@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MetaApiError,
+  costPerConversation,
   cpc,
   cpm,
   ctr,
+  frequency,
+  linkCtr,
+  roas,
   daysIn,
   facebookAccount,
   instagramAccount,
@@ -153,7 +157,7 @@ describe("instagramAccount", () => {
 describe("metaAds", () => {
   it("sums daily totals and maps campaigns with results", async () => {
     mockGraph((url) => {
-      if (url.pathname.endsWith("/campaigns")) return { body: { data: [{ id: "c1", updated_time: "2026-09-30T10:00:00+0000" }] } };
+      if (url.pathname.endsWith("/campaigns")) return { body: { data: [{ id: "c1", updated_time: "2026-09-30T10:00:00+0000", effective_status: "ACTIVE" }] } };
       if (url.searchParams.get("level") === "campaign")
         return {
           body: {
@@ -171,6 +175,25 @@ describe("metaAds", () => {
             ],
           },
         };
+      if (!url.searchParams.get("time_increment"))
+        return {
+          body: {
+            data: [
+              {
+                impressions: "3000",
+                reach: "1500",
+                clicks: "60",
+                inline_link_clicks: "45",
+                spend: "15.5",
+                actions: [
+                  { action_type: "onsite_conversion.messaging_conversation_started_7d", value: "9" },
+                  { action_type: "omni_purchase", value: "2" },
+                ],
+                action_values: [{ action_type: "omni_purchase", value: "62" }],
+              },
+            ],
+          },
+        };
       return {
         body: {
           data: [
@@ -181,8 +204,13 @@ describe("metaAds", () => {
       };
     });
     const ads = await metaAds("act_1", "tok", { since: "2026-10-01", until: "2026-10-02" }, "COP");
-    expect(ads.totals).toEqual({ impressions: 3000, reach: 2300, clicks: 60, spend: 15.5 });
+    // Reach comes from Meta's own total (people counted once), not the sum of days.
+    expect(ads.totals).toEqual({ impressions: 3000, reach: 1500, clicks: 60, spend: 15.5, linkClicks: 45, conversations: 9, purchases: 2, purchaseValue: 62 });
+    expect(frequency(ads.totals)).toBe(2);
+    expect(linkCtr(ads.totals)).toBe(1.5);
+    expect(costPerConversation(ads.totals)).toBeCloseTo(15.5 / 9);
+    expect(roas(ads.totals)).toBeCloseTo(4);
     expect(ads.daily["2026-10-02"].spend).toBe(10);
-    expect(ads.campaigns[0]).toMatchObject({ id: "c1", name: "Mensajes octubre", results: 9, spend: 15.5, updatedAt: "2026-09-30T10:00:00+0000" });
+    expect(ads.campaigns[0]).toMatchObject({ id: "c1", name: "Mensajes octubre", results: 9, spend: 15.5, conversations: 9, status: "ACTIVE", updatedAt: "2026-09-30T10:00:00+0000" });
   });
 });

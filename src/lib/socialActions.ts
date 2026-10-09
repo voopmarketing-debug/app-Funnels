@@ -6,7 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { listAdAccounts, listPages } from "@/lib/metaSocial";
-import { clearSocialCache } from "@/lib/socialDashboard";
+import { clearSocialCache, getSocialDashboard } from "@/lib/socialDashboard";
+import { RANGE_PRESETS, todayInColombia } from "@/lib/socialRanges";
+import { MIN_POSTS, generateContentDiagnosis as runContentDiagnosis, type ContentDiagnosis } from "@/lib/contentDiagnosis";
+import { withAiUsage } from "@/lib/aiUsage";
 
 async function userId(): Promise<string> {
   const session = await auth();
@@ -68,4 +71,44 @@ export async function disconnectSocial(businessId: string): Promise<void> {
   await prisma.socialConnection.deleteMany({ where: { businessId } });
   await clearSocialCache(businessId, true);
   revalidatePath(`/dashboard/businesses/${businessId}/redes`);
+}
+
+export type ContentDiagnosisResult =
+  | { status: "ok"; diagnosis: ContentDiagnosis; generatedAt: string; range: string }
+  | { status: "insufficient_data"; posts: number }
+  | { status: "error"; message: string };
+
+// A fresh report is only worth it once new posts have had time to get numbers.
+const DIAGNOSIS_COOLDOWN_MS = 10 * 60 * 1000;
+
+export async function generateContentDiagnosis(businessId: string): Promise<ContentDiagnosisResult> {
+  await requireBusinessMembership(await userId(), businessId);
+  const connection = await prisma.socialConnection.findUnique({ where: { businessId }, select: { contentDiagnosisAt: true } });
+  if (!connection) return { status: "error", message: "Conecta tus redes primero." };
+  if (connection.contentDiagnosisAt && Date.now() - connection.contentDiagnosisAt.getTime() < DIAGNOSIS_COOLDOWN_MS) {
+    return { status: "error", message: "Acabas de generar un diagnóstico. Espera unos minutos antes de pedir otro." };
+  }
+
+  try {
+    // The last 30 days, or 90 when the business posts rarely.
+    const today = todayInColombia();
+    const preset = (key: string) => RANGE_PRESETS.find((p) => p.key === key)!.range(today);
+    let data = await getSocialDashboard(businessId, preset("30d"));
+    if ((data.posts?.ok ? data.posts.data.length : 0) < MIN_POSTS) data = await getSocialDashboard(businessId, preset("3m"));
+    if (data.needsReconnect) return { status: "error", message: "Tu conexión con Facebook venció. Reconéctala y vuelve a intentarlo." };
+
+    const result = await withAiUsage(businessId, "DIAGNOSIS", () => runContentDiagnosis(businessId, data));
+    if (result.status === "insufficient_data") return result;
+
+    const generatedAt = new Date();
+    await prisma.socialConnection.update({
+      where: { businessId },
+      data: { contentDiagnosis: { ...result.diagnosis, range: data.range }, contentDiagnosisAt: generatedAt },
+    });
+    revalidatePath(`/dashboard/businesses/${businessId}/redes`);
+    return { status: "ok", diagnosis: result.diagnosis, generatedAt: generatedAt.toISOString(), range: `${data.range.since}|${data.range.until}` };
+  } catch (err) {
+    console.error("[social] content diagnosis failed", err);
+    return { status: "error", message: "No se pudo generar el diagnóstico. Intenta de nuevo en un momento." };
+  }
 }

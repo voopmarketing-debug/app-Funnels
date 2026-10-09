@@ -121,7 +121,7 @@ export async function exchangeCodeForToken(code: string): Promise<{ token: strin
 }
 
 export type MetaPage = { id: string; name: string; accessToken: string; igUserId: string | null; igUsername: string | null };
-export type MetaAdAccount = { id: string; name: string; currency: string; active: boolean };
+export type MetaAdAccount = { id: string; name: string; currency: string; active: boolean; spent: number };
 
 export async function listPages(userToken: string): Promise<MetaPage[]> {
   const rows = await graphAll<{ id: string; name: string; access_token: string; instagram_business_account?: { id: string; username?: string } }>(
@@ -139,12 +139,28 @@ export async function listPages(userToken: string): Promise<MetaPage[]> {
 }
 
 export async function listAdAccounts(userToken: string): Promise<MetaAdAccount[]> {
-  const rows = await graphAll<{ id: string; name: string; currency: string; account_status: number }>(
+  const rows = await graphAll<{ id: string; name?: string; currency: string; account_status: number; amount_spent?: string }>(
     "me/adaccounts",
-    { fields: "id,name,currency,account_status", limit: "100" },
+    { fields: "id,name,currency,account_status,amount_spent", limit: "100" },
     userToken,
   );
-  return rows.map((a) => ({ id: a.id, name: a.name, currency: a.currency, active: a.account_status === 1 }));
+  return rows.map((a) => {
+    const digits = a.id.replace(/^act_/, "");
+    // Accounts never renamed come back named with their bare number.
+    const named = a.name && a.name !== digits ? a.name : `Cuenta publicitaria …${digits.slice(-4)}`;
+    return { id: a.id, name: named, currency: a.currency, active: a.account_status === 1, spent: Number(a.amount_spent ?? 0) || 0 };
+  });
+}
+
+/** The Page to measure when the owner didn't pick: one with Instagram linked, else the first. */
+export function defaultPage(pages: MetaPage[]): MetaPage | null {
+  return pages.find((p) => p.igUserId) ?? pages[0] ?? null;
+}
+
+/** The ad account to measure when the owner didn't pick: the active one that has spent the most. */
+export function defaultAdAccount(accounts: MetaAdAccount[]): MetaAdAccount | null {
+  const pool = accounts.some((a) => a.active) ? accounts.filter((a) => a.active) : accounts;
+  return [...pool].sort((a, b) => b.spent - a.spent)[0] ?? null;
 }
 
 // ---- Dates ----
@@ -428,16 +444,21 @@ type AdInsightRow = {
   impressions?: string;
   reach?: string;
   clicks?: string;
+  inline_link_clicks?: string;
   spend?: string;
   actions?: AdAction[];
+  action_values?: AdAction[];
 };
+
+const MESSAGING_ACTION = "onsite_conversion.messaging_conversation_started_7d";
+const PURCHASE_ACTIONS = ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase"];
 
 // The action Meta counts as a "result" for each campaign objective.
 const RESULT_ACTIONS: Record<string, string[]> = {
-  OUTCOME_LEADS: ["lead", "onsite_conversion.lead_grouped", "offsite_conversion.fb_pixel_lead", "onsite_conversion.messaging_conversation_started_7d"],
-  OUTCOME_SALES: ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase", "onsite_conversion.messaging_conversation_started_7d"],
+  OUTCOME_LEADS: ["lead", "onsite_conversion.lead_grouped", "offsite_conversion.fb_pixel_lead", MESSAGING_ACTION],
+  OUTCOME_SALES: [...PURCHASE_ACTIONS, MESSAGING_ACTION],
   OUTCOME_TRAFFIC: ["landing_page_view", "link_click"],
-  OUTCOME_ENGAGEMENT: ["onsite_conversion.messaging_conversation_started_7d", "post_engagement"],
+  OUTCOME_ENGAGEMENT: [MESSAGING_ACTION, "post_engagement"],
   OUTCOME_AWARENESS: [],
   OUTCOME_APP_PROMOTION: ["mobile_app_install", "app_install"],
 };
@@ -447,6 +468,14 @@ export function resultsFor(objective: string | undefined, actions: AdAction[] | 
   if (!wanted || wanted.length === 0) return null;
   for (const type of wanted) {
     const hit = actions?.find((a) => a.action_type === type);
+    if (hit) return Number(hit.value) || 0;
+  }
+  return 0;
+}
+
+function firstAction(list: AdAction[] | undefined, types: string[]): number {
+  for (const type of types) {
+    const hit = list?.find((a) => a.action_type === type);
     if (hit) return Number(hit.value) || 0;
   }
   return 0;
@@ -462,37 +491,65 @@ const OBJECTIVE_LABELS: Record<string, string> = {
 };
 export const objectiveLabel = (o: string | undefined) => (o ? (OBJECTIVE_LABELS[o] ?? o.replace(/^OUTCOME_/, "").toLowerCase()) : "—");
 
-export type AdTotals = { impressions: number; reach: number; clicks: number; spend: number };
+export type AdTotals = {
+  impressions: number;
+  reach: number;
+  clicks: number;
+  spend: number;
+  /** Clicks that went to the ad's destination (WhatsApp, web…), not likes or "see more". */
+  linkClicks?: number;
+  /** WhatsApp/Messenger conversations the ads started. */
+  conversations?: number;
+  purchases?: number;
+  purchaseValue?: number;
+};
 export type AdCampaign = AdTotals & {
   id: string;
   name: string;
   objective: string;
   results: number | null;
   updatedAt: string | null;
+  /** ACTIVE, PAUSED, ARCHIVED… as Meta reports it. */
+  status?: string | null;
 };
 export type AdsData = { currency: string; daily: Record<string, AdTotals>; totals: AdTotals; campaigns: AdCampaign[] };
 
 const num = (v: string | undefined) => Number(v ?? 0) || 0;
-const totalsOf = (r: AdInsightRow): AdTotals => ({ impressions: num(r.impressions), reach: num(r.reach), clicks: num(r.clicks), spend: num(r.spend) });
+const totalsOf = (r: AdInsightRow): AdTotals => ({
+  impressions: num(r.impressions),
+  reach: num(r.reach),
+  clicks: num(r.clicks),
+  spend: num(r.spend),
+  linkClicks: num(r.inline_link_clicks),
+  conversations: firstAction(r.actions, [MESSAGING_ACTION]),
+  purchases: firstAction(r.actions, PURCHASE_ACTIONS),
+  purchaseValue: firstAction(r.action_values, PURCHASE_ACTIONS),
+});
+
+const TOTAL_FIELDS = "impressions,reach,clicks,inline_link_clicks,spend,actions,action_values";
+const EMPTY_TOTALS: AdTotals = { impressions: 0, reach: 0, clicks: 0, spend: 0, linkClicks: 0, conversations: 0, purchases: 0, purchaseValue: 0 };
 
 export async function metaAds(adAccountId: string, userToken: string, range: DayRange, currency: string): Promise<AdsData> {
   const timeRange = JSON.stringify({ since: range.since, until: range.until });
-  const [daily, campaigns, campaignMeta] = await Promise.all([
+  const [daily, totals, campaigns, campaignMeta] = await Promise.all([
     graphAll<AdInsightRow>(`${adAccountId}/insights`, { fields: "impressions,reach,clicks,spend", time_range: timeRange, time_increment: "1", limit: "100" }, userToken),
+    // Reach can't be summed across days (the same person counts once), so the totals come from Meta.
+    metaAdTotals(adAccountId, userToken, range),
     graphAll<AdInsightRow>(
       `${adAccountId}/insights`,
-      { level: "campaign", fields: "campaign_id,campaign_name,objective,impressions,reach,clicks,spend,actions", time_range: timeRange, limit: "100" },
+      { level: "campaign", fields: `campaign_id,campaign_name,objective,${TOTAL_FIELDS}`, time_range: timeRange, limit: "100" },
       userToken,
     ),
-    graphAll<{ id: string; updated_time?: string }>(`${adAccountId}/campaigns`, { fields: "id,updated_time", limit: "200" }, userToken, 2).catch(() => []),
+    graphAll<{ id: string; updated_time?: string; effective_status?: string }>(
+      `${adAccountId}/campaigns`,
+      { fields: "id,updated_time,effective_status", limit: "200" },
+      userToken,
+      2,
+    ).catch(() => []),
   ]);
-  const updated = new Map(campaignMeta.map((c) => [c.id, c.updated_time ?? null]));
+  const meta = new Map(campaignMeta.map((c) => [c.id, c]));
   const dailyMap: Record<string, AdTotals> = {};
   for (const row of daily) if (row.date_start) dailyMap[row.date_start] = totalsOf(row);
-  const totals = Object.values(dailyMap).reduce(
-    (acc, d) => ({ impressions: acc.impressions + d.impressions, reach: acc.reach + d.reach, clicks: acc.clicks + d.clicks, spend: acc.spend + d.spend }),
-    { impressions: 0, reach: 0, clicks: 0, spend: 0 },
-  );
   return {
     currency,
     daily: dailyMap,
@@ -502,22 +559,30 @@ export async function metaAds(adAccountId: string, userToken: string, range: Day
       name: c.campaign_name ?? "Campaña",
       objective: c.objective ?? "",
       results: resultsFor(c.objective, c.actions),
-      updatedAt: c.campaign_id ? (updated.get(c.campaign_id) ?? null) : null,
+      updatedAt: c.campaign_id ? (meta.get(c.campaign_id)?.updated_time ?? null) : null,
+      status: c.campaign_id ? (meta.get(c.campaign_id)?.effective_status ?? null) : null,
       ...totalsOf(c),
     })),
   };
 }
 
-/** Ad spend totals only, for the previous-period comparison. */
+/** Account totals for a range (also used for the previous-period comparison). */
 export async function metaAdTotals(adAccountId: string, userToken: string, range: DayRange): Promise<AdTotals> {
   const rows = await graph<{ data: AdInsightRow[] }>(
     `${adAccountId}/insights`,
-    { fields: "impressions,reach,clicks,spend", time_range: JSON.stringify({ since: range.since, until: range.until }) },
+    { fields: TOTAL_FIELDS, time_range: JSON.stringify({ since: range.since, until: range.until }) },
     userToken,
   );
-  return rows.data[0] ? totalsOf(rows.data[0]) : { impressions: 0, reach: 0, clicks: 0, spend: 0 };
+  return rows.data[0] ? totalsOf(rows.data[0]) : { ...EMPTY_TOTALS };
 }
 
 export const cpm = (t: AdTotals) => (t.impressions > 0 ? (t.spend / t.impressions) * 1000 : null);
 export const cpc = (t: AdTotals) => (t.clicks > 0 ? t.spend / t.clicks : null);
 export const ctr = (t: AdTotals) => (t.impressions > 0 ? (t.clicks / t.impressions) * 100 : null);
+/** Clicks to the destination per 100 impressions: the click rate that matters for selling. */
+export const linkCtr = (t: AdTotals) => (t.impressions > 0 && t.linkClicks != null ? (t.linkClicks / t.impressions) * 100 : null);
+/** How many times, on average, each person saw the ads. */
+export const frequency = (t: AdTotals) => (t.reach > 0 ? t.impressions / t.reach : null);
+export const costPerConversation = (t: AdTotals) => (t.conversations ? t.spend / t.conversations : null);
+/** Revenue per unit spent, from purchases Meta tracked (pixel or catalog). */
+export const roas = (t: AdTotals) => (t.purchaseValue && t.spend > 0 ? t.purchaseValue / t.spend : null);

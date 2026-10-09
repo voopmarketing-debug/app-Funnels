@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
+import { FunnelsLogoBadge } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
@@ -320,8 +320,8 @@ export function DashboardSidebar({
           never appears alongside or instead of the desktop sidebar below. */}
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-surface px-4 py-2.5 md:hidden">
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <FunnelsLogoMark className="h-6 w-6 flex-none" />
-          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
+          <FunnelsLogoBadge size="sm" />
+          <span className="text-base font-bold tracking-tight text-ink">Funnels Labs</span>
         </Link>
         <div className="flex items-center gap-2">
           {mobileActions}
@@ -345,8 +345,8 @@ export function DashboardSidebar({
           <aside onClick={handleNavTap} className="relative flex h-full w-64 flex-col gap-2 bg-surface py-5 shadow-xl">
             <div className="mb-2 flex items-center justify-between px-4">
               <Link href="/dashboard" className="flex items-center gap-2.5">
-                <FunnelsLogoMark className="h-6 w-6 flex-none" />
-                <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
+                <FunnelsLogoBadge size="sm" />
+                <span className="text-base font-bold tracking-tight text-ink">Funnels Labs</span>
               </Link>
               <button
                 type="button"
@@ -366,8 +366,8 @@ export function DashboardSidebar({
           below md so it doesn't fight the mobile top bar above for space. */}
       <aside onClick={handleNavTap} className="hidden min-h-screen w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5 md:flex">
         <Link href="/dashboard" className="mb-4 flex items-center gap-2.5 px-4">
-          <FunnelsLogoMark className="h-6 w-6 flex-none" />
-          <span className="text-sm font-bold tracking-tight text-ink">Funnels Labs</span>
+          <FunnelsLogoBadge />
+          <span className="text-[17px] font-extrabold tracking-tight text-ink">Funnels Labs</span>
         </Link>
         <NavLinks isAgencyAdmin={isAgencyAdmin} primaryBusinessId={primaryBusinessId} pathname={pathname} onSignOut={onSignOut} />
       </aside>

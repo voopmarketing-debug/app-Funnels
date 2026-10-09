@@ -1,7 +1,9 @@
 /** Money in the ad account's currency, e.g. "$ 45.200" for COP. */
 export function moneyFormatter(currency: string) {
-  const f = new Intl.NumberFormat("es-CO", { style: "currency", currency, maximumFractionDigits: 2, minimumFractionDigits: 0 });
-  return (n: number | null | undefined) => (n == null ? "—" : f.format(n));
+  // Cents only where they matter (a US$0,45 click); "$ 1.348", not "$ 1.347,76".
+  const whole = new Intl.NumberFormat("es-CO", { style: "currency", currency, maximumFractionDigits: 0 });
+  const cents = new Intl.NumberFormat("es-CO", { style: "currency", currency, maximumFractionDigits: 2, minimumFractionDigits: 0 });
+  return (n: number | null | undefined) => (n == null ? "—" : Math.abs(n) >= 100 ? whole.format(n) : cents.format(n));
 }
 
 // Dates are built by hand: Node and the browser ship different ICU data and

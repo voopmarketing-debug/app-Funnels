@@ -7,36 +7,6 @@ import type { AdTotals } from "@/lib/metaSocial";
 import { LineChart, compact, type ChartSeries } from "./LineChart";
 import { moneyFormatter } from "./format";
 
-const RANGES = [
-  { key: "7d", label: "7 días" },
-  { key: "30d", label: "30 días" },
-  { key: "90d", label: "90 días" },
-];
-
-export function SocialRangePills({ value }: { value: string }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [pending, start] = useTransition();
-  return (
-    <div role="radiogroup" aria-label="Periodo" className={`inline-flex rounded-lg border border-border bg-surface p-0.5 ${pending ? "opacity-70" : ""}`}>
-      {RANGES.map((r) => (
-        <button
-          key={r.key}
-          type="button"
-          role="radio"
-          aria-checked={r.key === value}
-          onClick={() => start(() => router.push(`${pathname}?range=${r.key}`, { scroll: false }))}
-          className={`whitespace-nowrap rounded-md px-3 py-2.5 text-xs font-semibold transition sm:py-1.5 ${
-            r.key === value ? "bg-accent text-accent-ink shadow-sm" : "text-ink-muted hover:text-ink"
-          }`}
-        >
-          {r.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function RefreshButton({ businessId, updatedLabel }: { businessId: string; updatedLabel: string }) {
   const [pending, start] = useTransition();
   const [note, setNote] = useState<string | null>(null);
@@ -87,7 +57,7 @@ export function AccountPicker({
 }: {
   businessId: string;
   pages: { id: string; name: string; igUsername: string | null }[];
-  adAccounts: { id: string; name: string; currency: string; active: boolean }[];
+  adAccounts: { id: string; name: string; currency: string; active: boolean; spent?: number }[];
   currentPageId: string | null;
   currentAdAccountId: string | null;
 }) {
@@ -111,9 +81,16 @@ export function AccountPicker({
         });
       }}
     >
-      <div>
-        <h2 className="text-base font-semibold">Elige qué cuentas quieres medir</h2>
-        <p className="text-sm text-ink-muted">Tu Facebook administra varias. Escoge las de este negocio; puedes cambiarlas después.</p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold">Cambiar las cuentas que mides</h2>
+          <p className="text-sm text-ink-muted">Elige la página de Facebook (con su Instagram) y la cuenta de anuncios de este negocio.</p>
+        </div>
+        {(currentPageId || currentAdAccountId) && (
+          <button type="button" onClick={() => router.push(pathname)} className="text-sm font-semibold text-ink-muted underline hover:text-ink">
+            Cancelar
+          </button>
+        )}
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block space-y-1.5" htmlFor="social-page">

@@ -969,6 +969,9 @@ model SocialConnection {
   adAccountName      String?
   adCurrency         String?
   connectedByUserId  String?
+  /// Last AI content diagnosis + ideas (see lib/contentDiagnosis.ts).
+  contentDiagnosis   Json?
+  contentDiagnosisAt DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

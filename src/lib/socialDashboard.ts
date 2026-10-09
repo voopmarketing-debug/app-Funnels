@@ -9,7 +9,6 @@ import {
   instagramAccount,
   instagramPosts,
   instagramTotals,
-  lastDays,
   metaAdTotals,
   metaAds,
   previousRange,
@@ -26,9 +25,6 @@ import {
 // in SocialMetricCache for a few hours: a page with posts and ads makes
 // dozens of Graph calls, too many to repeat on every visit.
 
-export const SOCIAL_RANGES = { "7d": 7, "30d": 30, "90d": 90 } as const;
-export type SocialRangeKey = keyof typeof SOCIAL_RANGES;
-export const isSocialRangeKey = (v: string): v is SocialRangeKey => v in SOCIAL_RANGES;
 
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000;
 /** "Actualizar" is ignored while the data is younger than this. */
@@ -144,9 +140,8 @@ async function summarize(
   };
 }
 
-async function loadFromMeta(businessId: string, days: number): Promise<SocialDashboard> {
+async function loadFromMeta(businessId: string, range: DayRange): Promise<SocialDashboard> {
   const connection = await prisma.socialConnection.findUnique({ where: { businessId } });
-  const range = lastDays(days);
   const previous = previousRange(range);
   const empty: SocialDashboard = {
     range,
@@ -205,19 +200,14 @@ async function loadFromMeta(businessId: string, days: number): Promise<SocialDas
   }
 }
 
-const cacheKey = (days: number) => `dashboard:${days}`;
+const cacheKey = (range: DayRange) => `dashboard:${range.since}:${range.until}`;
 
-export async function getSocialDashboard(businessId: string, rangeKey: SocialRangeKey): Promise<SocialDashboard> {
-  const days = SOCIAL_RANGES[rangeKey];
-  const key = cacheKey(days);
+/** Everything the page shows for `range`, compared with the same number of days just before it. */
+export async function getSocialDashboard(businessId: string, range: DayRange): Promise<SocialDashboard> {
+  const key = cacheKey(range);
   const cached = await prisma.socialMetricCache.findUnique({ where: { businessId_key: { businessId, key } } });
-  const today = lastDays(days).until;
-  if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) {
-    const data = cached.data as unknown as SocialDashboard;
-    // A cache from yesterday describes a different range.
-    if (data.range?.until === today) return data;
-  }
-  const fresh = await loadFromMeta(businessId, days);
+  if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) return cached.data as unknown as SocialDashboard;
+  const fresh = await loadFromMeta(businessId, range);
   // A section Meta failed on is retried on the next visit instead of being cached for hours.
   const failed = [fresh.facebook, fresh.instagram, fresh.posts, fresh.ads].some((r) => r && !r.ok);
   if (!fresh.needsReconnect && !failed) {
@@ -226,6 +216,8 @@ export async function getSocialDashboard(businessId: string, rangeKey: SocialRan
       create: { businessId, key, data: fresh as object, fetchedAt: new Date() },
       update: { data: fresh as object, fetchedAt: new Date() },
     });
+    // Every custom range leaves a row; old ones are no longer served anyway.
+    await prisma.socialMetricCache.deleteMany({ where: { businessId, fetchedAt: { lt: new Date(Date.now() - 2 * 86_400_000) } } });
   }
   return fresh;
 }

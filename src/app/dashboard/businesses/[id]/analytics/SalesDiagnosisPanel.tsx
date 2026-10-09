@@ -235,7 +235,7 @@ function scoreVerdict(score: number): { label: string; color: string; bg: string
   return { label: "Está dejando ventas sobre la mesa", color: "#d03b3b", bg: "rgba(208,59,59,0.12)", text: "var(--status-bad)" };
 }
 
-function ScoreRing({ score, color }: { score: number; color: string }) {
+export function ScoreRing({ score, color }: { score: number; color: string }) {
   const r = 34;
   const c = 2 * Math.PI * r;
   return (

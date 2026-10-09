@@ -7,3 +7,19 @@ export function FunnelsLogoMark({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/**
+ * The mark on its dark app-icon tile, the same as the Meta app's icon. The
+ * lime alone almost disappears on the light theme's white.
+ */
+export function FunnelsLogoBadge({ size = "md" }: { size?: "sm" | "md" }) {
+  return (
+    <span
+      className={`flex flex-none items-center justify-center rounded-xl bg-[#111214] shadow-[0_0_0_1px_rgba(181,255,43,0.25),0_4px_14px_-4px_rgba(181,255,43,0.45)] ${
+        size === "sm" ? "h-8 w-8" : "h-10 w-10"
+      }`}
+    >
+      <FunnelsLogoMark className={size === "sm" ? "h-5 w-5" : "h-6 w-6"} />
+    </span>
+  );
+}

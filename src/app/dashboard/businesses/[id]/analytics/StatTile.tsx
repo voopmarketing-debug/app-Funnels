@@ -13,13 +13,15 @@ const STATUS_STYLES: Record<"good" | "warning" | "critical" | "neutral", { dot: 
 // Identity color of the card's icon tile — the same family as the agent
 // page's connection cards. Decorative only: whether a number is good or bad
 // is said by the status pill, never by this color.
-export type StatTone = "accent" | "secondary" | "amber" | "blue";
+export type StatTone = "accent" | "secondary" | "amber" | "blue" | "facebook" | "instagram";
 
 const TONE_STYLES: Record<StatTone, string> = {
   accent: "linear-gradient(135deg, #16a34a, #0f6e35)",
   secondary: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
   amber: "linear-gradient(135deg, #f59e0b, #d9620b)",
   blue: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+  facebook: "linear-gradient(135deg, #1877f2, #0b55c4)",
+  instagram: "linear-gradient(135deg, #f58529, #dd2a7b 55%, #8134af)",
 };
 
 export function StatTile({
