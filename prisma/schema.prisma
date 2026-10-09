@@ -334,6 +334,10 @@ model Conversation {
   // the separate agenda.funnelslabs.app booking project.
   appointmentAt   DateTime?
   appointmentNote String?
+  // The appointmentAt the 1-hour-before WhatsApp reminder was sent for (see
+  // lib/agendaReminders.ts). Comparing against the current appointmentAt
+  // means a rescheduled appointment gets its own reminder.
+  appointmentReminderFor DateTime?
 
   business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   stage           PipelineStage    @relation(fields: [stageId], references: [id])
@@ -350,6 +354,7 @@ model Conversation {
   // only, so ordering isn't index-backed and gets slower as each business's
   // conversation history grows.
   @@index([businessId, lastMessageAt])
+  @@index([appointmentAt])
 }
 
 // Surfaced in the dashboard header's notification bell (see NotificationBell)

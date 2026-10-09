@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { maybeRetryPendingReplies } from "@/lib/replyRecovery";
+import { maybeRunAppointmentReminders } from "@/lib/agendaReminders";
 import {
   countInboundMessages,
   parseInboundMessages,
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
           select: { id: true },
         });
         await maybeRetryPendingReplies(businesses.map((b) => b.id));
+        await maybeRunAppointmentReminders();
       } catch (err) {
         console.error("Reply recovery (webhook) failed:", err);
       }

@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { maybeRetryPendingReplies } from "@/lib/replyRecovery";
+import { maybeRunAppointmentReminders } from "@/lib/agendaReminders";
 
 // Polled every few seconds by CrmLivePoller while the CRM is open. A plain
 // GET route instead of a Server Action so it never blocks page navigation
@@ -20,6 +21,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ busines
   // chat recovery for this business (throttled to once a minute, runs after
   // the response so the poll stays fast).
   after(() => maybeRetryPendingReplies([businessId]).catch((err) => console.error("Reply recovery (poll) failed:", err)));
+  after(() => maybeRunAppointmentReminders().catch((err) => console.error("Appointment reminders (poll) failed:", err)));
 
   const result = await prisma.conversation.aggregate({
     where: { businessId },

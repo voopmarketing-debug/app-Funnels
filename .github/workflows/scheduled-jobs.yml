@@ -1,0 +1,21 @@
+# Every 10 minutes: appointment reminders (~1 hour before) and the retry of
+# unanswered chats. Vercel Hobby crons only run once a day, so GitHub calls
+# the protected routes instead. Needs the repository secret CRON_SECRET
+# (same value as in Vercel).
+name: Scheduled jobs
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Appointment reminders
+        run: curl -fsS -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://agente.funnelslabs.app/api/cron/appointment-reminders
+      - name: Retry unanswered chats
+        if: always()
+        run: curl -fsS -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://agente.funnelslabs.app/api/cron/retry-replies
