@@ -112,8 +112,8 @@ function buildConversationState(history: AgentHistoryMessage[]): string {
     "ESTADO DE LA CONVERSACIÓN — LEE ESTO ANTES QUE CUALQUIER OTRA COSA:",
     "Ya llevan una conversación (no es el primer contacto): está completa en los mensajes anteriores. Léela entera antes de responder.",
     "REGLA #1, LA MÁS IMPORTANTE DE TODAS: todo lo que el cliente ya escribió arriba (su nombre, su negocio, qué necesita, cualquier dato) YA LO SABES. Está prohibido volver a preguntarlo, sin importar cuántos mensajes hayan pasado o si el tema cambió. Si te falta un solo dato, pregunta SOLO por ese, una vez, y avanza — nunca repitas una pregunta de varias partes solo porque una parte sigue faltando.",
-    "No saludes de nuevo ni te vuelvas a presentar (nada de \"Hola\", \"Buenas noches\", \"Qué tal\" al empezar ni a mitad de frase). No te disculpes por el tiempo de respuesta ni menciones demoras, ni siquiera si ves que tú mismo lo hiciste antes en esta transcripción — fue un error, no lo repitas.",
-    "Ojo: no saludar de nuevo NO significa sonar seco o robótico. Seguí siendo cálido y humano en cada respuesta — usá el nombre del cliente si lo sabés, mostrá interés genuino en lo que dice, como si la charla nunca se hubiera cortado.",
+    "Dentro de una charla activa no saludes de nuevo ni te vuelvas a presentar (nada de \"Hola\", \"Buenas noches\", \"Qué tal\" al empezar ni a mitad de frase). La única excepción: si el contexto del sistema del último mensaje dice que pasaron más de 24 horas desde el mensaje anterior, ahí sí saluda de nuevo con calidez, en una frase corta, y retoma donde quedaron. No te disculpes por el tiempo de respuesta ni menciones demoras, ni siquiera si ves que tú mismo lo hiciste antes en esta transcripción — fue un error, no lo repitas.",
+    "Ojo: no saludar de nuevo NO significa sonar seco o robótico. Sigue siendo cálido y humano en cada respuesta: usa el nombre del cliente si lo sabes con certeza y muestra interés genuino en lo que dice.",
   ].join("\n");
 }
 
@@ -217,8 +217,11 @@ function buildSystemPrompt(
   const isFirstMessage = history.length === 0;
 
   const styleRules = [
-    "Combinas tres perfiles en uno: pensás como un especialista en growth marketing (entendés de embudos, conversión, y cómo mover a alguien hacia la acción), tenés el instinto de un vendedor/asesor comercial experimentado (calificás, generás interés real, y guiás hacia el cierre sin ser insistente ni desesperado), y tenés la organización y calidez de una excelente secretaria o agente de servicio al cliente (atenta a los detalles, resolutiva, cortés, buena coordinando cosas como horarios o próximos pasos).",
-    "Seguro de vos mismo, cordial y sin relleno — pero siempre cálido y humano, nunca seco ni telegráfico. Directo no es lo mismo que frío.",
+    "Combinas tres perfiles en uno: piensas como un especialista en growth marketing (entiendes de embudos, conversión y cómo mover a alguien hacia la acción), tienes el instinto de un asesor comercial experimentado (calificas, generas interés real y guías hacia el cierre sin ser insistente) y la organización y calidez de una excelente secretaria o agente de servicio al cliente (atenta a los detalles, resolutiva, cortés, buena coordinando horarios y próximos pasos).",
+    "Seguro de ti mismo, cordial y sin relleno, pero siempre cálido y humano, nunca seco ni telegráfico. Directo no es lo mismo que frío.",
+    // The rules used to be written with voseo and it leaked into replies.
+    "Escribe en español latinoamericano neutro y tutea al cliente (tú, tienes, puedes, cuéntame). Nunca uses voseo (vos, tenés, podés, contame, mirá, decime).",
+    "Con los nombres, cero errores: usa solo el nombre que el cliente escribió en la conversación o el que aparece como NOMBRE DEL CLIENTE en el contexto. Si no estás seguro de cómo se llama, no uses ningún nombre; jamás lo adivines ni lo cambies.",
     toneInstruction,
     lengthInstruction,
     "Sin formato markdown (sin **negritas** ni listas con guiones) — escribe como en un chat normal.",
@@ -226,7 +229,7 @@ function buildSystemPrompt(
     // lose the sale: resolve and advance in as few messages as possible.
     "Resuelve en la menor cantidad de mensajes posible: en cada respuesta contesta lo que el cliente preguntó Y avanza un paso hacia el cierre (agendar, comprar, dejar sus datos), en el mismo mensaje.",
     "Como mucho UNA pregunta por mensaje, y solo si de verdad la necesitas para avanzar. Si ya tienes lo necesario, propone directamente el siguiente paso.",
-    "Nada de mensajes de relleno ni confirmaciones vacías (\"¡Perfecto!\", \"Claro, ya te cuento\", \"Dame un momento\"): si vas a responder, responde con el contenido de una vez.",
+    "Nada de mensajes de relleno ni promesas de responder después (\"ya te cuento\", \"ahora te cuento\", \"dame un momento\", \"déjame revisar\"): responde de una vez con la información correcta para lo que preguntó.",
     "Cuando el cliente muestra interés concreto (pregunta precio, disponibilidad o cómo comprar), dale el dato y ofrécele el siguiente paso en ese mismo mensaje; no alargues la conversación con preguntas que no cambian la propuesta.",
   ]
     .map((rule) => `- ${rule}`)
@@ -234,7 +237,7 @@ function buildSystemPrompt(
 
   const closingReminder = isFirstMessage
     ? ""
-    : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en los mensajes anteriores, y no saludes ni te disculpes por demoras — pero mantené la calidez, no te vuelvas seco por evitar el saludo.";
+    : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en los mensajes anteriores, y no saludes (salvo que hayan pasado más de 24 horas) ni te disculpes por demoras, pero mantén la calidez.";
 
   const cacheableBlock = `CÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.${buildOwnerContextBlock(owner)}\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${buildCatalogBlock(catalog)}`;
   const dynamicBlock = `${buildConversationState(history)}${closingReminder}`;
@@ -317,26 +320,68 @@ function buildMarkAppointmentTool(): Anthropic.Tool {
   };
 }
 
-// Sent at the start of the customer's latest turn, not in the system prompt:
-// it changes every minute, and anything that changes placed before the
-// history would keep the history from being read from the cache.
-// Relative-date phrases ("mañana", "el viernes") only resolve correctly if
-// the model knows what "today" actually is — it has no live clock of its
-// own. Colombia time since that's this product's primary market; a customer
-// who states a different timezone explicitly overrides it (see the tool
-// description above).
-function buildCurrentDateTimeBlock(): string {
-  const formatted = new Intl.DateTimeFormat("es-CO", {
+// Relative dates ("mañana", "el viernes") and a past appointment only make
+// sense if the model knows what time it is: it has no clock of its own.
+// Colombia time, this product's main market.
+export type TurnContext = {
+  // The contact's name as saved in the CRM (WhatsApp profile or typed by the team).
+  contactName?: string | null;
+  // When the conversation was last active before this message (see agent.ts).
+  lastActivityAt?: Date | null;
+  appointmentAt?: Date | null;
+  appointmentNote?: string | null;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function bogota(date: Date, withYear = false): string {
+  return new Intl.DateTimeFormat("es-CO", {
     timeZone: "America/Bogota",
     weekday: "long",
-    year: "numeric",
+    ...(withYear && { year: "numeric" }),
     month: "long",
     day: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
-    hour12: false,
-  }).format(new Date());
-  return `[Contexto del sistema, no lo menciones al cliente — FECHA Y HORA ACTUAL (zona horaria Colombia, UTC-5): ${formatted}. Úsala para calcular fechas relativas como "mañana" o "el viernes" al confirmar una cita con la herramienta ${MARK_APPOINTMENT_TOOL_NAME}.]`;
+  }).format(date);
+}
+
+// A profile name worth calling someone by: letters, not an emoji or a phone.
+function usableName(name: string | null | undefined): string | null {
+  const trimmed = name?.trim() ?? "";
+  return trimmed.length >= 2 && trimmed.length <= 40 && /\p{L}{2}/u.test(trimmed) && !/\d{4}/.test(trimmed) ? trimmed : null;
+}
+
+export function hadLongGap(turn: TurnContext | undefined, now = new Date()): boolean {
+  return !!turn?.lastActivityAt && now.getTime() - turn.lastActivityAt.getTime() > DAY_MS;
+}
+
+/**
+ * What changes from one message to the next (the clock, how long since the
+ * last exchange, the appointment's status, the contact's name), sent at the
+ * start of the customer's latest turn rather than in the system prompt:
+ * anything that changes placed before the history would keep the history
+ * from being read from the cache.
+ */
+export function buildTurnContext(turn: TurnContext | undefined, now = new Date()): string {
+  const lines = [
+    `FECHA Y HORA ACTUAL (Colombia, UTC-5): ${bogota(now, true)}. Úsala para calcular fechas relativas como "mañana" o "el viernes" al confirmar una cita con la herramienta ${MARK_APPOINTMENT_TOOL_NAME}.`,
+  ];
+  const name = usableName(turn?.contactName);
+  if (name) lines.push(`NOMBRE DEL CLIENTE en el CRM: "${name}". Escríbelo exactamente así (o como el cliente diga que se llama en la conversación); nunca uses otro nombre.`);
+  if (turn?.lastActivityAt && hadLongGap(turn, now)) {
+    const days = Math.floor((now.getTime() - turn.lastActivityAt.getTime()) / DAY_MS);
+    lines.push(`Pasaron ${days === 1 ? "más de 24 horas" : `${days} días`} desde el mensaje anterior: saluda de nuevo con calidez en una frase corta y retoma la conversación.`);
+  }
+  if (turn?.appointmentAt) {
+    const what = turn.appointmentNote ? ` (${turn.appointmentNote})` : "";
+    lines.push(
+      turn.appointmentAt.getTime() > now.getTime()
+        ? `Este cliente tiene una cita agendada para el ${bogota(turn.appointmentAt)}${what}.`
+        : `Este cliente tenía una cita el ${bogota(turn.appointmentAt)}${what} y esa hora YA PASÓ: no hables de ella como algo pendiente ni digas "nos vemos" a esa hora. Pregúntale con amabilidad si alcanzó a asistir o si quiere reagendar.`,
+    );
+  }
+  return `[Contexto del sistema, no lo menciones al cliente]\n${lines.join("\n")}`;
 }
 
 export type DetectedAppointment = { at: string; note: string };
@@ -382,8 +427,10 @@ export async function generateAgentReply(params: {
   availableMedia?: AvailableMedia[];
   catalog?: AgentCatalogItem[];
   funnel?: LeadFunnel;
+  turn?: TurnContext;
 }): Promise<{ text: string; usage: AgentReplyUsage; sendMediaId?: string; appointment?: DetectedAppointment; stage?: string }> {
-  const isFirstMessage = params.history.length === 0;
+  // A first message, or one coming back after more than a day, may open with a greeting.
+  const mayGreet = params.history.length === 0 || hadLongGap(params.turn);
   const availableMedia = params.availableMedia ?? [];
 
   const system = buildSystemPrompt(
@@ -427,7 +474,7 @@ export async function generateAgentReply(params: {
         source: { type: "base64", media_type: img.mediaType, data: img.data },
       }),
     ),
-    { type: "text", text: buildCurrentDateTimeBlock() },
+    { type: "text", text: buildTurnContext(params.turn) },
     { type: "text", text: userText },
   ];
 
@@ -514,7 +561,7 @@ export async function generateAgentReply(params: {
   const stage = typeof stageInput?.stage === "string" && funnel?.stages.includes(stageInput.stage) ? stageInput.stage : undefined;
 
   return {
-    text: stripGreetings(rawText, isFirstMessage),
+    text: stripGreetings(rawText, mayGreet),
     sendMediaId: sendMediaId && availableMedia.some((m) => m.id === sendMediaId) ? sendMediaId : undefined,
     appointment,
     stage,

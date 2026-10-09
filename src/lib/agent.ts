@@ -417,6 +417,21 @@ export async function replyToConversation(ctx: ReplyContext): Promise<void> {
   }
 }
 
+/**
+ * When the chat was last active before the message being answered. The
+ * customer's own quick follow-ups (a burst answered as one) don't count,
+ * so "hola" + "¿siguen?" after two days still reads as two days.
+ */
+function lastActivityBefore(previous: Message[]): Date | null {
+  const burstStart = Date.now() - 10 * 60 * 1000;
+  for (let i = previous.length - 1; i >= 0; i--) {
+    const m = previous[i];
+    if (m.role === "CUSTOMER" && m.createdAt.getTime() >= burstStart) continue;
+    return m.createdAt;
+  }
+  return null;
+}
+
 async function moveLeadStage(ctx: ReplyContext, target: FunnelStage): Promise<void> {
   const { business, conversation } = ctx;
   // Conditional on the stage we read: if someone on the team moved the lead
@@ -522,6 +537,12 @@ async function generateAndSendReply(ctx: ReplyContext, modelOverride?: string): 
       availableMedia,
       catalog,
       funnel: currentStage ? { stages: stageNames, current: currentStage.name } : undefined,
+      turn: {
+        contactName: conversation.customerName,
+        lastActivityAt: lastActivityBefore(ctx.previousMessages),
+        appointmentAt: conversation.appointmentAt,
+        appointmentNote: conversation.appointmentNote,
+      },
     });
     reply = result.text;
     usage = result.usage;

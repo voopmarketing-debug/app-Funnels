@@ -5,7 +5,7 @@ vi.mock("./anthropicClient", () => ({
   anthropic: { messages: { create: (...args: unknown[]) => createMock(...args) } },
 }));
 
-const { stripGreetings, generateAgentReply } = await import("./ai");
+const { stripGreetings, generateAgentReply, buildTurnContext } = await import("./ai");
 
 describe("stripGreetings", () => {
   it("leaves the first message of a conversation untouched", () => {
@@ -338,5 +338,53 @@ describe("generateAgentReply — move_lead_stage tool", () => {
     await generateAgentReply({ ...base, funnel: undefined });
     const req = createMock.mock.calls[0][0] as { tools: { name: string }[] };
     expect(req.tools.map((t) => t.name)).not.toContain("move_lead_stage");
+  });
+});
+
+describe("buildTurnContext", () => {
+  const now = new Date("2026-10-09T15:00:00Z"); // 10:00 Bogotá
+
+  it("tells the model a booked time already passed, so it never says 'nos vemos' for it", () => {
+    const text = buildTurnContext({ appointmentAt: new Date("2026-10-09T13:00:00Z"), appointmentNote: "Demo" }, now);
+    expect(text).toContain("YA PASÓ");
+    expect(text).toContain("reagendar");
+  });
+
+  it("keeps an upcoming appointment as upcoming", () => {
+    const text = buildTurnContext({ appointmentAt: new Date("2026-10-10T13:00:00Z") }, now);
+    expect(text).toContain("tiene una cita agendada");
+    expect(text).not.toContain("YA PASÓ");
+  });
+
+  it("asks for a warm greeting only after more than a day of silence", () => {
+    expect(buildTurnContext({ lastActivityAt: new Date("2026-10-07T15:00:00Z") }, now)).toContain("saluda de nuevo");
+    expect(buildTurnContext({ lastActivityAt: new Date("2026-10-09T10:00:00Z") }, now)).not.toContain("saluda de nuevo");
+  });
+
+  it("passes the CRM name to use exactly, but not junk profile names", () => {
+    expect(buildTurnContext({ contactName: "Juan Camilo" }, now)).toContain('NOMBRE DEL CLIENTE en el CRM: "Juan Camilo"');
+    expect(buildTurnContext({ contactName: "🔥🔥" }, now)).not.toContain("NOMBRE DEL CLIENTE");
+    expect(buildTurnContext({ contactName: "+57 300 123 4567" }, now)).not.toContain("NOMBRE DEL CLIENTE");
+  });
+});
+
+describe("greetings after a long gap", () => {
+  it("keeps the greeting when the customer comes back after more than a day", async () => {
+    createMock.mockReset();
+    createMock.mockResolvedValueOnce({
+      content: [{ type: "text", text: "¡Hola de nuevo, Juan! Seguimos con tu demo." }],
+      usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+    });
+    const result = await generateAgentReply({
+      systemPrompt: "x",
+      tone: "cercano",
+      replyLength: "breve",
+      industry: "otro",
+      model: "claude-sonnet-5",
+      history: [{ role: "assistant", content: "¿Te sirve el jueves?" }],
+      userMessage: "Hola, sigo interesado",
+      turn: { lastActivityAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
+    });
+    expect(result.text).toBe("¡Hola de nuevo, Juan! Seguimos con tu demo.");
   });
 });
