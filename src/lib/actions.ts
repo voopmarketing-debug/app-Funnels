@@ -66,6 +66,7 @@ import { PLAN_TIERS, PLAN_LABELS, TEAM_MEMBER_LIMITS } from "@/lib/plans";
 import { getAccountLineStatus } from "@/lib/lineLimits";
 import { logRegistrationForRemarketing } from "@/lib/remarketingSheet";
 import { sendEmail } from "@/lib/email";
+import { maskEmail } from "@/lib/logPrivacy";
 import { Prisma, type PlanTier } from "@prisma/client";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -1684,6 +1685,7 @@ export async function requestPasswordReset(
     // requests" here would itself leak whether the email exists faster than
     // just waiting the window out.
     if (await isRateLimited(rateLimitKey, RESET_REQUEST_MAX, RESET_REQUEST_WINDOW_MS)) {
+      console.warn("[reset] too many requests for", maskEmail(email));
       return { submitted: true };
     }
     await recordRateLimitEvent(rateLimitKey);
@@ -1706,7 +1708,7 @@ export async function requestPasswordReset(
       const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
       const resetUrl = `https://${appHost}/reset-password?token=${rawToken}`;
 
-      await sendEmail({
+      const sent = await sendEmail({
         to: email,
         subject: "Restablece tu contraseña — Funnels Labs",
         html: `
@@ -1715,10 +1717,40 @@ export async function requestPasswordReset(
           <p>Este enlace vence en 1 hora. Si tú no pediste esto, ignora este correo — tu contraseña sigue igual.</p>
         `,
       });
+      console.log(`[reset] link ${sent ? "sent" : "NOT sent"} to`, maskEmail(email));
+      await alertAgencyOfReset(email, sent ? "sent" : "failed");
+    } else {
+      console.log("[reset] no account for", maskEmail(email));
+      await alertAgencyOfReset(email, "unknown");
     }
   }
 
   return { submitted: true };
+}
+
+// Every reset request also reaches the agency (AGENCY_ADMIN_EMAIL), so a
+// client stuck without the email can be helped right away: from Clientes,
+// "Restablecer contraseña" sets one by hand. The link itself is never in
+// this email.
+async function alertAgencyOfReset(email: string, outcome: "sent" | "failed" | "unknown"): Promise<void> {
+  const admin = process.env.AGENCY_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!admin || admin === email) return;
+  const appHost = process.env.APP_HOST ?? "agente.funnelslabs.app";
+  const status = {
+    sent: "Le enviamos el enlace para crear una nueva contraseña.",
+    failed: "⚠️ El correo con el enlace NO se pudo enviar. Ayúdale a entrar desde Clientes → Restablecer contraseña.",
+    unknown: "Ese correo NO está registrado en la plataforma (puede ser un error al escribirlo o que se registró con otro correo).",
+  }[outcome];
+  const safe = email.replace(/[<>&"]/g, "");
+  await sendEmail({
+    to: admin,
+    subject: `🔑 ${safe} pidió recuperar su contraseña`,
+    html: `
+      <p><strong>${safe}</strong> pidió recuperar su contraseña en Funnels Labs.</p>
+      <p>${status}</p>
+      <p>Si te escribe porque no le llegó, puedes asignarle una contraseña desde <a href="https://${appHost}/dashboard/clients">Clientes</a> → Restablecer contraseña.</p>
+    `,
+  }).catch(() => false);
 }
 
 export type ResetPasswordState = { error: string | null };

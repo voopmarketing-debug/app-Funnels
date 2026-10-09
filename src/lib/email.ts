@@ -19,10 +19,10 @@ export async function sendEmail(options: {
   // existing doPost never reads it), so this is safe to ship either way.
   icsContent?: string;
   icsFilename?: string;
-}): Promise<void> {
+}): Promise<boolean> {
   if (!WEBHOOK_URL) {
     console.error("[email] GOOGLE_APPS_SCRIPT_WEBHOOK_URL not configured — email not sent:", maskEmail(options.to), options.subject);
-    return;
+    return false;
   }
 
   try {
@@ -36,8 +36,13 @@ export async function sendEmail(options: {
     });
     clearTimeout(timeout);
     const body = await res.text().catch(() => "");
-    if (!body.includes('"ok":true')) console.error("[email] Apps Script did not confirm:", res.status, body.slice(0, 300));
+    if (!body.includes('"ok":true')) {
+      console.error("[email] Apps Script did not confirm:", res.status, body.slice(0, 300));
+      return false;
+    }
+    return true;
   } catch (error) {
     console.error("[email] failed to send", error);
+    return false;
   }
 }
