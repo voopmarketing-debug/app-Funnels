@@ -7,8 +7,12 @@ import { prisma } from "@/lib/prisma";
 import { ADDON_PACKS } from "@/lib/addonPacks";
 import { activateAddon } from "@/lib/addons";
 import { sendEmail } from "@/lib/email";
-import { verifyMpSignature } from "@/lib/mercadopagoSignature";
+import { diagnoseMpSignature, verifyMpSignature } from "@/lib/mercadopagoSignature";
 import { maskEmail } from "@/lib/logPrivacy";
+
+// Flip to true once a real notification has verified in production (see
+// the "[mercadopago] invalid x-signature" diagnostics in the logs).
+const ENFORCE_MP_SIGNATURE = false;
 
 async function alertAgency(subject: string, detail: string) {
   // The detail (with the client's email) goes only in the email, not the logs.
@@ -31,26 +35,33 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Server misconfigured", { status: 500 });
   }
 
-  const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET?.trim();
-  if (webhookSecret) {
-    const valid = verifyMpSignature({
-      signatureHeader: req.headers.get("x-signature"),
-      requestId: req.headers.get("x-request-id"),
-      dataId: req.nextUrl.searchParams.get("data.id"),
-      secret: webhookSecret,
-    });
-    if (!valid) {
-      console.warn("[mercadopago] webhook rejected: invalid x-signature", req.nextUrl.search);
-      return new NextResponse("Invalid signature", { status: 401 });
-    }
-  }
-
+  const rawBody = await req.text();
   let body: unknown = {};
   try {
-    body = await req.json();
+    body = rawBody ? JSON.parse(rawBody) : {};
   } catch {
     // Some MP notifications arrive with an empty body and everything in
     // query params — that's fine, parseMpNotification falls back to those.
+  }
+
+  const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET?.trim();
+  if (webhookSecret) {
+    const signatureHeader = req.headers.get("x-signature");
+    const requestId = req.headers.get("x-request-id");
+    const queryDataId = req.nextUrl.searchParams.get("data.id");
+    const valid = verifyMpSignature({ signatureHeader, requestId, dataId: queryDataId, secret: webhookSecret });
+    if (!valid) {
+      const bodyData = (body as { data?: { id?: unknown } } | null)?.data;
+      const bodyDataId = bodyData?.id != null ? String(bodyData.id) : null;
+      console.warn(
+        "[mercadopago] invalid x-signature",
+        JSON.stringify(diagnoseMpSignature({ signatureHeader, requestId, queryDataId, bodyDataId, secret: webhookSecret })),
+      );
+      // Report-only until a real notification has verified in production:
+      // a wrong key or manifest detail would otherwise drop every renewal.
+      // The re-fetch from Mercado Pago below still blocks forged payments.
+      if (ENFORCE_MP_SIGNATURE) return new NextResponse("Invalid signature", { status: 401 });
+    }
   }
 
   const notification = parseMpNotification(body, req.nextUrl.searchParams);

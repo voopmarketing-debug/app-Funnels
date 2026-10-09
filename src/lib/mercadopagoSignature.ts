@@ -33,3 +33,44 @@ export function verifyMpSignature(params: {
   const b = Buffer.from(v1.toLowerCase(), "hex");
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+/**
+ * For the logs when a signature doesn't verify: which way of building the
+ * manifest (if any) matches, and the header's shape. Never includes the
+ * secret or the signature itself. "none" means the secret is the wrong one.
+ */
+export function diagnoseMpSignature(params: {
+  signatureHeader: string | null;
+  requestId: string | null;
+  queryDataId: string | null;
+  bodyDataId: string | null;
+  secret: string;
+}): Record<string, string | number | boolean> {
+  const parts = Object.fromEntries(
+    (params.signatureHeader ?? "").split(",").map((p) => {
+      const [k, ...v] = p.split("=");
+      return [k.trim(), v.join("=").trim()];
+    }),
+  );
+  const ts = parts.ts ?? "";
+  const v1 = (parts.v1 ?? "").toLowerCase();
+  const candidates: Record<string, string> = {
+    query_lower: mpSignatureManifest(params.queryDataId, params.requestId, ts),
+    query_raw: `${params.queryDataId ? `id:${params.queryDataId};` : ""}${params.requestId ? `request-id:${params.requestId};` : ""}ts:${ts};`,
+    body: mpSignatureManifest(params.bodyDataId, params.requestId, ts),
+    no_request_id: mpSignatureManifest(params.queryDataId ?? params.bodyDataId, null, ts),
+  };
+  const matched = Object.entries(candidates).find(
+    ([, manifest]) => !!v1 && createHmac("sha256", params.secret).update(manifest).digest("hex") === v1,
+  );
+  return {
+    matched: matched ? matched[0] : "none",
+    hasSignature: !!params.signatureHeader,
+    hasTs: !!ts,
+    v1Length: v1.length,
+    hasRequestId: !!params.requestId,
+    queryDataId: params.queryDataId ?? "",
+    bodyDataId: params.bodyDataId ?? "",
+    secretLength: params.secret.length,
+  };
+}
