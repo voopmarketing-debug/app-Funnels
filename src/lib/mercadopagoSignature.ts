@@ -69,6 +69,10 @@ export function diagnoseMpSignature(params: {
     hasTs: !!ts,
     v1Length: v1.length,
     hasRequestId: !!params.requestId,
+    // Not secret: lets us see whether something on the way replaced
+    // Mercado Pago's own request id (a UUID) before it reached us.
+    requestId: params.requestId ?? "",
+    ts,
     queryDataId: params.queryDataId ?? "",
     bodyDataId: params.bodyDataId ?? "",
     secretLength: params.secret.length,
