@@ -491,7 +491,33 @@ function parseTemplateButtons(formData: FormData): TemplateButton[] {
 }
 
 /** Submits a new WhatsApp message template to Meta for approval — see lib/whatsapp.ts for the API call itself. */
-export async function createMessageTemplate(businessId: string, formData: FormData): Promise<void> {
+// Meta's most common refusals, in words a business owner can act on.
+function friendlyTemplateError(message: string): string {
+  if (/being deleted|siendo eliminad/i.test(message)) {
+    return "Meta todavía está borrando una plantilla con ese nombre (puede tardar hasta 4 semanas). Usa otro nombre, por ejemplo agregándole _2 al final.";
+  }
+  if (/already exists|ya existe|duplicate/i.test(message)) {
+    return "Ya existe una plantilla con ese nombre e idioma en Meta. Usa otro nombre o elimina la anterior.";
+  }
+  return message;
+}
+
+/**
+ * Returns the error instead of throwing: Next.js hides a thrown error's
+ * message in production (the form showed "Minified React error #441"
+ * instead of Meta's reason).
+ */
+export async function createMessageTemplate(businessId: string, formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await createMessageTemplateOrThrow(businessId, formData);
+    return { ok: true };
+  } catch (err) {
+    console.error("createMessageTemplate failed:", err);
+    return { ok: false, error: friendlyTemplateError(err instanceof Error ? err.message : "No se pudo crear la plantilla") };
+  }
+}
+
+async function createMessageTemplateOrThrow(businessId: string, formData: FormData): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);

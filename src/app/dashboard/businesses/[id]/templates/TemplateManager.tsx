@@ -219,10 +219,10 @@ const INITIAL_STATE: FormState = { error: null, done: false };
 function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose: () => void }) {
   const [state, formAction, isPending] = useActionState<FormState, FormData>(async (_prev, formData) => {
     try {
-      await createMessageTemplate(businessId, formData);
-      return { error: null, done: true };
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : "No se pudo crear la plantilla", done: false };
+      const res = await createMessageTemplate(businessId, formData);
+      return res.ok ? { error: null, done: true } : { error: res.error, done: false };
+    } catch {
+      return { error: "No se pudo crear la plantilla. Recarga la página e inténtalo de nuevo.", done: false };
     }
   }, INITIAL_STATE);
 
@@ -329,8 +329,8 @@ function NewTemplateForm({ businessId, onClose }: { businessId: string; onClose:
                 defaultValue="MARKETING"
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
               >
-                <option value="MARKETING">Marketing / promoción</option>
-                <option value="UTILITY">Informativa (no promocional)</option>
+                <option value="MARKETING">Marketing: ofertas y promociones</option>
+                <option value="UTILITY">Utilidad: recordatorios, confirmaciones, avisos</option>
               </select>
             </div>
           </div>

@@ -7,9 +7,14 @@ const GRAPH_API_VERSION = "v21.0";
 /** Meta's error responses are JSON with the useful bit nested in error.message — this pulls that out so a failed send shows a human sentence instead of a raw JSON blob. */
 function parseMetaErrorMessage(status: number, rawBody: string): string {
   try {
-    const parsed = JSON.parse(rawBody) as { error?: { message?: string; error_data?: { details?: string } } };
+    const parsed = JSON.parse(rawBody) as {
+      error?: { message?: string; error_user_title?: string; error_user_msg?: string; error_data?: { details?: string } };
+    };
+    // Meta puts the actionable reason in error_user_msg ("Content in this
+    // language already exists"); `message` alone is often just "Invalid parameter".
+    const userMsg = [parsed.error?.error_user_title, parsed.error?.error_user_msg].filter(Boolean).join(": ");
     const details = parsed.error?.error_data?.details;
-    const message = parsed.error?.message;
+    const message = userMsg || parsed.error?.message;
     if (message) return details ? `${message} (${details})` : message;
   } catch {
     // Not JSON — fall through to the raw body below.
@@ -372,6 +377,7 @@ export async function createWhatsAppTemplate(params: {
 
   if (!response.ok) {
     const body = await response.text();
+    console.error("[templates] Meta rejected creation:", response.status, body.slice(0, 600));
     throw new Error(parseMetaErrorMessage(response.status, body));
   }
 
