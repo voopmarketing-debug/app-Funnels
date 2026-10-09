@@ -25,7 +25,9 @@ import { customDomainSecurityHeaders } from "@/lib/securityHeaders";
 // editor). No code change or redeploy is needed to connect a new one —
 // once the domain points here and its DB row has this hostname saved, this
 // proxy starts serving it automatically.
-const APP_HOSTS = new Set(["agente.funnelslabs.app", "localhost:3000", "localhost"]);
+// agenda.funnelslabs.app only reaches this app through the routing rule
+// that rewrites its /agenda page to /agenda-llamada.
+const APP_HOSTS = new Set(["agente.funnelslabs.app", "agenda.funnelslabs.app", "localhost:3000", "localhost"]);
 
 export async function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? "";

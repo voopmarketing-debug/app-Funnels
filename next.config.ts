@@ -43,7 +43,9 @@ const nextConfig: NextConfig = {
         // page with a Meta Pixel / Google tag needs a per-response nonce in
         // its CSP (lib/siteTracking.ts) — and a header set here would
         // override the one the route returns.
-        source: "/:path((?!sitio/).*)",
+        // /agenda-llamada (Funnels Labs' booking page) also sends its own,
+        // since it talks to the booking Apps Script from the browser.
+        source: "/:path((?!sitio/|agenda-llamada$).*)",
         headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: APP_CSP }],
       },
       {
