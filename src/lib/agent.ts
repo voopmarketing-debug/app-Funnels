@@ -24,7 +24,8 @@ import { synthesizeVoiceNote, transcribeVoiceNote } from "@/lib/tts";
 import { withAiUsage } from "@/lib/aiUsage";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { getAccountAddonCapacity } from "@/lib/addons";
-import { PLAN_LIMITS } from "@/lib/plans";
+import { ECONOMY_AGENT_MODEL, PLAN_LIMITS } from "@/lib/plans";
+import { checkReplyBudget, pausedOnlyByExpiredDailyCap } from "@/lib/aiReplyBudget";
 import { contactLabel } from "@/lib/contactDisplay";
 import { bookedStageAfter, resolveAutoStageMove, type FunnelStage } from "@/lib/autoStage";
 import { isWonStageName } from "@/lib/sales";
@@ -40,6 +41,10 @@ const MEDIA_TYPE_LABEL: Record<string, string> = {
 };
 
 const HISTORY_LIMIT = 20;
+// Customers often send a thought in several quick messages ("hola", "quiero
+// info", "precio?"). Waiting this long and answering only the latest one
+// (with the others in the history) gives one reply instead of three.
+const BURST_WINDOW_MS = 4000;
 
 // Claude's per-image cap is 5 MB after base64 encoding (~33% larger than the
 // raw bytes) — bigger photos still reach the AI, just as a text placeholder.
@@ -246,7 +251,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     }
   }
 
-  await prisma.message.create({
+  const savedInbound = await prisma.message.create({
     data: {
       conversationId: conversation.id,
       role: "CUSTOMER",
@@ -305,7 +310,7 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
 
   // A contact paused only because LAST month's plan limit ran out gets the
   // AI back once a new month starts: the monthly quota has renewed.
-  if (conversation.aiPaused && (await pausedOnlyByPastMonthLimit(conversation.id))) {
+  if (conversation.aiPaused && ((await pausedOnlyByPastMonthLimit(conversation.id)) || (await pausedOnlyByExpiredDailyCap(conversation.id)))) {
     await prisma.conversation.update({ where: { id: conversation.id }, data: { aiPaused: false } });
     conversation.aiPaused = false;
   }
@@ -332,6 +337,14 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     await prisma.conversation.update({ where: { id: conversation.id }, data: { aiPaused: true } });
     return;
   }
+
+  // More messages from this customer on the way? The latest one answers them all.
+  await new Promise((resolve) => setTimeout(resolve, BURST_WINDOW_MS));
+  const newer = await prisma.message.findFirst({
+    where: { conversationId: conversation.id, role: "CUSTOMER", createdAt: { gt: savedInbound.createdAt } },
+    select: { id: true },
+  });
+  if (newer) return;
 
   await replyToConversation({
     business: { ...business, agent: business.agent },
@@ -377,13 +390,25 @@ export const MAX_REPLY_ATTEMPTS = 3;
  * alerted to answer by hand.
  */
 export async function replyToConversation(ctx: ReplyContext): Promise<void> {
+  // The plan's AI budget (lib/aiReplyBudget.ts) is checked here so the
+  // retry sweep (lib/replyRecovery.ts) goes through it too.
+  const budget = await checkReplyBudget({
+    businessId: ctx.business.id,
+    businessName: ctx.business.name,
+    planTier: ctx.business.planTier,
+    conversationId: ctx.conversation.id,
+    contactLabel: contactLabel(ctx.conversation.customerName, ctx.conversation.customerPhone),
+  });
+  if (budget === "skip") return;
+  const model = budget === "economy" ? ECONOMY_AGENT_MODEL : undefined;
+
   const tracked = await prisma.conversation.update({
     where: { id: ctx.conversation.id },
     data: { replyAttempts: { increment: 1 }, lastReplyAttemptAt: new Date() },
     select: { replyAttempts: true },
   });
   try {
-    await generateAndSendReply(ctx);
+    await generateAndSendReply(ctx, model);
   } catch (err) {
     if (tracked.replyAttempts >= MAX_REPLY_ATTEMPTS) {
       await alertReplyGaveUp(ctx, err).catch(() => {});
@@ -436,7 +461,7 @@ export async function alertReplyGaveUp(ctx: ReplyContext, err: unknown): Promise
   });
 }
 
-async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
+async function generateAndSendReply(ctx: ReplyContext, modelOverride?: string): Promise<void> {
   const { business, conversation, accessToken } = ctx;
   // Internal error / plan-limit notices are stored as AGENT messages so they
   // show in the dashboard, but they were never sent to the customer — feeding
@@ -481,7 +506,7 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
       tone: business.agent.tone,
       replyLength: business.agent.replyLength,
       industry: business.industry,
-      model: business.agent.model,
+      model: modelOverride ?? business.agent.model,
       history,
       // Never message.text directly: for a voice note that's always empty
       // (messageContent holds the transcript), and for a photo sent without
@@ -619,7 +644,7 @@ async function generateAndSendReply(ctx: ReplyContext): Promise<void> {
         role: "AGENT",
         content: reply,
         whatsappMsgId: messageId,
-        model: business.agent.model,
+        model: modelOverride ?? business.agent.model,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         cacheCreationInputTokens: usage.cacheCreationInputTokens,

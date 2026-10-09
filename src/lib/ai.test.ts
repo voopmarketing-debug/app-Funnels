@@ -122,9 +122,21 @@ describe("generateAgentReply — mark_appointment tool", () => {
     expect(result.appointment).toEqual({ at: "2026-09-25T15:00:00-05:00", note: "Valoración estética" });
     expect(result.text).toContain("agendado");
 
-    const requestArg = createMock.mock.calls[0][0] as { tools: { name: string }[]; system: { text: string }[] };
+    const requestArg = createMock.mock.calls[0][0] as {
+      tools: { name: string }[];
+      system: { text: string }[];
+      messages: { role: string; content: string | { type: string; text?: string; cache_control?: unknown }[] }[];
+    };
     expect(requestArg.tools.map((t) => t.name)).toContain("mark_appointment");
-    expect(requestArg.system[1].text).toContain("FECHA Y HORA ACTUAL");
+    // The clock rides on the latest turn, so it never breaks the cached prefix.
+    expect(requestArg.system[1].text).not.toContain("FECHA Y HORA ACTUAL");
+    const lastTurn = requestArg.messages.at(-1)!.content as { text?: string }[];
+    expect(lastTurn.some((b) => b.text?.includes("FECHA Y HORA ACTUAL"))).toBe(true);
+    // History goes once, as messages (not repeated in the system prompt), with
+    // a cache breakpoint on the previous message.
+    expect(requestArg.system[1].text).not.toContain("Hola, quiero agendar una valoración");
+    const previous = requestArg.messages.at(-2)!.content as { text: string; cache_control?: unknown }[];
+    expect(previous[0].cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
   });
 
   it("discards a malformed appointment date instead of crashing", async () => {
@@ -239,8 +251,8 @@ describe("generateAgentReply — photos and empty content", () => {
     expect(Array.isArray(last.content)).toBe(true);
     const blocks = last.content as { type: string; text?: string; source?: { data: string } }[];
     expect(blocks[0]).toMatchObject({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: "BASE64DATA" } });
-    expect(blocks[1].type).toBe("text");
-    expect(blocks[1].text).toContain("imagen");
+    expect(blocks.at(-1)!.type).toBe("text");
+    expect(blocks.at(-1)!.text).toContain("imagen");
   });
 
   it("keeps a real caption as the text next to the photo", async () => {

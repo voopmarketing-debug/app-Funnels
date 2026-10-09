@@ -105,14 +105,12 @@ function buildConversationState(history: AgentHistoryMessage[]): string {
     return "ESTADO DE LA CONVERSACIÓN: es el primer mensaje del cliente. No hay historial previo.";
   }
 
-  const lines = history.map((msg) => (msg.role === "user" ? `Cliente: ${msg.content}` : `Tú: ${msg.content}`));
-
+  // The transcript itself is the message history (sent once and cached),
+  // not repeated here: a copy in the system prompt doubled the input billed
+  // on every reply and, sitting before the history, kept it from caching.
   return [
     "ESTADO DE LA CONVERSACIÓN — LEE ESTO ANTES QUE CUALQUIER OTRA COSA:",
-    "Ya llevan esta conversación (no es el primer contacto):",
-    "---",
-    lines.join("\n"),
-    "---",
+    "Ya llevan una conversación (no es el primer contacto): está completa en los mensajes anteriores. Léela entera antes de responder.",
     "REGLA #1, LA MÁS IMPORTANTE DE TODAS: todo lo que el cliente ya escribió arriba (su nombre, su negocio, qué necesita, cualquier dato) YA LO SABES. Está prohibido volver a preguntarlo, sin importar cuántos mensajes hayan pasado o si el tema cambió. Si te falta un solo dato, pregunta SOLO por ese, una vez, y avanza — nunca repitas una pregunta de varias partes solo porque una parte sigue faltando.",
     "No saludes de nuevo ni te vuelvas a presentar (nada de \"Hola\", \"Buenas noches\", \"Qué tal\" al empezar ni a mitad de frase). No te disculpes por el tiempo de respuesta ni menciones demoras, ni siquiera si ves que tú mismo lo hiciste antes en esta transcripción — fue un error, no lo repitas.",
     "Ojo: no saludar de nuevo NO significa sonar seco o robótico. Seguí siendo cálido y humano en cada respuesta — usá el nombre del cliente si lo sabés, mostrá interés genuino en lo que dice, como si la charla nunca se hubiera cortado.",
@@ -224,13 +222,19 @@ function buildSystemPrompt(
     toneInstruction,
     lengthInstruction,
     "Sin formato markdown (sin **negritas** ni listas con guiones) — escribe como en un chat normal.",
+    // Each reply costs money and every extra back-and-forth is a chance to
+    // lose the sale: resolve and advance in as few messages as possible.
+    "Resuelve en la menor cantidad de mensajes posible: en cada respuesta contesta lo que el cliente preguntó Y avanza un paso hacia el cierre (agendar, comprar, dejar sus datos), en el mismo mensaje.",
+    "Como mucho UNA pregunta por mensaje, y solo si de verdad la necesitas para avanzar. Si ya tienes lo necesario, propone directamente el siguiente paso.",
+    "Nada de mensajes de relleno ni confirmaciones vacías (\"¡Perfecto!\", \"Claro, ya te cuento\", \"Dame un momento\"): si vas a responder, responde con el contenido de una vez.",
+    "Cuando el cliente muestra interés concreto (pregunta precio, disponibilidad o cómo comprar), dale el dato y ofrécele el siguiente paso en ese mismo mensaje; no alargues la conversación con preguntas que no cambian la propuesta.",
   ]
     .map((rule) => `- ${rule}`)
     .join("\n");
 
   const closingReminder = isFirstMessage
     ? ""
-    : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en la transcripción de arriba, y no saludes ni te disculpes por demoras — pero mantené la calidez, no te vuelvas seco por evitar el saludo.";
+    : "\n\nRecordatorio final: no preguntes nada que el cliente ya te haya dicho en los mensajes anteriores, y no saludes ni te disculpes por demoras — pero mantené la calidez, no te vuelvas seco por evitar el saludo.";
 
   const cacheableBlock = `CÓMO ENTENDER AL CLIENTE:\n${COMPREHENSION_RULES}\n\nESTILO DE RESPUESTA:\n${styleRules}\n\nCONTEXTO DEL NEGOCIO:\n- Rubro: ${industryLabel}. Adapta ejemplos, vocabulario y prioridades a este tipo de negocio.${buildOwnerContextBlock(owner)}\n\nINSTRUCCIONES ESPECÍFICAS DE ESTE NEGOCIO:\n${basePrompt}${buildCatalogBlock(catalog)}`;
   const dynamicBlock = `${buildConversationState(history)}${closingReminder}`;
@@ -313,6 +317,9 @@ function buildMarkAppointmentTool(): Anthropic.Tool {
   };
 }
 
+// Sent at the start of the customer's latest turn, not in the system prompt:
+// it changes every minute, and anything that changes placed before the
+// history would keep the history from being read from the cache.
 // Relative-date phrases ("mañana", "el viernes") only resolve correctly if
 // the model knows what "today" actually is — it has no live clock of its
 // own. Colombia time since that's this product's primary market; a customer
@@ -329,7 +336,7 @@ function buildCurrentDateTimeBlock(): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date());
-  return `\n\nFECHA Y HORA ACTUAL (zona horaria Colombia, UTC-5): ${formatted}. Úsala para calcular fechas relativas como "mañana" o "el viernes" al confirmar una cita con la herramienta ${MARK_APPOINTMENT_TOOL_NAME}.`;
+  return `[Contexto del sistema, no lo menciones al cliente — FECHA Y HORA ACTUAL (zona horaria Colombia, UTC-5): ${formatted}. Úsala para calcular fechas relativas como "mañana" o "el viernes" al confirmar una cita con la herramienta ${MARK_APPOINTMENT_TOOL_NAME}.]`;
 }
 
 export type DetectedAppointment = { at: string; note: string };
@@ -388,7 +395,6 @@ export async function generateAgentReply(params: {
     params.owner,
     params.catalog,
   );
-  system[system.length - 1].text += buildCurrentDateTimeBlock();
   if (availableMedia.length > 0) {
     system[system.length - 1].text += buildAvailableMediaBlock(availableMedia);
   }
@@ -405,7 +411,13 @@ export async function generateAgentReply(params: {
   // non-empty content") — a caption-less photo, or a media-only reply in the
   // history, would otherwise fail the whole call and leave the customer
   // with no answer at all.
-  const history = params.history.map((msg) => ({ ...msg, content: msg.content.trim() || "[Adjunto]" }));
+  const history: Anthropic.MessageParam[] = params.history.map((msg) => ({ ...msg, content: msg.content.trim() || "[Adjunto]" }));
+  // Cache the conversation up to the previous message: the next reply in
+  // this chat reads it at a tenth of the price instead of paying it again.
+  const last = history.at(-1);
+  if (last && typeof last.content === "string") {
+    last.content = [{ type: "text", text: last.content, cache_control: { type: "ephemeral", ttl: "1h" } }];
+  }
   const images = params.userImages ?? [];
   const userText = params.userMessage.trim() || (images.length > 0 ? "(El cliente envió esta imagen sin texto.)" : "[Adjunto]");
   const userContent: Anthropic.ContentBlockParam[] = [
@@ -415,6 +427,7 @@ export async function generateAgentReply(params: {
         source: { type: "base64", media_type: img.mediaType, data: img.data },
       }),
     ),
+    { type: "text", text: buildCurrentDateTimeBlock() },
     { type: "text", text: userText },
   ];
 

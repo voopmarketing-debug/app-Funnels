@@ -66,6 +66,29 @@ export const BROADCAST_LIMITS: Record<PlanTier, number | null> = {
   SCALE: null,
 };
 
+// AI replies per account per calendar month (all its lines together): the
+// hard ceiling on what an account can cost in AI, on top of PLAN_LIMITS'
+// contacts. ~US$0.004 per cached reply on Sonnet keeps a client that uses
+// it all well inside the plan's margin. Past the limit the agent keeps
+// answering on the economical model for AI_REPLY_OVERFLOW more, so nobody's
+// agent goes quiet mid-sale, then stops until the month renews or the
+// account buys a pack (each extra contact adds REPLIES_PER_EXTRA_CONTACT).
+// Never mentioned to the end customer.
+export const AI_REPLY_LIMITS: Record<PlanTier, number | null> = {
+  STARTER: 6000,
+  PRO: 18000,
+  SCALE: null,
+};
+export const AI_REPLY_OVERFLOW = 0.2;
+export const REPLIES_PER_EXTRA_CONTACT = 15;
+export const ECONOMY_AGENT_MODEL = "claude-haiku-4-5";
+
+// Fair use per end customer: AI replies to one contact in 24 hours. A real
+// sale closes in far fewer; this stops bots and endless loops. The chat is
+// handed to a human (silently for the customer) and the AI comes back on
+// its own after 24 hours.
+export const CONTACT_DAILY_AI_REPLIES = 30;
+
 export const PLAN_TIERS: PlanTier[] = ["STARTER", "PRO", "SCALE"];
 
 export type PlanUsageStatus = "good" | "warning" | "critical" | "unlimited";
