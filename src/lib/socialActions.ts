@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { listAdAccounts, listPages } from "@/lib/metaSocial";
+import { sendReply } from "@/lib/metaInbox";
 import { clearSocialCache, getSocialDashboard } from "@/lib/socialDashboard";
 import { RANGE_PRESETS, todayInColombia } from "@/lib/socialRanges";
 import { MIN_POSTS, generateContentDiagnosis as runContentDiagnosis, type ContentDiagnosis } from "@/lib/contentDiagnosis";
@@ -111,4 +112,48 @@ export async function generateContentDiagnosis(businessId: string): Promise<Cont
     console.error("[social] content diagnosis failed", err);
     return { status: "error", message: "No se pudo generar el diagnóstico. Intenta de nuevo en un momento." };
   }
+}
+
+// ---- Mensajes (Messenger + Instagram Direct, answered by people) ----
+
+const inboxPath = (businessId: string) => `/dashboard/businesses/${businessId}/redes/mensajes`;
+
+export async function sendSocialReply(
+  businessId: string,
+  thread: { conversationId: string; network: "facebook" | "instagram"; recipientId: string },
+  text: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireBusinessMembership(await userId(), businessId);
+  const body = text.trim().slice(0, 2000);
+  if (!body) return { ok: false, error: "Escribe un mensaje" };
+  const connection = await prisma.socialConnection.findUnique({ where: { businessId }, select: { fbPageId: true, pageAccessToken: true } });
+  if (!connection?.fbPageId || !connection.pageAccessToken) return { ok: false, error: "Conecta tu página de Facebook primero." };
+  try {
+    await sendReply({ pageId: connection.fbPageId, pageToken: decryptSecret(connection.pageAccessToken), recipientId: thread.recipientId, text: body });
+  } catch (err) {
+    console.error("[social] reply failed", err);
+    return { ok: false, error: err instanceof Error ? err.message : "Meta no dejó enviar el mensaje." };
+  }
+  // Answering a thread reads it and puts it back in the open list.
+  await prisma.socialThreadState.upsert({
+    where: { businessId_conversationId: { businessId, conversationId: thread.conversationId } },
+    create: { businessId, conversationId: thread.conversationId, network: thread.network, readAt: new Date() },
+    update: { readAt: new Date() },
+  });
+  revalidatePath(inboxPath(businessId));
+  return { ok: true };
+}
+
+export async function setSocialThreadResolved(
+  businessId: string,
+  thread: { conversationId: string; network: "facebook" | "instagram" },
+  resolved: boolean,
+): Promise<void> {
+  await requireBusinessMembership(await userId(), businessId);
+  await prisma.socialThreadState.upsert({
+    where: { businessId_conversationId: { businessId, conversationId: thread.conversationId } },
+    create: { businessId, conversationId: thread.conversationId, network: thread.network, resolvedAt: resolved ? new Date() : null, readAt: new Date() },
+    update: { resolvedAt: resolved ? new Date() : null },
+  });
+  revalidatePath(inboxPath(businessId));
 }

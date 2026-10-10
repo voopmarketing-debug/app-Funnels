@@ -978,6 +978,21 @@ model SocialConnection {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
+// Our own state for a Messenger / Instagram Direct conversation (the
+// messages themselves stay in Meta and are read live): when someone on the
+// team last opened it and whether they marked it resolved.
+model SocialThreadState {
+  id             String    @id @default(cuid())
+  businessId     String
+  conversationId String
+  network        String
+  readAt         DateTime?
+  resolvedAt     DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([businessId, conversationId])
+}
+
 // Short-lived copy of what Meta answered for one view (range + section), so
 // moving around the module doesn't call Meta again every time.
 model SocialMetricCache {

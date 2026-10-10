@@ -27,6 +27,7 @@ import { StatTile } from "../analytics/StatTile";
 import { CostIcon, CursorClickIcon, WhatsAppSmallIcon } from "../analytics/StatIcons";
 import { AccountPicker, AdsDailyChart, DisconnectButton, NetworkChart, RefreshButton } from "./controls";
 import { DateRangePicker } from "./DateRangePicker";
+import { RedesTabs } from "./RedesTabs";
 import { CampaignsTable, PostsTable } from "./tables";
 import { ContentDiagnosisPanel } from "./ContentDiagnosisPanel";
 import { moneyFormatter, shortDateTime } from "./format";
@@ -630,8 +631,9 @@ export default async function RedesPage({ params, searchParams }: { params: Prom
               Cómo le va a tu Facebook, tu Instagram y tus anuncios: qué funciona, qué no y qué hacer ahora.
             </p>
           </div>
-          {hasSelection && <DateRangePicker value={range} today={today} />}
+          <RedesTabs businessId={id} active="metricas" />
         </div>
+        {hasSelection && <DateRangePicker value={range} today={today} />}
         {connection && hasSelection && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {connection.fbPageName && (

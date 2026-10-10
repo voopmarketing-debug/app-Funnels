@@ -16,6 +16,10 @@ export const META_SOCIAL_SCOPES = [
   "instagram_manage_insights",
   "ads_read",
   "business_management",
+  // The Mensajes inbox (Messenger + Instagram Direct, answered by people).
+  "pages_messaging",
+  "pages_manage_metadata",
+  "instagram_manage_messages",
 ];
 
 export class MetaApiError extends Error {
@@ -80,7 +84,7 @@ export function metaLoginUrl(state: string): string {
 
 type GraphError = { error?: { message?: string; code?: number; error_user_msg?: string } };
 
-async function graph<T>(path: string, params: Record<string, string>, token: string): Promise<T> {
+export async function graph<T>(path: string, params: Record<string, string>, token: string): Promise<T> {
   const url = new URL(path.startsWith("http") ? path : `${GRAPH}/${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   if (token) url.searchParams.set("access_token", token);
@@ -93,7 +97,7 @@ async function graph<T>(path: string, params: Record<string, string>, token: str
 }
 
 /** Follows `paging.next` up to `maxPages`. */
-async function graphAll<T>(path: string, params: Record<string, string>, token: string, maxPages = 5): Promise<T[]> {
+export async function graphAll<T>(path: string, params: Record<string, string>, token: string, maxPages = 5): Promise<T[]> {
   const out: T[] = [];
   let page = await graph<{ data: T[]; paging?: { next?: string } }>(path, params, token);
   out.push(...page.data);
