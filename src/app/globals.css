@@ -333,3 +333,107 @@ a:active {
   from { background-position: 0% 50%; }
   to { background-position: 100% 50%; }
 }
+
+@layer components {
+  /*
+   * Tactile controls: a sunken track (.fl-seg) whose chosen option sits
+   * raised on it, and raised buttons/selects (.fl-raised) that press down
+   * when clicked. Used by every period/section switcher so they all feel
+   * like the same physical control.
+   */
+  .fl-seg {
+    display: inline-flex;
+    max-width: 100%;
+    gap: 0.25rem;
+    padding: 0.3rem;
+    border-radius: 0.95rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, 0.16),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .fl-seg-item {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    border-radius: 0.7rem;
+    padding: 0.5rem 0.95rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease,
+      box-shadow 0.15s ease,
+      transform 0.15s ease;
+  }
+  .fl-seg-item:hover {
+    color: var(--ink);
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  }
+  .fl-seg-item:is([aria-checked="true"], [aria-current], [aria-selected="true"]) {
+    color: var(--accent-ink);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 82%, white), var(--accent) 55%, var(--accent-hover));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16),
+      0 4px 12px -3px rgba(var(--glow-accent), 0.55),
+      0 1px 2px rgba(0, 0, 0, 0.3);
+    transform: translateY(-1px);
+  }
+  .fl-seg-item:active {
+    transform: translateY(0);
+  }
+
+  .fl-raised {
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 2px 0 var(--border-strong),
+      0 8px 18px -10px rgba(0, 0, 0, 0.45);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease,
+      border-color 0.15s ease;
+  }
+  .fl-raised:hover {
+    border-color: rgba(var(--glow-accent), 0.55);
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 3px 0 var(--border-strong),
+      0 12px 22px -10px rgba(var(--glow-accent), 0.35);
+  }
+  .fl-raised:active {
+    transform: translateY(1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 1px 0 var(--border-strong);
+  }
+  :root[data-theme="light"] .fl-raised {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 2px 0 var(--border-strong),
+      0 8px 18px -12px rgba(22, 22, 15, 0.35);
+  }
+  :root[data-theme="light"] .fl-seg {
+    box-shadow:
+      inset 0 2px 4px rgba(22, 22, 15, 0.08),
+      inset 0 -1px 0 #fff;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fl-seg-item,
+    .fl-raised {
+      transition: none;
+      transform: none !important;
+    }
+  }
+}

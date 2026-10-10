@@ -149,12 +149,14 @@ export function DateRangePicker({ value, today }: { value: DayRange; today: stri
           setOpen((v) => !v);
         }}
         aria-expanded={open}
-        className={`flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink transition hover:border-accent ${pending ? "opacity-70" : ""}`}
+        className={`fl-raised flex max-w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-ink ${pending ? "opacity-70" : ""}`}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke="currentColor" strokeWidth="2" />
-          <path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
+        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-accent/15 text-accent" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke="currentColor" strokeWidth="2" />
+            <path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </span>
         <span className="tabular-nums">{rangeLabel(value)}</span>
         {activePreset && <span className="hidden font-normal text-ink-muted sm:inline">· {activePreset.label}</span>}
         <span className="text-ink-muted" aria-hidden="true">

@@ -285,19 +285,17 @@ export default async function MensajesPage({
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
               />
             </form>
-            <div role="tablist" className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1">
+            <div role="tablist" className="fl-seg grid w-full grid-cols-3">
               {FILTERS.map((f) => (
                 <Link
                   key={f.key}
                   href={href({ f: f.key, c: null })}
                   role="tab"
                   aria-selected={filter === f.key}
-                  className={`flex items-center justify-center gap-1 rounded-lg px-1 py-2 text-xs font-semibold transition ${
-                    filter === f.key ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-                  }`}
+                  className="fl-seg-item px-1 text-xs"
                 >
                   {f.label}
-                  <span className="font-normal text-ink-muted">{counts[f.key]}</span>
+                  <span className="font-normal opacity-75">{counts[f.key]}</span>
                 </Link>
               ))}
             </div>

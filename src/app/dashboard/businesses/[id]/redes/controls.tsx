@@ -22,9 +22,9 @@ export function RefreshButton({ businessId, updatedLabel }: { businessId: string
             setNote(res.ok ? null : "Se acaba de actualizar; espera un par de minutos");
           })
         }
-        className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-ink-muted transition hover:border-accent hover:text-ink disabled:opacity-60"
+        className="fl-raised rounded-xl px-3.5 py-2 text-xs font-semibold text-ink disabled:opacity-60"
       >
-        {pending ? "Actualizando…" : "Actualizar"}
+        {pending ? "Actualizando…" : "↻ Actualizar"}
       </button>
     </div>
   );
@@ -165,7 +165,7 @@ export function AdsDailyChart({ days, daily, currency }: { days: string[]; daily
   const label = AD_METRICS.find((m) => m.key === metric)!.label;
   return (
     <div className="space-y-3">
-      <div role="radiogroup" aria-label="Métrica" className="inline-flex max-w-full overflow-x-auto rounded-lg border border-border bg-background p-0.5 [scrollbar-width:none]">
+      <div role="radiogroup" aria-label="Métrica" className="fl-seg">
         {AD_METRICS.map((m) => (
           <button
             key={m.key}
@@ -173,7 +173,7 @@ export function AdsDailyChart({ days, daily, currency }: { days: string[]; daily
             role="radio"
             aria-checked={m.key === metric}
             onClick={() => setMetric(m.key)}
-            className={`flex-none rounded-md px-3 py-1.5 text-xs font-semibold transition ${m.key === metric ? "bg-surface-2 text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+            className="fl-seg-item"
           >
             {m.label}
           </button>
