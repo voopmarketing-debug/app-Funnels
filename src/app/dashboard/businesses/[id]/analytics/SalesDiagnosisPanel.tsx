@@ -178,7 +178,7 @@ export function SalesDiagnosisPanel({
 
             {/* One list at a time instead of three stacked: much less scroll. */}
             <div>
-              <div role="tablist" aria-label="Detalle del diagnóstico" className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1">
+              <div role="tablist" aria-label="Detalle del diagnóstico" className="fl-seg grid w-full grid-cols-3">
                 {TABS.map((t) => {
                   const count = t.key === "fix" ? d.debilidades.length : t.key === "todo" ? Math.max(0, d.recomendaciones.length - 1) : d.fortalezas.length;
                   const active = tab === t.key;
@@ -189,9 +189,7 @@ export function SalesDiagnosisPanel({
                       role="tab"
                       aria-selected={active}
                       onClick={() => setTab(t.key)}
-                      className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 py-2.5 text-[13px] font-semibold transition sm:text-sm ${
-                        active ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-                      }`}
+                      className="fl-seg-item min-w-0 px-1.5 py-2.5 text-[13px] sm:text-sm"
                     >
                       <span className={`hidden h-2 w-2 flex-none rounded-full sm:block ${t.dot}`} />
                       <span className="truncate">{t.label}</span>

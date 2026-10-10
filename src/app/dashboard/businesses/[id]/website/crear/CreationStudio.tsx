@@ -358,7 +358,7 @@ export function CreationStudio({
                           disabled={needsProducts}
                           onClick={() => setPlan({ ...plan, pageType: k })}
                           aria-pressed={active}
-                          className={`flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left transition disabled:opacity-50 ${
+                          className={`fl-option flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left disabled:opacity-50 ${
                             active ? "border-accent bg-accent/10" : "border-border hover:border-border-strong"
                           }`}
                         >
@@ -386,7 +386,7 @@ export function CreationStudio({
                           type="button"
                           onClick={() => setPlan({ ...plan, style: k })}
                           aria-pressed={active}
-                          className={`overflow-hidden rounded-lg border-2 text-left transition ${active ? "border-accent" : "border-border hover:border-border-strong"}`}
+                          className={`fl-option overflow-hidden rounded-lg border-2 text-left ${active ? "border-accent" : "border-border hover:border-border-strong"}`}
                         >
                           <ScaledPagePreview src={previewSrc(k, plan.pageType)} aspect={0.62} title={`Estilo ${STYLE_INFO[k].label}`} />
                           <span className="flex items-center justify-between gap-1 px-2 py-1.5">

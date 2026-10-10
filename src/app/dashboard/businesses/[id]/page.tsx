@@ -176,7 +176,7 @@ export default async function BusinessPage({
     ) : null;
 
   const shortcutClass =
-    "flex-none whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-sm font-medium text-ink-muted transition hover:border-accent hover:text-ink";
+    "fl-raised flex-none whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-semibold text-ink-muted hover:text-ink";
 
   return (
     <div className="space-y-6 md:space-y-8">

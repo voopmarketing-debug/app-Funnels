@@ -34,15 +34,23 @@ export function CrmTabs({ activeTab }: { activeTab: string }) {
           <Link
             key={tab.key}
             href={query ? `${pathname}?${query}` : pathname}
-            className="flex flex-none items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-semibold transition"
+            aria-current={active ? "page" : undefined}
+            className="flex flex-none items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-semibold transition hover:-translate-y-px"
             style={
               active
                 ? {
-                    borderColor: `rgba(var(${tab.glowVar}), 0.4)`,
-                    background: `rgba(var(${tab.glowVar}), 0.16)`,
+                    borderColor: `rgba(var(${tab.glowVar}), 0.5)`,
+                    background: `linear-gradient(180deg, rgba(var(${tab.glowVar}), 0.24), rgba(var(${tab.glowVar}), 0.1))`,
                     color: `rgba(var(${tab.glowVar}), 1)`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.12), 0 6px 16px -8px rgba(var(${tab.glowVar}), 0.7)`,
+                    transform: "translateY(-1px)",
                   }
-                : { borderColor: "var(--border)", color: "var(--ink-muted)" }
+                : {
+                    borderColor: "var(--border)",
+                    color: "var(--ink-muted)",
+                    background: "linear-gradient(180deg, var(--surface), var(--surface-2))",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 0 var(--border-strong)",
+                  }
             }
           >
             <Icon />

@@ -172,7 +172,7 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
             </div>
 
             <div>
-              <div role="tablist" aria-label="Detalle del diagnóstico" className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1">
+              <div role="tablist" aria-label="Detalle del diagnóstico" className="fl-seg grid w-full grid-cols-3">
                 {TABS.map((t) => {
                   const count = t.key === "todo" ? Math.max(0, d.recomendaciones.length - 1) : t.key === "good" ? d.funciona.length : d.noFunciona.length;
                   return (
@@ -182,9 +182,7 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
                       role="tab"
                       aria-selected={tab === t.key}
                       onClick={() => setTab(t.key)}
-                      className={`flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1.5 py-2.5 text-[13px] font-semibold transition sm:text-sm ${
-                        tab === t.key ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-                      }`}
+                      className="fl-seg-item min-w-0 px-1.5 py-2.5 text-[13px] sm:text-sm"
                     >
                       <span className={`hidden h-2 w-2 flex-none rounded-full sm:block ${t.dot}`} />
                       <span className="truncate">{t.label}</span>

@@ -94,7 +94,7 @@ export function ProductManager({ businessId, products, maxProducts }: { business
       </div>
 
       {productCount > 0 && serviceCount > 0 && (
-        <div role="tablist" aria-label="Filtrar catálogo" className="flex flex-wrap gap-2">
+        <div role="tablist" aria-label="Filtrar catálogo" className="fl-seg">
           {(
             [
               ["ALL", "Todo", products.length],
@@ -108,11 +108,9 @@ export function ProductManager({ businessId, products, maxProducts }: { business
               role="tab"
               aria-selected={filter === key}
               onClick={() => setFilter(key)}
-              className={`h-8 rounded-full border px-3 text-sm transition ${
-                filter === key ? "border-accent bg-accent/15 font-semibold text-ink" : "border-border text-ink-muted hover:border-border-strong"
-              }`}
+              className="fl-seg-item text-sm"
             >
-              {label} <span className="fl-mono text-xs tabular-nums text-ink-faint">{count}</span>
+              {label} <span className="fl-mono text-xs tabular-nums opacity-70">{count}</span>
             </button>
           ))}
         </div>
@@ -383,7 +381,7 @@ function ProductForm({
                   role="radio"
                   aria-checked={selected}
                   onClick={() => setKind(k)}
-                  className={`flex items-start gap-3 rounded-xl border-2 p-3 text-left transition ${
+                  className={`fl-option flex items-start gap-3 rounded-xl border-2 p-3 text-left ${
                     selected ? "border-accent bg-accent/10" : "border-border hover:border-border-strong"
                   }`}
                 >

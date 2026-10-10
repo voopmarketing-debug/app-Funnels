@@ -436,4 +436,146 @@ a:active {
       transform: none !important;
     }
   }
+
+  /* ---- Depth everywhere: the same lit-from-above light on every surface ---- */
+  .fl-card,
+  .fl-card-hero {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 1px 0 rgba(0, 0, 0, 0.25),
+      0 14px 34px -22px rgba(0, 0, 0, 0.7);
+  }
+  :root[data-theme="light"] :is(.fl-card, .fl-card-hero) {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 1px 2px rgba(22, 22, 15, 0.05),
+      0 14px 30px -22px rgba(22, 22, 15, 0.28);
+  }
+
+  /* Accent-filled buttons and links: a raised key that presses down. */
+  :is(button, a, [role="button"]).bg-accent {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.08));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16),
+      0 6px 16px -6px rgba(var(--glow-accent), 0.6);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.15s ease,
+      background-color 0.15s ease,
+      opacity 0.15s ease;
+  }
+  :is(button, a, [role="button"]).bg-accent:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16),
+      0 10px 22px -8px rgba(var(--glow-accent), 0.75);
+  }
+  :is(button, a, [role="button"]).bg-accent:not(:disabled):active {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Outlined secondary buttons across the app get the same raised key. */
+  :is(button, a).border-border-strong:not(.bg-accent) {
+    background-image: linear-gradient(180deg, var(--surface), var(--surface-2));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 1px 0 var(--border-strong),
+      0 6px 14px -10px rgba(0, 0, 0, 0.5);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+  :is(button, a).border-border-strong:not(.bg-accent):not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 2px 0 var(--border-strong),
+      0 10px 18px -10px rgba(var(--glow-accent), 0.35);
+  }
+  :is(button, a).border-border-strong:not(.bg-accent):not(:disabled):active {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.18);
+  }
+  :root[data-theme="light"] :is(button, a).border-border-strong:not(.bg-accent) {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 1px 0 var(--border-strong),
+      0 6px 14px -10px rgba(22, 22, 15, 0.3);
+  }
+
+  /* The open section in the sidebar sits raised like the chosen option of a switcher. */
+  .fl-nav-item[data-active="true"],
+  .fl-nav-icon[data-active="true"] {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 82%, white), var(--accent) 55%, var(--accent-hover));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.16),
+      0 8px 20px -8px rgba(var(--glow-accent), 0.7);
+  }
+
+  /* Filter chips (CRM stages, tags, quick filters). */
+  .fl-chip {
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 1px 0 var(--border-strong);
+    color: var(--ink-muted);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .fl-chip:hover {
+    color: var(--ink);
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+  }
+  .fl-chip:is([aria-pressed="true"], [aria-selected="true"], [aria-checked="true"]) {
+    color: var(--ink);
+    border-color: rgba(var(--glow-accent), 0.6);
+    background: linear-gradient(180deg, rgba(var(--glow-accent), 0.22), rgba(var(--glow-accent), 0.1));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 0 0 1px rgba(var(--glow-accent), 0.15),
+      0 6px 14px -8px rgba(var(--glow-accent), 0.65);
+  }
+
+  /* Big selectable cards (page type, product vs service…). */
+  .fl-option {
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
+  }
+  .fl-option:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -16px rgba(0, 0, 0, 0.55);
+  }
+  .fl-option:is([aria-pressed="true"], [aria-checked="true"]) {
+    box-shadow:
+      0 0 0 1px rgba(var(--glow-accent), 0.35),
+      0 12px 28px -14px rgba(var(--glow-accent), 0.55);
+  }
+
+  /* Text fields light up when focused. */
+  :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]), textarea, select):focus-visible {
+    box-shadow: 0 0 0 3px rgba(var(--glow-accent), 0.18);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(button, a, [role="button"]).bg-accent,
+    :is(button, a).border-border-strong,
+    .fl-chip,
+    .fl-option {
+      transition: none;
+      transform: none !important;
+    }
+  }
 }

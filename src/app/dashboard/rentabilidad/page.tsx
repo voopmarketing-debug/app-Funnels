@@ -179,7 +179,7 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
             diagnósticos) y las comisiones de cobro. Lo que cobra Meta por WhatsApp lo paga cada cliente en su cuenta.
           </p>
         </div>
-        <nav aria-label="Mes" className="inline-flex max-w-full overflow-x-auto rounded-lg border border-border bg-surface p-0.5 [scrollbar-width:none]">
+        <nav aria-label="Mes" className="fl-seg">
           {lastMonths(now, 6)
             .reverse()
             .map((key) => (
@@ -187,9 +187,7 @@ export default async function RentabilidadPage({ searchParams }: { searchParams:
                 key={key}
                 href={`/dashboard/rentabilidad?mes=${key}`}
                 aria-current={key === selected ? "page" : undefined}
-                className={`flex-none whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                  key === selected ? "bg-accent text-accent-ink shadow-sm" : "text-ink-muted hover:text-ink"
-                }`}
+                className="fl-seg-item text-xs"
               >
                 {monthLabel(key).split(" ")[0].slice(0, 3)}
               </Link>

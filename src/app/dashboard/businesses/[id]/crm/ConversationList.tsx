@@ -80,13 +80,11 @@ export function ConversationList({
                 title={f.hint}
                 onClick={() => setFilter(f.id)}
                 aria-pressed={active}
-                className={`flex flex-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium transition sm:py-1 ${
-                  active ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-muted hover:text-ink"
-                }`}
+                className="fl-chip flex flex-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium sm:py-1"
               >
                 {f.label}
                 {f.id !== "all" && counts[f.id] > 0 && (
-                  <span className={`fl-mono text-[12px] ${active ? "opacity-80" : "text-ink-faint"}`}>{counts[f.id]}</span>
+                  <span className={`fl-mono text-[12px] ${active ? "text-accent" : "text-ink-faint"}`}>{counts[f.id]}</span>
                 )}
               </button>
             );

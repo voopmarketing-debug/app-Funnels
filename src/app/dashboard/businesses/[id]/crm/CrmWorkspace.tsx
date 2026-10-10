@@ -271,9 +271,7 @@ export function CrmWorkspace({
                         type="button"
                         aria-pressed={active}
                         onClick={() => toggle("stageIds", s.id)}
-                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition ${
-                          active ? "border-accent bg-accent/10 font-semibold text-accent" : "border-border text-ink-muted hover:text-ink"
-                        }`}
+                        className={`fl-chip flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${active ? "font-semibold" : ""}`}
                       >
                         <span className={`h-1.5 w-1.5 rounded-full ${stageStyle(s.position).dot}`} />
                         {s.name}
@@ -304,9 +302,7 @@ export function CrmWorkspace({
                         type="button"
                         aria-pressed={active}
                         onClick={() => toggle("tags", tag)}
-                        className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition ${
-                          active ? "border-accent bg-accent/10 font-semibold text-accent" : "border-border text-ink hover:bg-surface-2"
-                        }`}
+                        className={`fl-chip flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs ${active ? "font-semibold" : ""}`}
                       >
                         <span className="truncate">{tag}</span>
                         <span className="flex-none text-ink-faint">{count}</span>

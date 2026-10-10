@@ -185,7 +185,7 @@ export function WebsiteBuilder({
             {PAGE_TYPE_LABELS[content.pageType]} · {STYLE_INFO[content.style].label}
           </p>
         </div>
-        <div className="mx-auto hidden items-center gap-1 rounded-lg border border-border bg-background p-0.5 md:flex" role="radiogroup" aria-label="Vista">
+        <div className="fl-seg mx-auto hidden md:inline-flex" role="radiogroup" aria-label="Vista">
           {(["desktop", "tablet", "mobile"] as Device[]).map((d) => (
             <button
               key={d}
@@ -193,7 +193,7 @@ export function WebsiteBuilder({
               role="radio"
               aria-checked={device === d}
               onClick={() => setDevice(d)}
-              className={`rounded-md px-3 py-1 text-xs font-semibold ${device === d ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"}`}
+              className="fl-seg-item px-3 py-1.5 text-xs"
             >
               {d === "desktop" ? "🖥 Escritorio" : d === "tablet" ? "Tablet" : "📱 Celular"}
             </button>
