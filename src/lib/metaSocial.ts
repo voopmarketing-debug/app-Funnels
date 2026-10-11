@@ -20,6 +20,10 @@ export const META_SOCIAL_SCOPES = [
   "pages_messaging",
   "pages_manage_metadata",
   "instagram_manage_messages",
+  // Comentarios: read who commented, answer and hide comments.
+  "pages_read_user_content",
+  "pages_manage_engagement",
+  "instagram_manage_comments",
 ];
 
 export class MetaApiError extends Error {

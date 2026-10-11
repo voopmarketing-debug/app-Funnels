@@ -7,6 +7,8 @@ import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { friendlyMetaError, listAdAccounts, listPages } from "@/lib/metaSocial";
 import { isConversationId, sendReply, threadParticipantIds } from "@/lib/metaInbox";
+import { isCommentId, privateReplyToComment, replyToComment, setCommentHidden, type CommentNetwork } from "@/lib/metaComments";
+import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { clearSocialCache, getSocialDashboard } from "@/lib/socialDashboard";
 import { RANGE_PRESETS, todayInColombia } from "@/lib/socialRanges";
 import { MIN_POSTS, generateContentDiagnosis as runContentDiagnosis, type ContentDiagnosis } from "@/lib/contentDiagnosis";
@@ -170,4 +172,65 @@ export async function setSocialThreadResolved(
     update: { resolvedAt: resolved ? new Date() : null },
   });
   revalidatePath(inboxPath(businessId));
+}
+
+// ---- Comentarios ----
+
+const commentsPath = (businessId: string) => `/dashboard/businesses/${businessId}/redes/comentarios`;
+// Generous for a team answering by hand; stops a runaway script from
+// getting the Page flagged by Meta for spam.
+const COMMENT_ACTIONS_PER_HOUR = 200;
+
+type CommentAction =
+  | { kind: "reply"; text: string }
+  | { kind: "private"; text: string }
+  | { kind: "hide"; hidden: boolean };
+
+export async function actOnSocialComment(
+  businessId: string,
+  comment: { id: string; network: CommentNetwork },
+  action: CommentAction,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireBusinessMembership(await userId(), businessId);
+  if (!isCommentId(comment.id) || !NETWORKS.has(comment.network)) return { ok: false, error: "Este comentario ya no está disponible. Recarga la página." };
+  const text = action.kind === "hide" ? "" : action.text.trim().slice(0, 2000);
+  if (action.kind !== "hide" && !text) return { ok: false, error: "Escribe una respuesta" };
+
+  const limitKey = `social-comment:${businessId}`;
+  if (await isRateLimited(limitKey, COMMENT_ACTIONS_PER_HOUR, 60 * 60 * 1000)) {
+    return { ok: false, error: "Respondiste muchos comentarios en la última hora. Espera un rato para que Meta no lo tome como spam." };
+  }
+  const connection = await prisma.socialConnection.findUnique({ where: { businessId }, select: { fbPageId: true, pageAccessToken: true } });
+  if (!connection?.fbPageId || !connection.pageAccessToken) return { ok: false, error: "Conecta tu página de Facebook primero." };
+  const pageToken = decryptSecret(connection.pageAccessToken);
+  try {
+    if (action.kind === "reply") await replyToComment({ network: comment.network, commentId: comment.id, text, pageToken });
+    else if (action.kind === "private") await privateReplyToComment({ pageId: connection.fbPageId, commentId: comment.id, text, pageToken });
+    else await setCommentHidden({ network: comment.network, commentId: comment.id, hidden: action.hidden, pageToken });
+  } catch (err) {
+    console.error(`[social] comment ${action.kind} failed`, err);
+    return { ok: false, error: friendlyMetaError(err, "Meta no dejó hacerlo ahora. Intenta de nuevo en un momento.") };
+  }
+  await recordRateLimitEvent(limitKey);
+  // Answering (publicly or in private) settles the comment.
+  if (action.kind !== "hide") await markCommentDone(businessId, comment, true);
+  revalidatePath(commentsPath(businessId));
+  return { ok: true };
+}
+
+async function markCommentDone(businessId: string, comment: { id: string; network: CommentNetwork }, done: boolean): Promise<void> {
+  // Same table as the DM inbox: a comment id never collides with a conversation id.
+  await prisma.socialThreadState.upsert({
+    where: { businessId_conversationId: { businessId, conversationId: comment.id } },
+    create: { businessId, conversationId: comment.id, network: comment.network, readAt: new Date(), resolvedAt: done ? new Date() : null },
+    update: { resolvedAt: done ? new Date() : null },
+  });
+}
+
+/** "Listo" for comments that need no answer (an emoji, a tag to a friend). */
+export async function setSocialCommentDone(businessId: string, comment: { id: string; network: CommentNetwork }, done: boolean): Promise<void> {
+  await requireBusinessMembership(await userId(), businessId);
+  if (!isCommentId(comment.id) || !NETWORKS.has(comment.network)) return;
+  await markCommentDone(businessId, comment, done);
+  revalidatePath(commentsPath(businessId));
 }
