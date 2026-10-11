@@ -101,3 +101,30 @@ describe("isMissingPermission", () => {
     expect(isMissingPermission(new MetaApiError("Invalid OAuth access token", 190))).toBe(false);
   });
 });
+
+describe("hardening", () => {
+  it("only renders https media", async () => {
+    const { safeMediaUrl } = await import("./metaInbox");
+    expect(safeMediaUrl("https://scontent.xx.fbcdn.net/a.jpg")).toBe("https://scontent.xx.fbcdn.net/a.jpg");
+    expect(safeMediaUrl("javascript:alert(1)")).toBeNull();
+    expect(safeMediaUrl("http://example.com/a.jpg")).toBeNull();
+    expect(safeMediaUrl(undefined)).toBeNull();
+  });
+
+  it("accepts Meta ids and rejects anything else", async () => {
+    const { isConversationId } = await import("./metaInbox");
+    expect(isConversationId("t_10161234567890")).toBe(true);
+    expect(isConversationId("aWdfZAG06MTpJR01lc3NhZA2VUaHJlYWQ6")).toBe(true);
+    expect(isConversationId("../me/accounts")).toBe(false);
+    expect(isConversationId("123?fields=access_token")).toBe(false);
+  });
+
+  it("shows our own messages and hides Meta's raw ones", async () => {
+    const { friendlyMetaError } = await import("./metaSocial");
+    expect(friendlyMetaError(new MetaApiError("Pasaron más de 24 horas…", 10, true))).toBe("Pasaron más de 24 horas…");
+    expect(friendlyMetaError(new MetaApiError("(#100) Tried accessing nonexisting field (x) on node 1234567", 100))).toBe(
+      "Meta no respondió. Intenta de nuevo en unos minutos.",
+    );
+    expect(friendlyMetaError(new MetaApiError("Error validating access token", 190))).toMatch(/venció/);
+  });
+});

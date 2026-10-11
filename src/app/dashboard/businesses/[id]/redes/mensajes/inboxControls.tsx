@@ -4,16 +4,32 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { sendSocialReply, setSocialThreadResolved } from "@/lib/socialActions";
 
+const POLL_MS = 30_000;
+const IDLE_STOP_MS = 30 * 60_000;
+
 type ThreadRef = { conversationId: string; network: "facebook" | "instagram"; recipientId: string };
 
-/** Re-reads the inbox from Meta every 20 s while the tab is visible. */
+/**
+ * Re-reads the inbox from Meta every 30 s while the tab is visible, and
+ * stops after 30 minutes without the person touching the page (a forgotten
+ * open tab shouldn't keep spending Meta's rate limit for the whole Page).
+ */
 export function InboxPoller() {
   const router = useRouter();
   useEffect(() => {
+    let lastActivity = Date.now();
+    const touch = () => {
+      lastActivity = Date.now();
+    };
+    const events = ["pointerdown", "keydown", "scroll", "visibilitychange"] as const;
+    events.forEach((e) => window.addEventListener(e, touch, { passive: true }));
     const id = setInterval(() => {
-      if (document.visibilityState === "visible") router.refresh();
-    }, 20_000);
-    return () => clearInterval(id);
+      if (document.visibilityState === "visible" && Date.now() - lastActivity < IDLE_STOP_MS) router.refresh();
+    }, POLL_MS);
+    return () => {
+      clearInterval(id);
+      events.forEach((e) => window.removeEventListener(e, touch));
+    };
   }, [router]);
   return null;
 }

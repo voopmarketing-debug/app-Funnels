@@ -5,8 +5,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
-import { listAdAccounts, listPages } from "@/lib/metaSocial";
-import { sendReply } from "@/lib/metaInbox";
+import { friendlyMetaError, listAdAccounts, listPages } from "@/lib/metaSocial";
+import { isConversationId, sendReply, threadParticipantIds } from "@/lib/metaInbox";
 import { clearSocialCache, getSocialDashboard } from "@/lib/socialDashboard";
 import { RANGE_PRESETS, todayInColombia } from "@/lib/socialRanges";
 import { MIN_POSTS, generateContentDiagnosis as runContentDiagnosis, type ContentDiagnosis } from "@/lib/contentDiagnosis";
@@ -97,6 +97,7 @@ export async function generateContentDiagnosis(businessId: string): Promise<Cont
     let data = await getSocialDashboard(businessId, preset("30d"));
     if ((data.posts?.ok ? data.posts.data.length : 0) < MIN_POSTS) data = await getSocialDashboard(businessId, preset("3m"));
     if (data.needsReconnect) return { status: "error", message: "Tu conexión con Facebook venció. Reconéctala y vuelve a intentarlo." };
+    if (data.throttled) return { status: "error", message: "Consultaste muchos periodos seguidos. Espera unos minutos y vuelve a intentarlo." };
 
     const result = await withAiUsage(businessId, "DIAGNOSIS", () => runContentDiagnosis(businessId, data));
     if (result.status === "insufficient_data") return result;
@@ -117,6 +118,7 @@ export async function generateContentDiagnosis(businessId: string): Promise<Cont
 // ---- Mensajes (Messenger + Instagram Direct, answered by people) ----
 
 const inboxPath = (businessId: string) => `/dashboard/businesses/${businessId}/redes/mensajes`;
+const NETWORKS = new Set(["facebook", "instagram"]);
 
 export async function sendSocialReply(
   businessId: string,
@@ -126,13 +128,24 @@ export async function sendSocialReply(
   await requireBusinessMembership(await userId(), businessId);
   const body = text.trim().slice(0, 2000);
   if (!body) return { ok: false, error: "Escribe un mensaje" };
+  if (!isConversationId(thread.conversationId) || !isConversationId(thread.recipientId) || !NETWORKS.has(thread.network)) {
+    return { ok: false, error: "Esta conversación ya no está disponible. Recarga la página." };
+  }
   const connection = await prisma.socialConnection.findUnique({ where: { businessId }, select: { fbPageId: true, pageAccessToken: true } });
   if (!connection?.fbPageId || !connection.pageAccessToken) return { ok: false, error: "Conecta tu página de Facebook primero." };
+  const pageToken = decryptSecret(connection.pageAccessToken);
   try {
-    await sendReply({ pageId: connection.fbPageId, pageToken: decryptSecret(connection.pageAccessToken), recipientId: thread.recipientId, text: body });
+    // The reply only goes to someone who is part of this Page's conversation:
+    // the ids come from the browser, so they're checked against Meta.
+    const participants = await threadParticipantIds(thread.conversationId, pageToken);
+    if (!participants.includes(thread.recipientId)) {
+      console.warn("[social] reply blocked: recipient not in conversation", { businessId });
+      return { ok: false, error: "Esta conversación ya no está disponible. Recarga la página." };
+    }
+    await sendReply({ pageId: connection.fbPageId, pageToken, recipientId: thread.recipientId, text: body });
   } catch (err) {
     console.error("[social] reply failed", err);
-    return { ok: false, error: err instanceof Error ? err.message : "Meta no dejó enviar el mensaje." };
+    return { ok: false, error: friendlyMetaError(err, "Meta no dejó enviar el mensaje. Intenta de nuevo en un momento.") };
   }
   // Answering a thread reads it and puts it back in the open list.
   await prisma.socialThreadState.upsert({
@@ -150,6 +163,7 @@ export async function setSocialThreadResolved(
   resolved: boolean,
 ): Promise<void> {
   await requireBusinessMembership(await userId(), businessId);
+  if (!isConversationId(thread.conversationId) || !NETWORKS.has(thread.network)) return;
   await prisma.socialThreadState.upsert({
     where: { businessId_conversationId: { businessId, conversationId: thread.conversationId } },
     create: { businessId, conversationId: thread.conversationId, network: thread.network, resolvedAt: resolved ? new Date() : null, readAt: new Date() },

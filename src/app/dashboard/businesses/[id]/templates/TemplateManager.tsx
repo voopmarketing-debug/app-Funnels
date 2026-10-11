@@ -41,7 +41,9 @@ export function TemplateManager({
   businessId,
   templates,
   hasWabaId,
+  canDelete,
 }: {
+  canDelete: boolean;
   businessId: string;
   templates: Template[];
   hasWabaId: boolean;
@@ -85,14 +87,14 @@ export function TemplateManager({
           <p className="fl-card p-4 text-center text-sm text-ink-muted">Todavía no hay plantillas creadas.</p>
         )}
         {templates.map((t) => (
-          <TemplateCard key={t.id} businessId={businessId} template={t} />
+          <TemplateCard key={t.id} businessId={businessId} template={t} canDelete={canDelete} />
         ))}
       </div>
     </div>
   );
 }
 
-function TemplateCard({ businessId, template }: { businessId: string; template: Template }) {
+function TemplateCard({ businessId, template, canDelete }: { businessId: string; template: Template; canDelete: boolean }) {
   const [isPending, startTransition] = useTransition();
   const [isDeleting, startDelete] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -126,6 +128,7 @@ function TemplateCard({ businessId, template }: { businessId: string; template: 
             {isPending ? "Consultando..." : "↻ Revisar estado"}
           </button>
         )}
+        {canDelete && (
         <button
           type="button"
           onClick={remove}
@@ -138,6 +141,7 @@ function TemplateCard({ businessId, template }: { businessId: string; template: 
             <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
           </svg>
         </button>
+        )}
       </div>
       {template.headerImageUrl && (
         // eslint-disable-next-line @next/next/no-img-element

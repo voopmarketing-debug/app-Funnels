@@ -90,7 +90,7 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle: str
 function SectionError({ error }: { error: string }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4 text-sm text-ink-muted">
-      Meta no nos dio estos datos ahora: <span className="text-ink">{error}</span>. Prueba con «Actualizar» en unos minutos.
+      No pudimos traer estos datos de Meta: <span className="text-ink">{error}</span>
     </div>
   );
 }
@@ -302,6 +302,16 @@ async function Dashboard({
   initialDiagnosis: InitialDiagnosis;
 }) {
   const data = await getSocialDashboard(businessId, range);
+  if (data.throttled) {
+    return (
+      <div className="fl-card space-y-2 p-5">
+        <h2 className="text-base font-semibold">Consultaste muchos periodos seguidos</h2>
+        <p className="text-sm text-ink-muted">
+          Para no agotar el límite de consultas que Meta da a tu página, espera unos minutos o vuelve a un periodo que ya hayas visto (esos abren al instante).
+        </p>
+      </div>
+    );
+  }
   if (data.needsReconnect) {
     return (
       <div className="fl-card-hero space-y-3 p-5">

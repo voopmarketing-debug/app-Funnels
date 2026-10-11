@@ -94,12 +94,16 @@ export async function listThreads(params: { pageId: string; igUserId: string | n
 
 function toAttachments(m: RawMessage): InboxAttachment[] {
   const out: InboxAttachment[] = [];
+  const push = (kind: InboxAttachment["kind"], raw: string | undefined, name?: string) => {
+    const url = safeMediaUrl(raw);
+    if (url) out.push({ kind, url, ...(name ? { name } : {}) });
+  };
   for (const a of m.attachments?.data ?? []) {
-    if (a.image_data?.url) out.push({ kind: "image", url: a.image_data.url });
-    else if (a.video_data?.url) out.push({ kind: "video", url: a.video_data.url });
-    else if (a.file_url) out.push({ kind: a.mime_type?.startsWith("audio") ? "audio" : "file", url: a.file_url, name: a.name });
+    if (a.image_data?.url) push("image", a.image_data.url);
+    else if (a.video_data?.url) push("video", a.video_data.url);
+    else if (a.file_url) push(a.mime_type?.startsWith("audio") ? "audio" : "file", a.file_url, a.name);
   }
-  if (m.sticker) out.push({ kind: "image", url: m.sticker });
+  if (m.sticker) push("image", m.sticker);
   return out;
 }
 
@@ -122,6 +126,25 @@ export async function threadMessages(params: { conversationId: string; pageId: s
     .reverse(); // oldest first, like a chat
 }
 
+/** Conversation ids are opaque Meta ids (digits, letters, "_", "-", ":"). */
+export const isConversationId = (id: string) => /^[A-Za-z0-9_:-]{4,200}$/.test(id);
+
+/** Who takes part in a conversation of this Page (to check a reply goes to the right person). */
+export async function threadParticipantIds(conversationId: string, pageToken: string): Promise<string[]> {
+  const res = await graph<{ participants?: { data: RawParticipant[] } }>(conversationId, { fields: "participants" }, pageToken);
+  return (res.participants?.data ?? []).map((p) => p.id);
+}
+
+/** Only http(s) links from Meta's CDN are rendered (defence in depth for href/src). */
+export function safeMediaUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Sends a text reply. Meta rejects it outside the 24-hour window. */
 export async function sendReply(params: { pageId: string; pageToken: string; recipientId: string; text: string }): Promise<void> {
   const url = new URL(`https://graph.facebook.com/v21.0/${params.pageId}/messages`);
@@ -137,9 +160,9 @@ export async function sendReply(params: { pageId: string; pageToken: string; rec
     const code = json.error?.code;
     // 10 / 2018278: outside the allowed window. 551: the person can't receive messages.
     if (code === 10 || json.error?.error_subcode === 2018278) {
-      throw new MetaApiError("Pasaron más de 24 horas desde el último mensaje de esta persona: Meta no deja responder hasta que vuelva a escribir.", code);
+      throw new MetaApiError("Pasaron más de 24 horas desde el último mensaje de esta persona: Meta no deja responder hasta que vuelva a escribir.", code, true);
     }
-    if (code === 551) throw new MetaApiError("Esta persona no puede recibir mensajes en este momento.", code);
+    if (code === 551) throw new MetaApiError("Esta persona no puede recibir mensajes en este momento.", code, true);
     throw new MetaApiError(json.error?.error_user_msg || json.error?.message || `Meta respondió ${res.status}`, code);
   }
 }

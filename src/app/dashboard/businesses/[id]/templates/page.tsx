@@ -38,7 +38,7 @@ export default async function TemplatesPage({ params }: { params: Promise<{ id: 
         </p>
       </div>
 
-      <TemplateManager businessId={id} templates={templates} hasWabaId={!!membership.business.wabaId} />
+      <TemplateManager businessId={id} templates={templates} hasWabaId={!!membership.business.wabaId} canDelete={membership.role !== "MEMBER"} />
     </div>
   );
 }

@@ -73,6 +73,10 @@ import { Prisma, type PlanTier } from "@prisma/client";
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const RESET_REQUEST_MAX = 3;
 const RESET_REQUEST_WINDOW_MS = 15 * 60 * 1000;
+const RESET_IP_MAX = 10;
+const RESET_IP_WINDOW_MS = 60 * 60 * 1000;
+const RESET_UNKNOWN_ALERTS_PER_HOUR = 5;
+const EMAIL_SHAPE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 
 function slugify(name: string): string {
   return name
@@ -628,10 +632,12 @@ async function createMessageTemplateOrThrow(businessId: string, formData: FormDa
 export async function deleteMessageTemplate(businessId: string, templateId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "Inicia sesión de nuevo" };
+  // Deleting is permanent in Meta (and the name stays reserved for weeks),
+  // and difusiones/reminders may depend on it: owner or agency only.
   try {
-    await requireBusinessMembership(session.user.id, businessId);
+    await requireBusinessOwnerOrAdmin(session.user.id, businessId);
   } catch {
-    return { ok: false, error: "No tienes acceso a este negocio" };
+    return { ok: false, error: "Solo el dueño del negocio o la agencia pueden eliminar plantillas" };
   }
   const [business, template] = await Promise.all([
     prisma.business.findUnique({ where: { id: businessId }, select: { wabaId: true, wabaAccessToken: true } }),
@@ -1760,7 +1766,21 @@ export async function requestPasswordReset(
   _prevState: ForgotPasswordState,
   formData: FormData,
 ): Promise<ForgotPasswordState> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase()
+    .slice(0, 160);
+
+  // Same { submitted: true } for a malformed address or an IP that already
+  // asked too often: each request can email the agency (alertAgencyOfReset),
+  // so without a per-IP cap a script could flood that inbox with made-up
+  // addresses (the per-address limit below never trips for new strings).
+  if (!EMAIL_SHAPE.test(email)) return { submitted: true };
+  const ip = clientIpFrom(await headers());
+  if (await overLimit(`reset-ip:${ip}`, RESET_IP_MAX, RESET_IP_WINDOW_MS)) {
+    console.warn("[reset] too many requests from one IP");
+    return { submitted: true };
+  }
 
   if (email) {
     const rateLimitKey = `reset:${email}`;
@@ -1804,7 +1824,10 @@ export async function requestPasswordReset(
       await alertAgencyOfReset(email, sent ? "sent" : "failed");
     } else {
       console.log("[reset] no account for", maskEmail(email));
-      await alertAgencyOfReset(email, "unknown");
+      // Mistyped addresses are worth a heads-up, but at most a few an hour.
+      if (!(await overLimit("reset-unknown-alert", RESET_UNKNOWN_ALERTS_PER_HOUR, 60 * 60 * 1000))) {
+        await alertAgencyOfReset(email, "unknown");
+      }
     }
   }
 

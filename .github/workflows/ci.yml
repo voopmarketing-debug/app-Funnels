@@ -1,0 +1,32 @@
+# Checks every push and pull request before it can reach production:
+# type-check, unit tests and the Prisma schema. Set it as a required status
+# check on the default branch (Settings → Branches → branch protection).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma validate
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      - run: npx tsc --noEmit -p .
+      - run: npx vitest run
+      - name: Known vulnerabilities in production dependencies
+        run: npm audit --omit=dev --audit-level=high

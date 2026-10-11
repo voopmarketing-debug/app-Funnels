@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import {
   MetaApiError,
+  friendlyMetaError,
   addDays,
   daysIn,
   facebookAccount,
@@ -27,6 +28,7 @@ import {
 
 
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000;
+const MAX_NEW_RANGES_PER_HOUR = 20;
 /** "Actualizar" is ignored while the data is younger than this. */
 export const MIN_REFRESH_MS = 2 * 60 * 1000;
 
@@ -53,6 +55,8 @@ export type SocialDashboard = {
   posts: SectionResult<SocialPost[]> | null;
   ads: SectionResult<AdsData & { previous: AdTotals }> | null;
   needsReconnect: boolean;
+  /** Too many different date ranges asked in the last hour: nothing was read from Meta. */
+  throttled?: boolean;
 };
 
 function within(series: Series | null, range: DayRange): Series | null {
@@ -80,7 +84,7 @@ async function settle<T>(fn: () => Promise<T>): Promise<SectionResult<T>> {
   } catch (err) {
     if (err instanceof MetaApiError && err.needsReconnect) throw err;
     console.error("[social] Meta request failed", err);
-    return { ok: false, error: err instanceof Error ? err.message : "Error consultando Meta" };
+    return { ok: false, error: friendlyMetaError(err) };
   }
 }
 
@@ -207,6 +211,13 @@ export async function getSocialDashboard(businessId: string, range: DayRange): P
   const key = cacheKey(range);
   const cached = await prisma.socialMetricCache.findUnique({ where: { businessId_key: { businessId, key } } });
   if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) return cached.data as unknown as SocialDashboard;
+  // Every new range costs dozens of Meta calls, shared by the whole Page's
+  // rate limit; clicking through many custom ranges is capped per hour.
+  const recentReads = await prisma.socialMetricCache.count({ where: { businessId, fetchedAt: { gt: new Date(Date.now() - 60 * 60 * 1000) } } });
+  if (recentReads >= MAX_NEW_RANGES_PER_HOUR) {
+    const previous = previousRange(range);
+    return { range, previous, fetchedAt: new Date().toISOString(), facebook: null, instagram: null, posts: null, ads: null, needsReconnect: false, throttled: true };
+  }
   const fresh = await loadFromMeta(businessId, range);
   // A section Meta failed on is retried on the next visit instead of being cached for hours.
   const failed = [fresh.facebook, fresh.instagram, fresh.posts, fresh.ads].some((r) => r && !r.ok);

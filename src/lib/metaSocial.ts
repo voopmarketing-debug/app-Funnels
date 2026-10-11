@@ -26,6 +26,8 @@ export class MetaApiError extends Error {
   constructor(
     message: string,
     readonly code?: number,
+    /** The message was written by us for the owner (safe to show as is). */
+    readonly friendly = false,
   ) {
     super(message);
   }
@@ -33,6 +35,20 @@ export class MetaApiError extends Error {
   get needsReconnect(): boolean {
     return this.code === 190 || this.code === 102;
   }
+}
+
+/**
+ * What the owner sees when Meta fails: our own plain-language messages pass
+ * through; Meta's raw ones (internal ids, codes) stay in the server log.
+ */
+export function friendlyMetaError(err: unknown, fallback = "Meta no respondió. Intenta de nuevo en unos minutos."): string {
+  if (err instanceof MetaApiError) {
+    if (err.friendly) return err.message;
+    if (err.needsReconnect) return "Tu conexión con Facebook venció. Vuelve a conectarla.";
+    if (err.code === 4 || err.code === 17 || err.code === 32 || err.code === 613) return "Meta está limitando las consultas por un momento. Intenta de nuevo en unos minutos.";
+    if (err.code === 10 || err.code === 200) return "Falta un permiso de Meta para ver esto. Vuelve a conectar Facebook y acepta todos los permisos.";
+  }
+  return fallback;
 }
 
 export function metaRedirectUri(): string {

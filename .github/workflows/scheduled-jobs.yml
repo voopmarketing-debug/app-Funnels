@@ -9,13 +9,20 @@ on:
     - cron: "*/10 * * * *"
   workflow_dispatch:
 
+# Only calls two URLs: the job's GitHub token needs no access at all.
+permissions: {}
+
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      # Read from the environment instead of being pasted into the commands,
+      # so it never ends up in a rendered script or a debug trace.
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
       - name: Appointment reminders
-        run: curl -fsS -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://agente.funnelslabs.app/api/cron/appointment-reminders
+        run: curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://agente.funnelslabs.app/api/cron/appointment-reminders
       - name: Retry unanswered chats
         if: always()
-        run: curl -fsS -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://agente.funnelslabs.app/api/cron/retry-replies
+        run: curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://agente.funnelslabs.app/api/cron/retry-replies

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { AdCampaign, SocialPost } from "@/lib/metaSocial";
 import { moneyFormatter, shortDate, shortDateTime } from "./format";
+import { toCsv } from "@/lib/csv";
 
 const NETWORK = {
   facebook: { label: "Facebook", color: "var(--series-fb)" },
@@ -13,12 +14,8 @@ const fmt = (n: number | null | undefined) => (n == null ? "—" : Math.round(n)
 
 
 function downloadCsv(filename: string, rows: (string | number | null)[][]) {
-  const cell = (v: string | number | null) => {
-    const s = v == null ? "" : String(v);
-    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  // BOM so Excel opens the accents correctly.
-  const blob = new Blob(["﻿" + rows.map((r) => r.map(cell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+  // toCsv neutralises formulas: captions and campaign names come from Meta, not from us.
+  const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

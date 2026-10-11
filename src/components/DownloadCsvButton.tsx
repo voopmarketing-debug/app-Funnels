@@ -1,27 +1,13 @@
 "use client";
 
+import { toCsv } from "@/lib/csv";
+
 // A .csv, not a real .xlsx — Excel (and Sheets, Numbers) opens it natively
 // with one double-click, no plugin or extra library needed, so this covers
 // "descargar en Excel" without adding a binary spreadsheet dependency for
 // what's ultimately a flat table. The UTF-8 BOM is required for Excel on
 // Windows to render Spanish accents (á, é, ñ, …) correctly instead of
 // garbling them — Sheets/Numbers ignore the BOM harmlessly.
-function toCsv(headers: string[], rows: (string | number)[][]): string {
-  const escapeCell = (value: string | number): string => {
-    let text = String(value ?? "");
-    // Neutralizes CSV/formula injection: a cell starting with =, +, -, @, or
-    // a tab is interpreted as a formula by Excel/Sheets when the file is
-    // opened — dangerous here because some columns (e.g. a WhatsApp
-    // contact's own display name) come straight from an unauthenticated
-    // lead, not from the business itself. A leading apostrophe forces
-    // spreadsheet apps to treat the cell as plain text.
-    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-  const lines = [headers, ...rows].map((row) => row.map(escapeCell).join(","));
-  return "﻿" + lines.join("\r\n");
-}
-
 export function DownloadCsvButton({
   filename,
   headers,
@@ -36,7 +22,7 @@ export function DownloadCsvButton({
   className?: string;
 }) {
   function handleDownload() {
-    const blob = new Blob([toCsv(headers, rows)], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([toCsv([headers, ...rows])], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

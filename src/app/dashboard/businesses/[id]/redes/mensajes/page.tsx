@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
-import { MetaApiError } from "@/lib/metaSocial";
+import { MetaApiError, friendlyMetaError } from "@/lib/metaSocial";
 import { REPLY_WINDOW_MS, isMissingPermission, listThreads, threadMessages, type InboxMessage, type InboxNetwork, type InboxThread } from "@/lib/metaInbox";
 import { RedesTabs } from "../RedesTabs";
 import { FacebookGlyph, InstagramGlyph } from "../icons";
@@ -11,7 +11,7 @@ import { shortDateTime } from "../format";
 import { InboxPoller, ReplyBox, ResolveButton, ScrollToBottom } from "./inboxControls";
 
 // Messenger + Instagram Direct for the connected Page, answered by people on
-// the team. Read live from Meta on every visit (and every 20 s while open);
+// the team. Read live from Meta on every visit (and every 30 s while open and in use);
 // only read/resolved state is stored here.
 
 const FILTERS = [
@@ -159,7 +159,7 @@ export default async function MensajesPage({
       listThreads({ pageId, igUserId, pageToken, network }).catch((err) => {
         if (err instanceof MetaApiError && err.needsReconnect) needsReconnect = true;
         else if (isMissingPermission(err)) missingPermission = true;
-        else errors.push(`${NETWORK_STYLE[network].label}: ${err instanceof Error ? err.message : "error"}`);
+        else errors.push(`${NETWORK_STYLE[network].label}: ${friendlyMetaError(err)}`);
         console.error(`[social inbox] ${network} threads failed`, err);
         return [] as InboxThread[];
       }),
@@ -195,7 +195,8 @@ export default async function MensajesPage({
     try {
       messages = await threadMessages({ conversationId: selected.id, pageId, igUserId, pageToken });
     } catch (err) {
-      threadError = err instanceof Error ? err.message : "Meta no devolvió los mensajes";
+      console.error("[social inbox] thread failed", err);
+      threadError = friendlyMetaError(err);
     }
     if (selected.unread) {
       await prisma.socialThreadState.upsert({
@@ -359,7 +360,7 @@ export default async function MensajesPage({
               </div>
               <div className="max-h-[55vh] flex-1 space-y-2.5 overflow-y-auto bg-background/40 p-4">
                 {threadError ? (
-                  <p className="text-sm text-ink-muted">Meta no devolvió los mensajes: {threadError}</p>
+                  <p className="text-sm text-ink-muted">No pudimos traer los mensajes: {threadError}</p>
                 ) : (
                   messages.map((m) => <MessageBubble key={m.id} m={m} />)
                 )}

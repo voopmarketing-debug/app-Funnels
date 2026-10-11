@@ -12,6 +12,12 @@ import ffmpegPath from "ffmpeg-static";
  * deliver/play it. Opus is the payload either way, so this is closer to a
  * remux than a lossy re-encode.
  */
+// Containers browsers and phones record voice notes in (WebM/Matroska from
+// Chrome, MP4/M4A from Safari and iPhones, Ogg, MP3, WAV, AAC, AMR, 3GP).
+const AUDIO_FORMATS = "matroska,webm,mov,mp4,m4a,3gp,3g2,mj2,ogg,mp3,wav,aac,amr,flac";
+const MAX_SECONDS = 600;
+const TIMEOUT_MS = 45_000;
+
 export async function convertToOggOpus(bytes: Buffer): Promise<Buffer> {
   if (!ffmpegPath) throw new Error("ffmpeg binary not available on this server");
   const ffmpegBinary: string = ffmpegPath;
@@ -27,14 +33,47 @@ export async function convertToOggOpus(bytes: Buffer): Promise<Buffer> {
       // channel; a stereo/multi-channel Ogg/Opus file (some mics record
       // stereo by default) is another way this silently fails to play on
       // the recipient's phone even though it decodes fine everywhere else.
-      const proc = spawn(ffmpegBinary, ["-y", "-i", inputPath, "-c:a", "libopus", "-ac", "1", "-b:a", "32k", "-vn", outputPath]);
+      //
+      // The input is a user's file, so ffmpeg is fenced in: only local-file
+      // input (no http/concat/playlist tricks reaching other files or the
+      // network), only real audio containers, at most 10 minutes of audio,
+      // and the process is killed if it hangs.
+      const proc = spawn(ffmpegBinary, [
+        "-hide_banner",
+        "-nostdin",
+        "-y",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-format_whitelist",
+        AUDIO_FORMATS,
+        "-i",
+        inputPath,
+        "-t",
+        String(MAX_SECONDS),
+        "-map",
+        "0:a:0",
+        "-c:a",
+        "libopus",
+        "-ac",
+        "1",
+        "-b:a",
+        "32k",
+        "-vn",
+        outputPath,
+      ]);
+      const timer = setTimeout(() => proc.kill("SIGKILL"), TIMEOUT_MS);
       let stderr = "";
       proc.stderr.on("data", (chunk) => {
-        stderr += chunk;
+        if (stderr.length < 20_000) stderr += chunk;
       });
-      proc.on("error", reject);
-      proc.on("close", (code) => {
+      proc.on("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      proc.on("close", (code, signal) => {
+        clearTimeout(timer);
         if (code === 0) resolve();
+        else if (signal === "SIGKILL") reject(new Error("ffmpeg took too long converting the audio"));
         else reject(new Error(`ffmpeg exited with code ${code}: ${stderr.slice(-500)}`));
       });
     });

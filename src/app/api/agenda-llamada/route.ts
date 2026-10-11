@@ -15,7 +15,8 @@ const ALLOWED_ORIGINS = new Set(["https://agenda.funnelslabs.app", "https://agen
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") ?? "";
-  const allowed = ALLOWED_ORIGINS.has(origin) || (process.env.VERCEL_ENV !== "production" && origin.startsWith("http://localhost"));
+  // localhost only on a developer's machine (never on a Vercel preview, which shares the database).
+  const allowed = ALLOWED_ORIGINS.has(origin) || (!process.env.VERCEL && process.env.NODE_ENV !== "production" && origin.startsWith("http://localhost"));
   return allowed ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", Vary: "Origin" } : {};
 }
 
