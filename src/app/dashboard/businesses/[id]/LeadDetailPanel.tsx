@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateContactInfo, updateConversationDetails } from "@/lib/actions";
 import { contactInitial, contactLabel, formatPhone, isBsuid } from "@/lib/contactDisplay";
 import { LeadSalesSection } from "./LeadSalesSection";
+import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
 
 const TAG_SUGGESTIONS = ["Lead calificado", "Cliente potencial", "Cotización enviada", "Urgente"];
 
@@ -24,6 +25,7 @@ export function LeadDetailPanel({
   customerPhone,
   customerName,
   customerEmail,
+  aiPaused,
   tags,
   notes,
   appointmentAt,
@@ -35,6 +37,7 @@ export function LeadDetailPanel({
   customerPhone: string;
   customerName: string | null;
   customerEmail: string | null;
+  aiPaused: boolean;
   tags: string[];
   notes: string | null;
   appointmentAt: Date | null;
@@ -207,6 +210,14 @@ export function LeadDetailPanel({
             </div>
           </div>
         )}
+
+        <div className="space-y-1.5">
+          <p className="text-[13px] text-ink-faint">Quién responde este chat</p>
+          <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} />
+          <p className="text-xs text-ink-muted">
+            {aiPaused ? "La IA no le escribe a este contacto: lo atiendes tú." : "La IA responde sola. Elige «Respondo yo» si prefieres atenderlo tú."}
+          </p>
+        </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
           {tagList.map((tag) => (

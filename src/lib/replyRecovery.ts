@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isSubscriptionActive } from "@/lib/subscription";
 import { decryptSecret } from "@/lib/crypto";
-import { sendWhatsAppMediaMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
+import { UNREADABLE_PREFIX, sendWhatsAppMediaMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { VISION_MEDIA_TYPES, type VisionImage } from "@/lib/ai";
 import { MAX_REPLY_ATTEMPTS, alertReplyGaveUp, replyToConversation, type ReplyContext } from "@/lib/agent";
 
@@ -92,6 +92,8 @@ async function recoverConversation(conversation: Candidate, now: number, manual 
   if (latestIdx === -1) return false;
   const latest = recentDesc[latestIdx];
   if (!manual && latest.role === "CUSTOMER" && now - latest.createdAt.getTime() < MIN_AGE_MS) return false;
+  // Left for a person on purpose (see "unreadable" in lib/whatsapp.ts).
+  if (latest.role === "CUSTOMER" && latest.content.startsWith(UNREADABLE_PREFIX)) return false;
 
   // Claim the conversation first (optimistic lock on the attempt timestamp)
   // so two concurrent sweeps can never both answer it.

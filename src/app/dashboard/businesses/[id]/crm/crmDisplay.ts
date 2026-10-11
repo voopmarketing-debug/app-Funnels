@@ -34,6 +34,7 @@ export function previewText(c: CrmConversation): string {
   const last = c.lastMessage;
   if (!last) return "";
   if (last.content.startsWith("[ERROR INTERNO")) return "⚠ La IA no pudo responder";
+  if (last.content.startsWith("[No se puede leer")) return "🔒 Mensaje que la IA no puede leer";
   const isPlaceholder = /^\[.*\]$/.test(last.content.trim());
   let body = last.content;
   if (last.mediaType && (isPlaceholder || !body.trim())) {

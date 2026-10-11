@@ -1,6 +1,6 @@
 import { createHmac } from "crypto";
 import { describe, expect, it } from "vitest";
-import { parseInboundMessages, verifyWebhookSignature } from "./whatsapp";
+import { UNREADABLE_PREFIX, parseInboundMessages, verifyWebhookSignature } from "./whatsapp";
 
 describe("verifyWebhookSignature", () => {
   const appSecret = "test-app-secret";
@@ -105,14 +105,42 @@ describe("parseInboundMessages", () => {
       ],
     };
 
-    expect(parseInboundMessages(payload).map((m) => m.text)).toEqual([
+    const parsed = parseInboundMessages(payload);
+    expect(parsed.map((m) => m.text)).toEqual([
       "Sí, me interesa",
       "Plan anual",
       "[Ubicación compartida: Oficina] https://maps.google.com/?q=4.6,-74.08",
       "[Contacto compartido: Ana +57 300 111 2233]",
       "[Sticker]",
-      "[El cliente envió algo que WhatsApp no deja ver fuera de su app (por ejemplo una foto o video de «ver una vez», una encuesta, un evento o un mensaje editado). Pídele que lo reenvíe como texto, foto o audio normal.]",
+      expect.stringContaining("Puede ser publicidad de otra empresa"),
     ]);
+    // Only the message with no content is kept away from the AI.
+    expect(parsed.map((m) => !!m.unreadable)).toEqual([false, false, false, false, false, true]);
+  });
+
+  it("marks content-less buttons and unknown types as unreadable", () => {
+    const msg = (id: string, extra: Record<string, unknown>) => ({ id, from: "573001234567", ...extra });
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "1234567890" },
+                messages: [
+                  msg("u1", { type: "button", button: { payload: "PROMO" } }),
+                  msg("u2", { type: "interactive", interactive: { type: "nfm_reply" } }),
+                  msg("u3", { type: "order", order: {} }),
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = parseInboundMessages(payload);
+    expect(parsed.every((m) => m.unreadable && m.text.startsWith(UNREADABLE_PREFIX))).toBe(true);
+    expect(parsed[2].text).toContain('"order"');
   });
 
   it("accepts a new contact who hides their number behind a WhatsApp username (BSUID only)", () => {

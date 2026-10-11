@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ManualMessageForm } from "./conversations/[conversationId]/ManualMessageForm";
 import { StageSelector } from "./conversations/[conversationId]/StageSelector";
 import { SaleButton } from "./SaleDialog";
-import { AiPauseButton } from "./conversations/[conversationId]/AiPauseButton";
+import { AiPauseButton, HumanAttentionBanner } from "./conversations/[conversationId]/AiPauseButton";
 import { TemplateSendButton } from "./conversations/[conversationId]/TemplateSendButton";
 import { MessageScrollArea } from "./MessageScrollArea";
 import { contactInitial, contactLabel, formatPhone } from "@/lib/contactDisplay";
@@ -96,6 +96,7 @@ export function ConversationThread({
   customerEmail = null,
   customerPhone,
   aiPaused,
+  needsHuman = false,
   stageId,
   stages,
   messages,
@@ -110,6 +111,8 @@ export function ConversationThread({
   customerEmail?: string | null;
   customerPhone: string;
   aiPaused: boolean;
+  // The customer sent something the AI couldn't read (Conversation.needsHumanAt).
+  needsHuman?: boolean;
   stageId: string;
   stages: { id: string; name: string; pipelineName?: string }[];
   messages: ThreadMessage[];
@@ -161,7 +164,7 @@ export function ConversationThread({
             templates={templates}
             windowOpen={windowOpen}
           />
-          <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} />
+          <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} compact />
           <StageSelector businessId={businessId} conversationId={conversationId} stageId={stageId} stages={stages} />
           {/* Phones don't get the lead panel (desktop-only third column), so
               the contact's name/email and sales are handled from here instead. */}
@@ -183,6 +186,8 @@ export function ConversationThread({
           </div>
         </div>
       </div>
+
+      <HumanAttentionBanner businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} needsHuman={needsHuman} />
 
       <MessageScrollArea messageCount={messages.length}>
         {messages.map((message, index) => {
@@ -266,7 +271,12 @@ export function ConversationThread({
                   {hasMedia && (
                     <MediaPreview url={message.mediaUrl!} type={message.mediaType ?? null} filename={message.mediaFilename ?? null} />
                   )}
-                  {(!hasMedia || !isPlaceholderCaption) && message.content && (
+                  {message.content.startsWith("[No se puede leer:") ? (
+                    <p className="flex gap-1.5 text-sm italic text-ink-muted">
+                      <span aria-hidden="true" className="not-italic">🔒</span>
+                      {message.content.slice("[No se puede leer:".length).replace(/\]$/, "").trim()}
+                    </p>
+                  ) : (!hasMedia || !isPlaceholderCaption) && message.content && (
                     <p className="whitespace-pre-wrap break-words text-ink">{message.content}</p>
                   )}
                   <p className="-mb-0.5 mt-0.5 flex items-center justify-end gap-1 text-[12px] text-ink-faint">

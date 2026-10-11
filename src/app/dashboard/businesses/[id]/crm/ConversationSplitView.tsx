@@ -27,6 +27,7 @@ export function ConversationSplitView({
     customerEmail: string | null;
     customerPhone: string;
     aiPaused: boolean;
+    needsHuman: boolean;
     stageId: string;
     windowOpen: boolean;
     tags: string[];
@@ -84,6 +85,7 @@ export function ConversationSplitView({
             customerEmail={selectedConversation.customerEmail}
             customerPhone={selectedConversation.customerPhone}
             aiPaused={selectedConversation.aiPaused}
+            needsHuman={selectedConversation.needsHuman}
             stageId={selectedConversation.stageId}
             stages={stages}
             messages={selectedConversation.messages}
@@ -117,6 +119,7 @@ export function ConversationSplitView({
             customerPhone={selectedConversation.customerPhone}
             customerName={selectedConversation.customerName}
             customerEmail={selectedConversation.customerEmail}
+            aiPaused={selectedConversation.aiPaused}
             tags={selectedConversation.tags}
             notes={selectedConversation.notes}
             appointmentAt={selectedConversation.appointmentAt}

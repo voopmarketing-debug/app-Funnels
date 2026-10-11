@@ -306,6 +306,10 @@ model Conversation {
   // conversation — for when the business owner wants to take over one chat
   // by hand without touching the agent for everyone else.
   aiPaused           Boolean   @default(false)
+  // The customer sent something the AI can't read (see lib/whatsapp.ts
+  // "unreadable"): the AI stayed quiet and the chat waits for a person.
+  // Cleared when someone on the team answers.
+  needsHumanAt       DateTime?
   lastMessageAt      DateTime  @default(now())
   // Automatic reply retries (see lib/replyRecovery.ts): how many times in a
   // row the AI reply to this conversation's latest customer message failed

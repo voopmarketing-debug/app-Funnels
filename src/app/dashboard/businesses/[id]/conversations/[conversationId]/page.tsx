@@ -64,6 +64,7 @@ export default async function ConversationPage({
           customerEmail={conversation.customerEmail}
           customerPhone={conversation.customerPhone}
           aiPaused={conversation.aiPaused}
+          needsHuman={!!conversation.needsHumanAt}
           stageId={conversation.stageId}
           stages={stages}
           messages={conversation.messages}
@@ -77,6 +78,7 @@ export default async function ConversationPage({
         customerPhone={conversation.customerPhone}
         customerName={conversation.customerName}
         customerEmail={conversation.customerEmail}
+        aiPaused={conversation.aiPaused}
         tags={conversation.tags}
         notes={conversation.notes}
         appointmentAt={conversation.appointmentAt}

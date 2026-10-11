@@ -1417,10 +1417,21 @@ export async function toggleConversationAiPaused(
 
   await prisma.conversation.update({
     where: { id: conversationId, businessId },
-    data: { aiPaused },
+    // Deciding who answers this chat also settles the "needs a person" flag.
+    data: { aiPaused, needsHumanAt: null },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
+  revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
+}
+
+/** "Ya lo revisé": clears the needs-a-person flag without sending anything. */
+export async function dismissNeedsHuman(businessId: string, conversationId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+  await prisma.conversation.updateMany({ where: { id: conversationId, businessId }, data: { needsHumanAt: null } });
+  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
 }
 
@@ -1555,6 +1566,8 @@ export async function sendManualMessage(
       data: { conversationId, role: "AGENT", content: text, whatsappMsgId: messageId, sentByHuman: true },
     });
   }
+  // Someone on the team answered: the chat no longer waits for a person.
+  await prisma.conversation.updateMany({ where: { id: conversationId, needsHumanAt: { not: null } }, data: { needsHumanAt: null } });
 
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
   // This composer is also embedded in the CRM's WhatsApp-Web-style split
@@ -1615,6 +1628,7 @@ export async function sendTemplateMessage(
       sentByHuman: true,
     },
   });
+  await prisma.conversation.updateMany({ where: { id: conversationId, needsHumanAt: { not: null } }, data: { needsHumanAt: null } });
 
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
   revalidatePath(`/dashboard/businesses/${businessId}/crm`);

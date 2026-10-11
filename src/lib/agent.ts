@@ -9,6 +9,7 @@ import {
   fetchWhatsAppMediaMeta,
   downloadWhatsAppMedia,
   type WhatsAppInboundMessage,
+  UNREADABLE_PREFIX,
 } from "@/lib/whatsapp";
 import { uploadAttachment } from "@/lib/attachments";
 import {
@@ -247,9 +248,11 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
       const label = MEDIA_TYPE_LABEL[message.media.type] ?? "Adjunto";
       messageContent = mediaFields.mediaUrl
         ? `[${label}${message.media.filename ? `: ${message.media.filename}` : ""}]`
-        : "[Adjunto recibido — no se pudo procesar]";
+        : `${UNREADABLE_PREFIX}: llegó un adjunto que no se pudo descargar. Revísalo en el celular.]`;
     }
   }
+  // No content the AI could read: it stays quiet and a person takes it.
+  const unreadable = !!message.unreadable || messageContent.startsWith(UNREADABLE_PREFIX);
 
   const savedInbound = await prisma.message.create({
     data: {
@@ -261,7 +264,10 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     },
   });
   // A new customer message gets a fresh reply-retry budget (see replyToConversation).
-  await prisma.conversation.update({ where: { id: conversation.id }, data: { replyAttempts: 0 } });
+  await prisma.conversation.update({
+    where: { id: conversation.id },
+    data: { replyAttempts: 0, ...(unreadable && !conversation.needsHumanAt ? { needsHumanAt: new Date() } : {}) },
+  });
 
   // Fires on every inbound customer message, independent of whether the AI
   // ends up replying (paused conversation, over plan limit, etc.) — those
@@ -277,7 +283,11 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
         businessId: business.id,
         conversationId: conversation.id,
         type: isNewChat ? "NEW_CONVERSATION" : "NEW_MESSAGE",
-        message: isNewChat ? `💬 Nuevo chat de ${leadLabel}: "${excerpt}"` : `${leadLabel} te escribió: "${excerpt}"`,
+        message: unreadable
+          ? `🙋 ${leadLabel} envió algo que la IA no puede leer (publicidad, botones o un «ver una vez»). La IA no respondió: revísalo tú.`
+          : isNewChat
+            ? `💬 Nuevo chat de ${leadLabel}: "${excerpt}"`
+            : `${leadLabel} te escribió: "${excerpt}"`,
       },
     });
     // Push to the owner's devices for every customer message (like Kommo),
@@ -285,14 +295,16 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
     // own (paused, switched off, over the limit), or a regular message.
     // Tagged by conversation, so a chatty contact replaces their previous
     // notification instead of stacking a dozen.
-    const needsHuman = conversation.aiPaused || !business.agent?.enabled || overPlanLimit;
+    const needsHuman = unreadable || conversation.aiPaused || !business.agent?.enabled || overPlanLimit;
     await sendPushToBusiness(business.id, {
-      title: isNewChat
-        ? `💬 Nuevo chat · ${business.name}`
-        : needsHuman
-          ? `✋ ${leadLabel} espera respuesta`
-          : `💬 ${leadLabel} · ${business.name}`,
-      body: isNewChat ? `${leadLabel}: ${excerpt}` : excerpt,
+      title: unreadable
+        ? `🙋 ${leadLabel} envió algo que la IA no puede leer`
+        : isNewChat
+          ? `💬 Nuevo chat · ${business.name}`
+          : needsHuman
+            ? `✋ ${leadLabel} espera respuesta`
+            : `💬 ${leadLabel} · ${business.name}`,
+      body: unreadable ? "La IA no respondió. Míralo en el celular y responde tú si hace falta." : isNewChat ? `${leadLabel}: ${excerpt}` : excerpt,
       url: `/dashboard/businesses/${business.id}/conversations/${conversation.id}`,
       tag: conversation.id,
     }).catch((err) => console.error("[push] new-message push failed", err));
@@ -303,6 +315,8 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   // and can answer by hand — it just gets no AI reply. (This used to return
   // before saving anything, so with the agent off, new messages never even
   // reached the CRM.)
+  if (unreadable) return;
+
   if (!business.agent?.enabled) {
     console.warn(`AI agent disabled or not configured for business ${business.id}; message saved without AI reply`);
     return;
@@ -341,7 +355,13 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   // More messages from this customer on the way? The latest one answers them all.
   await new Promise((resolve) => setTimeout(resolve, BURST_WINDOW_MS));
   const newer = await prisma.message.findFirst({
-    where: { conversationId: conversation.id, role: "CUSTOMER", createdAt: { gt: savedInbound.createdAt } },
+    // An unreadable message never gets an AI reply, so it doesn't count as "the latest one".
+    where: {
+      conversationId: conversation.id,
+      role: "CUSTOMER",
+      createdAt: { gt: savedInbound.createdAt },
+      NOT: { content: { startsWith: UNREADABLE_PREFIX } },
+    },
     select: { id: true },
   });
   if (newer) return;

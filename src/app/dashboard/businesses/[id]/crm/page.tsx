@@ -82,6 +82,8 @@ export default async function CrmPage({
         createdAt: true,
         tags: true,
         appointmentAt: true,
+        aiPaused: true,
+        needsHumanAt: true,
       },
     }),
     prisma.membership.findMany({
@@ -159,6 +161,8 @@ export default async function CrmPage({
     createdAt: c.createdAt.toISOString(),
     tags: c.tags,
     appointmentAt: c.appointmentAt?.toISOString() ?? null,
+    aiPaused: c.aiPaused,
+    needsHuman: !!c.needsHumanAt,
   }));
 
   // Only queried when the Difusiones tab is actually open — every other tab
@@ -243,6 +247,7 @@ export default async function CrmPage({
         customerEmail: full.customerEmail,
         customerPhone: full.customerPhone,
         aiPaused: full.aiPaused,
+        needsHuman: !!full.needsHumanAt,
         stageId: full.stageId,
         tags: full.tags,
         notes: full.notes,

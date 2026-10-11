@@ -486,13 +486,26 @@ export type WhatsAppInboundMessage = {
   text: string;
   whatsappMsgId: string;
   media?: { type: InboundMediaType; mediaId: string; filename?: string };
+  // Nothing the AI can read (Meta sent no content: a promo or button message
+  // from another business, a view-once photo, a poll…). Saved for the team,
+  // never answered by the AI — it would only guess and spend a reply.
+  unreadable?: boolean;
 };
 
 const INBOUND_MEDIA_TYPES = new Set<InboundMediaType>(["image", "audio", "document", "video"]);
 
+/** Placeholder text the CRM shows for a message nobody can read outside WhatsApp. */
+export const UNREADABLE_PREFIX = "[No se puede leer";
+
 // Text for inbound message types that aren't plain text or downloadable
 // media. Returns null for types that shouldn't create a message at all.
-function describeNonTextMessage(msg: Record<string, unknown>): string | null {
+function describeNonTextMessage(msg: Record<string, unknown>): { text: string; unreadable?: boolean } | null {
+  const text = describeNonTextContent(msg);
+  if (text === null) return null;
+  return text.startsWith(UNREADABLE_PREFIX) ? { text, unreadable: true } : { text };
+}
+
+function describeNonTextContent(msg: Record<string, unknown>): string | null {
   const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
   const obj = (v: unknown) => (isRecord(v) ? v : undefined);
   switch (msg.type) {
@@ -500,11 +513,11 @@ function describeNonTextMessage(msg: Record<string, unknown>): string | null {
       return null;
     case "button":
       // Quick-reply button on a template message.
-      return str(obj(msg.button)?.text) ?? "[Tocó un botón de la plantilla]";
+      return str(obj(msg.button)?.text) ?? `${UNREADABLE_PREFIX}: tocó un botón sin texto]`;
     case "interactive": {
       const interactive = obj(msg.interactive);
       const reply = obj(interactive?.button_reply) ?? obj(interactive?.list_reply);
-      return str(reply?.title) ?? "[Respuesta a un mensaje interactivo]";
+      return str(reply?.title) ?? `${UNREADABLE_PREFIX}: respuesta a un mensaje interactivo sin texto]`;
     }
     case "location": {
       const loc = obj(msg.location);
@@ -537,9 +550,11 @@ function describeNonTextMessage(msg: Record<string, unknown>): string | null {
       // events, edited messages, video notes… The API gets no content, so
       // say what it probably was and how to get it — this text is also what
       // the AI reads, so it asks the customer to resend it.
-      return "[El cliente envió algo que WhatsApp no deja ver fuera de su app (por ejemplo una foto o video de «ver una vez», una encuesta, un evento o un mensaje editado). Pídele que lo reenvíe como texto, foto o audio normal.]";
+      // Promos and button messages other businesses send arrive like this
+      // too, so the AI never answers it: the team sees it marked for them.
+      return `${UNREADABLE_PREFIX}: WhatsApp no deja verlo fuera de su app. Puede ser publicidad de otra empresa, una foto o video de «ver una vez», una encuesta o un mensaje editado. Revísalo en el celular.]`;
     default:
-      return `[Mensaje de tipo "${typeof msg.type === "string" ? msg.type : "desconocido"}" que no se puede mostrar aquí; revísalo en WhatsApp]`;
+      return `${UNREADABLE_PREFIX}: mensaje de tipo "${typeof msg.type === "string" ? msg.type : "desconocido"}". Revísalo en el celular.]`;
   }
 }
 
@@ -621,8 +636,8 @@ export function parseInboundMessages(payload: unknown): WhatsAppInboundMessage[]
         // never reached the CRM and got no reply. Now each becomes text the
         // business (and the AI) can read. Reactions are the one exception:
         // an emoji on an earlier message isn't a new message to answer.
-        const text = describeNonTextMessage(msg);
-        if (text) messages.push({ phoneNumberId, from, contactName, whatsappMsgId, text });
+        const described = describeNonTextMessage(msg);
+        if (described) messages.push({ phoneNumberId, from, contactName, whatsappMsgId, ...described });
       }
     }
   }

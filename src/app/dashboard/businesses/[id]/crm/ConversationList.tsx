@@ -7,13 +7,16 @@ import { contactInitial, contactLabel } from "@/lib/contactDisplay";
 import type { CrmStage, CrmConversation } from "../CrmBoard";
 import { previewText, useListTimeFormatter } from "./crmDisplay";
 
-type Filter = "all" | "unread" | "pending";
+type Filter = "all" | "unread" | "pending" | "human";
 
 const FILTERS: { id: Filter; label: string; hint: string }[] = [
   { id: "all", label: "Todas", hint: "Todas las conversaciones" },
   { id: "unread", label: "No leídas", hint: "Con mensajes que nadie ha abierto" },
   { id: "pending", label: "Sin respuesta", hint: "El último mensaje es del cliente" },
+  { id: "human", label: "🙋 Para ti", hint: "Chats que atiende una persona o que la IA no pudo leer" },
 ];
+
+const forHuman = (c: CrmConversation) => !!c.needsHuman || !!c.aiPaused;
 
 export function ConversationList({
   stages,
@@ -34,6 +37,7 @@ export function ConversationList({
       all: conversations.length,
       unread: conversations.filter((c) => c.unreadCount > 0).length,
       pending: conversations.filter((c) => c.lastMessage?.from === "customer").length,
+      human: conversations.filter(forHuman).length,
     }),
     [conversations],
   );
@@ -44,6 +48,7 @@ export function ConversationList({
     return conversations.filter((c) => {
       if (filter === "unread" && c.unreadCount === 0) return false;
       if (filter === "pending" && c.lastMessage?.from !== "customer") return false;
+      if (filter === "human" && !forHuman(c)) return false;
       if (!q) return true;
       return (
         (c.customerName ?? "").toLowerCase().includes(q) ||
@@ -136,11 +141,30 @@ export function ConversationList({
                     </span>
                   )}
                 </div>
-                {stage && (
-                  <p className="mt-1 flex items-center gap-1.5 text-[12px] uppercase tracking-wide text-ink-faint">
-                    {style && <span className={`h-1.5 w-1.5 flex-none rounded-full ${style.dot}`} />}
-                    <span className="truncate">{stage.name}</span>
-                  </p>
+                {(stage || forHuman(c)) && (
+                  <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                    {stage && (
+                      <p className="flex min-w-0 items-center gap-1.5 text-[12px] uppercase tracking-wide text-ink-faint">
+                        {style && <span className={`h-1.5 w-1.5 flex-none rounded-full ${style.dot}`} />}
+                        <span className="truncate">{stage.name}</span>
+                      </p>
+                    )}
+                    {c.needsHuman ? (
+                      <span
+                        title="Llegó algo que la IA no puede leer: revísalo tú"
+                        className="ml-auto flex-none rounded-full bg-[#fab219]/20 px-1.5 py-px text-[11px] font-semibold text-[var(--status-warn)]"
+                      >
+                        🙋 Revisar
+                      </span>
+                    ) : c.aiPaused ? (
+                      <span
+                        title="La IA está pausada en este chat: lo atiende una persona"
+                        className="ml-auto flex-none rounded-full border border-border px-1.5 py-px text-[11px] font-semibold text-ink-muted"
+                      >
+                        🙋 Humano
+                      </span>
+                    ) : null}
+                  </div>
                 )}
               </div>
             </Link>

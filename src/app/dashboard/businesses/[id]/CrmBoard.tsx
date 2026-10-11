@@ -25,6 +25,9 @@ export type CrmConversation = {
   createdAt?: string;
   tags?: string[];
   appointmentAt?: string | null;
+  // Who answers: paused = a person took over; needsHuman = something the AI couldn't read.
+  aiPaused?: boolean;
+  needsHuman?: boolean;
 };
 
 export function CrmBoard({
