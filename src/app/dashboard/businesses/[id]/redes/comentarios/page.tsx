@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
@@ -10,6 +11,7 @@ import { RedesTabs } from "../RedesTabs";
 import { FacebookGlyph, InstagramGlyph } from "../icons";
 import { shortDateTime } from "../format";
 import { InboxPoller } from "../mensajes/inboxControls";
+import { sweepCommentAutoReplies } from "@/lib/commentAutoReply";
 import { CommentActions } from "./commentControls";
 
 // Comments on the latest Facebook posts and Instagram publications, read live
@@ -131,6 +133,10 @@ export default async function ComentariosPage({
     ),
   );
   const comments = fetched.flat();
+  // Opening Comentarios also checks the keyword rules (throttled), so an
+  // auto-reply Meta's webhook missed doesn't wait for the 10-minute job.
+  after(() => sweepCommentAutoReplies({ businessIds: [id] }).catch((err) => console.error("[social comments] sweep failed", err)));
+  const activeRules = await prisma.commentAutoReply.count({ where: { businessId: id, enabled: true } });
   const states = await prisma.socialThreadState.findMany({
     where: { businessId: id, conversationId: { in: comments.map((c) => c.id) }, resolvedAt: { not: null } },
     select: { conversationId: true },
@@ -186,6 +192,24 @@ export default async function ComentariosPage({
       {errors.length > 0 && (
         <p className="rounded-xl border border-border bg-surface p-3 text-sm text-ink-muted">Meta no devolvió algunos comentarios ahora: {errors.join(" · ")}</p>
       )}
+
+      <Link
+        href={`/dashboard/businesses/${id}/redes/comentarios/automaticas`}
+        className="fl-card flex items-center gap-3 p-4 transition hover:border-accent/50"
+      >
+        <span className="fl-ai-badge flex h-10 w-10 flex-none items-center justify-center rounded-xl text-lg text-white" aria-hidden="true">
+          ⚡
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold text-ink">Respuestas automáticas por palabra clave</span>
+          <span className="block text-sm text-ink-muted">
+            {activeRules > 0
+              ? `${activeRules} regla${activeRules === 1 ? " activa" : "s activas"}: cuando alguien comenta la palabra, se responde solo.`
+              : "Ej. «Comenta INFO»: la plataforma responde el comentario y le escribe por privado, sola."}
+          </span>
+        </span>
+        <span className="flex-none text-sm font-semibold text-accent">{activeRules > 0 ? "Ver reglas →" : "Crear regla →"}</span>
+      </Link>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div role="tablist" aria-label="Filtrar comentarios" className="fl-seg">

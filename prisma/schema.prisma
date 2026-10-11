@@ -88,6 +88,7 @@ model Business {
   sales            Sale[]
   products         Product[]
   socialConnection SocialConnection?
+  commentAutoReplies CommentAutoReply[]
   aiUsage          AiUsage[]
   notifications    Notification[]
 }
@@ -985,6 +986,49 @@ model SocialConnection {
 // Our own state for a Messenger / Instagram Direct conversation (the
 // messages themselves stay in Meta and are read live): when someone on the
 // team last opened it and whether they marked it resolved.
+// ManyChat-style keyword rule for Facebook / Instagram comments: when a new
+// comment contains one of the keywords, the Page answers it publicly and
+// (optionally) sends the person a private message. See lib/commentAutoReply.ts.
+model CommentAutoReply {
+  id              String    @id @default(cuid())
+  businessId      String
+  name            String
+  /// Lower-case, accent-free words or phrases; any one of them triggers the rule.
+  keywords        String[]
+  /// "facebook" / "instagram".
+  networks        String[]
+  /// Public answers; one is picked at random so the Page doesn't repeat itself.
+  publicReplies   String[]
+  privateMessage  String?   @db.Text
+  enabled         Boolean   @default(true)
+  replyCount      Int       @default(0)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+// One row per comment a rule answered (or tried to): makes the webhook and
+// the polling sweep idempotent, and shows the owner what was sent.
+model CommentAutoReplyLog {
+  id         String   @id @default(cuid())
+  businessId String
+  ruleId     String
+  commentId  String
+  network    String
+  author     String?
+  comment    String   @db.Text
+  status     String
+  error      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([businessId, commentId])
+  @@index([businessId, createdAt])
+}
+
 model SocialThreadState {
   id             String    @id @default(cuid())
   businessId     String

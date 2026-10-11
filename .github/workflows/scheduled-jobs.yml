@@ -1,5 +1,5 @@
-# Every 10 minutes: appointment reminders (~1 hour before) and the retry of
-# unanswered chats. Vercel Hobby crons only run once a day, so GitHub calls
+# Every 10 minutes: appointment reminders (~1 hour before), the retry of
+# unanswered chats and keyword auto-replies to comments Meta didn't notify. Vercel Hobby crons only run once a day, so GitHub calls
 # the protected routes instead. Needs the repository secret CRON_SECRET
 # (same value as in Vercel).
 name: Scheduled jobs
@@ -9,7 +9,7 @@ on:
     - cron: "*/10 * * * *"
   workflow_dispatch:
 
-# Only calls two URLs: the job's GitHub token needs no access at all.
+# Only calls a few URLs: the job's GitHub token needs no access at all.
 permissions: {}
 
 jobs:
@@ -26,3 +26,6 @@ jobs:
       - name: Retry unanswered chats
         if: always()
         run: curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://agente.funnelslabs.app/api/cron/retry-replies
+      - name: Comment auto-replies
+        if: always()
+        run: curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://agente.funnelslabs.app/api/cron/comment-replies

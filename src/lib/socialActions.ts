@@ -9,6 +9,7 @@ import { friendlyMetaError, listAdAccounts, listPages } from "@/lib/metaSocial";
 import { isConversationId, sendReply, threadParticipantIds } from "@/lib/metaInbox";
 import { isCommentId, privateReplyToComment, replyToComment, setCommentHidden, type CommentNetwork } from "@/lib/metaComments";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
+import { MAX_RULES, parseKeywords, subscribePageToComments, sweepCommentAutoReplies } from "@/lib/commentAutoReply";
 import { clearSocialCache, getSocialDashboard } from "@/lib/socialDashboard";
 import { RANGE_PRESETS, todayInColombia } from "@/lib/socialRanges";
 import { MIN_POSTS, generateContentDiagnosis as runContentDiagnosis, type ContentDiagnosis } from "@/lib/contentDiagnosis";
@@ -233,4 +234,85 @@ export async function setSocialCommentDone(businessId: string, comment: { id: st
   if (!isCommentId(comment.id) || !NETWORKS.has(comment.network)) return;
   await markCommentDone(businessId, comment, done);
   revalidatePath(commentsPath(businessId));
+}
+
+// ---- Respuestas automáticas (keyword rules) ----
+
+const autoRepliesPath = (businessId: string) => `/dashboard/businesses/${businessId}/redes/comentarios/automaticas`;
+
+export type AutoReplyInput = {
+  name: string;
+  keywords: string;
+  networks: string[];
+  publicReplies: string[];
+  privateMessage: string;
+};
+
+function cleanRule(input: AutoReplyInput): { ok: true; data: { name: string; keywords: string[]; networks: string[]; publicReplies: string[]; privateMessage: string | null } } | { ok: false; error: string } {
+  const keywords = parseKeywords(input.keywords ?? "");
+  const networks = (Array.isArray(input.networks) ? input.networks : []).filter((n) => NETWORKS.has(n));
+  const publicReplies = (Array.isArray(input.publicReplies) ? input.publicReplies : [])
+    .map((r) => String(r).trim().slice(0, 1000))
+    .filter(Boolean)
+    .slice(0, 5);
+  const privateMessage = (input.privateMessage ?? "").trim().slice(0, 1000) || null;
+  if (keywords.length === 0) return { ok: false, error: "Escribe al menos una palabra clave" };
+  if (networks.length === 0) return { ok: false, error: "Elige Facebook, Instagram o ambas" };
+  if (publicReplies.length === 0 && !privateMessage) return { ok: false, error: "Escribe la respuesta pública, el mensaje privado o ambos" };
+  const name = (input.name ?? "").trim().slice(0, 60) || keywords[0].toUpperCase();
+  return { ok: true, data: { name, keywords, networks, publicReplies, privateMessage } };
+}
+
+export async function saveCommentAutoReply(
+  businessId: string,
+  ruleId: string | null,
+  input: AutoReplyInput,
+): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
+  await requireBusinessOwnerOrAdmin(await userId(), businessId);
+  const clean = cleanRule(input);
+  if (!clean.ok) return clean;
+  if (ruleId) {
+    const updated = await prisma.commentAutoReply.updateMany({ where: { id: ruleId, businessId }, data: clean.data });
+    if (updated.count === 0) return { ok: false, error: "Esta regla ya no existe. Recarga la página." };
+  } else {
+    if ((await prisma.commentAutoReply.count({ where: { businessId } })) >= MAX_RULES) {
+      return { ok: false, error: `Puedes tener hasta ${MAX_RULES} reglas. Borra alguna que ya no uses.` };
+    }
+    await prisma.commentAutoReply.create({ data: { businessId, ...clean.data } });
+  }
+  // Ask Meta to notify new comments right away (the 10-minute sweep covers the rest).
+  const connection = await prisma.socialConnection.findUnique({ where: { businessId }, select: { fbPageId: true, pageAccessToken: true } });
+  let warning: string | undefined;
+  if (connection?.fbPageId && connection.pageAccessToken) {
+    const sub = await subscribePageToComments(connection.fbPageId, decryptSecret(connection.pageAccessToken));
+    if (!sub.ok) warning = `La regla quedó guardada y responderá en máximo 10 minutos. Para que sea al instante: ${sub.error}`;
+  } else {
+    warning = "La regla quedó guardada, pero primero conecta tu página de Facebook para que empiece a responder.";
+  }
+  revalidatePath(autoRepliesPath(businessId));
+  return { ok: true, ...(warning ? { warning } : {}) };
+}
+
+export async function setCommentAutoReplyEnabled(businessId: string, ruleId: string, enabled: boolean): Promise<void> {
+  await requireBusinessOwnerOrAdmin(await userId(), businessId);
+  await prisma.commentAutoReply.updateMany({ where: { id: ruleId, businessId }, data: { enabled } });
+  revalidatePath(autoRepliesPath(businessId));
+}
+
+export async function deleteCommentAutoReply(businessId: string, ruleId: string): Promise<void> {
+  await requireBusinessOwnerOrAdmin(await userId(), businessId);
+  await prisma.commentAutoReply.deleteMany({ where: { id: ruleId, businessId } });
+  revalidatePath(autoRepliesPath(businessId));
+}
+
+/** "Revisar ahora": answers matching comments without waiting for the next sweep. */
+export async function runCommentAutoRepliesNow(businessId: string): Promise<{ answered: number }> {
+  await requireBusinessOwnerOrAdmin(await userId(), businessId);
+  const key = `comment-sweep-manual:${businessId}`;
+  if (await isRateLimited(key, 6, 60 * 60 * 1000)) return { answered: 0 };
+  await recordRateLimitEvent(key);
+  const res = await sweepCommentAutoReplies({ businessIds: [businessId], force: true });
+  revalidatePath(autoRepliesPath(businessId));
+  revalidatePath(commentsPath(businessId));
+  return { answered: res.answered };
 }
