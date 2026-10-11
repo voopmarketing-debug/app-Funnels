@@ -36,16 +36,22 @@ export type ClientRow = {
   lastActivity: string | null;
   lastPayment: string | null;
   paymentProvider: string;
+  // How the current period is covered: a free trial (card on file, no charge
+  // yet), a real payment, or dates the agency set by hand.
+  billing: "trial" | "paid" | "manual";
+  // During the trial: when Mercado Pago makes the first charge.
+  trialChargeAt: string | null;
   lines: { businessId: string; name: string; whatsappConnected: boolean; startedAt: string | null; endsAt: string | null }[];
   addons: { id: string; title: string; expiresAt: string; quantity: number; kind: string }[];
 };
 
-type Status = "nocard" | "active" | "expiring" | "expired" | "unset";
+type Status = "nocard" | "trial" | "active" | "expiring" | "expired" | "unset";
 const DAY_MS = 86_400_000;
 
 const STATUS: Record<Status, { label: string; bg: string; fg: string; dot: string }> = {
   nocard: { label: "Sin tarjeta", bg: "rgba(99,102,241,0.14)", fg: "var(--ink)", dot: "#6366f1" },
-  active: { label: "Activa", bg: "rgba(12,163,12,0.12)", fg: "var(--status-good)", dot: "#0ca30c" },
+  trial: { label: "Prueba gratis", bg: "rgba(14,165,233,0.14)", fg: "var(--status-trial)", dot: "#0ea5e9" },
+  active: { label: "Mes activo", bg: "rgba(12,163,12,0.12)", fg: "var(--status-good)", dot: "#0ca30c" },
   expiring: { label: "Por vencer", bg: "rgba(250,178,25,0.16)", fg: "var(--status-warn)", dot: "#fab219" },
   expired: { label: "Vencida", bg: "rgba(208,59,59,0.12)", fg: "var(--status-bad)", dot: "#d03b3b" },
   unset: { label: "Sin fecha", bg: "rgba(138,138,134,0.14)", fg: "var(--ink-muted)", dot: "#8a8a86" },
@@ -54,7 +60,8 @@ const STATUS: Record<Status, { label: string; bg: string; fg: string; dot: strin
 const FILTERS: { key: "all" | Status; label: string }[] = [
   { key: "all", label: "Todos" },
   { key: "nocard", label: "Sin tarjeta" },
-  { key: "active", label: "Activos" },
+  { key: "trial", label: "En prueba" },
+  { key: "active", label: "Mes activo" },
   { key: "expiring", label: "Por vencer" },
   { key: "expired", label: "Vencidos" },
   { key: "unset", label: "Sin fecha" },
@@ -73,7 +80,7 @@ function relative(iso: string | null, now: number): string {
   return `Hace ${Math.floor(days / 30)} ${Math.floor(days / 30) === 1 ? "mes" : "meses"}`;
 }
 
-function statusOf(endsAt: string | null, now: number): { status: Exclude<Status, "nocard">; days: number | null } {
+function statusOf(endsAt: string | null, now: number): { status: Exclude<Status, "nocard" | "trial">; days: number | null } {
   if (!endsAt) return { status: "unset", days: null };
   const diff = new Date(endsAt).getTime() - now;
   if (diff <= 0) return { status: "expired", days: -Math.floor(-diff / DAY_MS) };
@@ -103,7 +110,13 @@ export function ClientsList({ rows, nowIso, supportHost }: { rows: ClientRow[]; 
   const [open, setOpen] = useState<string | null>(null);
 
   const enriched = useMemo(
-    () => rows.map((r) => ({ ...r, ...(r.pendingCard ? { status: "nocard" as Status, days: null } : statusOf(r.endsAt, now)) })),
+    () =>
+      rows.map((r) => {
+        if (r.pendingCard) return { ...r, status: "nocard" as Status, days: null };
+        const s = statusOf(r.endsAt, now);
+        // A running trial is its own state; once it ends unpaid it shows as expired.
+        return { ...r, ...s, status: (r.billing === "trial" && s.status !== "expired" ? "trial" : s.status) as Status };
+      }),
     [rows, now],
   );
   const counts = useMemo(() => {
@@ -120,7 +133,7 @@ export function ClientsList({ rows, nowIso, supportHost }: { rows: ClientRow[]; 
   );
 
   // Leads to close first, then whoever needs attention, then the rest.
-  const ORDER: Record<Status, number> = { nocard: 0, expired: 1, expiring: 2, unset: 3, active: 4 };
+  const ORDER: Record<Status, number> = { nocard: 0, expired: 1, expiring: 2, trial: 3, unset: 4, active: 5 };
   const sorted = [...visible].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
 
   return (
@@ -160,8 +173,12 @@ export function ClientsList({ rows, nowIso, supportHost }: { rows: ClientRow[]; 
           const statusDetail =
             r.status === "nocard"
               ? `Se registró ${relative(r.joinedAt, now).toLowerCase()}`
+              : r.status === "trial"
+                ? r.trialChargeAt && new Date(r.trialChargeAt).getTime() > now
+                  ? `Primer cobro ${fmtDate(r.trialChargeAt)}`
+                  : "Cobrando el primer mes"
               : r.status === "expired"
-                ? `Venció ${r.days === 0 ? "hoy" : `hace ${Math.abs(r.days ?? 0)} d`}`
+                ? `${r.billing === "trial" ? "La prueba terminó sin pago" : "Venció"} ${r.days === 0 ? "hoy" : `hace ${Math.abs(r.days ?? 0)} d`}`
                 : r.status === "unset"
                   ? "Sin fecha de vencimiento"
                   : `Vence ${fmtDate(r.endsAt!)} · ${r.days} d`;
@@ -248,13 +265,19 @@ export function ClientsList({ rows, nowIso, supportHost }: { rows: ClientRow[]; 
                       { k: "Plan", v: `${r.planLabel} · US$${r.priceUsd}/mes${r.customPrice ? "*" : ""}` },
                       {
                         k: "Membresía",
-                        v: r.pendingCard ? "Sin activar" : r.endsAt ? `Hasta ${fmtDate(r.endsAt)}` : "Sin fecha",
+                        v: r.pendingCard ? "Sin activar" : r.endsAt ? `${r.status === "trial" ? "Prueba hasta" : "Hasta"} ${fmtDate(r.endsAt)}` : "Sin fecha",
                         sub: r.startedAt ? `Desde ${fmtDate(r.startedAt)}` : undefined,
                       },
                       {
                         k: "Último pago",
-                        v: r.lastPayment ? fmtDate(r.lastPayment) : r.pendingCard ? "Aún no" : "Manual",
-                        sub: r.lastPayment ? `Automático · ${r.paymentProvider}` : r.cardOnFile ? "Tarjeta registrada" : undefined,
+                        v: r.lastPayment ? fmtDate(r.lastPayment) : r.pendingCard || r.billing === "trial" ? "Aún no" : "Manual",
+                        sub: r.lastPayment
+                          ? `Automático · ${r.paymentProvider}`
+                          : r.status === "trial" && r.trialChargeAt
+                            ? `Tarjeta registrada · cobro ${fmtDate(r.trialChargeAt)}`
+                            : r.cardOnFile
+                              ? "Tarjeta registrada"
+                              : undefined,
                       },
                       { k: "Líneas de WhatsApp", v: `${connected} de ${r.lines.length} conectada${r.lines.length === 1 ? "" : "s"}`, sub: `Plan: hasta ${r.lineLimit ?? "∞"}` },
                       { k: "Última actividad", v: relative(r.lastActivity, now), sub: `Equipo ${r.team}/${r.teamLimit ?? "∞"} · ${r.websites} página${r.websites === 1 ? "" : "s"}` },
@@ -295,7 +318,7 @@ export function ClientsList({ rows, nowIso, supportHost }: { rows: ClientRow[]; 
                             businessId={l.businessId}
                             startedAt={l.startedAt ? new Date(l.startedAt) : null}
                             endsAt={l.endsAt ? new Date(l.endsAt) : null}
-                            status={statusOf(l.endsAt, now).status}
+                            status={r.status === "trial" && statusOf(l.endsAt, now).status !== "expired" ? "trial" : statusOf(l.endsAt, now).status}
                           />
                         </div>
                       ))}

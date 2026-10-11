@@ -18,6 +18,7 @@
   --series-ig: #e2559c;
   --status-warn: #fbc04d;
   --status-bad: #ff8080;
+  --status-trial: #6cc7f0;
 
   --background: #0a0a0a;
   --surface: #161616;
@@ -54,6 +55,7 @@
   --series-ig: #c93d84;
   --status-warn: #8f5a00;
   --status-bad: #b42828;
+  --status-trial: #0b6a96;
 
   --background: #f6f6f2;
   --surface: #ffffff;

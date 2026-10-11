@@ -4,12 +4,16 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isAgencyAdmin } from "@/lib/authz";
 import { findPack } from "@/lib/addonPacks";
-import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_USD, TEAM_MEMBER_LIMITS, LINE_LIMITS } from "@/lib/plans";
+import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_USD, TEAM_MEMBER_LIMITS, LINE_LIMITS, TRIAL_DAYS } from "@/lib/plans";
+import { RENEWAL_GRACE_DAYS } from "@/lib/hotmart";
 import { CreateClientForm } from "./CreateClientForm";
 import { EmailCheckButton } from "./EmailCheckButton";
 import { ClientsList, type ClientRow } from "./ClientsList";
 
 const DAY_MS = 86_400_000;
+// A free-trial grant covers TRIAL_DAYS + grace (10 days); a paid one, a month.
+// Anything this short that came from a card sign-up is the trial.
+const TRIAL_SPAN_MS = (TRIAL_DAYS + RENEWAL_GRACE_DAYS + 5) * DAY_MS;
 
 export default async function ClientsPage() {
   const session = await auth();
@@ -88,7 +92,7 @@ export default async function ClientsPage() {
     prisma.paymentEvent.findMany({
       where: { email: { in: emails }, action: "grant" },
       orderBy: { createdAt: "desc" },
-      select: { email: true, createdAt: true, provider: true },
+      select: { email: true, createdAt: true, provider: true, transaction: true },
     }),
   ]);
 
@@ -96,8 +100,8 @@ export default async function ClientsPage() {
   const activityBy = new Map(activityRows.map((r) => [r.businessId, r.last]));
   const teamBy = new Map(teamRows.map((r) => [r.businessId, r._count]));
   const websitesBy = new Map(websiteRows.map((r) => [r.businessId, r._count]));
-  const lastPaymentBy = new Map<string, { at: Date; provider: string }>();
-  for (const p of payments) if (!lastPaymentBy.has(p.email)) lastPaymentBy.set(p.email, { at: p.createdAt, provider: p.provider });
+  const grantsBy = new Map<string, typeof payments>();
+  for (const p of payments) grantsBy.set(p.email, [...(grantsBy.get(p.email) ?? []), p]);
 
   // One row per client account (an owner can run several WhatsApp lines).
   const rows = new Map<string, ClientRow>();
@@ -127,8 +131,10 @@ export default async function ClientsPage() {
         team: 0,
         websites: 0,
         lastActivity: null,
-        lastPayment: lastPaymentBy.get(user.email.toLowerCase())?.at.toISOString() ?? null,
-        paymentProvider: lastPaymentBy.get(user.email.toLowerCase())?.provider === "hotmart" ? "Hotmart" : "Mercado Pago",
+        lastPayment: null,
+        paymentProvider: "Mercado Pago",
+        billing: "manual",
+        trialChargeAt: null,
         lines: [],
         addons: (activeAddons.filter((a) => a.userId === user.id)).map((a) => ({
           id: a.id,
@@ -156,8 +162,27 @@ export default async function ClientsPage() {
       endsAt: business.subscriptionEndsAt?.toISOString() ?? null,
     });
   }
-  // Packs add capacity on top of the plan.
   for (const row of rows.values()) {
+    // The card sign-up (preapproval) only opens the free trial: the first real
+    // charge is a later payment. So the trial is the latest grant when it's
+    // that sign-up and it only covered the trial's few days.
+    const grants = grantsBy.get(row.email.toLowerCase()) ?? [];
+    const latest = grants[0];
+    // (A card linked with no recorded charge at all is the same trial.)
+    const trialStart = latest ? (latest.transaction.startsWith("preapproval:") ? latest.createdAt : null) : row.cardOnFile && row.startedAt ? new Date(row.startedAt) : null;
+    const onTrial = !!trialStart && !!row.endsAt && new Date(row.endsAt).getTime() - trialStart.getTime() <= TRIAL_SPAN_MS;
+    const paid = onTrial ? grants.slice(1) : grants;
+    if (onTrial) {
+      row.billing = "trial";
+      row.trialChargeAt = new Date(new Date(row.endsAt!).getTime() - RENEWAL_GRACE_DAYS * DAY_MS).toISOString();
+    } else if (paid.length) {
+      row.billing = "paid";
+    }
+    if (paid[0]) {
+      row.lastPayment = paid[0].createdAt.toISOString();
+      row.paymentProvider = paid[0].provider === "hotmart" ? "Hotmart" : "Mercado Pago";
+    }
+    // Packs add capacity on top of the plan.
     if (row.contactLimit !== null) row.contactLimit += row.addons.filter((a) => a.kind === "CONTACTS").reduce((s, a) => s + a.quantity, 0);
   }
 
@@ -172,16 +197,20 @@ export default async function ClientsPage() {
     const diff = new Date(iso).getTime() - now.getTime();
     return diff <= 0 ? -1 : Math.ceil(diff / DAY_MS);
   };
+  // Trials still running are counted apart: they haven't paid yet.
+  const trials = list.filter((r) => r.billing === "trial" && (daysLeft(r.endsAt) ?? -1) >= 0);
+  const members = list.filter((r) => !trials.includes(r));
   const summary = {
-    total: list.length,
     pending: pending.length,
-    active: list.filter((r) => (daysLeft(r.endsAt) ?? 1) > 7).length,
-    expiring: list.filter((r) => {
+    trial: trials.length,
+    active: members.filter((r) => (daysLeft(r.endsAt) ?? 1) > 7).length,
+    expiring: members.filter((r) => {
       const d = daysLeft(r.endsAt);
       return d !== null && d >= 0 && d <= 7;
     }).length,
-    expired: list.filter((r) => (daysLeft(r.endsAt) ?? 0) < 0).length,
-    mrr: list.filter((r) => (daysLeft(r.endsAt) ?? 1) >= 0).reduce((s, r) => s + r.priceUsd, 0),
+    expired: members.filter((r) => (daysLeft(r.endsAt) ?? 0) < 0).length,
+    mrr: members.filter((r) => (daysLeft(r.endsAt) ?? 1) >= 0).reduce((s, r) => s + r.priceUsd, 0),
+    trialMrr: trials.reduce((s, r) => s + r.priceUsd, 0),
   };
 
   return (
@@ -201,12 +230,16 @@ export default async function ClientsPage() {
 
       <section className="grid grid-cols-3 gap-2 sm:gap-3 xl:grid-cols-6">
         {[
-          { label: "Clientes", value: summary.total.toLocaleString("es-CO"), hint: "Con tarjeta o activados" },
           { label: "Sin tarjeta", value: summary.pending.toLocaleString("es-CO"), hint: "Se registraron, falta cerrarlos", tone: summary.pending ? "text-accent" : "" },
-          { label: "Activos", value: summary.active.toLocaleString("es-CO"), hint: "Con membresía al día", tone: "text-[var(--status-good)]" },
+          { label: "En prueba", value: summary.trial.toLocaleString("es-CO"), hint: "Prueba gratis, aún no pagan", tone: summary.trial ? "text-[var(--status-trial)]" : "" },
+          { label: "Mes activo", value: summary.active.toLocaleString("es-CO"), hint: "Ya pagan, membresía al día", tone: "text-[var(--status-good)]" },
           { label: "Por vencer", value: summary.expiring.toLocaleString("es-CO"), hint: "En los próximos 7 días", tone: summary.expiring ? "text-[var(--status-warn)]" : "" },
           { label: "Vencidos", value: summary.expired.toLocaleString("es-CO"), hint: "Sin acceso al panel", tone: summary.expired ? "text-[var(--status-bad)]" : "" },
-          { label: "Ingreso / mes", value: `US$${summary.mrr.toLocaleString("es-CO")}`, hint: "Clientes activos (aprox.)" },
+          {
+            label: "Ingreso / mes",
+            value: `US$${summary.mrr.toLocaleString("es-CO")}`,
+            hint: summary.trialMrr ? `+US$${summary.trialMrr.toLocaleString("es-CO")} si pagan las pruebas` : "Clientes que pagan (aprox.)",
+          },
         ].map((t) => (
           <div key={t.label} className="fl-card p-3 sm:p-4">
             <p className="truncate text-[11px] font-medium uppercase tracking-wide text-ink-muted sm:text-xs">{t.label}</p>

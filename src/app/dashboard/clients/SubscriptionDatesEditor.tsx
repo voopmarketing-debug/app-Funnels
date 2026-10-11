@@ -4,9 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateBusinessSubscription } from "@/lib/actions";
 
-type SubscriptionStatus = "active" | "expiring" | "expired" | "unset";
+type SubscriptionStatus = "trial" | "active" | "expiring" | "expired" | "unset";
 
 const STATUS_STYLES: Record<Exclude<SubscriptionStatus, "unset">, { dot: string; text: string; label: string }> = {
+  trial: { dot: "#0ea5e9", text: "var(--status-trial)", label: "Prueba gratis" },
   active: { dot: "#0ca30c", text: "#0ca30c", label: "Activa" },
   expiring: { dot: "#fab219", text: "#fab219", label: "Por vencer" },
   expired: { dot: "#d03b3b", text: "#d03b3b", label: "Vencida" },
