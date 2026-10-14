@@ -59,22 +59,37 @@ function useSort<K extends string>(initial: K) {
 const PAGE_SIZE = 7;
 
 /** One page of `rows`; the page goes back to the first whenever the filters or the order change. */
-export function usePaged<T>(rows: T[], resetKey: string) {
+export function usePaged<T>(rows: T[], resetKey: string, size = PAGE_SIZE) {
   const [state, setState] = useState({ page: 0, key: resetKey });
-  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(rows.length / size));
   const page = state.key === resetKey ? Math.min(state.page, pages - 1) : 0;
   return {
     page,
     pages,
-    visible: rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    visible: rows.slice(page * size, (page + 1) * size),
+    size,
     setPage: (n: number) => setState({ page: n, key: resetKey }),
   };
 }
 
-export function Pager({ page, pages, total, noun, onPage }: { page: number; pages: number; total: number; noun: string; onPage: (n: number) => void }) {
+export function Pager({
+  page,
+  pages,
+  total,
+  noun,
+  onPage,
+  size = PAGE_SIZE,
+}: {
+  page: number;
+  pages: number;
+  total: number;
+  noun: string;
+  onPage: (n: number) => void;
+  size?: number;
+}) {
   if (pages <= 1) return null;
-  const first = page * PAGE_SIZE + 1;
-  const last = Math.min(total, (page + 1) * PAGE_SIZE);
+  const first = page * size + 1;
+  const last = Math.min(total, (page + 1) * size);
   // Up to 5 page numbers around the current one.
   const start = Math.max(0, Math.min(page - 2, pages - 5));
   const numbers = Array.from({ length: Math.min(5, pages) }, (_, i) => start + i);

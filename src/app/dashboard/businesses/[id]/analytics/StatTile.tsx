@@ -15,7 +15,7 @@ export const STATUS_STYLES: Record<"good" | "warning" | "critical" | "neutral", 
 // is said by the status pill, never by this color.
 export type StatTone = "accent" | "secondary" | "amber" | "blue" | "facebook" | "instagram";
 
-const TONE_STYLES: Record<StatTone, string> = {
+export const TONE_STYLES: Record<StatTone, string> = {
   accent: "linear-gradient(135deg, #16a34a, #0f6e35)",
   secondary: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
   amber: "linear-gradient(135deg, #f59e0b, #d9620b)",

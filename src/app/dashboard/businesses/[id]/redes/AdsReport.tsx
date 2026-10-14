@@ -4,7 +4,9 @@ import type { DayRange } from "@/lib/socialRanges";
 import { rangeLabel } from "@/lib/socialRanges";
 import { adsHighlights, adviseCampaign, campaignOutcome, VERDICT_LABELS } from "@/lib/adsAdvice";
 import { InfoTip } from "../analytics/InfoTip";
-import { STATUS_STYLES } from "../analytics/StatTile";
+import { STATUS_STYLES, TONE_STYLES, type StatTone } from "../analytics/StatTile";
+import { CostIcon, CursorClickIcon, WhatsAppSmallIcon } from "../analytics/StatIcons";
+import { EyeIcon, RepeatIcon, TargetIcon, TrendIcon, UsersIcon } from "./icons";
 import { AdsTrendChart } from "./AdsTrendChart";
 import { CampaignList, type CampaignCard } from "./CampaignList";
 import { RefreshButton } from "./controls";
@@ -16,6 +18,9 @@ import { ChartCard, Delta, SectionError, dec, fmt, previousText, type Status } f
 
 type Metric = {
   label: string;
+  /** Same icon tiles as the Métricas tab, so both read as one product. */
+  icon: React.ReactNode;
+  tone: StatTone;
   hint: string;
   value: string;
   description: string;
@@ -29,9 +34,12 @@ function MetricCell({ m, big }: { m: Metric; big?: boolean }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 bg-surface p-4">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold leading-snug text-ink">{m.label}</p>
+        <span className="flex h-9 w-9 flex-none items-center justify-center rounded-xl text-white shadow-sm" style={{ background: TONE_STYLES[m.tone] }}>
+          {m.icon}
+        </span>
         <InfoTip text={m.description} label={m.label} />
       </div>
+      <p className="mt-2 text-sm font-semibold leading-snug text-ink">{m.label}</p>
       <p className="text-xs leading-snug text-ink-muted">{m.hint}</p>
       <p className={`mt-auto pt-2 font-bold tabular-nums tracking-tight text-ink ${big ? (m.value.length > 8 ? "text-xl sm:text-3xl" : "text-2xl sm:text-3xl") : m.value.length > 8 ? "text-xl sm:text-2xl" : "text-2xl"}`}>
         {m.value}
@@ -138,6 +146,8 @@ export async function AdsReport({ businessId, range, canManage }: { businessId: 
   const keyMetrics: Metric[] = [
     {
       label: "Invertiste",
+      icon: <CostIcon />,
+      tone: "amber",
       hint: "Lo que pagaste a Meta por tus anuncios",
       value: money(ads.totals.spend),
       description: "Lo que Meta te cobró por tus anuncios en estas fechas, en la moneda de tu cuenta publicitaria.",
@@ -145,6 +155,8 @@ export async function AdsReport({ businessId, range, canManage }: { businessId: 
     },
     {
       label: main.label,
+      icon: conversations > 0 ? <WhatsAppSmallIcon /> : <CursorClickIcon />,
+      tone: "accent",
       hint: main.hint,
       value: fmt(main.count),
       description:
@@ -155,6 +167,8 @@ export async function AdsReport({ businessId, range, canManage }: { businessId: 
     },
     {
       label: main.each,
+      icon: <TargetIcon />,
+      tone: "blue",
       hint: "Lo que pagaste en promedio por cada uno",
       value: money(mainCost),
       description:
@@ -164,6 +178,8 @@ export async function AdsReport({ businessId, range, canManage }: { businessId: 
     roasValue != null
       ? {
           label: "Ventas por cada $1",
+          icon: <TrendIcon />,
+          tone: "secondary",
           hint: "Cuánto vendiste por cada peso invertido",
           value: `${dec(roasValue, 1)}x`,
           status: roasValue >= 3 ? "good" : roasValue >= 1.5 ? "warning" : "critical",
@@ -172,6 +188,8 @@ export async function AdsReport({ businessId, range, canManage }: { businessId: 
         }
       : {
           label: "Personas que te vieron",
+          icon: <UsersIcon />,
+          tone: "secondary",
           hint: "Personas distintas que vieron tus anuncios",
           value: fmt(ads.totals.reach),
           description: "Cuántas personas diferentes vieron al menos uno de tus anuncios.",
@@ -180,6 +198,8 @@ export async function AdsReport({ businessId, range, canManage }: { businessId: 
   const advancedMetrics: Metric[] = [
     {
       label: "CTR al enlace",
+      icon: <CursorClickIcon />,
+      tone: "blue",
       hint: "De cada 100 que lo ven, cuántos hacen clic",
       value: adsLinkCtr == null ? "—" : `${dec(adsLinkCtr)}%`,
       status: adsLinkCtr == null ? "neutral" : adsLinkCtr >= 1 ? "good" : adsLinkCtr >= 0.6 ? "warning" : "critical",
@@ -188,12 +208,16 @@ export async function AdsReport({ businessId, range, canManage }: { businessId: 
     },
     {
       label: "CPC",
+      icon: <CostIcon />,
+      tone: "amber",
       hint: "Costo por cada clic al enlace",
       value: money(ads.totals.linkClicks ? ads.totals.spend / ads.totals.linkClicks : cpc(ads.totals)),
       description: "Cuánto pagaste, en promedio, por cada persona que hizo clic para ir a tu WhatsApp o web. Mientras más bajo, más visitas consigues con el mismo dinero.",
     },
     {
       label: "CPM",
+      icon: <EyeIcon />,
+      tone: "secondary",
       hint: "Costo por mil impresiones",
       value: money(cpm(ads.totals)),
       description: "Lo que cuesta mostrar tu anuncio 1.000 veces. Sube cuando el público es muy pequeño o muy disputado (por ejemplo en fechas especiales).",
@@ -201,6 +225,8 @@ export async function AdsReport({ businessId, range, canManage }: { businessId: 
     },
     {
       label: "Frecuencia",
+      icon: <RepeatIcon />,
+      tone: "accent",
       hint: "Veces que cada persona vio tus anuncios",
       value: dec(adsFreq, 1),
       status: adsFreq == null ? "neutral" : adsFreq <= 2.5 ? "good" : adsFreq <= 3.5 ? "warning" : "critical",

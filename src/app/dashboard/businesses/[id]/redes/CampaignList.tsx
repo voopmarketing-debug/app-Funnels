@@ -198,7 +198,8 @@ export function CampaignList({ campaigns, currency }: { campaigns: CampaignCard[
             : VERDICT_ORDER.indexOf(a.verdict) - VERDICT_ORDER.indexOf(b.verdict) || b.spend - a.spend,
     );
   }, [campaigns, filter, sort, query]);
-  const { page, pages, visible, setPage } = usePaged(rows, `${filter}|${sort}|${query}`);
+  // Cards are tall: four per page keeps one page about a screen and a half.
+  const { page, pages, visible, setPage, size } = usePaged(rows, `${filter}|${sort}|${query}`, 4);
 
   return (
     <div className="space-y-3">
@@ -227,7 +228,7 @@ export function CampaignList({ campaigns, currency }: { campaigns: CampaignCard[
             </option>
           ))}
         </select>
-        {campaigns.length > 7 && (
+        {campaigns.length > 4 && (
           <input id="campaigns-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar campaña" className={toolbarInput} />
         )}
         <button
@@ -273,7 +274,7 @@ export function CampaignList({ campaigns, currency }: { campaigns: CampaignCard[
             : "Ninguna campaña coincide con este filtro."}
         </p>
       )}
-      <Pager page={page} pages={pages} total={rows.length} noun="campañas" onPage={setPage} />
+      <Pager page={page} pages={pages} total={rows.length} noun="campañas" onPage={setPage} size={size} />
     </div>
   );
 }
