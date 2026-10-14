@@ -488,6 +488,18 @@ const RESULT_ACTIONS: Record<string, string[]> = {
   OUTCOME_ENGAGEMENT: [MESSAGING_ACTION, "post_engagement"],
   OUTCOME_AWARENESS: [],
   OUTCOME_APP_PROMOTION: ["mobile_app_install", "app_install"],
+  // Objectives of campaigns created before Meta's 2022 "OUTCOME_" redesign.
+  LINK_CLICKS: ["link_click"],
+  MESSAGES: [MESSAGING_ACTION],
+  LEAD_GENERATION: ["lead", "onsite_conversion.lead_grouped", MESSAGING_ACTION],
+  CONVERSIONS: [...PURCHASE_ACTIONS, "lead", "offsite_conversion.fb_pixel_lead", MESSAGING_ACTION],
+  PRODUCT_CATALOG_SALES: PURCHASE_ACTIONS,
+  POST_ENGAGEMENT: [MESSAGING_ACTION, "post_engagement"],
+  PAGE_LIKES: ["like"],
+  VIDEO_VIEWS: ["video_view"],
+  APP_INSTALLS: ["mobile_app_install", "app_install"],
+  REACH: [],
+  BRAND_AWARENESS: [],
 };
 
 export function resultsFor(objective: string | undefined, actions: AdAction[] | undefined): number | null {
@@ -515,8 +527,24 @@ const OBJECTIVE_LABELS: Record<string, string> = {
   OUTCOME_ENGAGEMENT: "Interacción",
   OUTCOME_AWARENESS: "Reconocimiento",
   OUTCOME_APP_PROMOTION: "Promoción de app",
+  LINK_CLICKS: "Tráfico",
+  MESSAGES: "Mensajes",
+  LEAD_GENERATION: "Clientes potenciales",
+  CONVERSIONS: "Conversiones",
+  PRODUCT_CATALOG_SALES: "Ventas del catálogo",
+  POST_ENGAGEMENT: "Interacción",
+  PAGE_LIKES: "Me gusta de la página",
+  VIDEO_VIEWS: "Reproducciones de video",
+  APP_INSTALLS: "Instalaciones de app",
+  REACH: "Alcance",
+  BRAND_AWARENESS: "Reconocimiento",
+  STORE_VISITS: "Visitas al negocio",
 };
-export const objectiveLabel = (o: string | undefined) => (o ? (OBJECTIVE_LABELS[o] ?? o.replace(/^OUTCOME_/, "").toLowerCase()) : "—");
+export const objectiveLabel = (o: string | undefined) => {
+  if (!o) return "—";
+  const plain = o.replace(/^OUTCOME_/, "").replace(/_/g, " ").toLowerCase();
+  return OBJECTIVE_LABELS[o] ?? plain.charAt(0).toUpperCase() + plain.slice(1);
+};
 
 export type AdTotals = {
   impressions: number;
@@ -559,7 +587,7 @@ const EMPTY_TOTALS: AdTotals = { impressions: 0, reach: 0, clicks: 0, spend: 0, 
 export async function metaAds(adAccountId: string, userToken: string, range: DayRange, currency: string): Promise<AdsData> {
   const timeRange = JSON.stringify({ since: range.since, until: range.until });
   const [daily, totals, campaigns, campaignMeta] = await Promise.all([
-    graphAll<AdInsightRow>(`${adAccountId}/insights`, { fields: "impressions,reach,clicks,spend", time_range: timeRange, time_increment: "1", limit: "100" }, userToken),
+    graphAll<AdInsightRow>(`${adAccountId}/insights`, { fields: "impressions,reach,clicks,inline_link_clicks,spend,actions", time_range: timeRange, time_increment: "1", limit: "100" }, userToken),
     // Reach can't be summed across days (the same person counts once), so the totals come from Meta.
     metaAdTotals(adAccountId, userToken, range),
     graphAll<AdInsightRow>(

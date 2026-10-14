@@ -29,7 +29,7 @@ export function compact(n: number): string {
   return Math.round(n).toLocaleString("es-CO");
 }
 
-function useChartWidth(fallback: number) {
+export function useChartWidth(fallback: number) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(fallback);
   useEffect(() => {

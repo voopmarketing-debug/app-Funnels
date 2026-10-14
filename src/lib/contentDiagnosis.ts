@@ -4,17 +4,20 @@ import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropicClient";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { recordAnthropicUsage } from "@/lib/aiUsage";
-import type { SocialDashboard } from "@/lib/socialDashboard";
-import type { SocialPost } from "@/lib/metaSocial";
+import type { AdsWithPrevious, SocialDashboard } from "@/lib/socialDashboard";
+import { cpm, frequency, linkCtr, objectiveLabel, type DayRange, type SocialPost } from "@/lib/metaSocial";
+import { adviseCampaign, campaignOutcome, VERDICT_LABELS } from "@/lib/adsAdvice";
 
 // Reads the business's real Facebook/Instagram posts and their numbers and
 // says what kind of content works for THIS audience, then proposes posts
-// built on that. Grounded in the data on purpose: generic social-media tips
+// built on that. When the business runs ads, the same report says what to
+// change in each campaign and proposes new ads. Grounded in the data on purpose: generic social-media tips
 // are free anywhere, the value is "your carousels about X get 3x the rest".
 
 /** Fewer posts than this and any "pattern" would be noise. */
 export const MIN_POSTS = 4;
 const MAX_POSTS = 40;
+const MAX_CAMPAIGNS = 25;
 
 const ContentIdeaSchema = z.object({
   titulo: z.string().describe("Nombre corto de la idea, ej. 'Antes y después de un blanqueamiento'."),
@@ -36,7 +39,39 @@ const ContentDiagnosisSchema = z.object({
   ideas: z.array(ContentIdeaSchema).min(3).max(6).describe("Ideas de publicaciones nuevas basadas en lo que ya funciona para este negocio."),
 });
 
-export type ContentDiagnosis = z.infer<typeof ContentDiagnosisSchema>;
+const AdImprovementSchema = z.object({
+  campana: z.string().describe("Nombre exacto de la campaña, o 'Toda la cuenta' si aplica a todas."),
+  accion: z.string().describe("Qué hacer, en una frase que empieza con un verbo: 'Apágala', 'Cambia el video', 'Súbele 20% el presupuesto'…"),
+  porque: z.string().describe("Por qué, citando sus números reales (inversión, conversaciones, costo de cada una) en palabras simples."),
+});
+
+const AdIdeaSchema = z.object({
+  titulo: z.string().describe("Nombre corto del anuncio, ej. 'Promo de blanqueamiento con testimonio'."),
+  formato: z.enum(["Video", "Reel", "Imagen", "Carrusel"]),
+  gancho: z.string().describe("La primera frase o los primeros 3 segundos, lo que hace que la persona se detenga."),
+  texto: z.string().describe("Texto del anuncio listo para pegar, que invita a escribir por WhatsApp."),
+  publico: z.string().describe("A quién mostrárselo, en palabras simples (edad, zona, intereses)."),
+  porque: z.string().describe("Por qué debería funcionar, basado en la campaña o publicación real que mejor rindió."),
+});
+
+const AdsDiagnosisSchema = z.object({
+  resumen: z.string().describe("2-3 frases para el dueño sobre si sus anuncios le están trayendo clientes a buen precio."),
+  puntuacion: z.number().int().min(1).max(10).describe("De 1 a 10, qué tan bien están rindiendo sus anuncios para lo que invierte."),
+  mejoras: z.array(AdImprovementSchema).min(1).max(5).describe("Cambios concretos por campaña, en orden de impacto. La primera es la más importante."),
+  presupuesto: z.string().describe("Dónde poner el dinero de ahora en adelante: qué apagar, qué subir y cuánto, en 2-3 frases."),
+  ideas: z.array(AdIdeaSchema).min(2).max(3).describe("Anuncios nuevos para probar, basados en lo que ya funcionó."),
+});
+
+const DiagnosisSchema = ContentDiagnosisSchema.extend({
+  anuncios: AdsDiagnosisSchema.nullable().describe("El diagnóstico de los anuncios. null si no se te dieron datos de anuncios."),
+});
+
+export type ContentDiagnosis = z.infer<typeof ContentDiagnosisSchema> & {
+  /** Missing in reports made before ads were included. */
+  anuncios?: AdsDiagnosis | null;
+};
+export type AdsDiagnosis = z.infer<typeof AdsDiagnosisSchema>;
+export type AdIdea = z.infer<typeof AdIdeaSchema>;
 export type ContentIdea = z.infer<typeof ContentIdeaSchema>;
 
 const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -62,7 +97,28 @@ function describeAccount(data: SocialDashboard): string {
   return lines.join("\n") || "Sin datos de cuenta.";
 }
 
-const SYSTEM_PROMPT = `Eres estratega de contenido para redes sociales de pequeños negocios en Latinoamérica, experto en Instagram y Facebook orgánico.
+export type AdsInput = { range: DayRange; data: AdsWithPrevious };
+
+/** The ads, as the model reads them: totals, then each campaign with what it got and what our rules already see. */
+function describeAds({ range, data }: AdsInput): string {
+  const t = data.totals;
+  const money = (n: number | null) => (n == null ? "sin dato" : `${Math.round(n).toLocaleString("es-CO")} ${data.currency}`);
+  const totalLine = `Toda la cuenta (${range.since} a ${range.until}): invirtió ${money(t.spend)}, ${t.conversations ?? 0} conversaciones por WhatsApp/Messenger${
+    t.conversations ? ` (${money(t.spend / t.conversations)} cada una)` : ""
+  }, ${t.linkClicks ?? 0} clics al enlace, ${t.reach} personas alcanzadas, frecuencia ${frequency(t)?.toFixed(1) ?? "?"}, CPM ${money(cpm(t))}. Período anterior: invirtió ${money(data.previous.spend)}, ${data.previous.conversations ?? 0} conversaciones.`;
+  const campaigns = [...data.campaigns].sort((a, b) => b.spend - a.spend).slice(0, MAX_CAMPAIGNS);
+  const lines = campaigns.map((c, i) => {
+    const o = campaignOutcome(c);
+    const advice = adviseCampaign(c, data.campaigns, t);
+    const ctr = linkCtr(c);
+    return `${i + 1}. «${c.name}» [${c.status ?? "estado desconocido"} · objetivo: ${objectiveLabel(c.objective)}] invirtió ${money(c.spend)} → ${o.count ?? "sin dato"} ${o.plural}${
+      o.cost != null ? ` (${o.costLabel.toLowerCase()} ${money(o.cost)})` : ""
+    }; CTR enlace ${ctr == null ? "?" : `${ctr.toFixed(2)}%`}; frecuencia ${frequency(c)?.toFixed(1) ?? "?"}; CPM ${money(cpm(c))}. Nuestra regla dice: ${VERDICT_LABELS[advice.verdict]} (${advice.tips.map((x) => x.text).join(" ")})`;
+  });
+  return `${totalLine}\n${lines.join("\n") || "Ninguna campaña con gasto."}`;
+}
+
+const SYSTEM_PROMPT = `Eres estratega de redes sociales y de publicidad en Facebook e Instagram (Meta Ads) para pequeños negocios en Latinoamérica.
 
 Recibes las publicaciones reales de un negocio con sus números. Tu trabajo:
 1. Encontrar qué tipo de contenido le funciona A ESTE negocio (temas, formatos, ganchos, días y horas) y qué no, comparando publicaciones entre sí. Cita publicaciones y cifras reales; nunca des consejos genéricos que servirían para cualquier cuenta.
@@ -73,14 +129,24 @@ Reglas:
 - Trata a la persona de "tú".
 - La interacción importa más que las visualizaciones: una publicación vista por pocos pero con muchas interacciones indica un tema que conecta.
 - Si hay pocas publicaciones o los números son bajos, dilo con honestidad y basa las ideas en lo poco que sí funcionó y en lo que vende el negocio.
-- Los textos propuestos invitan a escribir por WhatsApp, que es donde el negocio vende. Nada de hashtags en exceso (máximo 3-5).`;
+- Los textos propuestos invitan a escribir por WhatsApp, que es donde el negocio vende. Nada de hashtags en exceso (máximo 3-5).
+
+Si recibes datos de anuncios, haz también su diagnóstico (campo "anuncios"):
+- Lo que importa es cuánto cuesta cada conversación o cliente, no los clics ni las impresiones. Compara campañas entre sí con sus números reales.
+- Cada mejora nombra la campaña exacta y dice qué hacer: apagarla, cambiar el anuncio (imagen, video, primera frase), cambiar el público, o subir el presupuesto de a poco (20% cada 3-4 días).
+- Una campaña apagada que funcionó bien es un modelo a repetir; una que gastó sin resultados no se repite.
+- Las ideas de anuncios se basan en la campaña que mejor rindió y en las publicaciones con más interacción: lo que ya conectó de forma orgánica suele funcionar como anuncio.
+- Sin datos de anuncios, "anuncios" es null.`;
 
 export async function generateContentDiagnosis(
   businessId: string,
   data: SocialDashboard,
+  ads: AdsInput | null = null,
 ): Promise<{ status: "insufficient_data"; posts: number } | { status: "ok"; diagnosis: ContentDiagnosis }> {
   const posts = data.posts?.ok ? data.posts.data : [];
-  if (posts.length < MIN_POSTS) return { status: "insufficient_data", posts: posts.length };
+  const hasAds = !!ads && ads.data.campaigns.some((c) => c.spend > 0);
+  // With ads to look at, a few posts are still worth a report.
+  if (posts.length < MIN_POSTS && !hasAds) return { status: "insufficient_data", posts: posts.length };
 
   const [business, products] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { name: true, industry: true } }),
@@ -98,7 +164,7 @@ export async function generateContentDiagnosis(
     model: "claude-opus-5-5",
     max_tokens: 16000,
     system: SYSTEM_PROMPT,
-    output_config: { format: zodOutputFormat(ContentDiagnosisSchema), effort: "high" },
+    output_config: { format: zodOutputFormat(DiagnosisSchema), effort: "high" },
     messages: [
       {
         role: "user",
@@ -109,10 +175,12 @@ Período analizado: ${data.range.since} a ${data.range.until}.
 Cuenta:
 ${describeAccount(data)}
 
-${sample.length} publicaciones del período, ordenadas de más a menos interacciones:
-${sample.map(describePost).join("\n")}
+${sample.length} publicaciones del período, ordenadas de más a menos interacciones${sample.length < MIN_POSTS ? " (son pocas: dilo y no saques patrones fuertes)" : ""}:
+${sample.map(describePost).join("\n") || "(ninguna)"}
 
-Haz el diagnóstico del contenido y propone las ideas.`,
+${hasAds ? `Anuncios (Meta Ads), campañas de la que más invirtió a la que menos:\n${describeAds(ads!)}` : "Sin datos de anuncios."}
+
+Haz el diagnóstico del contenido${hasAds ? " y de los anuncios" : ""} y propone las ideas.`,
       },
     ],
   });

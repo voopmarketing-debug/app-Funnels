@@ -92,3 +92,125 @@ export const VERDICT_LABELS: Record<CampaignVerdict, string> = {
   pausar: "Pausa o rehaz",
   poco_dato: "Falta información",
 };
+
+// ---- In plain words ----
+// "Resultados" means nothing to a business owner: each campaign is shown with
+// what it actually got (conversations, clicks, sales…) and what each one cost.
+
+export type CampaignOutcome = {
+  count: number | null;
+  /** "conversaciones", "clics a tu enlace"… */
+  plural: string;
+  singular: string;
+  /** What the campaign was bought for, e.g. "conseguir clientes potenciales". */
+  goal: string;
+  /** Cost of one, or of 1.000 people reached for awareness campaigns. */
+  cost: number | null;
+  costLabel: string;
+};
+
+type OutcomeKind = { goal: string; plural: string; singular: string; count: (c: AdCampaign) => number | null };
+
+const RESULTS = (c: AdCampaign) => c.results;
+const KINDS: Record<string, OutcomeKind> = {
+  leads: { goal: "conseguir clientes potenciales", plural: "clientes potenciales", singular: "cliente potencial", count: RESULTS },
+  sales: { goal: "vender", plural: "ventas", singular: "venta", count: (c) => (c.purchases ? c.purchases : c.results) },
+  traffic: { goal: "llevar gente a tu enlace", plural: "clics a tu enlace", singular: "clic", count: (c) => c.linkClicks ?? c.results },
+  engagement: { goal: "conseguir interacciones", plural: "interacciones", singular: "interacción", count: RESULTS },
+  messages: { goal: "recibir mensajes", plural: "conversaciones", singular: "conversación", count: (c) => c.conversations ?? c.results },
+  video: { goal: "que vean tu video", plural: "reproducciones", singular: "reproducción", count: RESULTS },
+  likes: { goal: "ganar seguidores", plural: "me gusta", singular: "me gusta", count: RESULTS },
+  app: { goal: "instalar tu app", plural: "instalaciones", singular: "instalación", count: RESULTS },
+};
+const KIND_OF: Record<string, keyof typeof KINDS | "awareness"> = {
+  OUTCOME_LEADS: "leads",
+  LEAD_GENERATION: "leads",
+  OUTCOME_SALES: "sales",
+  CONVERSIONS: "sales",
+  PRODUCT_CATALOG_SALES: "sales",
+  OUTCOME_TRAFFIC: "traffic",
+  LINK_CLICKS: "traffic",
+  OUTCOME_ENGAGEMENT: "engagement",
+  POST_ENGAGEMENT: "engagement",
+  MESSAGES: "messages",
+  VIDEO_VIEWS: "video",
+  PAGE_LIKES: "likes",
+  OUTCOME_APP_PROMOTION: "app",
+  APP_INSTALLS: "app",
+  OUTCOME_AWARENESS: "awareness",
+  REACH: "awareness",
+  BRAND_AWARENESS: "awareness",
+};
+
+export function campaignOutcome(c: AdCampaign): CampaignOutcome {
+  const kind = KIND_OF[c.objective];
+  // A WhatsApp conversation is what these businesses sell through: it wins
+  // over the objective's own result whenever the campaign started any.
+  if (c.conversations && kind !== "awareness") {
+    return {
+      count: c.conversations,
+      plural: "conversaciones",
+      singular: "conversación",
+      goal: kind ? KINDS[kind].goal : "recibir mensajes",
+      cost: c.spend / c.conversations,
+      costLabel: "Cada conversación te costó",
+    };
+  }
+  if (kind === "awareness") {
+    return {
+      count: c.reach,
+      plural: "personas alcanzadas",
+      singular: "persona alcanzada",
+      goal: "que mucha gente te conozca",
+      cost: c.reach > 0 ? (c.spend / c.reach) * 1000 : null,
+      costLabel: "Llegar a 1.000 personas te costó",
+    };
+  }
+  const k = kind ? KINDS[kind] : { goal: "conseguir resultados", plural: "resultados", singular: "resultado", count: (x: AdCampaign) => x.results ?? x.linkClicks ?? null };
+  const count = k.count(c);
+  return { count, plural: k.plural, singular: k.singular, goal: k.goal, cost: count ? c.spend / count : null, costLabel: `Cada ${k.singular} te costó` };
+}
+
+export type AdsHighlight = { tone: "good" | "warn" | "bad"; text: string };
+
+const isActive = (c: AdCampaign) => c.status === "ACTIVE";
+
+/** The two or three things to do first with the whole account, best ordered for a busy owner. */
+export function adsHighlights(campaigns: AdCampaign[], account: AdTotals, money: (n: number) => string): AdsHighlight[] {
+  const out: AdsHighlight[] = [];
+  const advised = campaigns.map((c) => ({ c, advice: adviseCampaign(c, campaigns, account), outcome: campaignOutcome(c) }));
+  const byActiveThenSpend = (a: (typeof advised)[number], b: (typeof advised)[number]) => Number(isActive(b.c)) - Number(isActive(a.c)) || b.c.spend - a.c.spend;
+
+  const worst = advised.filter((x) => x.advice.verdict === "pausar").sort(byActiveThenSpend)[0];
+  if (worst) {
+    const n = worst.outcome.count;
+    const got = n ? `y solo consiguió ${n} ${n === 1 ? worst.outcome.singular : worst.outcome.plural}` : `sin conseguir ${worst.outcome.plural}`;
+    out.push({ tone: "bad", text: `${isActive(worst.c) ? "Pausa o cambia" : "No repitas"} «${worst.c.name}»: gastó ${money(worst.c.spend)} ${got}.` });
+  }
+
+  // Only compare like with like: when any campaign brought conversations,
+  // the best one is the cheapest per conversation, not per click.
+  const unit = advised.some((x) => x.outcome.plural === "conversaciones") ? "conversaciones" : null;
+  const best = advised
+    .filter((x) => (x.advice.verdict === "escalar" || x.advice.verdict === "mantener") && x.outcome.cost != null && x.outcome.count)
+    .filter((x) => !unit || x.outcome.plural === unit)
+    .sort((a, b) => Number(isActive(b.c)) - Number(isActive(a.c)) || (a.outcome.cost ?? 0) - (b.outcome.cost ?? 0))[0];
+  if (best) {
+    out.push({
+      tone: "good",
+      text: `Tu campaña que mejor rinde es «${best.c.name}»: ${best.outcome.costLabel.toLowerCase()} ${money(best.outcome.cost!)}. ${
+        isActive(best.c) ? "Súbele el presupuesto de a poco (20% cada 3-4 días)." : "Úsala como modelo para tu próxima campaña."
+      }`,
+    });
+  }
+
+  const f = frequency(account);
+  if (f != null && f >= FATIGUE_FREQUENCY) {
+    out.push({ tone: "warn", text: `La misma gente ya vio tus anuncios ${f.toFixed(1).replace(".", ",")} veces en promedio: cambia las imágenes o los videos para que no se cansen.` });
+  }
+
+  if (campaigns.length > 0 && !campaigns.some(isActive) && campaigns.some((c) => c.status)) {
+    out.push({ tone: "warn", text: "Ahora mismo no tienes ninguna campaña encendida: si quieres seguir recibiendo clientes por anuncios, activa la que mejor te funcionó." });
+  }
+  return out.slice(0, 3);
+}

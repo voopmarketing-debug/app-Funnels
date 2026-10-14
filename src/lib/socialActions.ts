@@ -10,9 +10,9 @@ import { isConversationId, sendReply, threadParticipantIds } from "@/lib/metaInb
 import { isCommentId, privateReplyToComment, replyToComment, setCommentHidden, type CommentNetwork } from "@/lib/metaComments";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { MAX_RULES, parseKeywords, subscribePageToComments, sweepCommentAutoReplies } from "@/lib/commentAutoReply";
-import { clearSocialCache, getSocialDashboard } from "@/lib/socialDashboard";
+import { clearSocialCache, getAdsSection, getSocialDashboard } from "@/lib/socialDashboard";
 import { RANGE_PRESETS, todayInColombia } from "@/lib/socialRanges";
-import { MIN_POSTS, generateContentDiagnosis as runContentDiagnosis, type ContentDiagnosis } from "@/lib/contentDiagnosis";
+import { MIN_POSTS, generateContentDiagnosis as runContentDiagnosis, type AdsInput, type ContentDiagnosis } from "@/lib/contentDiagnosis";
 import { withAiUsage } from "@/lib/aiUsage";
 
 async function userId(): Promise<string> {
@@ -102,7 +102,21 @@ export async function generateContentDiagnosis(businessId: string): Promise<Cont
     if (data.needsReconnect) return { status: "error", message: "Tu conexión con Facebook venció. Reconéctala y vuelve a intentarlo." };
     if (data.throttled) return { status: "error", message: "Consultaste muchos periodos seguidos. Espera unos minutos y vuelve a intentarlo." };
 
-    const result = await withAiUsage(businessId, "DIAGNOSIS", () => runContentDiagnosis(businessId, data));
+    // Ads over the last 3 months, or the last year when nothing ran lately:
+    // a paused campaign that worked is still the model for the next one.
+    let ads: AdsInput | null = null;
+    if (data.ads?.ok) {
+      for (const key of ["3m", "12m"]) {
+        const range = preset(key);
+        const section = await getAdsSection(businessId, range);
+        if (section.ads?.ok && section.ads.data.campaigns.some((c) => c.spend > 0)) {
+          ads = { range, data: section.ads.data };
+          break;
+        }
+      }
+    }
+
+    const result = await withAiUsage(businessId, "DIAGNOSIS", () => runContentDiagnosis(businessId, data, ads));
     if (result.status === "insufficient_data") return result;
 
     const generatedAt = new Date();

@@ -3,9 +3,7 @@
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { disconnectSocial, refreshSocialData, selectSocialAccounts } from "@/lib/socialActions";
-import type { AdTotals } from "@/lib/metaSocial";
-import { LineChart, compact, type ChartSeries } from "./LineChart";
-import { moneyFormatter } from "./format";
+import { LineChart, type ChartSeries } from "./LineChart";
 
 export function RefreshButton({ businessId, updatedLabel }: { businessId: string; updatedLabel: string }) {
   const [pending, start] = useTransition();
@@ -137,55 +135,4 @@ const NETWORK_META = {
 export function NetworkChart({ days, series, label, emptyText }: { days: string[]; series: (NetworkSeries & { label?: string })[]; label: string; emptyText?: string }) {
   const chart: ChartSeries[] = series.map((s) => ({ key: s.key, label: s.label ?? NETWORK_META[s.key].label, color: NETWORK_META[s.key].color, values: s.values }));
   return <LineChart days={days} series={chart} label={label} emptyText={emptyText} format={(n) => Math.round(n).toLocaleString("es-CO")} />;
-}
-
-const AD_METRICS = [
-  { key: "spend", label: "Gasto" },
-  { key: "impressions", label: "Impresiones" },
-  { key: "clicks", label: "Clics" },
-  { key: "cpm", label: "CPM" },
-  { key: "cpc", label: "CPC" },
-] as const;
-type AdMetric = (typeof AD_METRICS)[number]["key"];
-
-export function AdsDailyChart({ days, daily, currency }: { days: string[]; daily: Record<string, AdTotals>; currency: string }) {
-  const [metric, setMetric] = useState<AdMetric>("spend");
-  const money = moneyFormatter(currency);
-  const isMoney = metric === "spend" || metric === "cpm" || metric === "cpc";
-  const values: Record<string, number | null> = {};
-  for (const day of days) {
-    const d = daily[day];
-    if (!d) {
-      values[day] = metric === "cpm" || metric === "cpc" ? null : 0;
-      continue;
-    }
-    values[day] =
-      metric === "cpm" ? (d.impressions > 0 ? (d.spend / d.impressions) * 1000 : null) : metric === "cpc" ? (d.clicks > 0 ? d.spend / d.clicks : null) : d[metric];
-  }
-  const label = AD_METRICS.find((m) => m.key === metric)!.label;
-  return (
-    <div className="space-y-3">
-      <div role="radiogroup" aria-label="Métrica" className="fl-seg">
-        {AD_METRICS.map((m) => (
-          <button
-            key={m.key}
-            type="button"
-            role="radio"
-            aria-checked={m.key === metric}
-            onClick={() => setMetric(m.key)}
-            className="fl-seg-item"
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-      <LineChart
-        days={days}
-        label={`${label} por día`}
-        series={[{ key: metric, label, color: "var(--series-fb)", values }]}
-        format={(n) => (isMoney ? money(n) : compact(n))}
-        emptyText="Sin gasto en este período"
-      />
-    </div>
-  );
 }
