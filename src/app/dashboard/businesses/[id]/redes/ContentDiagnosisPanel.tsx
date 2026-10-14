@@ -241,21 +241,19 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
         )}
         {notice && <p className="rounded-lg border border-border-strong bg-surface-2 p-3 text-sm text-ink">{notice}</p>}
         {!current && !notice && !isPending && (
-          <div className="space-y-3 border-t border-border pt-4">
-            <p className="text-sm font-semibold text-ink">En un minuto sabrás:</p>
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                ["📝", "Qué publicaciones le gustan a tu audiencia"],
-                ["🕒", "Qué días y horas publicar"],
-                ["📣", "Qué cambiar en cada campaña y dónde poner tu dinero"],
-                ["💡", "Ideas de publicaciones y anuncios listas para copiar"],
-              ].map(([icon, text]) => (
-                <li key={text} className="flex items-start gap-2.5 rounded-xl bg-surface-2/60 p-3 text-sm leading-snug text-ink">
-                  <span aria-hidden="true">{icon}</span>
-                  <span>{text}</span>
-                </li>
-              ))}
-            </ul>
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+            <span className="mr-1 text-sm font-semibold text-ink">En un minuto sabrás:</span>
+            {[
+              ["📝", "Qué publicaciones gustan"],
+              ["🕒", "Cuándo publicar"],
+              ["📣", "Qué cambiar en tus campañas"],
+              ["💡", "Ideas listas para copiar"],
+            ].map(([icon, text]) => (
+              <span key={text} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2/60 px-3 py-1 text-xs font-semibold text-ink">
+                <span aria-hidden="true">{icon}</span>
+                {text}
+              </span>
+            ))}
           </div>
         )}
 
