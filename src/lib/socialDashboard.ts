@@ -21,6 +21,7 @@ import {
   type Series,
   type SocialPost,
 } from "@/lib/metaSocial";
+import { todayInColombia } from "@/lib/socialRanges";
 
 // Everything the "Redes sociales" page shows, read from Meta once and kept
 // in SocialMetricCache for a few hours: a page with posts and ads makes
@@ -28,6 +29,10 @@ import {
 
 
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000;
+// A range that includes today keeps changing (new posts, spend): it's read
+// again every few minutes instead of every few hours.
+const LIVE_CACHE_TTL_MS = 10 * 60 * 1000;
+const ttlFor = (range: DayRange) => (range.until >= todayInColombia() ? LIVE_CACHE_TTL_MS : CACHE_TTL_MS);
 const MAX_NEW_RANGES_PER_HOUR = 20;
 /** "Actualizar" is ignored while the data is younger than this. */
 export const MIN_REFRESH_MS = 2 * 60 * 1000;
@@ -46,6 +51,8 @@ export type NetworkSummary = {
 
 export type SectionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
+export type AdsWithPrevious = AdsData & { previous: AdTotals };
+
 export type SocialDashboard = {
   range: DayRange;
   previous: DayRange;
@@ -53,7 +60,7 @@ export type SocialDashboard = {
   facebook: SectionResult<NetworkSummary> | null;
   instagram: SectionResult<NetworkSummary> | null;
   posts: SectionResult<SocialPost[]> | null;
-  ads: SectionResult<AdsData & { previous: AdTotals }> | null;
+  ads: SectionResult<AdsWithPrevious> | null;
   needsReconnect: boolean;
   /** Too many different date ranges asked in the last hour: nothing was read from Meta. */
   throttled?: boolean;
@@ -144,6 +151,11 @@ async function summarize(
   };
 }
 
+async function loadAds(adAccountId: string, userToken: string, range: DayRange, currency: string): Promise<AdsWithPrevious> {
+  const [current, prev] = await Promise.all([metaAds(adAccountId, userToken, range, currency), metaAdTotals(adAccountId, userToken, previousRange(range))]);
+  return { ...current, previous: prev };
+}
+
 async function loadFromMeta(businessId: string, range: DayRange): Promise<SocialDashboard> {
   const connection = await prisma.socialConnection.findUnique({ where: { businessId } });
   const previous = previousRange(range);
@@ -187,15 +199,7 @@ async function loadFromMeta(businessId: string, range: DayRange): Promise<Social
             return [...fb, ...ig].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
           })
         : null,
-      adAccountId && userToken
-        ? settle(async () => {
-            const [current, prev] = await Promise.all([
-              metaAds(adAccountId, userToken, range, connection.adCurrency ?? "USD"),
-              metaAdTotals(adAccountId, userToken, previous),
-            ]);
-            return { ...current, previous: prev };
-          })
-        : null,
+      adAccountId && userToken ? settle(() => loadAds(adAccountId, userToken, range, connection.adCurrency ?? "USD")) : null,
     ]);
     return { ...empty, facebook, instagram, posts, ads };
   } catch (err) {
@@ -204,17 +208,21 @@ async function loadFromMeta(businessId: string, range: DayRange): Promise<Social
   }
 }
 
+// Every new range costs dozens of Meta calls, shared by the whole Page's
+// rate limit; clicking through many custom ranges is capped per hour.
+async function overHourlyReads(businessId: string): Promise<boolean> {
+  const recentReads = await prisma.socialMetricCache.count({ where: { businessId, fetchedAt: { gt: new Date(Date.now() - 60 * 60 * 1000) } } });
+  return recentReads >= MAX_NEW_RANGES_PER_HOUR;
+}
+
 const cacheKey = (range: DayRange) => `dashboard:${range.since}:${range.until}`;
 
 /** Everything the page shows for `range`, compared with the same number of days just before it. */
 export async function getSocialDashboard(businessId: string, range: DayRange): Promise<SocialDashboard> {
   const key = cacheKey(range);
   const cached = await prisma.socialMetricCache.findUnique({ where: { businessId_key: { businessId, key } } });
-  if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) return cached.data as unknown as SocialDashboard;
-  // Every new range costs dozens of Meta calls, shared by the whole Page's
-  // rate limit; clicking through many custom ranges is capped per hour.
-  const recentReads = await prisma.socialMetricCache.count({ where: { businessId, fetchedAt: { gt: new Date(Date.now() - 60 * 60 * 1000) } } });
-  if (recentReads >= MAX_NEW_RANGES_PER_HOUR) {
+  if (cached && Date.now() - cached.fetchedAt.getTime() < ttlFor(range)) return cached.data as unknown as SocialDashboard;
+  if (await overHourlyReads(businessId)) {
     const previous = previousRange(range);
     return { range, previous, fetchedAt: new Date().toISOString(), facebook: null, instagram: null, posts: null, ads: null, needsReconnect: false, throttled: true };
   }
@@ -231,6 +239,39 @@ export async function getSocialDashboard(businessId: string, range: DayRange): P
     await prisma.socialMetricCache.deleteMany({ where: { businessId, fetchedAt: { lt: new Date(Date.now() - 2 * 86_400_000) } } });
   }
   return fresh;
+}
+
+export type AdsSection = { ads: SectionResult<AdsWithPrevious> | null; needsReconnect: boolean; throttled?: boolean };
+
+/**
+ * Only the ads, for their own dates (to look back at older campaigns without
+ * reading every other section again). Cached like the dashboard.
+ */
+export async function getAdsSection(businessId: string, range: DayRange): Promise<AdsSection> {
+  const key = `ads:${range.since}:${range.until}`;
+  const cached = await prisma.socialMetricCache.findUnique({ where: { businessId_key: { businessId, key } } });
+  if (cached && Date.now() - cached.fetchedAt.getTime() < ttlFor(range)) return cached.data as unknown as AdsSection;
+  if (await overHourlyReads(businessId)) return { ads: null, needsReconnect: false, throttled: true };
+
+  const connection = await prisma.socialConnection.findUnique({ where: { businessId } });
+  const { adAccountId } = connection ?? {};
+  if (!connection?.userAccessToken || !adAccountId) return { ads: null, needsReconnect: false };
+  const userToken = decryptSecret(connection.userAccessToken);
+  let section: AdsSection;
+  try {
+    section = { ads: await settle(() => loadAds(adAccountId, userToken, range, connection.adCurrency ?? "USD")), needsReconnect: false };
+  } catch (err) {
+    if (err instanceof MetaApiError && err.needsReconnect) return { ads: null, needsReconnect: true };
+    throw err;
+  }
+  if (section.ads?.ok) {
+    await prisma.socialMetricCache.upsert({
+      where: { businessId_key: { businessId, key } },
+      create: { businessId, key, data: section as object, fetchedAt: new Date() },
+      update: { data: section as object, fetchedAt: new Date() },
+    });
+  }
+  return section;
 }
 
 /** Drops the cached dashboards so the next visit reads Meta again. Returns false when it's too soon. */

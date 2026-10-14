@@ -219,7 +219,10 @@ export function previousRange(range: DayRange): DayRange {
   return { since: addDays(range.since, -len), until: addDays(range.since, -1) };
 }
 
-const unix = (day: string, endOfDay = false) => String(Math.floor(Date.parse(`${day}T${endOfDay ? "23:59:59" : "00:00:00"}-05:00`) / 1000));
+// Never later than now: ranges can end today, and Meta's insights refuse an
+// `until` in the future.
+const unix = (day: string, endOfDay = false) =>
+  String(Math.min(Math.floor(Date.parse(`${day}T${endOfDay ? "23:59:59" : "00:00:00"}-05:00`) / 1000), Math.floor(Date.now() / 1000)));
 
 // ---- Account (followers, views, engagement) ----
 

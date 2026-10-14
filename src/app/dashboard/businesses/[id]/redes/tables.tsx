@@ -56,6 +56,57 @@ function useSort<K extends string>(initial: K) {
   return { sort, onSort };
 }
 
+const PAGE_SIZE = 7;
+
+/** One page of `rows`; the page goes back to the first whenever the filters or the order change. */
+function usePaged<T>(rows: T[], resetKey: string) {
+  const [state, setState] = useState({ page: 0, key: resetKey });
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const page = state.key === resetKey ? Math.min(state.page, pages - 1) : 0;
+  return {
+    page,
+    pages,
+    visible: rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    setPage: (n: number) => setState({ page: n, key: resetKey }),
+  };
+}
+
+function Pager({ page, pages, total, noun, onPage }: { page: number; pages: number; total: number; noun: string; onPage: (n: number) => void }) {
+  if (pages <= 1) return null;
+  const first = page * PAGE_SIZE + 1;
+  const last = Math.min(total, (page + 1) * PAGE_SIZE);
+  // Up to 5 page numbers around the current one.
+  const start = Math.max(0, Math.min(page - 2, pages - 5));
+  const numbers = Array.from({ length: Math.min(5, pages) }, (_, i) => start + i);
+  const btn = "min-w-9 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-40";
+  return (
+    <nav className="flex flex-wrap items-center justify-between gap-2" aria-label={`Páginas de ${noun}`}>
+      <p className="text-xs text-ink-muted tabular-nums">
+        {first}–{last} de {total} {noun}
+      </p>
+      <div className="flex items-center gap-1">
+        <button type="button" className={`${btn} text-ink-muted hover:border-accent hover:text-ink`} disabled={page === 0} onClick={() => onPage(page - 1)} aria-label="Página anterior">
+          ‹ Anterior
+        </button>
+        {numbers.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onPage(n)}
+            aria-current={n === page ? "page" : undefined}
+            className={`${btn} tabular-nums ${n === page ? "border-accent bg-accent/15 text-ink" : "text-ink-muted hover:border-accent hover:text-ink"}`}
+          >
+            {n + 1}
+          </button>
+        ))}
+        <button type="button" className={`${btn} text-ink-muted hover:border-accent hover:text-ink`} disabled={page >= pages - 1} onClick={() => onPage(page + 1)} aria-label="Página siguiente">
+          Siguiente ›
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 const toolbarInput = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none sm:w-64";
 const toolbarButton = "rounded-lg border border-border px-3 py-2 text-xs font-semibold text-ink-muted transition hover:border-accent hover:text-ink";
 
@@ -77,6 +128,7 @@ export function PostsTable({ posts }: { posts: SocialPost[] }) {
         return (av < bv ? -1 : av > bv ? 1 : 0) * sort.dir;
       });
   }, [posts, query, network, sort]);
+  const { page, pages, visible, setPage } = usePaged(rows, `${query}|${network}|${sort.key}|${sort.dir}`);
 
   return (
     <div className="space-y-3">
@@ -117,7 +169,7 @@ export function PostsTable({ posts }: { posts: SocialPost[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map((p) => (
+            {visible.map((p) => (
               <tr key={p.id} className="align-top">
                 <td className="px-3 py-2.5">
                   <div className="flex items-start gap-3">
@@ -156,6 +208,7 @@ export function PostsTable({ posts }: { posts: SocialPost[] }) {
           </tbody>
         </table>
       </div>
+      <Pager page={page} pages={pages} total={rows.length} noun="publicaciones" onPage={setPage} />
     </div>
   );
 }
@@ -213,6 +266,7 @@ export function CampaignsTable({ campaigns, currency, objectiveLabels }: { campa
         return (av < bv ? -1 : av > bv ? 1 : 0) * sort.dir;
       });
   }, [campaigns, query, sort, objectiveLabels]);
+  const { page, pages, visible, setPage } = usePaged(rows, `${query}|${sort.key}|${sort.dir}`);
 
   const cols = 9 + (showConversations ? 2 : 0) + (showRoas ? 1 : 0);
 
@@ -288,7 +342,7 @@ export function CampaignsTable({ campaigns, currency, objectiveLabels }: { campa
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map((c) => {
+            {visible.map((c) => {
               const status = STATUS_LABELS[c.status ?? ""];
               return (
                 <tr key={c.id}>
@@ -324,13 +378,16 @@ export function CampaignsTable({ campaigns, currency, objectiveLabels }: { campa
             {rows.length === 0 && (
               <tr>
                 <td colSpan={cols} className="px-3 py-8 text-center text-ink-muted">
-                  {campaigns.length === 0 ? "Ninguna campaña tuvo gasto en este período." : "Ninguna campaña coincide con la búsqueda."}
+                  {campaigns.length === 0
+                    ? "Ninguna campaña tuvo gasto en estas fechas. Para ver campañas anteriores, cambia las fechas de los anuncios (por ejemplo, Últimos 12 meses)."
+                    : "Ninguna campaña coincide con la búsqueda."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+      <Pager page={page} pages={pages} total={rows.length} noun="campañas" onPage={setPage} />
     </div>
   );
 }

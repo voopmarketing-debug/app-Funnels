@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MAX_RANGE_DAYS, RANGE_PRESETS, rangeLabel, rangeLength, type DayRange } from "@/lib/socialRanges";
 
 const WEEKDAYS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -92,9 +92,29 @@ function Month({
   );
 }
 
-export function DateRangePicker({ value, today }: { value: DayRange; today: string }) {
+/**
+ * `from` / `to` name the URL params it writes (the page and the ads section
+ * each have their own); the page's other params are kept.
+ */
+export function DateRangePicker({
+  value,
+  today,
+  from = "desde",
+  to = "hasta",
+  align = "left",
+  label,
+}: {
+  value: DayRange;
+  today: string;
+  from?: string;
+  to?: string;
+  align?: "left" | "right";
+  /** Shown before the dates, e.g. "Anuncios". */
+  label?: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState<string | null>(value.since);
@@ -118,7 +138,10 @@ export function DateRangePicker({ value, today }: { value: DayRange; today: stri
 
   function go(r: DayRange) {
     setOpen(false);
-    startTransition(() => router.push(`${pathname}?desde=${r.since}&hasta=${r.until}`, { scroll: false }));
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(from, r.since);
+    params.set(to, r.until);
+    startTransition(() => router.push(`${pathname}?${params}`, { scroll: false }));
   }
 
   function pick(day: string) {
@@ -157,6 +180,7 @@ export function DateRangePicker({ value, today }: { value: DayRange; today: stri
             <path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </span>
+        {label && <span className="font-normal text-ink-muted">{label}:</span>}
         <span className="tabular-nums">{rangeLabel(value)}</span>
         {activePreset && <span className="hidden font-normal text-ink-muted sm:inline">· {activePreset.label}</span>}
         <span className="text-ink-muted" aria-hidden="true">
@@ -165,7 +189,7 @@ export function DateRangePicker({ value, today }: { value: DayRange; today: stri
       </button>
 
       {open && (
-        <div className="absolute left-0 z-30 mt-2 w-[min(92vw,44rem)] rounded-2xl border border-border-strong bg-surface p-4 shadow-2xl">
+        <div className={`absolute ${align === "right" ? "right-0" : "left-0"} z-30 mt-2 w-[min(92vw,44rem)] rounded-2xl border border-border-strong bg-surface p-4 shadow-2xl`}>
           <div className="flex flex-col gap-4 md:flex-row">
             <div className="min-w-0 flex-1 space-y-3">
               <div className="flex items-center justify-between">

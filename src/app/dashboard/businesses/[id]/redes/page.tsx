@@ -19,7 +19,7 @@ import {
   type AdCampaign,
   type SocialPost,
 } from "@/lib/metaSocial";
-import { getSocialDashboard, type NetworkSummary, type SectionResult } from "@/lib/socialDashboard";
+import { getAdsSection, getSocialDashboard, type AdsSection, type NetworkSummary, type SectionResult, type SocialDashboard } from "@/lib/socialDashboard";
 import { parseRange, rangeLength, todayInColombia, type DayRange } from "@/lib/socialRanges";
 import { adviseCampaign, VERDICT_LABELS, type CampaignVerdict } from "@/lib/adsAdvice";
 import type { ContentDiagnosis } from "@/lib/contentDiagnosis";
@@ -73,6 +73,21 @@ function Section({ title, subtitle, children, aside }: { title: string; subtitle
         {aside}
       </div>
       {children}
+    </section>
+  );
+}
+
+/** While the ads of other dates load, the rest of the page stays put. */
+function SectionSkeleton({ title }: { title: string }) {
+  return (
+    <section className="space-y-4" aria-busy="true">
+      <h2 className="text-lg font-semibold text-ink">{title}</h2>
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="fl-card h-24 animate-pulse" />
+        ))}
+      </div>
+      <div className="fl-card h-56 animate-pulse" />
     </section>
   );
 }
@@ -224,6 +239,50 @@ const VERDICT_STYLE: Record<CampaignVerdict, { bg: string; fg: string; dot: stri
 const TIP_DOT = { good: "#0ca30c", warn: "#fab219", bad: "#d03b3b" };
 const VERDICT_ORDER: CampaignVerdict[] = ["pausar", "optimizar", "escalar", "mantener", "poco_dato"];
 
+const ADVICE_SHOWN = 6;
+
+function AdviceCard({ c, advice, money }: { c: AdCampaign; advice: ReturnType<typeof adviseCampaign>; money: (n: number | null | undefined) => string }) {
+  const style = VERDICT_STYLE[advice.verdict];
+  const cpr = c.results ? c.spend / c.results : null;
+  return (
+    <article className="fl-card min-w-0 space-y-3 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-ink" title={c.name}>
+            {c.name}
+          </p>
+          <p className="text-xs text-ink-muted">{objectiveLabel(c.objective)}</p>
+        </div>
+        <span className="inline-flex flex-none items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: style.bg, color: style.fg }}>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: style.dot }} />
+          {VERDICT_LABELS[advice.verdict]}
+        </span>
+      </div>
+      <dl className="grid grid-cols-4 gap-2 rounded-xl bg-surface-2/60 p-2.5 text-center">
+        {[
+          ["Gasto", money(c.spend)],
+          ["Resultados", fmt(c.results)],
+          ["Costo/result.", money(cpr)],
+          ["CTR enlace", linkCtr(c) == null ? "—" : `${dec(linkCtr(c))}%`],
+        ].map(([k, v]) => (
+          <div key={k} className="min-w-0">
+            <dt className="truncate text-[11px] text-ink-muted">{k}</dt>
+            <dd className="truncate text-sm font-semibold tabular-nums text-ink">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <ul className="space-y-1.5">
+        {advice.tips.map((t, i) => (
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-ink">
+            <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full" style={{ background: TIP_DOT[t.tone] }} />
+            <span>{t.text}</span>
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
 function CampaignAdviceList({ campaigns, account, money }: { campaigns: AdCampaign[]; account: Parameters<typeof adviseCampaign>[2]; money: (n: number | null | undefined) => string }) {
   const advised = campaigns
     .map((c) => ({ c, advice: adviseCampaign(c, campaigns, account) }))
@@ -236,48 +295,23 @@ function CampaignAdviceList({ campaigns, account, money }: { campaigns: AdCampai
         <p className="text-xs text-ink-muted">Comparamos cada campaña con el resto de tu cuenta. Primero las que necesitan atención.</p>
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
-        {advised.map(({ c, advice }) => {
-          const style = VERDICT_STYLE[advice.verdict];
-          const cpr = c.results ? c.spend / c.results : null;
-          return (
-            <article key={c.id} className="fl-card min-w-0 space-y-3 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-ink" title={c.name}>
-                    {c.name}
-                  </p>
-                  <p className="text-xs text-ink-muted">{objectiveLabel(c.objective)}</p>
-                </div>
-                <span className="inline-flex flex-none items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: style.bg, color: style.fg }}>
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: style.dot }} />
-                  {VERDICT_LABELS[advice.verdict]}
-                </span>
-              </div>
-              <dl className="grid grid-cols-4 gap-2 rounded-xl bg-surface-2/60 p-2.5 text-center">
-                {[
-                  ["Gasto", money(c.spend)],
-                  ["Resultados", fmt(c.results)],
-                  ["Costo/result.", money(cpr)],
-                  ["CTR enlace", linkCtr(c) == null ? "—" : `${dec(linkCtr(c))}%`],
-                ].map(([k, v]) => (
-                  <div key={k} className="min-w-0">
-                    <dt className="truncate text-[11px] text-ink-muted">{k}</dt>
-                    <dd className="truncate text-sm font-semibold tabular-nums text-ink">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-              <ul className="space-y-1.5">
-                {advice.tips.map((t, i) => (
-                  <li key={i} className="flex gap-2 text-sm leading-relaxed text-ink">
-                    <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full" style={{ background: TIP_DOT[t.tone] }} />
-                    <span>{t.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          );
-        })}
+        {advised.slice(0, ADVICE_SHOWN).map(({ c, advice }) => (
+          <AdviceCard key={c.id} c={c} advice={advice} money={money} />
+        ))}
       </div>
+      {advised.length > ADVICE_SHOWN && (
+        <details className="group">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-accent underline">
+            <span className="group-open:hidden">Ver las otras {advised.length - ADVICE_SHOWN} campañas</span>
+            <span className="hidden group-open:inline">Ver menos</span>
+          </summary>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {advised.slice(ADVICE_SHOWN).map(({ c, advice }) => (
+              <AdviceCard key={c.id} c={c} advice={advice} money={money} />
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -293,11 +327,15 @@ type InitialDiagnosis = { diagnosis: ContentDiagnosis; generatedAt: string } | n
 async function Dashboard({
   businessId,
   range,
+  adsRange,
+  today,
   canManage,
   initialDiagnosis,
 }: {
   businessId: string;
   range: DayRange;
+  adsRange: DayRange;
+  today: string;
   canManage: boolean;
   initialDiagnosis: InitialDiagnosis;
 }) {
@@ -333,12 +371,6 @@ async function Dashboard({
   const postInteractions = posts.reduce((a, p) => a + p.interactions, 0);
   const postViews = posts.some((p) => p.views != null) ? posts.reduce((a, p) => a + (p.views ?? 0), 0) : null;
   const rate = engagementRate(posts);
-  const ads = data.ads?.ok ? data.ads.data : null;
-  const money = moneyFormatter(ads?.currency ?? "USD");
-  const results = ads ? ads.campaigns.reduce<number | null>((acc, c) => (c.results == null ? acc : (acc ?? 0) + c.results), null) : null;
-  const objectiveLabels = ads ? Object.fromEntries(ads.campaigns.map((c) => [c.objective, objectiveLabel(c.objective)])) : {};
-  const adsFreq = ads ? frequency(ads.totals) : null;
-  const adsLinkCtr = ads ? linkCtr(ads.totals) : null;
 
   return (
     <div className="space-y-10">
@@ -445,143 +477,198 @@ async function Dashboard({
       )}
 
       {data.ads && (
-        <Section
-          title="Tus anuncios"
-          subtitle={`Cuánto inviertes en Meta Ads y qué te devuelve · montos en ${ads?.currency ?? "la moneda de tu cuenta"}. Toca ⓘ para ver qué significa cada número.`}
-        >
-          {ads ? (
-            <>
-              <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-                <StatTile
-                  label="Inversión"
-                  hint="Lo que gastaste en anuncios"
-                  value={money(ads.totals.spend)}
-                  description="Lo que Meta te cobró por tus anuncios en el período, en la moneda de tu cuenta publicitaria."
-                  tone="amber"
-                  icon={<CostIcon />}
-                >
-                  <Delta now={ads.totals.spend} before={ads.previous.spend} period={period} invert />
-                </StatTile>
-                <StatTile
-                  label="Resultados"
-                  hint="Lo que pediste a Meta conseguir"
-                  value={fmt(results)}
-                  sublabel={results ? `${money(ads.totals.spend / results)} c/u` : undefined}
-                  description="Lo que cada campaña buscaba según su objetivo: conversaciones por WhatsApp, clientes potenciales, ventas o visitas. El número pequeño es el costo por resultado: es el número más importante para saber si tus anuncios son rentables."
-                  tone="accent"
-                  icon={<TargetIcon />}
-                />
-                {ads.totals.conversations ? (
-                  <StatTile
-                    label="Conversaciones"
-                    hint="Personas que te escribieron por el anuncio"
-                    value={fmt(ads.totals.conversations)}
-                    sublabel={`${money(costPerConversation(ads.totals))} c/u`}
-                    description="Cuántas personas empezaron una conversación por WhatsApp o Messenger después de ver tu anuncio. El número pequeño es cuánto te costó cada una. Compáralo con lo que vale un cliente para ti."
-                    tone="accent"
-                    icon={<WhatsAppSmallIcon />}
-                  >
-                    <Delta now={costPerConversation(ads.totals)} before={costPerConversation(ads.previous)} period={period} invert />
-                  </StatTile>
-                ) : (
-                  <StatTile
-                    label="Clics al enlace"
-                    hint="Personas que fueron a tu WhatsApp o web"
-                    value={fmt(ads.totals.linkClicks)}
-                    description="Clics que llevaron a la persona a donde querías (tu WhatsApp, tu web o tu formulario). No cuenta me gusta ni clics para ver más."
-                    tone="blue"
-                    icon={<CursorClickIcon />}
-                  >
-                    <Delta now={ads.totals.linkClicks} before={ads.previous.linkClicks} period={period} />
-                  </StatTile>
-                )}
-                {roas(ads.totals) != null ? (
-                  <StatTile
-                    label="Retorno (ROAS)"
-                    hint="Cuánto vendiste por cada peso invertido"
-                    value={`${dec(roas(ads.totals), 1)}x`}
-                    status={roas(ads.totals)! >= 3 ? "good" : roas(ads.totals)! >= 1.5 ? "warning" : "critical"}
-                    goal="Meta: 3x o más"
-                    description="Ventas registradas por Meta divididas entre lo que invertiste. 3x significa que por cada 1 que pusiste en anuncios vendiste 3. Solo aparece si tu web o catálogo reportan compras a Meta."
-                    tone="secondary"
-                    icon={<TrendIcon />}
-                  />
-                ) : (
-                  <StatTile
-                    label="Personas alcanzadas"
-                    hint="Personas distintas que vieron tus anuncios"
-                    value={fmt(ads.totals.reach)}
-                    sublabel={`${fmt(ads.totals.impressions)} impresiones`}
-                    description="Cuántas personas diferentes vieron al menos uno de tus anuncios. Las impresiones (número pequeño) cuentan cada vez que se mostró, aunque sea la misma persona."
-                    tone="secondary"
-                    icon={<UsersIcon />}
-                  />
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-                <StatTile
-                  label="CTR al enlace"
-                  hint="De cada 100 que lo ven, cuántos hacen clic"
-                  value={adsLinkCtr == null ? "—" : `${dec(adsLinkCtr)}%`}
-                  status={adsLinkCtr == null ? "neutral" : adsLinkCtr >= 1 ? "good" : adsLinkCtr >= 0.6 ? "warning" : "critical"}
-                  goal="Meta: 1% o más"
-                  description="Porcentaje de personas que hicieron clic para ir a tu WhatsApp o web después de ver el anuncio. Si está bajo, el anuncio no llama la atención: cambia la imagen, el video o la primera frase."
-                  tone="blue"
-                  icon={<CursorClickIcon />}
-                >
-                  <Delta now={adsLinkCtr} before={linkCtr(ads.previous)} period={period} />
-                </StatTile>
-                <StatTile
-                  label="CPC"
-                  hint="Costo por cada clic al enlace"
-                  value={money(ads.totals.linkClicks ? ads.totals.spend / ads.totals.linkClicks : cpc(ads.totals))}
-                  description="Cuánto pagaste, en promedio, por cada persona que hizo clic para ir a tu WhatsApp o web. Mientras más bajo, más visitas consigues con el mismo dinero."
-                  tone="amber"
-                  icon={<CostIcon />}
-                />
-                <StatTile
-                  label="CPM"
-                  hint="Costo por mil impresiones"
-                  value={money(cpm(ads.totals))}
-                  description="Lo que cuesta mostrar tu anuncio 1.000 veces. Sube cuando el público es muy pequeño o muy disputado (por ejemplo en fechas especiales). Sirve para comparar qué tan caro es llegar a tu público."
-                  tone="secondary"
-                  icon={<EyeIcon />}
-                >
-                  <Delta now={cpm(ads.totals)} before={cpm(ads.previous)} period={period} invert />
-                </StatTile>
-                <StatTile
-                  label="Frecuencia"
-                  hint="Veces que cada persona vio tus anuncios"
-                  value={dec(adsFreq, 1)}
-                  status={adsFreq == null ? "neutral" : adsFreq <= 2.5 ? "good" : adsFreq <= 3.5 ? "warning" : "critical"}
-                  goal="Ideal: menos de 3"
-                  description="Cuántas veces, en promedio, cada persona vio tus anuncios. Arriba de 3 la gente empieza a cansarse y los resultados se encarecen: es momento de cambiar la imagen o el video, o ampliar el público."
-                  tone="accent"
-                  icon={<RepeatIcon />}
-                />
-              </div>
-
-              <ChartCard title="Evolución diaria" subtitle="Elige la métrica para ver cómo se movió cada día.">
-                <AdsDailyChart days={days} daily={ads.daily} currency={ads.currency} />
-              </ChartCard>
-
-              <CampaignAdviceList campaigns={ads.campaigns} account={ads.totals} money={money} />
-
-              <div className="space-y-2">
-                <div>
-                  <h3 className="text-sm font-semibold text-ink">Todas las campañas</h3>
-                  <p className="text-xs text-ink-muted">Ordena por cualquier columna tocando su título. Fíjate primero en el costo por resultado.</p>
-                </div>
-                <CampaignsTable campaigns={ads.campaigns} currency={ads.currency} objectiveLabels={objectiveLabels} />
-              </div>
-            </>
-          ) : (
-            data.ads && !data.ads.ok && <SectionError error={data.ads.error} />
-          )}
-        </Section>
+        <Suspense key={`${adsRange.since}:${adsRange.until}`} fallback={<SectionSkeleton title="Tus anuncios" />}>
+          <AdsBlock businessId={businessId} adsRange={adsRange} today={today} canManage={canManage} preloaded={sameRange(adsRange, range) ? data.ads : undefined} />
+        </Suspense>
       )}
     </div>
+  );
+}
+
+const sameRange = (a: DayRange, b: DayRange) => a.since === b.since && a.until === b.until;
+
+/** The ads, with their own dates (to look back at older campaigns); reuses the dashboard's read when the dates match. */
+async function AdsBlock({
+  businessId,
+  adsRange,
+  today,
+  canManage,
+  preloaded,
+}: {
+  businessId: string;
+  adsRange: DayRange;
+  today: string;
+  canManage: boolean;
+  preloaded?: SocialDashboard["ads"];
+}) {
+  const section: AdsSection = preloaded !== undefined ? { ads: preloaded, needsReconnect: false } : await getAdsSection(businessId, adsRange);
+  const picker = <DateRangePicker value={adsRange} today={today} from="adesde" to="ahasta" align="right" label="Fechas de anuncios" />;
+  if (section.throttled || section.needsReconnect) {
+    return (
+      <Section title="Tus anuncios" subtitle="Cuánto inviertes en Meta Ads y qué te devuelve." aside={picker}>
+        <div className="rounded-xl border border-border bg-surface p-4 text-sm text-ink-muted">
+          {section.throttled ? (
+            "Consultaste muchos periodos seguidos. Espera unos minutos o vuelve a unas fechas que ya hayas visto."
+          ) : (
+            <>
+              Tu conexión con Facebook venció.{" "}
+              {canManage && (
+                <a href={`/api/social/meta/connect?businessId=${businessId}`} className="font-semibold text-ink underline">
+                  Reconectar
+                </a>
+              )}
+            </>
+          )}
+        </div>
+      </Section>
+    );
+  }
+  const ads = section.ads?.ok ? section.ads.data : null;
+  const period = previousText(adsRange);
+  const days = daysIn(adsRange);
+  const money = moneyFormatter(ads?.currency ?? "USD");
+  const results = ads ? ads.campaigns.reduce<number | null>((acc, c) => (c.results == null ? acc : (acc ?? 0) + c.results), null) : null;
+  const objectiveLabels = ads ? Object.fromEntries(ads.campaigns.map((c) => [c.objective, objectiveLabel(c.objective)])) : {};
+  const adsFreq = ads ? frequency(ads.totals) : null;
+  const adsLinkCtr = ads ? linkCtr(ads.totals) : null;
+
+  return (
+    <Section
+      title="Tus anuncios"
+      subtitle={`Cuánto inviertes en Meta Ads y qué te devuelve · montos en ${ads?.currency ?? "la moneda de tu cuenta"}. Toca ⓘ para ver qué significa cada número.`}
+      aside={picker}
+    >
+      {ads ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+            <StatTile
+              label="Inversión"
+              hint="Lo que gastaste en anuncios"
+              value={money(ads.totals.spend)}
+              description="Lo que Meta te cobró por tus anuncios en el período, en la moneda de tu cuenta publicitaria."
+              tone="amber"
+              icon={<CostIcon />}
+            >
+              <Delta now={ads.totals.spend} before={ads.previous.spend} period={period} invert />
+            </StatTile>
+            <StatTile
+              label="Resultados"
+              hint="Lo que pediste a Meta conseguir"
+              value={fmt(results)}
+              sublabel={results ? `${money(ads.totals.spend / results)} c/u` : undefined}
+              description="Lo que cada campaña buscaba según su objetivo: conversaciones por WhatsApp, clientes potenciales, ventas o visitas. El número pequeño es el costo por resultado: es el número más importante para saber si tus anuncios son rentables."
+              tone="accent"
+              icon={<TargetIcon />}
+            />
+            {ads.totals.conversations ? (
+              <StatTile
+                label="Conversaciones"
+                hint="Personas que te escribieron por el anuncio"
+                value={fmt(ads.totals.conversations)}
+                sublabel={`${money(costPerConversation(ads.totals))} c/u`}
+                description="Cuántas personas empezaron una conversación por WhatsApp o Messenger después de ver tu anuncio. El número pequeño es cuánto te costó cada una. Compáralo con lo que vale un cliente para ti."
+                tone="accent"
+                icon={<WhatsAppSmallIcon />}
+              >
+                <Delta now={costPerConversation(ads.totals)} before={costPerConversation(ads.previous)} period={period} invert />
+              </StatTile>
+            ) : (
+              <StatTile
+                label="Clics al enlace"
+                hint="Personas que fueron a tu WhatsApp o web"
+                value={fmt(ads.totals.linkClicks)}
+                description="Clics que llevaron a la persona a donde querías (tu WhatsApp, tu web o tu formulario). No cuenta me gusta ni clics para ver más."
+                tone="blue"
+                icon={<CursorClickIcon />}
+              >
+                <Delta now={ads.totals.linkClicks} before={ads.previous.linkClicks} period={period} />
+              </StatTile>
+            )}
+            {roas(ads.totals) != null ? (
+              <StatTile
+                label="Retorno (ROAS)"
+                hint="Cuánto vendiste por cada peso invertido"
+                value={`${dec(roas(ads.totals), 1)}x`}
+                status={roas(ads.totals)! >= 3 ? "good" : roas(ads.totals)! >= 1.5 ? "warning" : "critical"}
+                goal="Meta: 3x o más"
+                description="Ventas registradas por Meta divididas entre lo que invertiste. 3x significa que por cada 1 que pusiste en anuncios vendiste 3. Solo aparece si tu web o catálogo reportan compras a Meta."
+                tone="secondary"
+                icon={<TrendIcon />}
+              />
+            ) : (
+              <StatTile
+                label="Personas alcanzadas"
+                hint="Personas distintas que vieron tus anuncios"
+                value={fmt(ads.totals.reach)}
+                sublabel={`${fmt(ads.totals.impressions)} impresiones`}
+                description="Cuántas personas diferentes vieron al menos uno de tus anuncios. Las impresiones (número pequeño) cuentan cada vez que se mostró, aunque sea la misma persona."
+                tone="secondary"
+                icon={<UsersIcon />}
+              />
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+            <StatTile
+              label="CTR al enlace"
+              hint="De cada 100 que lo ven, cuántos hacen clic"
+              value={adsLinkCtr == null ? "—" : `${dec(adsLinkCtr)}%`}
+              status={adsLinkCtr == null ? "neutral" : adsLinkCtr >= 1 ? "good" : adsLinkCtr >= 0.6 ? "warning" : "critical"}
+              goal="Meta: 1% o más"
+              description="Porcentaje de personas que hicieron clic para ir a tu WhatsApp o web después de ver el anuncio. Si está bajo, el anuncio no llama la atención: cambia la imagen, el video o la primera frase."
+              tone="blue"
+              icon={<CursorClickIcon />}
+            >
+              <Delta now={adsLinkCtr} before={linkCtr(ads.previous)} period={period} />
+            </StatTile>
+            <StatTile
+              label="CPC"
+              hint="Costo por cada clic al enlace"
+              value={money(ads.totals.linkClicks ? ads.totals.spend / ads.totals.linkClicks : cpc(ads.totals))}
+              description="Cuánto pagaste, en promedio, por cada persona que hizo clic para ir a tu WhatsApp o web. Mientras más bajo, más visitas consigues con el mismo dinero."
+              tone="amber"
+              icon={<CostIcon />}
+            />
+            <StatTile
+              label="CPM"
+              hint="Costo por mil impresiones"
+              value={money(cpm(ads.totals))}
+              description="Lo que cuesta mostrar tu anuncio 1.000 veces. Sube cuando el público es muy pequeño o muy disputado (por ejemplo en fechas especiales). Sirve para comparar qué tan caro es llegar a tu público."
+              tone="secondary"
+              icon={<EyeIcon />}
+            >
+              <Delta now={cpm(ads.totals)} before={cpm(ads.previous)} period={period} invert />
+            </StatTile>
+            <StatTile
+              label="Frecuencia"
+              hint="Veces que cada persona vio tus anuncios"
+              value={dec(adsFreq, 1)}
+              status={adsFreq == null ? "neutral" : adsFreq <= 2.5 ? "good" : adsFreq <= 3.5 ? "warning" : "critical"}
+              goal="Ideal: menos de 3"
+              description="Cuántas veces, en promedio, cada persona vio tus anuncios. Arriba de 3 la gente empieza a cansarse y los resultados se encarecen: es momento de cambiar la imagen o el video, o ampliar el público."
+              tone="accent"
+              icon={<RepeatIcon />}
+            />
+          </div>
+
+          <ChartCard title="Evolución diaria" subtitle="Elige la métrica para ver cómo se movió cada día.">
+            <AdsDailyChart days={days} daily={ads.daily} currency={ads.currency} />
+          </ChartCard>
+
+          <CampaignAdviceList campaigns={ads.campaigns} account={ads.totals} money={money} />
+
+          <div className="space-y-2">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Todas las campañas</h3>
+              <p className="text-xs text-ink-muted">Ordena por cualquier columna tocando su título. Fíjate primero en el costo por resultado.</p>
+            </div>
+            <CampaignsTable campaigns={ads.campaigns} currency={ads.currency} objectiveLabels={objectiveLabels} />
+          </div>
+        </>
+      ) : (
+        section.ads && !section.ads.ok && <SectionError error={section.ads.error} />
+      )}
+    </Section>
   );
 }
 
@@ -591,11 +678,19 @@ const ERRORS: Record<string, string> = {
   config: "La conexión con Facebook aún no está activada en la plataforma. Escríbenos a soporte.",
 };
 
-export default async function RedesPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ desde?: string; hasta?: string; choose?: string; error?: string }> }) {
+export default async function RedesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ desde?: string; hasta?: string; adesde?: string; ahasta?: string; choose?: string; error?: string }>;
+}) {
   const { id } = await params;
-  const { desde, hasta, choose, error } = await searchParams;
+  const { desde, hasta, adesde, ahasta, choose, error } = await searchParams;
   const today = todayInColombia();
   const range = parseRange({ desde, hasta }, today);
+  // The ads can have their own dates; without them they follow the page's.
+  const adsRange = adesde && ahasta ? parseRange({ desde: adesde, hasta: ahasta }, today) : range;
 
   const session = await auth();
   if (!session?.user?.id) return null;
@@ -705,7 +800,7 @@ export default async function RedesPage({ params, searchParams }: { params: Prom
         <>
           {picker}
           <Suspense key={`${range.since}:${range.until}`} fallback={<PageSkeleton />}>
-            <Dashboard businessId={id} range={range} canManage={canManage} initialDiagnosis={initialDiagnosis} />
+            <Dashboard businessId={id} range={range} adsRange={adsRange} today={today} canManage={canManage} initialDiagnosis={initialDiagnosis} />
           </Suspense>
         </>
       )}

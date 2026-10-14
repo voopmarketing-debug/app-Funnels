@@ -25,11 +25,12 @@ export type RangePreset = { key: string; label: string; range: (today: string) =
 
 const monthStart = (day: string) => `${day.slice(0, 7)}-01`;
 
+// The "últimos N" presets include today, so a post published today shows up right away.
 export const RANGE_PRESETS: RangePreset[] = [
   { key: "ayer", label: "Ayer", range: (t) => ({ since: addDays(t, -1), until: addDays(t, -1) }) },
-  { key: "7d", label: "Última semana", range: (t) => ({ since: addDays(t, -7), until: addDays(t, -1) }) },
+  { key: "7d", label: "Últimos 7 días", range: (t) => ({ since: addDays(t, -6), until: t }) },
   { key: "mes", label: "Mes actual", range: (t) => ({ since: monthStart(t), until: t }) },
-  { key: "30d", label: "Últimos 30 días", range: (t) => ({ since: addDays(t, -30), until: addDays(t, -1) }) },
+  { key: "30d", label: "Últimos 30 días", range: (t) => ({ since: addDays(t, -29), until: t }) },
   {
     key: "mes-pasado",
     label: "Mes pasado",
@@ -38,9 +39,9 @@ export const RANGE_PRESETS: RangePreset[] = [
       return { since: monthStart(lastOfPrev), until: lastOfPrev };
     },
   },
-  { key: "3m", label: "Últimos 3 meses", range: (t) => ({ since: addDays(t, -90), until: addDays(t, -1) }) },
-  { key: "6m", label: "Últimos 6 meses", range: (t) => ({ since: addDays(t, -182), until: addDays(t, -1) }) },
-  { key: "12m", label: "Últimos 12 meses", range: (t) => ({ since: addDays(t, -365), until: addDays(t, -1) }) },
+  { key: "3m", label: "Últimos 3 meses", range: (t) => ({ since: addDays(t, -89), until: t }) },
+  { key: "6m", label: "Últimos 6 meses", range: (t) => ({ since: addDays(t, -181), until: t }) },
+  { key: "12m", label: "Últimos 12 meses", range: (t) => ({ since: addDays(t, -364), until: t }) },
 ];
 
 export const DEFAULT_PRESET = "30d";
