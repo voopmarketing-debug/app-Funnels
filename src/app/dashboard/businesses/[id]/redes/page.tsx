@@ -665,6 +665,14 @@ export default async function RedesPage({ params, searchParams }: { params: Prom
                 <Link href={`?choose=1`} className="font-semibold underline hover:text-ink">
                   Cambiar cuentas
                 </Link>
+                {/* Logs in with Meta again (e.g. to accept new permissions) keeping everything saved here. */}
+                <a
+                  href={`/api/social/meta/connect?businessId=${id}`}
+                  title="Vuelve a iniciar sesión con Facebook para aceptar permisos nuevos, sin perder nada"
+                  className="font-semibold underline hover:text-ink"
+                >
+                  Reconectar
+                </a>
                 <DisconnectButton businessId={id} />
               </span>
             )}
