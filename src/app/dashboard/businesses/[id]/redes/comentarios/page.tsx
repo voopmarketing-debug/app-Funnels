@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { MetaApiError, friendlyMetaError } from "@/lib/metaSocial";
 import { isMissingPermission } from "@/lib/metaInbox";
-import { PRIVATE_REPLY_WINDOW_MS, facebookComments, instagramComments, type CommentNetwork, type SocialComment } from "@/lib/metaComments";
+import { PRIVATE_REPLY_WINDOW_MS, adComments, facebookComments, instagramComments, mergeComments, type CommentNetwork, type SocialComment } from "@/lib/metaComments";
 import { RedesTabs } from "../RedesTabs";
 import { FacebookGlyph, InstagramGlyph } from "../icons";
 import { shortDateTime } from "../format";
@@ -64,13 +64,15 @@ export default async function ComentariosPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ f?: string; red?: string; q?: string }>;
+  searchParams: Promise<{ f?: string; red?: string; q?: string; tipo?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const filter: FilterKey = FILTERS.some((f) => f.key === sp.f) ? (sp.f as FilterKey) : "pendientes";
   const networkFilter: CommentNetwork | "todas" = sp.red === "facebook" || sp.red === "instagram" ? sp.red : "todas";
   const query = (sp.q ?? "").trim().toLowerCase();
+  // Organic posts, ads (their comments live on separate, often hidden, posts) or both.
+  const typeFilter: "todo" | "publicaciones" | "anuncios" = sp.tipo === "publicaciones" || sp.tipo === "anuncios" ? sp.tipo : "todo";
 
   const session = await auth();
   if (!session?.user?.id) return null;
@@ -132,7 +134,24 @@ export default async function ComentariosPage({
       }),
     ),
   );
-  const comments = fetched.flat();
+  // Ad comments need the ad account (user token with ads_read); a failure there never hides the rest.
+  let adsUnavailable = false;
+  const hasAds = !!connection.adAccountId && !!connection.userAccessToken;
+  const ads = hasAds
+    ? await adComments({
+        adAccountId: connection.adAccountId!,
+        userToken: decryptSecret(connection.userAccessToken!),
+        pageId,
+        igUserId,
+        pageToken,
+      }).catch((err) => {
+        if (err instanceof MetaApiError && err.needsReconnect) needsReconnect = true;
+        else adsUnavailable = true;
+        console.error("[social comments] ads failed", err);
+        return [] as SocialComment[];
+      })
+    : [];
+  const comments = mergeComments(fetched.flat(), ads);
   // Opening Comentarios also checks the keyword rules (throttled), so an
   // auto-reply Meta's webhook missed doesn't wait for the 10-minute job.
   after(() => sweepCommentAutoReplies({ businessIds: [id] }).catch((err) => console.error("[social comments] sweep failed", err)));
@@ -146,7 +165,11 @@ export default async function ComentariosPage({
   const rows: Row[] = comments
     .map((c) => ({ ...c, done: c.answered || doneIds.has(c.id) }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const inNetwork = rows.filter((r) => networkFilter === "todas" || r.network === networkFilter);
+  const inNetwork = rows.filter(
+    (r) =>
+      (networkFilter === "todas" || r.network === networkFilter) &&
+      (typeFilter === "todo" || (typeFilter === "anuncios" ? !!r.ad : !r.ad)),
+  );
   const counts = {
     pendientes: inNetwork.filter((r) => !r.done && !r.hidden).length,
     todos: inNetwork.length,
@@ -161,8 +184,10 @@ export default async function ComentariosPage({
 
   const href = (over: Record<string, string | null>) => {
     const p = new URLSearchParams();
-    const merged = { f: filter, red: networkFilter, q: sp.q ?? "", ...over };
-    for (const [k, v] of Object.entries(merged)) if (v && !(k === "f" && v === "pendientes") && !(k === "red" && v === "todas")) p.set(k, v);
+    const merged = { f: filter, red: networkFilter, tipo: typeFilter, q: sp.q ?? "", ...over };
+    for (const [k, v] of Object.entries(merged)) {
+      if (v && !(k === "f" && v === "pendientes") && !(k === "red" && v === "todas") && !(k === "tipo" && v === "todo")) p.set(k, v);
+    }
     const s = p.toString();
     return s ? `?${s}` : "?";
   };
@@ -192,6 +217,11 @@ export default async function ComentariosPage({
       {errors.length > 0 && (
         <p className="rounded-xl border border-border bg-surface p-3 text-sm text-ink-muted">Meta no devolvió algunos comentarios ahora: {errors.join(" · ")}</p>
       )}
+      {adsUnavailable && (
+        <p className="rounded-xl border border-border bg-surface p-3 text-sm text-ink-muted">
+          No pudimos leer los comentarios de tus anuncios ahora. Si sigue pasando, reconecta Facebook en Métricas y acepta el permiso de anuncios.
+        </p>
+      )}
 
       <Link
         href={`/dashboard/businesses/${id}/redes/comentarios/automaticas`}
@@ -211,7 +241,8 @@ export default async function ComentariosPage({
         <span className="flex-none text-sm font-semibold text-accent">{activeRules > 0 ? "Ver reglas →" : "Crear regla →"}</span>
       </Link>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
         <div role="tablist" aria-label="Filtrar comentarios" className="fl-seg">
           {FILTERS.map((f) => (
             <Link key={f.key} href={href({ f: f.key })} role="tab" aria-selected={filter === f.key} className="fl-seg-item px-3 text-sm">
@@ -220,15 +251,32 @@ export default async function ComentariosPage({
             </Link>
           ))}
         </div>
+        {hasAds && (
+          <div role="tablist" aria-label="Publicaciones o anuncios" className="fl-seg">
+            {(
+              [
+                ["todo", "Todo"],
+                ["publicaciones", "Publicaciones"],
+                ["anuncios", "📣 Anuncios"],
+              ] as const
+            ).map(([key, label]) => (
+              <Link key={key} href={href({ tipo: key })} role="tab" aria-selected={typeFilter === key} className="fl-seg-item px-3 text-sm">
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {(["todas", ...networks] as const).map((n) => (
             <Link key={n} href={href({ red: n })} aria-current={networkFilter === n ? "true" : undefined} className="fl-chip flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
-              {n === "todas" ? "Todas" : <><NetworkBadge network={n} />{NETWORK_STYLE[n].label}</>}
+              {n === "todas" ? "Todas las redes" : <><NetworkBadge network={n} />{NETWORK_STYLE[n].label}</>}
             </Link>
           ))}
           <form action="" className="min-w-0 flex-1 sm:flex-none">
             {filter !== "pendientes" && <input type="hidden" name="f" value={filter} />}
             {networkFilter !== "todas" && <input type="hidden" name="red" value={networkFilter} />}
+            {typeFilter !== "todo" && <input type="hidden" name="tipo" value={typeFilter} />}
             <label htmlFor="comments-search" className="sr-only">
               Buscar comentarios
             </label>
@@ -259,6 +307,14 @@ export default async function ComentariosPage({
                   <p className="font-semibold text-ink">{c.authorName}</p>
                   <span className="text-xs text-ink-faint">{ago(c.createdAt, now)}</span>
                   {c.likeCount > 0 && <span className="text-xs text-ink-faint">♥ {c.likeCount}</span>}
+                  {c.ad && (
+                    <span
+                      title={c.ad.campaign ? `Campaña: ${c.ad.campaign}` : undefined}
+                      className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-ink"
+                    >
+                      📣 Anuncio
+                    </span>
+                  )}
                   {c.hidden && <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">🙈 Oculto</span>}
                   {c.answered ? (
                     <span className="rounded-full bg-[#0ca30c]/15 px-2 py-0.5 text-[11px] font-semibold text-[var(--status-good)]">✓ Respondido</span>
@@ -297,7 +353,9 @@ export default async function ComentariosPage({
                   </span>
                 )}
                 <span className="min-w-0">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wide text-ink-faint">En tu publicación de {NETWORK_STYLE[c.network].label}</span>
+                  <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                    {c.ad ? `En tu anuncio de ${NETWORK_STYLE[c.network].label}${c.ad.campaign ? ` · ${c.ad.campaign}` : ""}` : `En tu publicación de ${NETWORK_STYLE[c.network].label}`}
+                  </span>
                   <span className="block truncate text-xs text-ink-muted">{c.post.text || "Publicación sin texto"}</span>
                 </span>
                 <span className="ml-auto flex-none text-xs text-ink-faint" aria-hidden="true">
@@ -327,7 +385,7 @@ export default async function ComentariosPage({
                   ? "¡Todo al día! No hay comentarios sin responder."
                   : "Nada por aquí con estos filtros."}
             </p>
-            <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">Revisamos los comentarios de tus últimas 12 publicaciones en cada red. Los nuevos aparecen solos.</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-ink-muted">Revisamos tus últimas 12 publicaciones de cada red y tus anuncios recientes. Los comentarios nuevos aparecen solos.</p>
           </li>
         )}
       </ul>

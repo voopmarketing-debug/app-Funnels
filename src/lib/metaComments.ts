@@ -14,6 +14,8 @@ export type SocialComment = {
   id: string;
   network: CommentNetwork;
   post: { id: string; text: string; permalink: string | null; image: string | null };
+  /** Set when the comment is on a post used by an ad (dark posts included). */
+  ad: { name: string; campaign: string | null } | null;
   authorName: string;
   text: string;
   createdAt: string;
@@ -41,42 +43,40 @@ type FbComment = {
 };
 type FbPost = { id: string; message?: string; permalink_url?: string; full_picture?: string; comments?: { data: FbComment[] } };
 
+const FB_POST_FIELDS = `id,message,permalink_url,full_picture,comments.order(reverse_chronological).limit(${COMMENTS}){id,message,created_time,from,is_hidden,like_count,comments.limit(10){id,message,created_time,from}}`;
+
+function fbPostComments(p: FbPost, pageId: string): SocialComment[] {
+  return (p.comments?.data ?? [])
+    // The Page's own top-level comments (e.g. a pinned "link en la bio") aren't questions to answer.
+    .filter((c) => c.from?.id !== pageId)
+    .map((c) => {
+      const replies = (c.comments?.data ?? []).map((r) => ({
+        id: r.id,
+        text: r.message ?? "",
+        createdAt: r.created_time,
+        fromUs: r.from?.id === pageId,
+        authorName: r.from?.id === pageId ? "Tú" : r.from?.name ?? "Alguien",
+      }));
+      return {
+        id: c.id,
+        network: "facebook" as const,
+        post: { id: p.id, text: p.message ?? "", permalink: p.permalink_url ?? null, image: safeMediaUrl(p.full_picture) },
+        ad: null,
+        // Without pages_read_user_content Meta leaves out who wrote it.
+        authorName: c.from?.name ?? "Alguien en Facebook",
+        text: c.message ?? "",
+        createdAt: c.created_time,
+        hidden: !!c.is_hidden,
+        likeCount: c.like_count ?? 0,
+        replies,
+        answered: replies.some((r) => r.fromUs),
+      };
+    });
+}
+
 export async function facebookComments(pageId: string, pageToken: string): Promise<SocialComment[]> {
-  const res = await graph<{ data: FbPost[] }>(
-    `${pageId}/posts`,
-    {
-      fields: `id,message,permalink_url,full_picture,comments.order(reverse_chronological).limit(${COMMENTS}){id,message,created_time,from,is_hidden,like_count,comments.limit(10){id,message,created_time,from}}`,
-      limit: POSTS,
-    },
-    pageToken,
-  );
-  return res.data.flatMap((p) =>
-    (p.comments?.data ?? [])
-      // The Page's own top-level comments (e.g. a pinned "link en la bio") aren't questions to answer.
-      .filter((c) => c.from?.id !== pageId)
-      .map((c) => {
-        const replies = (c.comments?.data ?? []).map((r) => ({
-          id: r.id,
-          text: r.message ?? "",
-          createdAt: r.created_time,
-          fromUs: r.from?.id === pageId,
-          authorName: r.from?.id === pageId ? "Tú" : r.from?.name ?? "Alguien",
-        }));
-        return {
-          id: c.id,
-          network: "facebook" as const,
-          post: { id: p.id, text: p.message ?? "", permalink: p.permalink_url ?? null, image: safeMediaUrl(p.full_picture) },
-          // Without pages_read_user_content Meta leaves out who wrote it.
-          authorName: c.from?.name ?? "Alguien en Facebook",
-          text: c.message ?? "",
-          createdAt: c.created_time,
-          hidden: !!c.is_hidden,
-          likeCount: c.like_count ?? 0,
-          replies,
-          answered: replies.some((r) => r.fromUs),
-        };
-      }),
-  );
+  const res = await graph<{ data: FbPost[] }>(`${pageId}/posts`, { fields: FB_POST_FIELDS, limit: POSTS }, pageToken);
+  return res.data.flatMap((p) => fbPostComments(p, pageId));
 }
 
 type IgComment = {
@@ -99,48 +99,115 @@ type IgMedia = {
   comments?: { data: IgComment[] };
 };
 
-export async function instagramComments(igUserId: string, pageToken: string): Promise<SocialComment[]> {
-  const res = await graph<{ data: IgMedia[] }>(
-    `${igUserId}/media`,
-    {
-      fields: `id,caption,permalink,media_type,media_url,thumbnail_url,comments.limit(${COMMENTS}){id,text,username,timestamp,hidden,like_count,from,replies.limit(10){id,text,username,timestamp,from}}`,
-      limit: POSTS,
-    },
-    pageToken,
-  );
+const IG_MEDIA_FIELDS = `id,caption,permalink,media_type,media_url,thumbnail_url,comments.limit(${COMMENTS}){id,text,username,timestamp,hidden,like_count,from,replies.limit(10){id,text,username,timestamp,from}}`;
+
+function igMediaComments(m: IgMedia, igUserId: string): SocialComment[] {
   const isUs = (c: IgComment) => c.from?.id === igUserId;
-  return res.data.flatMap((m) =>
-    (m.comments?.data ?? [])
-      .filter((c) => !isUs(c))
-      .map((c) => {
-        const replies = (c.replies?.data ?? [])
-          .map((r) => ({
-            id: r.id,
-            text: r.text ?? "",
-            createdAt: r.timestamp,
-            fromUs: isUs(r),
-            authorName: isUs(r) ? "Tú" : r.username ? `@${r.username}` : "Alguien",
-          }))
-          .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-        return {
-          id: c.id,
-          network: "instagram" as const,
-          post: {
-            id: m.id,
-            text: m.caption ?? "",
-            permalink: m.permalink ?? null,
-            image: safeMediaUrl(m.media_type === "VIDEO" ? m.thumbnail_url : m.media_url ?? m.thumbnail_url),
-          },
-          authorName: c.username ? `@${c.username}` : c.from?.username ? `@${c.from.username}` : "Alguien en Instagram",
-          text: c.text ?? "",
-          createdAt: c.timestamp,
-          hidden: !!c.hidden,
-          likeCount: c.like_count ?? 0,
-          replies,
-          answered: replies.some((r) => r.fromUs),
-        };
-      }),
+  return (m.comments?.data ?? [])
+    .filter((c) => !isUs(c))
+    .map((c) => {
+      const replies = (c.replies?.data ?? [])
+        .map((r) => ({
+          id: r.id,
+          text: r.text ?? "",
+          createdAt: r.timestamp,
+          fromUs: isUs(r),
+          authorName: isUs(r) ? "Tú" : r.username ? `@${r.username}` : "Alguien",
+        }))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return {
+        id: c.id,
+        network: "instagram" as const,
+        post: {
+          id: m.id,
+          text: m.caption ?? "",
+          permalink: m.permalink ?? null,
+          image: safeMediaUrl(m.media_type === "VIDEO" ? m.thumbnail_url : m.media_url ?? m.thumbnail_url),
+        },
+        ad: null,
+        authorName: c.username ? `@${c.username}` : c.from?.username ? `@${c.from.username}` : "Alguien en Instagram",
+        text: c.text ?? "",
+        createdAt: c.timestamp,
+        hidden: !!c.hidden,
+        likeCount: c.like_count ?? 0,
+        replies,
+        answered: replies.some((r) => r.fromUs),
+      };
+    });
+}
+
+export async function instagramComments(igUserId: string, pageToken: string): Promise<SocialComment[]> {
+  const res = await graph<{ data: IgMedia[] }>(`${igUserId}/media`, { fields: IG_MEDIA_FIELDS, limit: POSTS }, pageToken);
+  return res.data.flatMap((m) => igMediaComments(m, igUserId));
+}
+
+// ---- Ads ----
+
+type RawAd = {
+  id: string;
+  name?: string;
+  updated_time?: string;
+  campaign?: { name?: string };
+  creative?: { effective_object_story_id?: string; effective_instagram_media_id?: string };
+};
+
+// Ads come and go; recent ones (running or just paused) are where comments still arrive.
+const AD_STATUSES = JSON.stringify(["ACTIVE", "PAUSED", "ADSET_PAUSED", "CAMPAIGN_PAUSED"]);
+const MAX_AD_POSTS = 15;
+
+/**
+ * Comments on the posts the business's ads run on. Facebook ads usually use
+ * "dark" posts that never show on the Page (so facebookComments can't see
+ * them); several ads can share one post. The ad list needs the user token
+ * (ads_read); the posts and comments are read with the Page token, and only
+ * posts of the connected Page are kept.
+ */
+export async function adComments(params: {
+  adAccountId: string;
+  userToken: string;
+  pageId: string;
+  igUserId: string | null;
+  pageToken: string;
+}): Promise<SocialComment[]> {
+  const ads = await graph<{ data: RawAd[] }>(
+    `${params.adAccountId}/ads`,
+    {
+      fields: "id,name,updated_time,campaign{name},creative{effective_object_story_id,effective_instagram_media_id}",
+      effective_status: AD_STATUSES,
+      limit: "50",
+    },
+    params.userToken,
   );
+  const recent = [...ads.data].sort((a, b) => (b.updated_time ?? "").localeCompare(a.updated_time ?? ""));
+  const fbAd = new Map<string, { name: string; campaign: string | null }>();
+  const igAd = new Map<string, { name: string; campaign: string | null }>();
+  for (const ad of recent) {
+    const info = { name: ad.name ?? "Anuncio", campaign: ad.campaign?.name ?? null };
+    const story = ad.creative?.effective_object_story_id;
+    // Story ids are "<pageId>_<postId>": anything else belongs to another Page.
+    if (story && story.startsWith(`${params.pageId}_`) && !fbAd.has(story) && fbAd.size < MAX_AD_POSTS) fbAd.set(story, info);
+    const media = ad.creative?.effective_instagram_media_id;
+    if (media && params.igUserId && !igAd.has(media) && igAd.size < MAX_AD_POSTS) igAd.set(media, info);
+  }
+
+  const none = async <T,>(): Promise<Record<string, T>> => ({});
+  const [fbPosts, igMedia] = await Promise.all([
+    fbAd.size ? graph<Record<string, FbPost>>("", { ids: [...fbAd.keys()].join(","), fields: FB_POST_FIELDS }, params.pageToken) : none<FbPost>(),
+    igAd.size && params.igUserId
+      ? graph<Record<string, IgMedia>>("", { ids: [...igAd.keys()].join(","), fields: IG_MEDIA_FIELDS }, params.pageToken)
+      : none<IgMedia>(),
+  ]);
+  return [
+    ...Object.entries(fbPosts).flatMap(([id, p]) => fbPostComments(p, params.pageId).map((c) => ({ ...c, ad: fbAd.get(id) ?? null }))),
+    ...Object.entries(igMedia).flatMap(([id, m]) => igMediaComments(m, params.igUserId!).map((c) => ({ ...c, ad: igAd.get(id) ?? null }))),
+  ];
+}
+
+/** Organic + ad comments without duplicates (a boosted post shows up in both): the ad label wins. */
+export function mergeComments(organic: SocialComment[], ads: SocialComment[]): SocialComment[] {
+  const byId = new Map(organic.map((c) => [c.id, c]));
+  for (const c of ads) byId.set(c.id, { ...(byId.get(c.id) ?? c), ad: c.ad });
+  return [...byId.values()];
 }
 
 /** Comment ids are opaque Meta ids: digits, letters and "_". */

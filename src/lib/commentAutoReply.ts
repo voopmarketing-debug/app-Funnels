@@ -2,7 +2,7 @@ import { Prisma, type CommentAutoReply } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { friendlyMetaError, MetaApiError } from "@/lib/metaSocial";
-import { facebookComments, instagramComments, privateReplyToComment, replyToComment, type CommentNetwork } from "@/lib/metaComments";
+import { adComments, facebookComments, instagramComments, mergeComments, privateReplyToComment, replyToComment, type CommentNetwork } from "@/lib/metaComments";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 
 // ManyChat-style keyword answers for Facebook / Instagram comments. A new
@@ -175,7 +175,7 @@ export async function sweepCommentAutoReplies(options: { businessIds?: string[];
       pageAccessToken: { not: null },
       business: { commentAutoReplies: { some: { enabled: true } } },
     },
-    select: { businessId: true, fbPageId: true, igUserId: true, pageAccessToken: true },
+    select: { businessId: true, fbPageId: true, igUserId: true, pageAccessToken: true, adAccountId: true, userAccessToken: true },
     take: 100,
   });
   let answered = 0;
@@ -184,7 +184,14 @@ export async function sweepCommentAutoReplies(options: { businessIds?: string[];
     if (!options.force && (await isRateLimited(key, 1, SWEEP_EVERY_MS))) continue;
     await recordRateLimitEvent(key);
     try {
-      answered += await sweepBusiness({ businessId: c.businessId, fbPageId: c.fbPageId!, pageAccessToken: c.pageAccessToken!, igUserId: c.igUserId });
+      answered += await sweepBusiness({
+        businessId: c.businessId,
+        fbPageId: c.fbPageId!,
+        pageAccessToken: c.pageAccessToken!,
+        igUserId: c.igUserId,
+        adAccountId: c.adAccountId,
+        userAccessToken: c.userAccessToken,
+      });
     } catch (err) {
       console.error("[comment auto-reply] sweep failed", c.businessId, err);
     }
@@ -192,16 +199,25 @@ export async function sweepCommentAutoReplies(options: { businessIds?: string[];
   return { businesses: connections.length, answered };
 }
 
-async function sweepBusiness(c: Connection & { igUserId: string | null }): Promise<number> {
+async function sweepBusiness(c: Connection & { igUserId: string | null; adAccountId: string | null; userAccessToken: string | null }): Promise<number> {
   const rules = await prisma.commentAutoReply.findMany({ where: { businessId: c.businessId, enabled: true } });
   const networks = new Set(rules.flatMap((r) => r.networks));
   const pageToken = decryptSecret(c.pageAccessToken);
-  const [fb, ig] = await Promise.all([
+  const [fb, ig, ads] = await Promise.all([
     networks.has("facebook") ? facebookComments(c.fbPageId, pageToken) : [],
     networks.has("instagram") && c.igUserId ? instagramComments(c.igUserId, pageToken) : [],
+    // Comments on ads ("Comenta INFO" campaigns) live on their own, often hidden, posts.
+    c.adAccountId && c.userAccessToken
+      ? adComments({ adAccountId: c.adAccountId, userToken: decryptSecret(c.userAccessToken), pageId: c.fbPageId, igUserId: c.igUserId, pageToken }).catch((err) => {
+          console.error("[comment auto-reply] ad comments failed", c.businessId, err);
+          return [];
+        })
+      : [],
   ]);
   const since = Date.now() - SWEEP_LOOKBACK_MS;
-  const fresh = [...fb, ...ig].filter((m) => !m.answered && !m.hidden && Date.parse(m.createdAt) >= since);
+  const fresh = mergeComments([...fb, ...ig], ads.filter((m) => networks.has(m.network))).filter(
+    (m) => !m.answered && !m.hidden && Date.parse(m.createdAt) >= since,
+  );
   if (fresh.length === 0) return 0;
   const done = await prisma.commentAutoReplyLog.findMany({
     where: { businessId: c.businessId, commentId: { in: fresh.map((m) => m.id) } },

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MetaApiError } from "./metaSocial";
-import { facebookComments, instagramComments, isCommentId, privateReplyToComment, replyToComment, setCommentHidden } from "./metaComments";
+import { adComments, facebookComments, instagramComments, isCommentId, mergeComments, privateReplyToComment, replyToComment, setCommentHidden } from "./metaComments";
 
 function mockFetch(handler: (url: URL, init?: RequestInit) => { status?: number; body: unknown }) {
   const fn = vi.fn(async (input: URL | string, init?: RequestInit) => {
@@ -118,5 +118,48 @@ describe("actions", () => {
     expect(isCommentId("17890000000000001")).toBe(true);
     expect(isCommentId("../me/accounts")).toBe(false);
     expect(isCommentId("1?fields=access_token")).toBe(false);
+  });
+});
+
+describe("adComments", () => {
+  it("reads comments on the ads' own posts and labels them with the campaign", async () => {
+    const calls: URL[] = [];
+    mockFetch((url) => {
+      calls.push(url);
+      if (url.pathname.endsWith("/act_1/ads")) {
+        expect(url.searchParams.get("access_token")).toBe("user-tok");
+        return {
+          body: {
+            data: [
+              { id: "ad1", name: "Promo A", updated_time: "2026-10-10", campaign: { name: "Octubre" }, creative: { effective_object_story_id: "page1_777", effective_instagram_media_id: "ig9" } },
+              // Same post reused by a second ad: read once.
+              { id: "ad2", name: "Promo B", updated_time: "2026-10-09", campaign: { name: "Octubre" }, creative: { effective_object_story_id: "page1_777" } },
+              // Another Page's post (shared ad account): never read with this Page's token.
+              { id: "ad3", name: "Otra página", updated_time: "2026-10-08", creative: { effective_object_story_id: "otherpage_1" } },
+            ],
+          },
+        };
+      }
+      expect(url.searchParams.get("access_token")).toBe("page-tok");
+      const ids = url.searchParams.get("ids");
+      if (ids === "page1_777") {
+        return { body: { page1_777: { id: "page1_777", message: "Anuncio", comments: { data: [{ id: "c9", message: "INFO", created_time: "2026-10-10T10:00:00+0000", from: { id: "u1", name: "Ana" } }] } } } };
+      }
+      expect(ids).toBe("ig9");
+      return { body: { ig9: { id: "ig9", caption: "Ad IG", comments: { data: [{ id: "ic9", text: "precio", username: "pepe", timestamp: "2026-10-10T11:00:00+0000" }] } } } };
+    });
+    const comments = await adComments({ adAccountId: "act_1", userToken: "user-tok", pageId: "page1", igUserId: "ig1", pageToken: "page-tok" });
+    expect(comments.map((c) => [c.id, c.network, c.ad?.campaign])).toEqual([
+      ["c9", "facebook", "Octubre"],
+      ["ic9", "instagram", "Octubre"],
+    ]);
+    expect(calls.some((u) => (u.searchParams.get("ids") ?? "").includes("otherpage"))).toBe(false);
+  });
+
+  it("keeps one copy of a boosted post's comment, labelled as an ad", () => {
+    const base = { network: "facebook" as const, post: { id: "p", text: "", permalink: null, image: null }, authorName: "Ana", text: "hola", createdAt: "2026-10-10", hidden: false, likeCount: 0, replies: [], answered: false };
+    const merged = mergeComments([{ ...base, id: "c1", ad: null }, { ...base, id: "c2", ad: null }], [{ ...base, id: "c1", ad: { name: "Promo", campaign: "Oct" } }]);
+    expect(merged).toHaveLength(2);
+    expect(merged.find((c) => c.id === "c1")?.ad).toEqual({ name: "Promo", campaign: "Oct" });
   });
 });
