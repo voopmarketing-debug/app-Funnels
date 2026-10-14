@@ -141,19 +141,20 @@ describe("adComments", () => {
         };
       }
       expect(url.searchParams.get("access_token")).toBe("page-tok");
-      const ids = url.searchParams.get("ids");
-      if (ids === "page1_777") {
-        return { body: { page1_777: { id: "page1_777", message: "Anuncio", comments: { data: [{ id: "c9", message: "INFO", created_time: "2026-10-10T10:00:00+0000", from: { id: "u1", name: "Ana" } }] } } } };
+      // Posts are read one by one: the batched `?ids=` form is rejected by current API versions.
+      expect(url.searchParams.get("ids")).toBeNull();
+      if (url.pathname.endsWith("/page1_777")) {
+        return { body: { id: "page1_777", message: "Anuncio", comments: { data: [{ id: "c9", message: "INFO", created_time: "2026-10-10T10:00:00+0000", from: { id: "u1", name: "Ana" } }] } } };
       }
-      expect(ids).toBe("ig9");
-      return { body: { ig9: { id: "ig9", caption: "Ad IG", comments: { data: [{ id: "ic9", text: "precio", username: "pepe", timestamp: "2026-10-10T11:00:00+0000" }] } } } };
+      expect(url.pathname.endsWith("/ig9")).toBe(true);
+      return { body: { id: "ig9", caption: "Ad IG", comments: { data: [{ id: "ic9", text: "precio", username: "pepe", timestamp: "2026-10-10T11:00:00+0000" }] } } };
     });
     const comments = await adComments({ adAccountId: "act_1", userToken: "user-tok", pageId: "page1", igUserId: "ig1", pageToken: "page-tok" });
     expect(comments.map((c) => [c.id, c.network, c.ad?.campaign])).toEqual([
       ["c9", "facebook", "Octubre"],
       ["ic9", "instagram", "Octubre"],
     ]);
-    expect(calls.some((u) => (u.searchParams.get("ids") ?? "").includes("otherpage"))).toBe(false);
+    expect(calls.some((u) => u.pathname.includes("otherpage"))).toBe(false);
   });
 
   it("keeps one copy of a boosted post's comment, labelled as an ad", () => {

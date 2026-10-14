@@ -190,16 +190,30 @@ export async function adComments(params: {
     if (media && params.igUserId && !igAd.has(media) && igAd.size < MAX_AD_POSTS) igAd.set(media, info);
   }
 
-  const none = async <T,>(): Promise<Record<string, T>> => ({});
+  // One read per post: Meta no longer accepts the batched `?ids=` form on
+  // current API versions. A post that can't be read (deleted, no access) is
+  // skipped instead of failing every ad.
+  const readEach = async <T,>(ids: string[], fields: string): Promise<[string, T][]> => {
+    const reads = await Promise.all(
+      ids.map(async (id): Promise<[string, T] | null> => {
+        try {
+          return [id, await graph<T>(id, { fields }, params.pageToken)];
+        } catch (err) {
+          if (err instanceof MetaApiError && err.needsReconnect) throw err;
+          console.error("[social comments] ad post unreadable", id, err);
+          return null;
+        }
+      }),
+    );
+    return reads.filter((r): r is [string, T] => r !== null);
+  };
   const [fbPosts, igMedia] = await Promise.all([
-    fbAd.size ? graph<Record<string, FbPost>>("", { ids: [...fbAd.keys()].join(","), fields: FB_POST_FIELDS }, params.pageToken) : none<FbPost>(),
-    igAd.size && params.igUserId
-      ? graph<Record<string, IgMedia>>("", { ids: [...igAd.keys()].join(","), fields: IG_MEDIA_FIELDS }, params.pageToken)
-      : none<IgMedia>(),
+    readEach<FbPost>([...fbAd.keys()], FB_POST_FIELDS),
+    params.igUserId ? readEach<IgMedia>([...igAd.keys()], IG_MEDIA_FIELDS) : Promise.resolve([] as [string, IgMedia][]),
   ]);
   return [
-    ...Object.entries(fbPosts).flatMap(([id, p]) => fbPostComments(p, params.pageId).map((c) => ({ ...c, ad: fbAd.get(id) ?? null }))),
-    ...Object.entries(igMedia).flatMap(([id, m]) => igMediaComments(m, params.igUserId!).map((c) => ({ ...c, ad: igAd.get(id) ?? null }))),
+    ...fbPosts.flatMap(([id, p]) => fbPostComments(p, params.pageId).map((c) => ({ ...c, ad: fbAd.get(id) ?? null }))),
+    ...igMedia.flatMap(([id, m]) => igMediaComments(m, params.igUserId!).map((c) => ({ ...c, ad: igAd.get(id) ?? null }))),
   ];
 }
 
