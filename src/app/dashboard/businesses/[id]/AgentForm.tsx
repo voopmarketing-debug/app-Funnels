@@ -2,6 +2,7 @@
 
 import { useActionState, useRef } from "react";
 import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
+import { ASSISTANT_OPEN_EVENT } from "@/components/assistant/AssistantChat";
 import { updateAgent } from "@/lib/actions";
 import { TONE_OPTIONS, LENGTH_OPTIONS, INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 
@@ -46,13 +47,32 @@ export function AgentForm({
       <div className="space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-ink-muted">Reemplaza cada [ ... ] con la información real de tu negocio y borra lo que no aplique.</p>
-          <button
-            type="button"
-            onClick={applyTemplate}
-            className="rounded-md border border-border-strong px-2.5 py-1 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
-          >
-            📋 Usar plantilla maestra
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent(ASSISTANT_OPEN_EVENT, {
+                    detail: {
+                      text: promptRef.current?.value.trim()
+                        ? "Revisa el prompt de mi agente y mis conversaciones, y propónme una versión mejorada"
+                        : "Escríbeme el prompt para mi agente de IA",
+                    },
+                  }),
+                )
+              }
+              className="rounded-md border border-accent/50 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-ink transition hover:bg-accent/20"
+            >
+              ✦ Que el asistente lo escriba
+            </button>
+            <button
+              type="button"
+              onClick={applyTemplate}
+              className="rounded-md border border-border-strong px-2.5 py-1 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+            >
+              📋 Usar plantilla maestra
+            </button>
+          </div>
         </div>
         <textarea
           ref={promptRef}

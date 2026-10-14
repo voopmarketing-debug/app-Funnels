@@ -11,7 +11,7 @@ import { estimateCostUsd } from "@/lib/aiCost";
  * to thread a businessId through. Outside a withAiUsage scope nothing is
  * recorded (e.g. the health check).
  */
-export type AiUsageKind = "DIAGNOSIS" | "WEBSITE" | "VOICE_IN" | "VOICE_OUT" | "IMAGE";
+export type AiUsageKind = "DIAGNOSIS" | "WEBSITE" | "VOICE_IN" | "VOICE_OUT" | "IMAGE" | "ASSISTANT";
 
 type Scope = { businessId: string; kind: AiUsageKind };
 const scope = new AsyncLocalStorage<Scope>();

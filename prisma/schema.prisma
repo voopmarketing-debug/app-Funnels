@@ -1065,3 +1065,45 @@ model SocialFollowerSnapshot {
 
   @@unique([businessId, network, date])
 }
+
+// Asistente Funnels: the in-app copilot chat (lib/assistant). One thread per
+// conversation a user has with it; `messages` is the exact Claude message
+// history (content blocks, thinking included), only ever appended to.
+model AssistantThread {
+  id         String   @id @default(cuid())
+  userId     String
+  /// The business the chat started on (its AI cost is charged there).
+  businessId String?
+  title      String
+  messages   Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  actions AssistantAction[]
+
+  @@index([userId, updatedAt])
+}
+
+// A change the assistant proposed ("¿Aplico este prompt?"). Nothing is
+// written until the person taps Aplicar; then the platform's own action runs
+// with that person's permissions.
+model AssistantAction {
+  id         String    @id @default(cuid())
+  threadId   String
+  userId     String
+  businessId String
+  /// The tool_use block that proposed it, to place its card in the chat.
+  toolUseId  String
+  kind       String
+  payload    Json
+  /// pending | applied | discarded | failed
+  status     String    @default("pending")
+  result     String?
+  createdAt  DateTime  @default(now())
+  appliedAt  DateTime?
+
+  thread AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+}
+

@@ -9,6 +9,10 @@ import { DashboardSidebar } from "./DashboardSidebar";
 import { NotificationBell, type NotificationItem } from "./NotificationBell";
 import { PushBanner } from "./PushNotifications";
 import { NotificationSoundPoller } from "./NotificationSoundPoller";
+import { AssistantChat } from "@/components/assistant/AssistantChat";
+
+// The Asistente Funnels runs a few Claude calls per message from these pages.
+export const maxDuration = 120;
 
 function formatNotificationDate(date: Date): string {
   return new Intl.DateTimeFormat("es-CO", {
@@ -126,6 +130,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {children}
         </main>
       </div>
+      <Suspense fallback={null}>
+        <AssistantChat />
+      </Suspense>
     </div>
   );
 }

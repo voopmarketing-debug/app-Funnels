@@ -318,6 +318,9 @@ export default async function BusinessPage({
               dialogTitle="Instrucciones del agente de IA"
             >
               <AgentForm
+                // Remounts when the prompt changes elsewhere (e.g. applied from
+                // the Asistente Funnels), so the editor never shows a stale copy.
+                key={business.agent?.updatedAt.toISOString() ?? "none"}
                 businessId={id}
                 systemPrompt={business.agent?.systemPrompt ?? ""}
                 tone={business.agent?.tone ?? "cercano"}

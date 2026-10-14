@@ -42,6 +42,7 @@ const BREAKDOWN_LABELS: { key: keyof CostBreakdown; label: string; color: string
   { key: "voice", label: "Notas de voz", color: "#5b8def" },
   { key: "websites", label: "Sitios web", color: "#b07cf0" },
   { key: "diagnosis", label: "Diagnósticos", color: "#fab219" },
+  { key: "assistant", label: "Asistente", color: "#14b8a6" },
   { key: "images", label: "Imágenes", color: "#ef6b8a" },
 ];
 

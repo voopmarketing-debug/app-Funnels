@@ -32,6 +32,7 @@ export type CostBreakdown = {
   websites: number;
   diagnosis: number;
   images: number;
+  assistant: number;
 };
 
 export type LineRow = {
@@ -96,7 +97,7 @@ export function parseMonth(value: string | undefined, now: Date): { start: Date;
 }
 
 function emptyBreakdown(): CostBreakdown {
-  return { replies: 0, voice: 0, websites: 0, diagnosis: 0, images: 0 };
+  return { replies: 0, voice: 0, websites: 0, diagnosis: 0, images: 0, assistant: 0 };
 }
 
 function addBreakdown(into: CostBreakdown, from: CostBreakdown): void {
@@ -105,10 +106,11 @@ function addBreakdown(into: CostBreakdown, from: CostBreakdown): void {
   into.websites += from.websites;
   into.diagnosis += from.diagnosis;
   into.images += from.images;
+  into.assistant += from.assistant;
 }
 
 function sumBreakdown(b: CostBreakdown): number {
-  return b.replies + b.voice + b.websites + b.diagnosis + b.images;
+  return b.replies + b.voice + b.websites + b.diagnosis + b.images + b.assistant;
 }
 
 export async function getProfitabilityReport(adminUserId: string, monthParam: string | undefined, now = new Date()): Promise<ProfitabilityReport> {
@@ -205,6 +207,7 @@ export async function getProfitabilityReport(adminUserId: string, monthParam: st
     else if (u.kind === "WEBSITE") b.websites += cost;
     else if (u.kind === "DIAGNOSIS") b.diagnosis += cost;
     else if (u.kind === "IMAGE") b.images += cost;
+    else if (u.kind === "ASSISTANT") b.assistant += cost;
   }
   const contactsByBusiness = new Map(contactRows.map((r) => [r.businessId, Number(r.contacts)]));
 
