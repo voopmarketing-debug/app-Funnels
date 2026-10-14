@@ -32,6 +32,7 @@ import { withAiUsage } from "@/lib/aiUsage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { setSectionImage, setTextAtPath, type SectionImageField } from "@/lib/websiteEdit";
 import {
   generateWebsiteContentV2,
   applyWebsiteEditV2,
@@ -3007,8 +3008,12 @@ export async function applyWebsitePromptV2(
 
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
     const current = WebsiteContentV2Schema.parse(website.content);
-    const products = await getCatalogProducts(businessId);
-    const updated = await withAiUsage(businessId, "WEBSITE", () => applyWebsiteEditV2(current, trimmed, products));
+    const [products, library] = await Promise.all([
+      getCatalogProducts(businessId),
+      prisma.agentMedia.findMany({ where: { businessId, mediaType: "image" }, orderBy: { createdAt: "desc" }, take: 30, select: { url: true, label: true } }),
+    ]);
+    const photos = [...(website.aiImageUrl ? [{ url: website.aiImageUrl, label: "Imagen generada para la portada" }] : []), ...library];
+    const updated = await withAiUsage(businessId, "WEBSITE", () => applyWebsiteEditV2(current, trimmed, products, photos));
     await recordWebsiteGeneration(businessId);
     await prisma.website.update({ where: { id: websiteId }, data: { content: updated } });
     revalidatePath(`/dashboard/businesses/${businessId}/website`);
@@ -3092,6 +3097,98 @@ export async function updateWebsiteDesignV2(
   await prisma.website.update({ where: { id: websiteId }, data: { content: parsed } });
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
   return parsed;
+}
+
+// ---- Click-to-edit in the builder's preview ----
+
+/** Saves one text edited directly on the preview (see lib/websiteEdit.ts for what can be edited). */
+export async function updateWebsiteTextV2(businessId: string, websiteId: string, path: string, value: string): Promise<BuilderResult<{ content: WebsiteContentV2 }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    if (typeof path !== "string" || typeof value !== "string" || path.length > 80 || value.length > 5000) throw new Error("No se pudo guardar ese texto");
+
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const result = setTextAtPath(WebsiteContentV2Schema.parse(website.content), path, value);
+    if (!result.ok) throw new Error(result.error);
+    await prisma.website.update({ where: { id: websiteId }, data: { content: result.content } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, content: result.content };
+  } catch (err) {
+    return builderError(`updateWebsiteTextV2(${websiteId})`, err);
+  }
+}
+
+/** The business's own pictures a section can use: uploaded photos and product photos. */
+async function ownImageUrls(businessId: string, aiImageUrl: string | null): Promise<Set<string>> {
+  const [media, products] = await Promise.all([
+    prisma.agentMedia.findMany({ where: { businessId, mediaType: "image" }, select: { url: true } }),
+    prisma.product.findMany({ where: { businessId, imageUrl: { not: null } }, select: { imageUrl: true } }),
+  ]);
+  return new Set([...media.map((m) => m.url), ...products.flatMap((p) => (p.imageUrl ? [p.imageUrl] : [])), ...(aiImageUrl ? [aiImageUrl] : [])]);
+}
+
+/** Pictures for the builder's image picker, newest first. */
+export async function listWebsiteImagesV2(businessId: string): Promise<{ url: string; label: string }[]> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessMembership(session.user.id, businessId);
+  const media = await prisma.agentMedia.findMany({ where: { businessId, mediaType: "image" }, orderBy: { createdAt: "desc" }, take: 60, select: { url: true, label: true } });
+  return media;
+}
+
+/** Uploads a photo from the builder straight into the business's library (the same one the AI agent and the gallery use). */
+export async function uploadWebsiteImageV2(businessId: string, formData: FormData): Promise<BuilderResult<{ url: string; label: string }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+
+    const fileEntry = formData.get("file");
+    const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
+    if (!file) throw new Error("Elige una foto");
+    if (resolveMediaType(file.type) !== "image") throw new Error("Solo se aceptan fotos (JPG, PNG o WebP)");
+    if (file.size > MAX_ATTACHMENT_BYTES.image) throw new Error(`La foto supera el máximo permitido (${maxMbFor("image")} MB)`);
+    if ((await prisma.agentMedia.count({ where: { businessId } })) >= MAX_AGENT_MEDIA_PER_BUSINESS) {
+      throw new Error(`Ya tienes el máximo de ${MAX_AGENT_MEDIA_PER_BUSINESS} archivos: borra alguno para subir otro.`);
+    }
+
+    const { url, size } = await uploadAttachment({ bytes: Buffer.from(await file.arrayBuffer()), filename: file.name, contentType: file.type });
+    const label = (file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Foto de la página").slice(0, 80);
+    await prisma.agentMedia.create({ data: { businessId, url, mediaType: "image", filename: file.name, label, sizeBytes: size } });
+    revalidatePath(`/dashboard/businesses/${businessId}`);
+    return { ok: true, url, label };
+  } catch (err) {
+    return builderError(`uploadWebsiteImageV2(${businessId})`, err);
+  }
+}
+
+/** Puts one of the business's own pictures on a section (as its photo or as its background), or clears it. */
+export async function setWebsiteSectionImageV2(
+  businessId: string,
+  websiteId: string,
+  index: number,
+  field: SectionImageField,
+  url: string | null,
+): Promise<BuilderResult<{ content: WebsiteContentV2 }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    if (field !== "image" && field !== "bgImage") throw new Error("No se pudo cambiar la imagen");
+
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    // Only the business's own pictures: never a url typed in by the browser.
+    if (url && !(await ownImageUrls(businessId, website.aiImageUrl)).has(url)) throw new Error("Esa foto ya no está en tu biblioteca");
+    const next = setSectionImage(WebsiteContentV2Schema.parse(website.content), index, field, url);
+    if (!next) throw new Error("No se pudo cambiar la imagen de esa sección");
+    await prisma.website.update({ where: { id: websiteId }, data: { content: next } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, content: next };
+  } catch (err) {
+    return builderError(`setWebsiteSectionImageV2(${websiteId})`, err);
+  }
 }
 
 export type UpdateTrackingResult =

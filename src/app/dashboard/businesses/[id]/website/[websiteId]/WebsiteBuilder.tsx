@@ -4,7 +4,7 @@ import { TrackingSettings } from "./TrackingSettings";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { applyWebsitePromptV2, regenerateWebsitePageV2, updateWebsiteDesignV2 } from "@/lib/actions";
+import { applyWebsitePromptV2, regenerateWebsitePageV2, setWebsiteSectionImageV2, updateWebsiteDesignV2, updateWebsiteTextV2 } from "@/lib/actions";
 import {
   PAGE_TYPE_LABELS,
   SECTION_LABELS,
@@ -17,12 +17,16 @@ import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
+import { ImagePicker } from "./ImagePicker";
+import { attachPreviewEditor, type EditorHandlers } from "./previewEditor";
 
 type Tab = "chat" | "diseno" | "secciones" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
 type ChatEntry = { role: "user" | "assistant"; text: string; error?: boolean };
 
 const DEVICE_WIDTH: Record<Device, string> = { desktop: "100%", tablet: "820px", mobile: "390px" };
+const HINT_KEY = "fl-builder-edit-hint";
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 const SUGGESTIONS = [
   "Haz el titular más corto y directo",
@@ -89,11 +93,83 @@ export function WebsiteBuilder({
   const [isPending, startTransition] = useTransition();
   const chatRef = useRef<HTMLDivElement>(null);
 
+  // Click-to-edit on the preview itself (see previewEditor.ts).
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const scrollRef = useRef(0);
+  const detachRef = useRef<(() => void) | null>(null);
+  const handlersRef = useRef<EditorHandlers | null>(null);
+  const [imageTarget, setImageTarget] = useState<{ index: number; field: "image" | "bgImage" } | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [toast, setToast] = useState<string | null>(null);
+  const [hintDismissed, setHintDismissed] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(HINT_KEY)) setHintDismissed(true);
+    } catch {
+      // Storage blocked: the tip just shows again.
+    }
+  }, []);
+  useEffect(() => () => detachRef.current?.(), []);
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
   }, [chat, busy]);
 
-  const refreshPreview = () => setPreviewVersion((v) => v + 1);
+  const refreshPreview = () => {
+    // The reload keeps the person where they were instead of jumping back to the top.
+    try {
+      scrollRef.current = iframeRef.current?.contentWindow?.scrollY ?? 0;
+    } catch {
+      scrollRef.current = 0;
+    }
+    setPreviewVersion((v) => v + 1);
+  };
+
+  function onPreviewLoad() {
+    detachRef.current?.();
+    detachRef.current = null;
+    const frame = iframeRef.current;
+    const doc = frame?.contentDocument;
+    if (!frame || !doc) return;
+    try {
+      frame.contentWindow?.scrollTo(0, scrollRef.current);
+    } catch {
+      // Not scrollable yet: harmless.
+    }
+    detachRef.current = attachPreviewEditor(doc, () => handlersRef.current!);
+  }
+
+  // The first preview can finish loading before React hydrates this page, and then its
+  // onLoad never fires: attach the editor to it here.
+  useEffect(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (doc && doc.readyState === "complete" && doc.querySelector("[data-edit]") && !doc.querySelector("style[data-fl-editor]")) onPreviewLoad();
+  }, []);
+
+  function applyImage(url: string | null) {
+    if (!imageTarget) return;
+    const { index, field } = imageTarget;
+    setImageTarget(null);
+    setBusy("Aplicando la imagen…");
+    startTransition(async () => {
+      try {
+        const res = await setWebsiteSectionImageV2(businessId, websiteId, index, field, url);
+        if (!res.ok) {
+          setToast(res.error);
+          return;
+        }
+        setContent(res.content);
+        refreshPreview();
+      } finally {
+        setBusy(null);
+      }
+    });
+  }
 
   function runDesign(label: string, patch: Parameters<typeof updateWebsiteDesignV2>[2]) {
     setBusy(label);
@@ -164,6 +240,38 @@ export function WebsiteBuilder({
     setContent(initialContent);
   }, [initialContent]);
 
+  // What the preview's own editor can do: save a text, open the image window, move or hide a block.
+  const editorHandlers: EditorHandlers = {
+    async saveText(path, value) {
+      setSaveState("saving");
+      const res = await updateWebsiteTextV2(businessId, websiteId, path, value);
+      if (!res.ok) {
+        setSaveState("error");
+        return { ok: false, error: res.error };
+      }
+      setContent(res.content);
+      setSaveState("saved");
+      setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 2500);
+      // Something appeared or disappeared (an emptied text, the highlighted words of the headline): redraw.
+      const sectionIndex = Number(path.split(".")[1]);
+      const refresh = value === "" || (/^sections\.\d+\.heading$/.test(path) && res.content.sections[sectionIndex]?.type === "hero");
+      if (refresh) refreshPreview();
+      return { ok: true, refresh };
+    },
+    pickImage: (index, field) => setImageTarget({ index, field }),
+    move: (index, direction) => runDesign("Moviendo…", { move: { from: index, to: index + direction } }),
+    hide: (index) => runDesign("Ocultando…", { hidden: [...content.hidden, index] }),
+    section(index) {
+      const s = content.sections[index];
+      if (!s) return null;
+      return { index, label: SECTION_LABELS[s.type], canMoveUp: index >= 2, canMoveDown: index >= 1 && index < content.sections.length - 1, hasBg: !!s.bgImage };
+    },
+    notice: (message) => setToast(message),
+  };
+  useEffect(() => {
+    handlersRef.current = editorHandlers;
+  });
+
   const hidden = new Set(content.hidden);
   const TABS: { key: Tab; label: string }[] = [
     { key: "chat", label: "✦ Chat IA" },
@@ -200,6 +308,9 @@ export function WebsiteBuilder({
           ))}
         </div>
         <div className="ml-auto flex items-center gap-1.5">
+          <span aria-live="polite" className={`hidden min-w-[5.5rem] text-right text-[11px] font-semibold sm:block ${saveState === "error" ? "text-error" : "text-ink-muted"}`}>
+            {saveState === "saving" ? "Guardando…" : saveState === "saved" ? "✓ Guardado" : saveState === "error" ? "No se guardó" : ""}
+          </span>
           <span className="hidden items-center gap-1.5 rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent sm:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Publicada
           </span>
@@ -399,15 +510,39 @@ export function WebsiteBuilder({
         </aside>
 
         {/* Live preview */}
-        <main className={`${mobilePanel === "preview" ? "flex" : "hidden"} min-w-0 flex-1 justify-center overflow-auto bg-[repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2)_10px,var(--background)_10px,var(--background)_20px)] p-0 md:flex md:p-4`}>
+        <div className={`${mobilePanel === "preview" ? "flex" : "hidden"} min-w-0 flex-1 flex-col md:flex`}>
+        {!hintDismissed && (
+          <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
+            <p className="min-w-0 flex-1">
+              <strong>✏️ Edita directo en la página:</strong> toca un texto para escribir sobre él, toca una imagen para cambiarla y usa la barra que aparece sobre cada bloque para ponerle una foto de fondo o moverlo.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setHintDismissed(true);
+                try {
+                  localStorage.setItem(HINT_KEY, "1");
+                } catch {
+                  // Storage blocked: it will show again next time.
+                }
+              }}
+              className="flex-none rounded-md border border-border-strong px-2.5 py-1 text-xs font-semibold hover:border-accent"
+            >
+              Entendido
+            </button>
+          </div>
+        )}
+        <main className="relative flex min-h-0 min-w-0 flex-1 justify-center overflow-auto bg-[repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2)_10px,var(--background)_10px,var(--background)_20px)] p-0 md:p-4">
           <div
             className={`relative h-full overflow-hidden bg-white transition-[width] duration-300 md:rounded-xl md:border md:border-border md:shadow-2xl ${isPending ? "opacity-80" : ""}`}
             style={{ width: DEVICE_WIDTH[device], maxWidth: "100%" }}
           >
             <iframe
+              ref={iframeRef}
               key={`${previewVersion}-${previewTheme ? themeQuery(previewTheme) : ""}`}
-              src={`/sitio/${slug}?preview=1&v=${previewVersion}${previewTheme ? `&${themeQuery(previewTheme)}` : ""}`}
-              title="Vista previa de la página"
+              src={`/sitio/${slug}?preview=1&edit=1&v=${previewVersion}${previewTheme ? `&${themeQuery(previewTheme)}` : ""}`}
+              title="Vista previa de la página, editable: toca un texto o una imagen para cambiarlos"
+              onLoad={onPreviewLoad}
               className="h-full w-full border-0"
             />
             {busy && (
@@ -416,8 +551,32 @@ export function WebsiteBuilder({
               </div>
             )}
           </div>
+          {toast && (
+            <p role="status" className="absolute bottom-4 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-center text-sm font-semibold text-background shadow-lg">
+              {toast}
+            </p>
+          )}
         </main>
+        </div>
       </div>
+
+      {imageTarget && (() => {
+        const section = content.sections[imageTarget.index];
+        const isBg = imageTarget.field === "bgImage";
+        const current = (isBg ? section?.bgImage : section?.image) ?? null;
+        return (
+          <ImagePicker
+            businessId={businessId}
+            title={isBg ? `Imagen de fondo · ${section ? SECTION_LABELS[section.type] : "bloque"}` : "Cambiar imagen"}
+            help={isBg ? "La foto queda detrás del bloque, con un velo oscuro para que el texto se lea bien." : "Elige una de tus fotos o sube una nueva: reemplaza esta imagen."}
+            current={current}
+            removeLabel={isBg ? "Quitar la imagen de fondo" : "Volver a la imagen automática"}
+            onPick={(url) => applyImage(url)}
+            onRemove={current ? () => applyImage(null) : null}
+            onClose={() => setImageTarget(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

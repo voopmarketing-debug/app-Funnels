@@ -75,6 +75,8 @@ export const AiSectionSchema = z.object({
     .catch([])
     .describe("Ítems de trustBar, features, steps, comparison (filas), agenda, objections, stats y los bullets de productSpotlight."),
   specs: z.array(z.object({ label: z.string(), value: z.string() })).catch([]).describe("Solo productSpotlight: especificaciones reales."),
+  image: z.string().nullable().catch(null).describe("Foto principal de la sección (portada, host): SOLO una URL de la lista FOTOS. null para dejar la automática."),
+  bgImage: z.string().nullable().catch(null).describe("Foto de FONDO de toda la sección (con velo oscuro para leer el texto): SOLO una URL de la lista FOTOS. null si no lleva."),
 });
 export type AiSection = z.infer<typeof AiSectionSchema>;
 
@@ -89,7 +91,7 @@ export type AiPage = z.infer<typeof AiPageSchema>;
 
 const items = (s: AiSection) => s.items.map((i) => ({ title: i.title, description: i.text, icon: i.icon ?? "check" }));
 
-function toTyped(s: AiSection): unknown {
+function toTypedBase(s: AiSection): unknown {
   switch (s.type) {
     case "hero":
       return {
@@ -143,6 +145,9 @@ function toTyped(s: AiSection): unknown {
   }
 }
 
+// Images are only stored when set (so a section without photos stays exactly as it was).
+const toTyped = (s: AiSection): unknown => ({ ...(toTypedBase(s) as object), ...(s.image ? { image: s.image } : {}), ...(s.bgImage ? { bgImage: s.bgImage } : {}) });
+
 /** AI section → stored section, or null when it can't be made valid. */
 export function fromAiSection(s: AiSection): Section | null {
   const parsed = SectionSchema.safeParse(toTyped(s));
@@ -179,10 +184,12 @@ const EMPTY: Omit<AiSection, "type" | "heading"> = {
   othersLabel: null,
   items: [],
   specs: [],
+  image: null,
+  bgImage: null,
 };
 
 /** Stored section → AI format, so edits show the AI the same shape it returns. */
-export function toAiSection(s: Section): AiSection {
+function toAiSectionBase(s: Section): AiSection {
   const base = { ...EMPTY, type: s.type, heading: "" } as AiSection;
   const it = (title: string, text: string, icon: AiSection["items"][number]["icon"] = null, extra: string | null = null) => ({ title, text, icon, extra });
   switch (s.type) {
@@ -217,4 +224,18 @@ export function toAiSection(s: Section): AiSection {
     case "cta":
       return { ...base, heading: s.heading, body: s.body, ctaLabel: s.ctaLabel };
   }
+}
+
+export function toAiSection(s: Section): AiSection {
+  return { ...toAiSectionBase(s), image: s.image ?? null, bgImage: s.bgImage ?? null };
+}
+
+/** The only image urls a section may keep: the business's own photos. Anything else the AI wrote is dropped. */
+export function keepKnownImages(s: Section, allowed: ReadonlySet<string>): Section {
+  const { image, bgImage, ...rest } = s;
+  return {
+    ...rest,
+    ...(image && allowed.has(image) ? { image } : {}),
+    ...(bgImage && allowed.has(bgImage) ? { bgImage } : {}),
+  } as Section;
 }

@@ -81,7 +81,21 @@ const nullableText = (hint: string) => z.string().nullable().catch(null).describ
 
 const item = z.object({ title: z.string(), description: z.string() });
 
+// Photos the owner puts on a section (picked from their own library, see
+// actions.ts setWebsiteSectionImageV2): `bgImage` is the section's background
+// (dark veil on top so the text stays readable), `image` replaces the section's
+// main picture (portada, quién está detrás). Only https urls are ever stored.
+const imageUrl = z
+  .string()
+  .max(2000)
+  .regex(/^https:\/\//)
+  .nullable()
+  .optional()
+  .catch(null);
+const media = { image: imageUrl, bgImage: imageUrl };
+
 const HeroSection = z.object({
+  ...media,
   type: z.literal("hero"),
   variant: z
     .enum(["split", "centered", "fullbleed", "product", "giant"])
@@ -106,6 +120,7 @@ const HeroSection = z.object({
 });
 
 const TrustBarSection = z.object({
+  ...media,
   type: z.literal("trustBar"),
   items: z
     .array(z.object({ icon: z.enum(ICON_KEYS).catch("check"), title: z.string(), description: z.string() }))
@@ -113,6 +128,7 @@ const TrustBarSection = z.object({
 });
 
 const FeaturesSection = z.object({
+  ...media,
   type: z.literal("features"),
   variant: z.enum(["cards", "icons", "list"]).catch("cards"),
   kicker: nullableText("Etiqueta pequeña sobre el título, ej. 'Lo que ofrecemos'."),
@@ -122,6 +138,7 @@ const FeaturesSection = z.object({
 });
 
 const StepsSection = z.object({
+  ...media,
   type: z.literal("steps"),
   kicker: nullableText("Etiqueta pequeña, ej. 'Cómo funciona'."),
   heading: text(80, "Título con beneficio"),
@@ -129,6 +146,7 @@ const StepsSection = z.object({
 });
 
 const ProductGridSection = z.object({
+  ...media,
   type: z.literal("productGrid"),
   variant: z.enum(["grid", "row", "featured"]).catch("grid").describe("grid: rejilla completa; row: fila destacada; featured: tarjetas grandes con descripción (más vendidos)."),
   kicker: nullableText("Etiqueta pequeña, ej. 'Novedades'."),
@@ -138,6 +156,7 @@ const ProductGridSection = z.object({
 });
 
 const SpotlightSection = z.object({
+  ...media,
   type: z.literal("productSpotlight"),
   productId: z.string().describe("Id del producto protagonista."),
   heading: text(80, "Por qué este producto"),
@@ -148,6 +167,7 @@ const SpotlightSection = z.object({
 });
 
 const PromoSection = z.object({
+  ...media,
   type: z.literal("promo"),
   tone: z.enum(["dark", "accent", "soft"]).catch("dark"),
   kicker: nullableText("Etiqueta pequeña, ej. 'Oferta de temporada' (solo si es real)."),
@@ -157,6 +177,7 @@ const PromoSection = z.object({
 });
 
 const ComparisonSection = z.object({
+  ...media,
   type: z.literal("comparison"),
   heading: text(80, "Título de la comparación"),
   usLabel: text(30, "Nombre de la columna propia (el negocio o producto)"),
@@ -165,6 +186,7 @@ const ComparisonSection = z.object({
 });
 
 const AgendaSection = z.object({
+  ...media,
   type: z.literal("agenda"),
   kicker: nullableText("Etiqueta, ej. 'Agenda del evento'."),
   heading: text(80, "Título de la agenda"),
@@ -174,6 +196,7 @@ const AgendaSection = z.object({
 });
 
 const HostSection = z.object({
+  ...media,
   type: z.literal("host"),
   kicker: nullableText("Etiqueta, ej. 'Quién te acompaña'."),
   heading: text(80, "Título"),
@@ -183,6 +206,7 @@ const HostSection = z.object({
 });
 
 const ObjectionsSection = z.object({
+  ...media,
   type: z.literal("objections"),
   kicker: nullableText("Etiqueta, ej. 'Preguntas frecuentes'."),
   heading: text(80, "Título que desactive la duda principal"),
@@ -190,6 +214,7 @@ const ObjectionsSection = z.object({
 });
 
 const StatsSection = z.object({
+  ...media,
   type: z.literal("stats"),
   items: z
     .array(z.object({ value: z.string(), label: z.string() }))
@@ -197,12 +222,14 @@ const StatsSection = z.object({
 });
 
 const GallerySection = z.object({
+  ...media,
   type: z.literal("gallery"),
   kicker: nullableText("Etiqueta pequeña."),
   heading: text(70, "Título de la galería (usa las FOTOS reales del negocio)"),
 });
 
 const LeadFormSection = z.object({
+  ...media,
   type: z.literal("leadForm"),
   kicker: nullableText("Etiqueta pequeña."),
   heading: text(80, "Invitación a dejar sus datos"),
@@ -211,6 +238,7 @@ const LeadFormSection = z.object({
 });
 
 const CtaSection = z.object({
+  ...media,
   type: z.literal("cta"),
   heading: text(80, "Invitación final a dar el paso hoy"),
   body: text(180, "Frase que reduzca el riesgo de escribir"),

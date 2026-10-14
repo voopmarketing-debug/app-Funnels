@@ -168,6 +168,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     trackingBasePath: `/sitio/${slug}`,
     leadSubmitted,
     preview,
+    // The builder's click-to-edit preview (markers for texts, images and sections).
+    edit: preview && req.nextUrl.searchParams.get("edit") === "1",
     themeOverride: preview ? themeOverrideFromQuery(req.nextUrl.searchParams) : undefined,
   });
   if (!html) {

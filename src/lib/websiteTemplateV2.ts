@@ -101,6 +101,10 @@ export type RenderV2Context = {
   businessName: string;
   trackingBasePath: string;
   preview?: boolean;
+  // The builder's click-to-edit preview: marks every editable text, image and
+  // section with data-* attributes (the builder's own script reads them from
+  // the same-origin iframe). Never set on the public page.
+  edit?: boolean;
   leadSubmitted?: boolean;
   heroImageUrl?: string | null;
   photos?: string[];
@@ -113,6 +117,13 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   const productById = new Map(products.map((p) => [p.id, p]));
   const photos = (ctx.photos ?? []).map(safeUrl).filter((u): u is string => !!u);
   const heroImage = safeUrl(ctx.heroImageUrl) ?? photos[0] ?? null;
+
+  const edit = !!(ctx.preview && ctx.edit);
+  // data-edit="sections.2.heading": the path of the text in the stored content.
+  const ed = (path: string) => (edit ? ` data-edit="${esc(path)}"` : "");
+  // Safe inside url('…'): only the characters that could end the url or the string are encoded.
+  // (Then HTML-escaped, since it lands in a style="" attribute: an "&" stays an "&" for the browser.)
+  const cssUrl = (u: string) => esc(u.replace(/['()\s"\\<>]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`));
 
   const previewQ = ctx.preview ? "&preview=1" : "";
   const href = (label: string) => `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(label)}${previewQ}`;
@@ -139,16 +150,20 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     return `<span class="price">${esc(formatMoney(p.price, p.currency))}</span>${compare}`;
   };
 
+  // Pictures that are not picked on the page itself: in the editing preview they explain where they are changed.
+  const note = (text: string) => (edit ? ` data-note="${esc(text)}"` : "");
   const productImage = (p: CatalogProduct, cls = "") => {
     const url = safeUrl(p.imageUrl);
     return url
-      ? `<img class="${cls}" src="${esc(url)}" alt="${esc(p.name)}" loading="lazy">`
+      ? `<img class="${cls}" src="${esc(url)}" alt="${esc(p.name)}" loading="lazy"${note("La foto de cada producto se cambia en Productos.")}>`
       : `<div class="img-ph ${cls}" aria-hidden="true">${esc(p.name.slice(0, 1).toUpperCase())}</div>`;
   };
 
   // Sold out (inventory at zero): a plain "Agotado" instead of the order link.
-  const orderButton = (p: CatalogProduct, cls: string, label: string) =>
-    p.soldOut ? `<span class="${cls} btn-soldout" aria-disabled="true">Agotado</span>` : `<a class="${cls}" href="${esc(orderHref(p))}">${esc(label)}</a>`;
+  const orderButton = (p: CatalogProduct, cls: string, label: string, editPath?: string) =>
+    p.soldOut
+      ? `<span class="${cls} btn-soldout" aria-disabled="true">Agotado</span>`
+      : `<a class="${cls}" href="${esc(orderHref(p))}"${editPath ? ed(editPath) : ""}>${esc(label)}</a>`;
   const badgeHtml = (p: CatalogProduct) =>
     p.soldOut ? `<span class="pbadge pbadge-soldout">Agotado</span>` : p.badge ? `<span class="pbadge">${esc(p.badge)}</span>` : "";
 
@@ -167,7 +182,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       </div>
     </article>`;
 
-  const kickerHtml = (k: string | null | undefined) => (k ? `<p class="kicker">${esc(k)}</p>` : "");
+  const kickerHtml = (k: string | null | undefined, path?: string) => (k ? `<p class="kicker"${path ? ed(path) : ""}>${esc(k)}</p>` : "");
 
   // Paints the AI-chosen words of the headline in the accent color.
   const headline = (heading: string, highlight: string | null | undefined) => {
@@ -188,25 +203,31 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         </form>`;
 
   const renderSection = (s: Section, index: number): string => {
+    // Path of a field of this section, and the marker of its main picture.
+    const fp = (field: string) => `sections.${index}.${field}`;
+    const imgMark = edit ? ` data-img="${index}"` : "";
+    // The owner's own photo wins over the automatic one.
+    const mainImage = safeUrl(s.image) ?? heroImage;
     switch (s.type) {
       case "hero": {
         const product = s.productId ? productById.get(s.productId) : undefined;
-        const primaryBtn = `<a class="btn" href="${esc(href("hero"))}">${esc(s.ctaLabel)}</a>`;
+        const primaryBtn = `<a class="btn" href="${esc(href("hero"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a>`;
         const secondaryBtn = s.secondaryCtaLabel
-          ? `<a class="btn btn-ghost" href="#${products.length > 0 ? "productos" : "detalles"}">${esc(s.secondaryCtaLabel)}</a>`
+          ? `<a class="btn btn-ghost" href="#${products.length > 0 ? "productos" : "detalles"}"${ed(fp("secondaryCtaLabel"))}>${esc(s.secondaryCtaLabel)}</a>`
           : "";
-        const eyebrow = s.eyebrow ? `<p class="eyebrow">${esc(s.eyebrow)}</p>` : "";
-        const badge = s.badge ? `<span class="hero-badge">${esc(s.badge)}</span>` : "";
+        const eyebrow = s.eyebrow ? `<p class="eyebrow"${ed(fp("eyebrow"))}>${esc(s.eyebrow)}</p>` : "";
+        const badge = s.badge ? `<span class="hero-badge"${ed(fp("badge"))}>${esc(s.badge)}</span>` : "";
         const chips = (s.chips ?? []).slice(0, 3);
-        const chipsHtml = chips.length ? `<ul class="chips">${chips.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
-        const h1 = (cls = "") => `<h1${cls ? ` class="${cls}"` : ""}>${headline(s.heading, s.highlight)}</h1>`;
+        const chipsHtml = chips.length ? `<ul class="chips">${chips.map((c, ci) => `<li${ed(fp(`chips.${ci}`))}>${esc(c)}</li>`).join("")}</ul>` : "";
+        const h1 = (cls = "") => `<h1${cls ? ` class="${cls}"` : ""}${ed(fp("heading"))}>${headline(s.heading, s.highlight)}</h1>`;
+        const heroBg = safeUrl(s.bgImage);
 
         // Event / lead-capture hero (refs: webinar pages): copy + chips on
         // one side, the registration form right there on the other.
         if (s.showLeadForm) {
           return `<section class="hero hero-form" id="inicio"><div class="decor" aria-hidden="true"></div><div class="wrap hero-split-grid">
-            <div>${eyebrow}${h1()}<p class="lead">${esc(s.subheading)}</p>${chipsHtml}${badge}</div>
-            <div class="form-card">${heroImage ? `<img class="form-card-img" src="${esc(heroImage)}" alt="">` : ""}<p class="form-card-title">${esc(s.ctaLabel)}</p>${leadFormHtml(s.ctaLabel)}</div>
+            <div>${eyebrow}${h1()}<p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}${badge}</div>
+            <div class="form-card">${mainImage ? `<img class="form-card-img" src="${esc(mainImage)}" alt=""${imgMark}>` : ""}<p class="form-card-title"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</p>${leadFormHtml(s.ctaLabel)}</div>
           </div></section>`;
         }
 
@@ -216,61 +237,63 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
             <div class="hero-product-info">
               ${eyebrow}
               ${h1()}
-              <p class="lead">${esc(s.subheading)}</p>
+              <p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>
               <div class="prow prow-lg">${priceHtml(product)}</div>
               ${chipsHtml}
-              <div class="hero-actions">${orderButton(product, "btn btn-block", s.ctaLabel)}${secondaryBtn}</div>
+              <div class="hero-actions">${orderButton(product, "btn btn-block", s.ctaLabel, fp("ctaLabel"))}${secondaryBtn}</div>
               ${badge}
             </div>
           </div></section>`;
         }
-        if (s.variant === "fullbleed" && heroImage) {
-          return `<section class="hero hero-full" id="inicio" style="background-image:linear-gradient(90deg, rgba(0,0,0,.72), rgba(0,0,0,.25)), url('${esc(heroImage)}')">
-            <div class="wrap"><div class="hero-full-inner">${eyebrow}${h1()}<p class="lead">${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions">${primaryBtn}${secondaryBtn}</div>${badge}</div></div>
+        // A background photo chosen by the owner turns the portada into the full-photo one.
+        const fullImage = heroBg ?? (s.variant === "fullbleed" ? mainImage : null);
+        if (fullImage) {
+          return `<section class="hero hero-full" id="inicio" style="background-image:linear-gradient(90deg, rgba(0,0,0,.72), rgba(0,0,0,.25)), url('${cssUrl(fullImage)}')">
+            <div class="wrap"><div class="hero-full-inner">${eyebrow}${h1()}<p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions">${primaryBtn}${secondaryBtn}</div>${badge}</div></div>
           </section>`;
         }
         if (s.variant === "giant") {
           return `<section class="hero hero-giant" id="inicio"><div class="wrap">
             ${eyebrow}${h1("giant")}
             <div class="giant-row">
-              ${heroImage ? `<img class="giant-img" src="${esc(heroImage)}" alt="">` : ""}
-              <div class="giant-copy"><p class="lead">${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions">${primaryBtn}${secondaryBtn}</div>${badge}</div>
+              ${mainImage ? `<img class="giant-img" src="${esc(mainImage)}" alt=""${imgMark}>` : ""}
+              <div class="giant-copy"><p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions">${primaryBtn}${secondaryBtn}</div>${badge}</div>
             </div>
           </div></section>`;
         }
-        if (s.variant === "split" && heroImage) {
+        if (s.variant === "split" && mainImage) {
           return `<section class="hero hero-split" id="inicio"><div class="decor" aria-hidden="true"></div><div class="wrap hero-split-grid">
-            <div>${eyebrow}${h1()}<p class="lead">${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions">${primaryBtn}${secondaryBtn}</div>${badge}</div>
-            <div class="hero-media"><img src="${esc(heroImage)}" alt=""></div>
+            <div>${eyebrow}${h1()}<p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions">${primaryBtn}${secondaryBtn}</div>${badge}</div>
+            <div class="hero-media"><img src="${esc(mainImage)}" alt=""${imgMark}></div>
           </div></section>`;
         }
         return `<section class="hero hero-centered" id="inicio"><div class="decor" aria-hidden="true"></div><div class="wrap narrow">
-          ${eyebrow}${h1()}<p class="lead">${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions center">${primaryBtn}${secondaryBtn}</div>${badge}
-          ${heroImage && s.variant === "centered" ? `<img class="hero-wide" src="${esc(heroImage)}" alt="">` : ""}
+          ${eyebrow}${h1()}<p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions center">${primaryBtn}${secondaryBtn}</div>${badge}
+          ${mainImage && s.variant === "centered" ? `<img class="hero-wide" src="${esc(mainImage)}" alt=""${imgMark}>` : ""}
         </div></section>`;
       }
 
       case "trustBar":
         return `<section class="trust"><div class="wrap trust-grid">${s.items
           .slice(0, 4)
-          .map((it) => `<div class="trust-item">${icon(it.icon)}<div><p class="t-title">${esc(it.title)}</p><p class="t-desc">${esc(it.description)}</p></div></div>`)
+          .map((it, ii) => `<div class="trust-item">${icon(it.icon)}<div><p class="t-title"${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</p><p class="t-desc"${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p></div></div>`)
           .join("")}</div></section>`;
 
       case "features":
         return `<section class="sec" id="${index === 1 ? "detalles" : `s${index}`}"><div class="wrap">
-          ${kickerHtml(s.kicker)}<h2>${esc(s.heading)}</h2>${s.intro ? `<p class="intro">${esc(s.intro)}</p>` : ""}
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>${s.intro ? `<p class="intro"${ed(fp("intro"))}>${esc(s.intro)}</p>` : ""}
           <div class="feat feat-${s.variant}">${s.items
             .slice(0, 6)
-            .map((it) => `<div class="feat-item">${s.variant !== "list" ? `<span class="feat-ico">${icon(it.icon)}</span>` : `<span class="feat-check">${icon("check")}</span>`}<div><h3>${esc(it.title)}</h3><p>${esc(it.description)}</p></div></div>`)
+            .map((it, ii) => `<div class="feat-item">${s.variant !== "list" ? `<span class="feat-ico">${icon(it.icon)}</span>` : `<span class="feat-check">${icon("check")}</span>`}<div><h3${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</h3><p${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p></div></div>`)
             .join("")}</div>
         </div></section>`;
 
       case "steps":
         return `<section class="sec alt" id="como-funciona"><div class="wrap">
-          ${kickerHtml(s.kicker)}<h2>${esc(s.heading)}</h2>
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
           <ol class="steps">${s.items
             .slice(0, 4)
-            .map((it, i) => `<li><span class="step-n">${String(i + 1).padStart(2, "0")}</span><h3>${esc(it.title)}</h3><p>${esc(it.description)}</p></li>`)
+            .map((it, i) => `<li><span class="step-n">${String(i + 1).padStart(2, "0")}</span><h3${ed(fp(`items.${i}.title`))}>${esc(it.title)}</h3><p${ed(fp(`items.${i}.description`))}>${esc(it.description)}</p></li>`)
             .join("")}</ol>
         </div></section>`;
 
@@ -281,7 +304,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
             ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerán tus productos. Agrégalos en <strong>Productos</strong> dentro de la plataforma.</div></div></section>`
             : "";
         }
-        const head = `${kickerHtml(s.kicker)}<div class="sec-head"><h2>${esc(s.heading)}</h2></div>`;
+        const head = `${kickerHtml(s.kicker, fp("kicker"))}<div class="sec-head"><h2${ed(fp("heading"))}>${esc(s.heading)}</h2></div>`;
         if (s.showCategoryFilter) {
           const cats = Array.from(new Set(chosen.map((p) => p.category ?? "Otros")));
           if (cats.length > 1) {
@@ -314,8 +337,8 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         return `<section class="sec alt" id="producto"><div class="wrap spot">
           <div class="spot-media">${productImage(p, "spot-img")}</div>
           <div class="spot-info">
-            <h2>${esc(s.heading)}</h2>
-            <ul class="spot-bullets">${s.bullets.slice(0, 4).map((b) => `<li>${icon(b.icon)}<div><strong>${esc(b.title)}</strong><span>${esc(b.description)}</span></div></li>`).join("")}</ul>
+            <h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
+            <ul class="spot-bullets">${s.bullets.slice(0, 4).map((b, bi) => `<li>${icon(b.icon)}<div><strong${ed(fp(`bullets.${bi}.title`))}>${esc(b.title)}</strong><span${ed(fp(`bullets.${bi}.description`))}>${esc(b.description)}</span></div></li>`).join("")}</ul>
             ${specs.length ? `<dl class="specs">${specs.map((sp) => `<div><dt>${esc(sp.label)}</dt><dd>${esc(sp.value)}</dd></div>`).join("")}</dl>` : ""}
             <div class="prow prow-lg">${priceHtml(p)}</div>
             ${orderButton(p, "btn", p.isService ? "Agendar por WhatsApp" : "Pedir por WhatsApp")}
@@ -325,68 +348,84 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
 
       case "promo":
         return `<section class="promo promo-${s.tone}"><div class="wrap promo-inner">
-          <div>${kickerHtml(s.kicker)}<h2>${esc(s.heading)}</h2><p>${esc(s.body)}</p></div>
-          <a class="btn ${s.tone === "accent" ? "btn-invert" : ""}" href="${esc(href("promo"))}">${esc(s.ctaLabel)}</a>
+          <div>${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p${ed(fp("body"))}>${esc(s.body)}</p></div>
+          <a class="btn ${s.tone === "accent" ? "btn-invert" : ""}" href="${esc(href("promo"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a>
         </div></section>`;
 
       case "comparison":
         return `<section class="sec"><div class="wrap narrow-lg">
-          <h2>${esc(s.heading)}</h2>
-          <div class="cmp-wrap"><table class="cmp"><thead><tr><th></th><th class="us">${esc(s.usLabel)}</th><th>${esc(s.othersLabel)}</th></tr></thead>
-          <tbody>${s.rows.slice(0, 6).map((r) => `<tr><th scope="row">${esc(r.label)}</th><td class="us">${esc(r.us)}</td><td>${esc(r.others)}</td></tr>`).join("")}</tbody></table></div>
+          <h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
+          <div class="cmp-wrap"><table class="cmp"><thead><tr><th></th><th class="us"${ed(fp("usLabel"))}>${esc(s.usLabel)}</th><th${ed(fp("othersLabel"))}>${esc(s.othersLabel)}</th></tr></thead>
+          <tbody>${s.rows.slice(0, 6).map((r, ri) => `<tr><th scope="row"${ed(fp(`rows.${ri}.label`))}>${esc(r.label)}</th><td class="us"${ed(fp(`rows.${ri}.us`))}>${esc(r.us)}</td><td${ed(fp(`rows.${ri}.others`))}>${esc(r.others)}</td></tr>`).join("")}</tbody></table></div>
         </div></section>`;
 
       case "agenda":
         return `<section class="sec alt" id="agenda"><div class="wrap">
-          ${kickerHtml(s.kicker)}<h2>${esc(s.heading)}</h2>
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
           <div class="agenda">${s.items
             .slice(0, 6)
-            .map((it, i) => `<article class="ag-item"><div class="ag-num">${String(i + 1).padStart(2, "0")}</div><div><p class="ag-when">${esc(it.when)}</p><h3>${esc(it.title)}</h3><p>${esc(it.description)}</p></div></article>`)
+            .map((it, i) => `<article class="ag-item"><div class="ag-num">${String(i + 1).padStart(2, "0")}</div><div><p class="ag-when"${ed(fp(`items.${i}.when`))}>${esc(it.when)}</p><h3${ed(fp(`items.${i}.title`))}>${esc(it.title)}</h3><p${ed(fp(`items.${i}.description`))}>${esc(it.description)}</p></div></article>`)
             .join("")}</div>
           <div class="center mt"><a class="btn" href="${esc(href("agenda"))}">Quiero participar</a></div>
         </div></section>`;
 
-      case "host":
-        return `<section class="sec" id="nosotros"><div class="wrap host${heroImage ? "" : " host-noimg"}">
-          ${heroImage ? `<img class="host-img" src="${esc(photos[1] ?? heroImage)}" alt="">` : ""}
-          <div>${kickerHtml(s.kicker)}<h2>${esc(s.heading)}</h2><p class="host-name">${esc(s.name)}${s.role ? ` <span>· ${esc(s.role)}</span>` : ""}</p><p class="host-body">${esc(s.body)}</p></div>
+      case "host": {
+        const hostImage = safeUrl(s.image) ?? (heroImage ? (photos[1] ?? heroImage) : null);
+        return `<section class="sec" id="nosotros"><div class="wrap host${hostImage ? "" : " host-noimg"}">
+          ${hostImage ? `<img class="host-img" src="${esc(hostImage)}" alt=""${imgMark}>` : ""}
+          <div>${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p class="host-name"><span class="host-n"${ed(fp("name"))}>${esc(s.name)}</span>${s.role ? ` <span>· <span${ed(fp("role"))}>${esc(s.role)}</span></span>` : ""}</p><p class="host-body"${ed(fp("body"))}>${esc(s.body)}</p></div>
         </div></section>`;
+      }
 
       case "objections":
         return `<section class="sec" id="preguntas"><div class="wrap narrow-lg">
-          ${kickerHtml(s.kicker)}<h2>${esc(s.heading)}</h2>
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
           <div class="faq">${s.items
             .slice(0, 6)
-            .map((o, i) => `<details${i === 0 ? " open" : ""}><summary>${esc(o.question)}<span class="faq-plus" aria-hidden="true">+</span></summary><p>${esc(o.answer)}</p></details>`)
+            .map((o, i) => `<details${i === 0 ? " open" : ""}><summary><span${ed(fp(`items.${i}.question`))}>${esc(o.question)}</span><span class="faq-plus" aria-hidden="true">+</span></summary><p${ed(fp(`items.${i}.answer`))}>${esc(o.answer)}</p></details>`)
             .join("")}</div>
         </div></section>`;
 
       case "stats":
         return `<section class="stats"><div class="wrap stats-grid">${s.items
           .slice(0, 4)
-          .map((it) => `<div><p class="stat-v">${esc(it.value)}</p><p class="stat-l">${esc(it.label)}</p></div>`)
+          .map((it, ii) => `<div><p class="stat-v"${ed(fp(`items.${ii}.value`))}>${esc(it.value)}</p><p class="stat-l"${ed(fp(`items.${ii}.label`))}>${esc(it.label)}</p></div>`)
           .join("")}</div></section>`;
 
       case "gallery":
         if (photos.length === 0) return "";
-        return `<section class="sec"><div class="wrap">${kickerHtml(s.kicker)}<h2>${esc(s.heading)}</h2>
-          <div class="gallery">${photos.slice(0, 8).map((u) => `<img src="${esc(u)}" alt="" loading="lazy">`).join("")}</div></div></section>`;
+        return `<section class="sec"><div class="wrap">${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
+          <div class="gallery">${photos.slice(0, 8).map((u) => `<img src="${esc(u)}" alt="" loading="lazy"${note("La galería muestra tus fotos más recientes. Sube más desde “Imagen de fondo” de cualquier bloque.")}>`).join("")}</div></div></section>`;
 
       case "leadForm":
         return `<section class="sec alt" id="registro"><div class="wrap narrow">
-          ${kickerHtml(s.kicker)}<h2>${esc(s.heading)}</h2><p class="intro">${esc(s.body)}</p>
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p class="intro"${ed(fp("body"))}>${esc(s.body)}</p>
           ${leadFormHtml(s.buttonLabel)}
         </div></section>`;
 
       case "cta":
         return `<section class="final-cta"><div class="wrap narrow center">
-          <h2>${esc(s.heading)}</h2><p class="intro">${esc(s.body)}</p>
-          <a class="btn btn-lg" href="${esc(href("cta-final"))}">${esc(s.ctaLabel)}</a>
+          <h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p class="intro"${ed(fp("body"))}>${esc(s.body)}</p>
+          <a class="btn btn-lg" href="${esc(href("cta-final"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a>
         </div></section>`;
     }
   };
 
-  const body = sections.map(({ s, i }) => renderSection(s, i)).join("\n");
+  // Adds the builder markers and the owner's background photo to a rendered
+  // section: the photo goes behind it with a dark veil, and the section's own
+  // colors flip to light text so everything stays readable. (The portada in
+  // its full-photo form already has its own background.)
+  const decorate = (html: string, s: Section, index: number): string =>
+    html.replace(/^(\s*)<section\b([^>]*)>/, (_m, lead: string, attrs: string) => {
+      const bgUrl = safeUrl(s.bgImage);
+      let a = attrs;
+      if (bgUrl && !/class="hero hero-full"/.test(a)) {
+        a = /class="/.test(a) ? a.replace(/class="([^"]*)"/, 'class="$1 has-bg"') : `${a} class="has-bg"`;
+        a += ` style="--bgimg:url('${cssUrl(bgUrl)}')"`;
+      }
+      return `${lead}<section${a}${edit ? ` data-sec="${index}" data-type="${s.type}"` : ""}>`;
+    });
+  const body = sections.map(({ s, i }) => decorate(renderSection(s, i), s, i)).join("\n");
   const firstHero = content.sections.find((s) => s.type === "hero");
   const navLinks: { href: string; label: string }[] = [];
   if (sections.some(({ s }) => s.type === "productGrid") && products.length > 0) navLinks.push({ href: "#productos", label: "Productos" });
@@ -413,7 +452,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
 <meta name="description" content="${esc(firstHero && firstHero.type === "hero" ? firstHero.subheading : ctx.businessName)}">
 ${fontLink(fonts)}
 <style>
-:root{--primary:${primary};--btn-text:${readableTextColor(primary)};--bg:${bg};--surface:${surface};--text:${textColor};
+:root{--primary:${primary};--primary-base:${primary};--btn-text:${readableTextColor(primary)};--bg:${bg};--surface:${surface};--text:${textColor};
 --muted:color-mix(in srgb,var(--text) 64%,transparent);--line:color-mix(in srgb,var(--text) 12%,transparent);
 --hf:${fontStack(content.theme.headingFont)};--bf:${fontStack(content.theme.bodyFont)};
 --r:${style.radius};--br:${style.btnRadius};--pad:${style.sectionPad};--max:${style.maxWidth}}
@@ -589,6 +628,10 @@ section{position:relative}
 .lead-ok{padding:18px;border-radius:12px;background:color-mix(in srgb,var(--primary) 14%,transparent);font-weight:600}
 .final-cta{padding:var(--pad) 0;background:var(--surface)}
 .empty-note{padding:28px;border:2px dashed var(--line);border-radius:var(--r);text-align:center;color:var(--muted)}
+.has-bg{background-color:#000!important;background-image:linear-gradient(rgba(0,0,0,.6),rgba(0,0,0,.6)),var(--bgimg)!important;background-size:cover!important;background-position:center!important;color:#fff;--text:#fff;--muted:rgba(255,255,255,.82);--line:rgba(255,255,255,.24);--surface:rgba(255,255,255,.1);--bg:rgba(0,0,0,.32)}
+.has-bg{--primary:color-mix(in srgb,var(--primary-base) 50%,#fff)}
+.has-bg .btn{background:var(--primary-base);color:var(--btn-text);border-color:var(--primary-base)}
+.has-bg .btn-ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
 footer.foot{padding:40px 0;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
 footer.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
 .ico{width:22px;height:22px}
@@ -614,7 +657,7 @@ footer.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
 </style>
 </head>
 <body class="st-${content.style} pt-${content.pageType}">
-${content.announcement ? `<div class="annc">${esc(content.announcement)}</div>` : ""}
+${content.announcement ? `<div class="annc"${ed("announcement")}>${esc(content.announcement)}</div>` : ""}
 <header class="top"><div class="wrap">
   <a class="brand" href="#inicio">${esc(ctx.businessName)}</a>
   <nav class="nav" aria-label="Secciones">${navLinks.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("")}</nav>

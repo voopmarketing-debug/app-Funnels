@@ -46,6 +46,8 @@ export async function renderStoredWebsite(
     trackingBasePath: string;
     leadSubmitted?: boolean;
     preview?: boolean;
+    // Click-to-edit markers for the builder's preview (v2 pages only).
+    edit?: boolean;
     // Unsaved colors/fonts from the builder's Diseño tab, shown live in the
     // preview iframe before the owner applies them (v2 pages only).
     themeOverride?: Partial<WebsiteContentV2["theme"]>;
@@ -70,6 +72,7 @@ export async function renderStoredWebsite(
       businessName: website.business.name,
       trackingBasePath: opts.trackingBasePath,
       preview: opts.preview,
+      edit: opts.edit,
       leadSubmitted: opts.leadSubmitted,
       heroImageUrl: website.aiImageUrl ?? heroImageUrl,
       photos: photos.map((p) => p.url),

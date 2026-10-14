@@ -14,7 +14,7 @@ import {
   formatMoney,
 } from "@/lib/websiteContentV2";
 import { recordAnthropicUsage } from "@/lib/aiUsage";
-import { AiPageSchema, fromAiPage, toAiSection, type AiPage } from "@/lib/websiteAiFormat";
+import { AiPageSchema, fromAiPage, keepKnownImages, toAiSection, type AiPage } from "@/lib/websiteAiFormat";
 
 // Same model the v1 generator has been running on in production — a page
 // is a single structured-output call that has to finish inside the
@@ -106,6 +106,14 @@ ${PAGE_JSON_SCHEMA}`;
 function applyBrand(content: WebsiteContentV2, brand: WebsiteV2Context["brandColors"]): WebsiteContentV2 {
   if (!brand?.primary) return content;
   return { ...content, theme: { ...content.theme, primaryColor: brand.primary } };
+}
+
+function photosBlock(photos: { url: string; label: string }[]): string {
+  if (photos.length === 0) return "ninguna (el negocio todavía no ha subido fotos; si piden poner una foto, dile que la suba con el botón de imagen del editor)";
+  return photos
+    .slice(0, 30)
+    .map((p, i) => `${i + 1}. ${p.url} | ${p.label.slice(0, 80)}`)
+    .join("\n");
 }
 
 function productsBlock(products: CatalogProduct[]): string {
@@ -217,8 +225,9 @@ PASO 7 · REVISIÓN FINAL ANTES DE RESPONDER
 ¿El titular solo podría ser de este negocio? ¿Cada sección tiene un dato concreto? ¿Hay algo inventado? ¿El estilo encaja con el rubro y el brief? ¿Algún texto suena a relleno de IA? Corrige lo que falle. La primera sección es siempre "hero"; entre 6 y 10 secciones en total.`;
 }
 
-function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: string | null }): WebsiteContentV2 {
+function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: string | null; allowedImages?: ReadonlySet<string> }): WebsiteContentV2 {
   const ids = new Set(ctx.products.map((p) => p.id));
+  const allowed = ctx.allowedImages ?? new Set<string>();
   const sections = ai.sections
     .filter((s) => {
       if (s.type === "productSpotlight") return ids.has(s.productId);
@@ -230,6 +239,7 @@ function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: 
       if (s.type === "productGrid") return { ...s, productIds: s.productIds.filter((id) => ids.has(id)) };
       return s;
     })
+    .map((s) => keepKnownImages(s, allowed))
     .slice(0, 12);
   // Always open with a hero.
   const heroIndex = sections.findIndex((s) => s.type === "hero");
@@ -249,6 +259,7 @@ export async function applyWebsiteEditV2(
   current: WebsiteContentV2,
   instruction: string,
   products: CatalogProduct[],
+  photos: { url: string; label: string }[] = [],
 ): Promise<WebsiteContentV2> {
   const editable = { pageType: current.pageType, style: current.style, announcement: current.announcement, theme: current.theme, sections: current.sections.map(toAiSection) };
   const prompt = `Aquí está el contenido actual de una página web, en JSON:
@@ -258,15 +269,22 @@ ${JSON.stringify(editable, null, 2)}
 PRODUCTOS reales disponibles (ids válidos):
 ${productsBlock(products)}
 
+FOTOS del negocio (únicas URLs válidas para los campos image y bgImage de una sección):
+${photosBlock(photos)}
+
 Estilos disponibles (campo style):
 ${STYLE_GUIDE}
 
 El dueño del negocio pidió este cambio: "${instruction}"
 
+Sobre las fotos: "image" es la foto principal de una sección (portada o quién está detrás) y "bgImage" pone una foto de FONDO detrás de toda la sección (el texto queda encima con un velo oscuro). Si el dueño pide una imagen "como fondo" de un bloque o sección, usa bgImage de ESA sección con la URL de FOTOS que pidió (o la que mejor encaje si no precisó cuál; la primera de la lista suele ser la más reciente). Si pide quitar el fondo o la imagen, pon null. No inventes URLs: solo las de FOTOS. Las secciones que ya traen image o bgImage las conservas igual salvo que pida cambiarlas.
+
 Actúa como el director creativo de la mejor agencia de diseño web con IA del mundo. Devuelve la página COMPLETA en el mismo formato aplicando ese cambio. Todo lo que no tenga que ver con el pedido queda EXACTAMENTE igual: no reescribas texto que no te pidieron. Puedes agregar, quitar o reordenar secciones si el pedido lo implica.
 Lo que cambies debe tener nivel de agencia premium: copy concreto, sin relleno de IA, sin emojis ni guion largo, sin inventar precios, reseñas, descuentos ni cifras. Si cambias colores: fondo nunca #ffffff/#000000 puros, texto ≥7:1, acento ≥4.5:1.`;
   const ai = fromAiPage(await generatePageJson(prompt));
-  const next = normalize(ai, { products, ctaUrl: current.heroCtaUrl });
+  // What the page already uses stays valid even if the photo left the library list.
+  const allowedImages = new Set([...photos.map((p) => p.url), ...current.sections.flatMap((s) => [s.image, s.bgImage]).filter((u): u is string => !!u)]);
+  const next = normalize(ai, { products, ctaUrl: current.heroCtaUrl, allowedImages });
   // Keep the owner's hide toggles only while the section list is the same shape.
   const sameShape = next.sections.length === current.sections.length && next.sections.every((s, i) => s.type === current.sections[i].type);
   return { ...next, hidden: sameShape ? current.hidden : [] };
