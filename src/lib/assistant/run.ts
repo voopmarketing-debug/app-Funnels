@@ -3,7 +3,7 @@ import { anthropic } from "@/lib/anthropicClient";
 import { prisma } from "@/lib/prisma";
 import { recordAnthropicUsage, withAiUsage } from "@/lib/aiUsage";
 import { ASSISTANT_SYSTEM_PROMPT } from "./prompt";
-import { ASSISTANT_TOOLS, ToolInputError, buildProposal, isProposeTool, runReadTool, type AccessibleBusiness } from "./tools";
+import { AGENCY_MODE_TOOLS, BUSINESS_TOOLS, ToolInputError, buildProposal, isProposeTool, runReadTool, type AccessibleBusiness, type ToolScope } from "./tools";
 
 export const ASSISTANT_MODEL = "claude-opus-5-5";
 // Tool calls per message the person sends: plenty for "read 3 things, propose 2".
@@ -22,11 +22,12 @@ export async function accessibleBusinesses(userId: string): Promise<AccessibleBu
 }
 
 /** Where the person is, written into their message (not the system prompt, so the cache holds). */
-export function contextNote(businesses: AccessibleBusiness[], current: AccessibleBusiness | null, pageLabel: string | null): string {
+export function contextNote(scope: { business: AccessibleBusiness } | { agency: true; clients: number }, pageLabel: string | null): string {
   const lines = [
-    current ? `Negocio en pantalla: ${current.name} (id ${current.id}).` : "No hay un negocio abierto en pantalla.",
+    "business" in scope
+      ? `Negocio activo en el chat: ${scope.business.name} (id ${scope.business.id}). Trabaja solo con este negocio.`
+      : `Modo agencia: la persona es la agencia y tiene ${scope.clients} negocios de clientes. Puedes consultar cualquiera y los datos de la agencia; para cambiar algo de un negocio, debe elegirlo arriba en el asistente.`,
     pageLabel ? `Sección abierta: ${pageLabel}.` : null,
-    businesses.length > 1 ? `Tiene acceso a ${businesses.length} negocios.` : null,
   ].filter(Boolean);
   return `[Contexto de la plataforma: ${lines.join(" ")}]`;
 }
@@ -40,10 +41,12 @@ export async function runAssistant(params: {
   threadId: string;
   userId: string;
   chargeBusinessId: string | null;
-  businesses: AccessibleBusiness[];
+  scope: ToolScope;
   messages: Message[];
 }): Promise<void> {
-  const { threadId, userId, businesses, messages } = params;
+  const { threadId, userId, scope, messages } = params;
+  const agencyMode = !!scope.agencyUserId;
+  const tools = agencyMode ? AGENCY_MODE_TOOLS : BUSINESS_TOOLS;
 
   const loop = async () => {
     for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -55,7 +58,7 @@ export async function runAssistant(params: {
         output_config: { effort: "medium" },
         cache_control: { type: "ephemeral" },
         system: [{ type: "text", text: ASSISTANT_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        tools: ASSISTANT_TOOLS,
+        tools,
         messages,
       });
       await recordAnthropicUsage(ASSISTANT_MODEL, response.usage as Anthropic.Usage);
@@ -73,7 +76,8 @@ export async function runAssistant(params: {
         if (block.type !== "tool_use") continue;
         try {
           if (isProposeTool(block.name)) {
-            const proposal = await buildProposal(block.name, block.input, businesses);
+            if (agencyMode) throw new ToolInputError("En modo agencia no se proponen cambios: pídele a la persona que elija el negocio arriba en el asistente.");
+            const proposal = await buildProposal(block.name, block.input, scope.businesses);
             await prisma.assistantAction.create({
               data: {
                 threadId,
@@ -90,7 +94,7 @@ export async function runAssistant(params: {
               content: "Propuesta mostrada a la persona con el botón Aplicar. Todavía no se aplicó: dile qué revisar.",
             });
           } else {
-            const data = await runReadTool(block.name, block.input, businesses);
+            const data = await runReadTool(block.name, block.input, scope);
             results.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(data) });
           }
         } catch (err) {
@@ -115,7 +119,7 @@ export async function runAssistant(params: {
       fallbacks: "default",
       output_config: { effort: "low" },
       system: [{ type: "text", text: ASSISTANT_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      tools: ASSISTANT_TOOLS,
+      tools,
       messages,
     });
     await recordAnthropicUsage(ASSISTANT_MODEL, last.usage as Anthropic.Usage);

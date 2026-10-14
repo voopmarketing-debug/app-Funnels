@@ -5,6 +5,8 @@ import { getBusinessAnalytics } from "@/lib/analytics";
 import { PLAN_LABELS } from "@/lib/plans";
 import { WebsiteContentV2Schema } from "@/lib/websiteContentV2";
 import { parseKeywords } from "@/lib/commentAutoReply";
+import { getClientRows } from "@/lib/clientRows";
+import { getProfitabilityReport } from "@/lib/profitability";
 
 // The Asistente Funnels' tools. "Read" tools answer right away from the
 // database, scoped to the businesses the person can open. "Propose" tools
@@ -14,7 +16,7 @@ import { parseKeywords } from "@/lib/commentAutoReply";
 
 export type AccessibleBusiness = { id: string; name: string; role: string };
 
-const BusinessId = z.string().min(1).max(40).describe("Id del negocio (de list_my_businesses o del contexto)");
+const BusinessId = z.string().min(1).max(40).describe("Id del negocio (el del contexto)");
 
 // ---- Read tools ----
 
@@ -56,6 +58,20 @@ const READ_TOOLS = {
   list_comment_rules: {
     description: "Reglas de respuesta automática a comentarios de Facebook/Instagram por palabra clave.",
     schema: z.object({ businessId: BusinessId }),
+  },
+} as const;
+
+// ---- Agency-only read tools (modo agencia) ----
+
+const AGENCY_TOOLS = {
+  agency_clients: {
+    description:
+      "Las cuentas de clientes de la agencia: estado de la membresía (prueba gratis, mes activo, por vencer, vencida, sin tarjeta), cuándo vence o cuándo se cobra la prueba, plan y precio, último pago, WhatsApp conectado, uso de IA del mes y última actividad.",
+    schema: z.object({}),
+  },
+  agency_profitability: {
+    description: "Rentabilidad de la agencia en un mes: ingresos, costos de IA por cliente (respuestas, voz, sitios, diagnósticos, asistente), comisiones, costos fijos y margen.",
+    schema: z.object({ month: z.string().regex(/^\d{4}-\d{2}$/).optional().describe("Mes AAAA-MM; por defecto el actual") }),
   },
 } as const;
 
@@ -148,19 +164,31 @@ const PROPOSE_TOOLS = {
 
 export type ProposeToolName = keyof typeof PROPOSE_TOOLS;
 type ReadToolName = keyof typeof READ_TOOLS;
+type AgencyToolName = keyof typeof AGENCY_TOOLS;
 
 export const isProposeTool = (name: string): name is ProposeToolName => name in PROPOSE_TOOLS;
 
 /** Tool definitions sent to Claude (stable order, so the prompt cache holds). */
-export const ASSISTANT_TOOLS: Anthropic.Beta.BetaTool[] = [...Object.entries(READ_TOOLS), ...Object.entries(PROPOSE_TOOLS)].map(([name, t]) => {
-  const schema = z.toJSONSchema(t.schema) as Record<string, unknown>;
-  delete schema.$schema;
-  return { name, description: t.description, input_schema: schema as Anthropic.Beta.BetaTool.InputSchema };
-});
+function toApiTools(entries: [string, { description: string; schema: z.ZodType }][]): Anthropic.Beta.BetaTool[] {
+  return entries.map(([name, t]) => {
+    const schema = z.toJSONSchema(t.schema) as Record<string, unknown>;
+    delete schema.$schema;
+    return { name, description: t.description, input_schema: schema as Anthropic.Beta.BetaTool.InputSchema };
+  });
+}
+
+const BUSINESS_READ = Object.entries(READ_TOOLS).filter(([name]) => name !== "list_my_businesses");
+
+/** Working on one business: read it and propose changes to it. */
+export const BUSINESS_TOOLS = toApiTools([...BUSINESS_READ, ...Object.entries(PROPOSE_TOOLS)]);
+/** Modo agencia: read any client and the agency's numbers; no changes (those happen with a business picked). */
+export const AGENCY_MODE_TOOLS = toApiTools([...Object.entries(READ_TOOLS), ...Object.entries(AGENCY_TOOLS)]);
 
 /** Short label the chat shows while/after a read tool runs. */
 export const READ_TOOL_LABELS: Record<string, string> = {
   list_my_businesses: "Revisé tus negocios",
+  agency_clients: "Revisé tus clientes",
+  agency_profitability: "Revisé la rentabilidad",
   get_business: "Revisé la configuración del negocio",
   read_conversations: "Leí tus conversaciones recientes",
   find_contacts: "Busqué en tus contactos",
@@ -181,13 +209,21 @@ function parseInput<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> 
 
 function requireAccess(businesses: AccessibleBusiness[], businessId: string): AccessibleBusiness {
   const b = businesses.find((x) => x.id === businessId);
-  if (!b) throw new ToolInputError("No tienes acceso a ese negocio. Usa list_my_businesses para ver los ids válidos.");
+  if (!b) throw new ToolInputError("Ese negocio no es el que está activo en el chat. Pídele a la persona que lo elija arriba en el asistente.");
   return b;
 }
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
-export async function runReadTool(name: string, input: unknown, businesses: AccessibleBusiness[]): Promise<unknown> {
+/** What the tools may see: the active business, or (modo agencia) every client plus the agency's own data. */
+export type ToolScope = { businesses: AccessibleBusiness[]; agencyUserId: string | null };
+
+export async function runReadTool(name: string, input: unknown, scope: ToolScope): Promise<unknown> {
+  const { businesses } = scope;
+  if (name in AGENCY_TOOLS) {
+    if (!scope.agencyUserId) throw new ToolInputError(`Herramienta desconocida: ${name}`);
+    return runAgencyTool(name as AgencyToolName, input, scope.agencyUserId);
+  }
   if (!(name in READ_TOOLS)) throw new ToolInputError(`Herramienta desconocida: ${name}`);
   const tool = name as ReadToolName;
   if (tool === "list_my_businesses") return businesses.map((b) => ({ id: b.id, name: b.name, role: b.role }));
@@ -312,6 +348,69 @@ export async function runReadTool(name: string, input: unknown, businesses: Acce
       });
     }
   }
+}
+
+const DAY_MS = 86_400_000;
+
+async function runAgencyTool(tool: AgencyToolName, input: unknown, agencyUserId: string): Promise<unknown> {
+  const data = parseInput(AGENCY_TOOLS[tool].schema, input) as { month?: string };
+  const now = new Date();
+  const day = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
+  if (tool === "agency_clients") {
+    const rows = (await getClientRows(agencyUserId, now)) ?? [];
+    return rows.map((r) => {
+      const left = r.endsAt ? Math.ceil((Date.parse(r.endsAt) - now.getTime()) / DAY_MS) : null;
+      const status = r.pendingCard
+        ? "sin tarjeta (se registró pero no activó)"
+        : left === null
+          ? "sin fecha"
+          : left <= 0
+            ? r.billing === "trial"
+              ? "prueba terminada sin pago"
+              : "vencida"
+            : r.billing === "trial"
+              ? "prueba gratis"
+              : left <= 7
+                ? "por vencer"
+                : "mes activo";
+      return {
+        cliente: r.name,
+        email: r.email,
+        negocios: r.lines.map((l) => ({ id: l.businessId, nombre: l.name, whatsapp: l.whatsappConnected })),
+        estado: status,
+        pago: r.billing,
+        venceEl: day(r.endsAt),
+        diasRestantes: left,
+        primerCobroPrueba: day(r.trialChargeAt),
+        ultimoPago: day(r.lastPayment),
+        plan: r.planLabel,
+        precioUsd: r.priceUsd,
+        contactosIaEsteMes: r.contacts,
+        limiteContactos: r.contactLimit,
+        ultimaActividad: day(r.lastActivity),
+        clienteDesde: day(r.joinedAt),
+      };
+    });
+  }
+  const report = await getProfitabilityReport(agencyUserId, data.month, now);
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return {
+    mes: report.month,
+    mesEnCurso: report.isCurrentMonth,
+    totales: { ...report.totals, revenue: round(report.totals.revenue), aiCost: round(report.totals.aiCost), profit: round(report.totals.profit) },
+    cuentas: report.accounts.map((a) => ({
+      cliente: a.name,
+      plan: a.planLabel,
+      activa: a.active,
+      ingresoUsd: round(a.revenue),
+      costoIaUsd: round(a.aiCost),
+      desgloseIa: Object.fromEntries(Object.entries(a.breakdown).map(([k, v]) => [k, round(v)])),
+      comisionesUsd: round(a.fees),
+      gananciaUsd: round(a.profit),
+      margen: a.margin,
+      contactos: a.contacts,
+    })),
+  };
 }
 
 // ---- Proposals ----

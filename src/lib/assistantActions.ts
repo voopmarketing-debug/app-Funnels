@@ -8,6 +8,7 @@ import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { accessibleBusinesses, contextNote, runAssistant } from "@/lib/assistant/run";
 import { READ_TOOL_LABELS, isProposeTool, type ProposalPreview } from "@/lib/assistant/tools";
 import { executeProposal } from "@/lib/assistant/apply";
+import { AGENCY_SCOPE, type ChatScope } from "@/lib/assistant/scope";
 
 // Server actions behind the Asistente Funnels chat (components/assistant).
 
@@ -34,7 +35,7 @@ export type ChatItem =
   | { type: "step"; label: string }
   | { type: "action"; action: ChatAction };
 
-export type ChatView = { threadId: string; title: string; items: ChatItem[] };
+export type ChatView = { threadId: string; title: string; scope: ChatScope; items: ChatItem[] };
 
 async function userId(): Promise<string> {
   const session = await auth();
@@ -77,39 +78,57 @@ async function viewOf(threadId: string, uid: string): Promise<ChatView> {
     where: { id: threadId, userId: uid },
     include: { actions: { select: { id: true, toolUseId: true, status: true, result: true, payload: true } } },
   });
-  return { threadId: thread.id, title: thread.title, items: toChatItems(thread.messages as unknown as Message[], thread.actions) };
+  return {
+    threadId: thread.id,
+    title: thread.title,
+    scope: thread.businessId ?? AGENCY_SCOPE,
+    items: toChatItems(thread.messages as unknown as Message[], thread.actions),
+  };
+}
+
+/** Businesses the chat can switch between, and whether the agency mode is on offer. */
+export async function getAssistantContext(): Promise<{ isAgency: boolean; businesses: { id: string; name: string }[] }> {
+  const uid = await userId();
+  const [isAgency, businesses] = await Promise.all([isAgencyAdmin(uid), accessibleBusinesses(uid)]);
+  return { isAgency, businesses: businesses.map((b) => ({ id: b.id, name: b.name })) };
 }
 
 export async function sendAssistantMessage(input: {
   threadId: string | null;
   text: string;
-  businessId: string | null;
+  scope: ChatScope;
   pageLabel: string | null;
 }): Promise<{ ok: true; view: ChatView } | { ok: false; error: string; view?: ChatView }> {
   const uid = await userId();
   const text = input.text.trim().slice(0, MAX_INPUT_CHARS);
   if (!text) return { ok: false, error: "Escribe qué necesitas" };
 
+  const isAgency = await isAgencyAdmin(uid);
   const limitKey = `assistant:${uid}`;
-  const limit = (await isAgencyAdmin(uid)) ? DAILY_LIMIT_AGENCY : DAILY_LIMIT_CLIENT;
+  const limit = isAgency ? DAILY_LIMIT_AGENCY : DAILY_LIMIT_CLIENT;
   if (await isRateLimited(limitKey, limit, DAY_MS)) {
     return { ok: false, error: `Llegaste al límite de ${limit} mensajes al asistente por hoy. Mañana puedes seguir.` };
   }
 
   const businesses = await accessibleBusinesses(uid);
-  const current = businesses.find((b) => b.id === input.businessId) ?? null;
-  const thread = input.threadId
-    ? await prisma.assistantThread.findFirst({ where: { id: input.threadId, userId: uid } })
-    : await prisma.assistantThread.create({
-        data: { userId: uid, businessId: current?.id ?? businesses[0]?.id ?? null, title: text.slice(0, 60), messages: [] },
-      });
-  if (!thread) return { ok: false, error: "Esta conversación ya no existe. Empieza una nueva." };
+  const existing = input.threadId ? await prisma.assistantThread.findFirst({ where: { id: input.threadId, userId: uid } }) : null;
+  if (input.threadId && !existing) return { ok: false, error: "Esta conversación ya no existe. Empieza una nueva." };
+  // A conversation keeps the scope it started with.
+  const scope = existing ? (existing.businessId ?? AGENCY_SCOPE) : input.scope;
+  const agencyMode = scope === AGENCY_SCOPE;
+  const business = agencyMode ? null : (businesses.find((b) => b.id === scope) ?? null);
+  if (agencyMode ? !isAgency : !business) return { ok: false, error: "Elige arriba el negocio con el que quieres trabajar." };
+
+  // The agency's own line pays for agency-mode chats.
+  const chargeBusinessId = business?.id ?? businesses.find((b) => b.role === "OWNER")?.id ?? businesses[0]?.id ?? null;
+  const thread =
+    existing ?? (await prisma.assistantThread.create({ data: { userId: uid, businessId: business?.id ?? null, title: text.slice(0, 60), messages: [] } }));
 
   const messages = thread.messages as unknown as Message[];
   messages.push({
     role: "user",
     content: [
-      { type: "text", text: contextNote(businesses, current, input.pageLabel?.slice(0, 80) ?? null) },
+      { type: "text", text: contextNote(business ? { business } : { agency: true, clients: businesses.length }, input.pageLabel?.slice(0, 80) ?? null) },
       { type: "text", text },
     ],
   });
@@ -118,7 +137,13 @@ export async function sendAssistantMessage(input: {
   const before = messages.length;
   let error: string | null = null;
   try {
-    await runAssistant({ threadId: thread.id, userId: uid, chargeBusinessId: thread.businessId, businesses, messages });
+    await runAssistant({
+      threadId: thread.id,
+      userId: uid,
+      chargeBusinessId,
+      scope: business ? { businesses: [business], agencyUserId: null } : { businesses, agencyUserId: uid },
+      messages,
+    });
   } catch (err) {
     console.error("[assistant] run failed", err);
     error = "El asistente no pudo responder ahora. Intenta de nuevo en un momento.";
@@ -140,10 +165,13 @@ export async function getAssistantThread(threadId: string): Promise<ChatView | n
   return exists ? viewOf(threadId, uid) : null;
 }
 
-export async function listAssistantThreads(): Promise<{ id: string; title: string; updatedAt: string }[]> {
+export async function listAssistantThreads(): Promise<{ id: string; title: string; updatedAt: string; scopeLabel: string }[]> {
   const uid = await userId();
-  const rows = await prisma.assistantThread.findMany({ where: { userId: uid }, orderBy: { updatedAt: "desc" }, take: 20, select: { id: true, title: true, updatedAt: true } });
-  return rows.map((r) => ({ id: r.id, title: r.title, updatedAt: r.updatedAt.toISOString() }));
+  const rows = await prisma.assistantThread.findMany({ where: { userId: uid }, orderBy: { updatedAt: "desc" }, take: 20, select: { id: true, title: true, updatedAt: true, businessId: true } });
+  const names = new Map(
+    (await prisma.business.findMany({ where: { id: { in: rows.map((r) => r.businessId).filter((x): x is string => !!x) } }, select: { id: true, name: true } })).map((b) => [b.id, b.name]),
+  );
+  return rows.map((r) => ({ id: r.id, title: r.title, updatedAt: r.updatedAt.toISOString(), scopeLabel: r.businessId ? (names.get(r.businessId) ?? "Negocio") : "Mi agencia" }));
 }
 
 /** "Aplicar": runs the proposal once, with the person's own permissions. */

@@ -2,48 +2,13 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { PlanTier } from "@prisma/client";
 import { SubscriptionDatesEditor } from "./SubscriptionDatesEditor";
 import { AddonGrantCell } from "./AddonGrantCell";
 import { ResetPasswordButton } from "./ResetPasswordButton";
 import { PendingCardStrip } from "./PendingCardStrip";
+import type { ClientRow } from "@/lib/clientRows";
 
-export type ClientRow = {
-  userId: string;
-  name: string;
-  email: string;
-  phone: string | null;
-  location: string | null;
-  joinedAt: string;
-  // Signed up on their own but never registered a card (see /activar).
-  pendingCard: boolean;
-  // When they last went to Mercado Pago from /activar without finishing.
-  checkoutOpenedAt: string | null;
-  // A Mercado Pago subscription is linked to the account.
-  cardOnFile: boolean;
-  planTier: PlanTier;
-  planLabel: string;
-  priceUsd: number;
-  customPrice: boolean;
-  startedAt: string | null;
-  endsAt: string | null;
-  contacts: number;
-  contactLimit: number | null;
-  lineLimit: number | null;
-  teamLimit: number | null;
-  team: number;
-  websites: number;
-  lastActivity: string | null;
-  lastPayment: string | null;
-  paymentProvider: string;
-  // How the current period is covered: a free trial (card on file, no charge
-  // yet), a real payment, or dates the agency set by hand.
-  billing: "trial" | "paid" | "manual";
-  // During the trial: when Mercado Pago makes the first charge.
-  trialChargeAt: string | null;
-  lines: { businessId: string; name: string; whatsappConnected: boolean; startedAt: string | null; endsAt: string | null }[];
-  addons: { id: string; title: string; expiresAt: string; quantity: number; kind: string }[];
-};
+export type { ClientRow } from "@/lib/clientRows";
 
 type Status = "nocard" | "trial" | "active" | "expiring" | "expired" | "unset";
 const DAY_MS = 86_400_000;

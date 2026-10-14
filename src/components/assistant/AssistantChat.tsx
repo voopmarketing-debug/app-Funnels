@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   applyAssistantAction,
   discardAssistantAction,
+  getAssistantContext,
   getAssistantThread,
   listAssistantThreads,
   sendAssistantMessage,
@@ -12,13 +13,23 @@ import {
   type ChatItem,
   type ChatView,
 } from "@/lib/assistantActions";
+import { AGENCY_SCOPE } from "@/lib/assistant/scope";
 
 // The Asistente Funnels: a floating ✦ button on every dashboard page that
 // opens a chat. Other screens can open it with a ready question:
 //   window.dispatchEvent(new CustomEvent("fl-assistant-open", { detail: { text } }))
 
 export const ASSISTANT_OPEN_EVENT = "fl-assistant-open";
-const THREAD_KEY = "fl-assistant-thread";
+// Last conversation per scope, and the scope picked last (per browser).
+const threadKey = (scope: string) => `fl-assistant-thread:${scope}`;
+const SCOPE_KEY = "fl-assistant-scope";
+
+const AGENCY_SUGGESTIONS = [
+  "¿Quiénes están en prueba gratis y cuándo les cobran?",
+  "¿Qué clientes se vencen esta semana?",
+  "¿Qué cliente me está costando más de IA este mes?",
+  "¿Quién no ha conectado WhatsApp todavía?",
+];
 
 const SUGGESTIONS = [
   "Escríbeme el prompt para mi agente de IA",
@@ -243,50 +254,103 @@ function Item({ item }: { item: ChatItem }) {
   return <ActionCard action={item.action} />;
 }
 
+type Ctx = { isAgency: boolean; businesses: { id: string; name: string }[] };
+
+function ScopeIcon({ agency }: { agency: boolean }) {
+  return <span aria-hidden="true">{agency ? "🏢" : "🤖"}</span>;
+}
+
 export function AssistantChat() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<ChatView | null>(null);
+  const [ctx, setCtx] = useState<Ctx | null>(null);
+  // An explicit choice (selector, picker or history) wins while the person stays on that page.
+  const [picked, setPicked] = useState<{ scope: string; path: string } | null>(null);
+  const [views, setViews] = useState<Record<string, ChatView | null>>({});
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const [history, setHistory] = useState<{ id: string; title: string }[] | null>(null);
+  const [history, setHistory] = useState<{ id: string; title: string; scopeLabel: string }[] | null>(null);
+  const [choosing, setChoosing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { businessId, pageLabel } = pageContext(pathname);
 
-  const loadThread = useCallback((id: string) => {
-    start(async () => {
-      const v = await getAssistantThread(id).catch(() => null);
-      setView(v);
-      write(THREAD_KEY, v ? v.threadId : null);
-    });
-  }, []);
+  const valid = useCallback(
+    (s: string | null | undefined): s is string => !!s && !!ctx && (s === AGENCY_SCOPE ? ctx.isAgency : ctx.businesses.some((b) => b.id === s)),
+    [ctx],
+  );
+  // One business at a time: the one picked here, else the one on screen, else
+  // the last one used, else the only one there is. null = ask first.
+  const scope: string | null = !ctx
+    ? null
+    : picked && picked.path === pathname && valid(picked.scope)
+      ? picked.scope
+      : valid(businessId)
+        ? businessId
+        : valid(read(SCOPE_KEY))
+          ? read(SCOPE_KEY)
+          : !ctx.isAgency && ctx.businesses.length === 1
+            ? ctx.businesses[0].id
+            : null;
+  const view = scope ? (views[scope] ?? null) : null;
+  const scopeName = scope === AGENCY_SCOPE ? "Mi agencia" : (ctx?.businesses.find((b) => b.id === scope)?.name ?? null);
+  const canSwitch = !!ctx && (ctx.isAgency || ctx.businesses.length > 1);
+
+  const choose = useCallback(
+    (next: string) => {
+      setPicked({ scope: next, path: pathname });
+      write(SCOPE_KEY, next);
+      setChoosing(false);
+      setError(null);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    },
+    [pathname],
+  );
+
+  const loadThread = useCallback(
+    (id: string, forScope: string | null) => {
+      start(async () => {
+        const v = await getAssistantThread(id).catch(() => null);
+        const key = v?.scope ?? forScope;
+        if (!key) return;
+        setViews((all) => ({ ...all, [key]: v }));
+        if (v) write(threadKey(v.scope), v.threadId);
+        else write(threadKey(key), null);
+      });
+    },
+    [],
+  );
 
   const send = useCallback(
     (raw: string) => {
       const body = raw.trim();
-      if (!body || pending) return;
+      if (!body || pending || !scope) return;
       setError(null);
       setText("");
       setHistory(null);
+      write(SCOPE_KEY, scope);
       // Show the question right away while the assistant works.
-      setView((v) => ({ threadId: v?.threadId ?? "", title: v?.title ?? body, items: [...(v?.items ?? []), { type: "user", text: body }] }));
+      setViews((all) => {
+        const v = all[scope];
+        return { ...all, [scope]: { threadId: v?.threadId ?? "", title: v?.title ?? body, scope, items: [...(v?.items ?? []), { type: "user", text: body }] } };
+      });
       start(async () => {
-        const res = await sendAssistantMessage({ threadId: view?.threadId || null, text: body, businessId, pageLabel }).catch(() => ({
+        const res = await sendAssistantMessage({ threadId: view?.threadId || null, text: body, scope, pageLabel }).catch(() => ({
           ok: false as const,
           error: "No hubo conexión. Intenta de nuevo.",
           view: undefined,
         }));
         if (res.view) {
-          setView(res.view);
-          write(THREAD_KEY, res.view.threadId);
+          const v = res.view;
+          setViews((all) => ({ ...all, [v.scope]: v }));
+          write(threadKey(v.scope), v.threadId);
         }
         if (!res.ok) setError(res.error);
       });
     },
-    [businessId, pageLabel, pending, view?.threadId],
+    [pageLabel, pending, scope, view?.threadId],
   );
 
   // Open from anywhere (e.g. the agent's prompt editor), optionally with a question.
@@ -301,16 +365,24 @@ export function AssistantChat() {
     return () => window.removeEventListener(ASSISTANT_OPEN_EVENT, onOpen);
   }, []);
 
-  // Pick up the last conversation the first time it opens.
+  // What the person can work on, read once when the chat first opens.
   useEffect(() => {
-    if (!open || view) return;
-    const saved = read(THREAD_KEY);
-    if (saved) loadThread(saved);
-  }, [open, view, loadThread]);
+    if (!open || ctx) return;
+    getAssistantContext()
+      .then(setCtx)
+      .catch(() => setCtx({ isAgency: false, businesses: [] }));
+  }, [open, ctx]);
+
+  // Pick up the last conversation of this business the first time it's shown.
+  useEffect(() => {
+    if (!open || !scope || scope in views) return;
+    const saved = read(threadKey(scope));
+    if (saved) loadThread(saved, scope);
+  }, [open, scope, views, loadThread]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [view?.items.length, pending, open]);
+  }, [view?.items.length, pending, open, scope]);
 
   useEffect(() => {
     if (!open) return;
@@ -321,6 +393,15 @@ export function AssistantChat() {
 
   // On a phone, an open WhatsApp/Messenger chat owns the bottom of the screen.
   const chatOpenOnPhone = !!searchParams.get("conv") || (pathname.includes("/redes/mensajes") && !!searchParams.get("c"));
+  const agencyScope = scope === AGENCY_SCOPE;
+  const showPicker = !!ctx && (!scope || choosing);
+
+  const scopeOptions = ctx
+    ? [
+        ...(ctx.isAgency ? [{ id: AGENCY_SCOPE, name: "Mi agencia", hint: "Todos tus clientes, membresías y rentabilidad" }] : []),
+        ...ctx.businesses.map((b) => ({ id: b.id, name: b.name, hint: "Su agente, CRM, plantillas, catálogo y página" })),
+      ]
+    : [];
 
   return (
     <>
@@ -355,7 +436,21 @@ export function AssistantChat() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="font-semibold leading-tight text-ink">Asistente Funnels</p>
-              <p className="truncate text-xs text-ink-muted">{pageLabel ? `Estás en ${pageLabel}` : "Pídeme lo que necesites de la plataforma"}</p>
+              {scopeName && canSwitch ? (
+                <button
+                  type="button"
+                  onClick={() => setChoosing((c) => !c)}
+                  aria-expanded={choosing}
+                  title="Cambiar el negocio con el que trabaja el asistente"
+                  className="flex max-w-full items-center gap-1 truncate text-xs font-semibold text-accent hover:underline"
+                >
+                  <ScopeIcon agency={agencyScope} />
+                  <span className="truncate">{scopeName}</span>
+                  <span aria-hidden="true">▾</span>
+                </button>
+              ) : (
+                <p className="truncate text-xs text-ink-muted">{scopeName ?? (pageLabel ? `Estás en ${pageLabel}` : "Pídeme lo que necesites de la plataforma")}</p>
+              )}
             </div>
             <button
               type="button"
@@ -373,14 +468,16 @@ export function AssistantChat() {
               type="button"
               title="Nueva conversación"
               aria-label="Nueva conversación"
+              disabled={!scope}
               onClick={() => {
-                setView(null);
+                if (!scope) return;
+                setViews((all) => ({ ...all, [scope]: null }));
                 setHistory(null);
                 setError(null);
-                write(THREAD_KEY, null);
+                write(threadKey(scope), null);
                 inputRef.current?.focus();
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-40"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
                 <path d="M12 5v14M5 12h14" />
@@ -405,28 +502,67 @@ export function AssistantChat() {
                   type="button"
                   onClick={() => {
                     setHistory(null);
-                    loadThread(h.id);
+                    start(async () => {
+                      const v = await getAssistantThread(h.id).catch(() => null);
+                      if (!v) return;
+                      setViews((all) => ({ ...all, [v.scope]: v }));
+                      write(threadKey(v.scope), v.threadId);
+                      choose(v.scope);
+                    });
                   }}
-                  className="block w-full truncate rounded-lg px-3 py-2 text-left text-sm text-ink transition hover:bg-surface"
+                  className="block w-full rounded-lg px-3 py-2 text-left transition hover:bg-surface"
                 >
-                  {h.title}
+                  <span className="block truncate text-sm text-ink">{h.title}</span>
+                  <span className="block truncate text-xs text-ink-faint">{h.scopeLabel}</span>
                 </button>
               ))}
             </div>
           )}
 
           <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-            {!view?.items.length && !pending && (
+            {!ctx && <Thinking />}
+            {showPicker && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <p className="text-base font-semibold text-ink">¿Con qué trabajamos?</p>
+                  <p className="text-sm text-ink-muted">El asistente trabaja con un negocio a la vez, para no mezclar información. Puedes cambiarlo cuando quieras arriba.</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {scopeOptions.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => choose(o.id)}
+                      aria-current={scope === o.id ? "true" : undefined}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition hover:border-accent/50 hover:bg-accent/10 ${
+                        scope === o.id ? "border-accent/60 bg-accent/10" : "border-border bg-surface-2/50"
+                      }`}
+                    >
+                      <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-surface text-base">
+                        <ScopeIcon agency={o.id === AGENCY_SCOPE} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-ink">{o.name}</span>
+                        <span className="block truncate text-xs text-ink-muted">{o.hint}</span>
+                      </span>
+                    </button>
+                  ))}
+                  {scopeOptions.length === 0 && <p className="text-sm text-ink-muted">Todavía no tienes negocios. Crea tu primer agente de IA para empezar.</p>}
+                </div>
+              </div>
+            )}
+            {!showPicker && scope && !view?.items.length && !pending && (
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <p className="text-base font-semibold text-ink">¿Qué hacemos hoy?</p>
+                  <p className="text-base font-semibold text-ink">{agencyScope ? "¿Qué quieres saber de tus clientes?" : "¿Qué hacemos hoy?"}</p>
                   <p className="text-sm text-ink-muted">
-                    Pídeme cosas en tus palabras: escribo el prompt de tu agente, creo plantillas y respuestas automáticas, cargo productos, edito tu página o reviso tus
-                    métricas. Antes de cambiar algo te muestro la propuesta para que la apliques.
+                    {agencyScope
+                      ? "Te digo quién está en prueba, quién se vence, quién no ha conectado WhatsApp y cuánto te deja cada cliente. Para cambiar algo de un negocio, elígelo arriba."
+                      : "Pídeme cosas en tus palabras: escribo el prompt de tu agente, creo plantillas y respuestas automáticas, cargo productos, edito tu página o reviso tus métricas. Antes de cambiar algo te muestro la propuesta para que la apliques."}
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  {SUGGESTIONS.map((s) => (
+                  {(agencyScope ? AGENCY_SUGGESTIONS : SUGGESTIONS).map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -439,10 +575,9 @@ export function AssistantChat() {
                 </div>
               </div>
             )}
-            {view?.items.map((item, i) => (
-              <Item key={item.type === "action" ? item.action.id : `${i}-${item.type}`} item={item} />
-            ))}
-            {pending && <Thinking />}
+            {!showPicker &&
+              view?.items.map((item, i) => <Item key={item.type === "action" ? item.action.id : `${i}-${item.type}`} item={item} />)}
+            {pending && ctx && <Thinking />}
             {error && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{error}</p>}
           </div>
 
@@ -469,12 +604,13 @@ export function AssistantChat() {
               }}
               rows={1}
               maxLength={4000}
-              placeholder="Escribe lo que necesitas"
-              className="max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none md:text-sm"
+              disabled={!scope}
+              placeholder={scope ? "Escribe lo que necesitas" : "Elige una opción arriba"}
+              className="max-h-32 min-h-[2.75rem] flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none disabled:opacity-60 md:text-sm"
             />
             <button
               type="submit"
-              disabled={pending || !text.trim()}
+              disabled={pending || !text.trim() || !scope}
               aria-label="Enviar"
               className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-accent text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
             >
