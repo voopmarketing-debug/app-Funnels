@@ -1298,6 +1298,9 @@ export async function addPipelineStage(businessId: string, pipelineId: string, f
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("name is required");
+  // The pipeline id comes from the browser: it must be one of this business's.
+  const pipeline = await prisma.pipeline.findFirst({ where: { id: pipelineId, businessId }, select: { id: true } });
+  if (!pipeline) throw new Error("Invalid pipeline");
 
   const last = await prisma.pipelineStage.findFirst({
     where: { pipelineId },
@@ -1374,7 +1377,7 @@ export async function movePipelineStage(
   await requireBusinessMembership(session.user.id, businessId);
 
   const stages = await prisma.pipelineStage.findMany({
-    where: { pipelineId },
+    where: { pipelineId, businessId },
     orderBy: { position: "asc" },
   });
 
