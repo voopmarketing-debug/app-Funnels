@@ -211,7 +211,10 @@ async function loadFromMeta(businessId: string, range: DayRange): Promise<Social
 // Every new range costs dozens of Meta calls, shared by the whole Page's
 // rate limit; clicking through many custom ranges is capped per hour.
 async function overHourlyReads(businessId: string): Promise<boolean> {
-  const recentReads = await prisma.socialMetricCache.count({ where: { businessId, fetchedAt: { gt: new Date(Date.now() - 60 * 60 * 1000) } } });
+  // The inbox lists refresh every few seconds and don't count as "new ranges".
+  const recentReads = await prisma.socialMetricCache.count({
+    where: { businessId, NOT: { key: { startsWith: "inbox:" } }, fetchedAt: { gt: new Date(Date.now() - 60 * 60 * 1000) } },
+  });
   return recentReads >= MAX_NEW_RANGES_PER_HOUR;
 }
 
@@ -277,7 +280,11 @@ export async function getAdsSection(businessId: string, range: DayRange): Promis
 /** Drops the cached dashboards so the next visit reads Meta again. Returns false when it's too soon. */
 export async function clearSocialCache(businessId: string, force = false): Promise<boolean> {
   if (!force) {
-    const newest = await prisma.socialMetricCache.findFirst({ where: { businessId }, orderBy: { fetchedAt: "desc" }, select: { fetchedAt: true } });
+    const newest = await prisma.socialMetricCache.findFirst({
+      where: { businessId, NOT: { key: { startsWith: "inbox:" } } },
+      orderBy: { fetchedAt: "desc" },
+      select: { fetchedAt: true },
+    });
     if (newest && Date.now() - newest.fetchedAt.getTime() < MIN_REFRESH_MS) return false;
   }
   await prisma.socialMetricCache.deleteMany({ where: { businessId } });

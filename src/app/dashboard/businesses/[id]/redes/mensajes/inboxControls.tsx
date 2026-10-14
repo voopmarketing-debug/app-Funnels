@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
 import { sendSocialReply, setSocialThreadResolved } from "@/lib/socialActions";
 
@@ -32,6 +33,20 @@ export function InboxPoller() {
     };
   }, [router]);
   return null;
+}
+
+/**
+ * Inside a conversation link: a small spinner while that conversation loads,
+ * so the click answers at once instead of looking dead for a few seconds.
+ */
+export function LinkPending() {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden="true"
+      className={`ml-1 h-3.5 w-3.5 flex-none rounded-full border-2 border-accent border-t-transparent transition-opacity ${pending ? "animate-spin opacity-100" : "opacity-0"}`}
+    />
+  );
 }
 
 /** Keeps the newest message in view when the thread opens or grows. */

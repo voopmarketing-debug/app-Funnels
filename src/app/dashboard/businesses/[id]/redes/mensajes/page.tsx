@@ -4,11 +4,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { MetaApiError, friendlyMetaError } from "@/lib/metaSocial";
-import { REPLY_WINDOW_MS, isMissingPermission, listThreads, threadMessages, type InboxMessage, type InboxNetwork, type InboxThread } from "@/lib/metaInbox";
+import { REPLY_WINDOW_MS, isConversationId, isMissingPermission, listThreads, threadMessages, type InboxMessage, type InboxNetwork, type InboxThread } from "@/lib/metaInbox";
+import { cachedThreads } from "@/lib/inboxCache";
+import { parseRange, rangeLabel, todayInColombia } from "@/lib/socialRanges";
 import { RedesTabs } from "../RedesTabs";
 import { FacebookGlyph, InstagramGlyph } from "../icons";
 import { shortDateTime } from "../format";
-import { InboxPoller, ReplyBox, ResolveButton, ScrollToBottom } from "./inboxControls";
+import { DateRangePicker } from "../DateRangePicker";
+import { InboxPoller, LinkPending, ReplyBox, ResolveButton, ScrollToBottom } from "./inboxControls";
 
 // Messenger + Instagram Direct for the connected Page, answered by people on
 // the team. Read live from Meta on every visit (and every 30 s while open and in use);
@@ -97,13 +100,16 @@ export default async function MensajesPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ c?: string; f?: string; red?: string; q?: string }>;
+  searchParams: Promise<{ c?: string; f?: string; red?: string; q?: string; desde?: string; hasta?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const filter: FilterKey = FILTERS.some((f) => f.key === sp.f) ? (sp.f as FilterKey) : "pendientes";
   const networkFilter: InboxNetwork | "todas" = sp.red === "facebook" || sp.red === "instagram" ? sp.red : "todas";
   const query = (sp.q ?? "").trim().toLowerCase();
+  // Optional date filter ("this month"): by the conversation's last activity.
+  const today = todayInColombia();
+  const range = sp.desde && sp.hasta ? parseRange({ desde: sp.desde, hasta: sp.hasta }, today) : null;
 
   const session = await auth();
   if (!session?.user?.id) return null;
@@ -154,9 +160,22 @@ export default async function MensajesPage({
   let missingPermission = false;
   let needsReconnect = false;
   const errors: string[] = [];
-  const fetched = await Promise.all(
+  // The lists (cached for a few seconds) and the open conversation's messages
+  // are read at the same time: they don't depend on each other.
+  const openId = sp.c && isConversationId(sp.c) ? sp.c : null;
+  const openRead = openId
+    ? threadMessages({ conversationId: openId, pageId, igUserId, pageToken }).then(
+        (m) => ({ messages: m, error: null as string | null }),
+        (err) => {
+          console.error("[social inbox] thread failed", err);
+          return { messages: [] as InboxMessage[], error: friendlyMetaError(err) };
+        },
+      )
+    : null;
+  const [fetched, open] = await Promise.all([
+    Promise.all(
     networks.map((network) =>
-      listThreads({ pageId, igUserId, pageToken, network }).catch((err) => {
+      cachedThreads(id, network, () => listThreads({ pageId, igUserId, pageToken, network })).catch((err) => {
         if (err instanceof MetaApiError && err.needsReconnect) needsReconnect = true;
         else if (isMissingPermission(err)) missingPermission = true;
         else errors.push(`${NETWORK_STYLE[network].label}: ${friendlyMetaError(err)}`);
@@ -164,7 +183,9 @@ export default async function MensajesPage({
         return [] as InboxThread[];
       }),
     ),
-  );
+    ),
+    openRead,
+  ]);
   const threads = fetched.flat();
   const states = await prisma.socialThreadState.findMany({ where: { businessId: id, conversationId: { in: threads.map((t) => t.id) } } });
   const stateById = new Map(states.map((s) => [s.conversationId, s]));
@@ -180,24 +201,23 @@ export default async function MensajesPage({
     })
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
-  const visible = rows.filter(
+  const sinceMs = range ? Date.parse(`${range.since}T00:00:00-05:00`) : null;
+  const untilMs = range ? Date.parse(`${range.until}T23:59:59-05:00`) : null;
+  const inRange = sinceMs == null || untilMs == null ? rows : rows.filter((r) => Date.parse(r.updatedAt) >= sinceMs && Date.parse(r.updatedAt) <= untilMs);
+
+  const visible = inRange.filter(
     (r) =>
       (networkFilter === "todas" || r.network === networkFilter) &&
       (filter === "todos" || (filter === "pendientes" ? !r.resolved : r.unread)) &&
       (!query || r.customerName.toLowerCase().includes(query) || r.snippet.toLowerCase().includes(query)),
   );
-  const counts = { pendientes: rows.filter((r) => !r.resolved).length, "sin-leer": rows.filter((r) => r.unread).length, todos: rows.length };
+  const counts = { pendientes: inRange.filter((r) => !r.resolved).length, "sin-leer": inRange.filter((r) => r.unread).length, todos: inRange.length };
 
   const selected = sp.c ? rows.find((r) => r.id === sp.c) ?? null : null;
-  let messages: InboxMessage[] = [];
-  let threadError: string | null = null;
+  // Only a conversation of this Page's list is shown (the id comes from the URL).
+  const messages: InboxMessage[] = selected && open ? open.messages : [];
+  const threadError: string | null = selected && open ? open.error : null;
   if (selected) {
-    try {
-      messages = await threadMessages({ conversationId: selected.id, pageId, igUserId, pageToken });
-    } catch (err) {
-      console.error("[social inbox] thread failed", err);
-      threadError = friendlyMetaError(err);
-    }
     if (selected.unread) {
       await prisma.socialThreadState.upsert({
         where: { businessId_conversationId: { businessId: id, conversationId: selected.id } },
@@ -212,7 +232,7 @@ export default async function MensajesPage({
 
   const href = (over: Record<string, string | null>) => {
     const p = new URLSearchParams();
-    const merged = { f: filter, red: networkFilter, q: sp.q ?? "", c: sp.c ?? "", ...over };
+    const merged = { f: filter, red: networkFilter, q: sp.q ?? "", c: sp.c ?? "", desde: sp.desde ?? "", hasta: sp.hasta ?? "", ...over };
     for (const [k, v] of Object.entries(merged)) if (v && !(k === "f" && v === "pendientes") && !(k === "red" && v === "todas")) p.set(k, v);
     const s = p.toString();
     return s ? `?${s}` : "?";
@@ -244,6 +264,22 @@ export default async function MensajesPage({
         <p className="rounded-xl border border-border bg-surface p-3 text-sm text-ink-muted">Meta no devolvió algunos mensajes ahora: {errors.join(" · ")}</p>
       )}
 
+      <div className="flex flex-wrap items-center gap-3">
+        <DateRangePicker
+          value={range}
+          today={today}
+          emptyLabel="Todas las fechas"
+          hint="Se muestran las conversaciones con actividad en esas fechas."
+          resetParams={["c"]}
+          label="Fechas"
+        />
+        {range && (
+          <p className="text-xs text-ink-muted">
+            {inRange.length} {inRange.length === 1 ? "conversación" : "conversaciones"} con actividad del {rangeLabel(range).replace(" – ", " al ")}
+          </p>
+        )}
+      </div>
+
       <div className="grid min-h-[70vh] overflow-hidden rounded-2xl border border-border bg-surface md:grid-cols-[minmax(17rem,22rem)_1fr]">
         {/* Thread list (hidden on phones while a conversation is open). */}
         <aside className={`min-w-0 flex-col border-border md:flex md:border-r ${selected ? "hidden" : "flex"}`}>
@@ -274,6 +310,8 @@ export default async function MensajesPage({
             <form className="flex gap-2" action="">
               {filter !== "pendientes" && <input type="hidden" name="f" value={filter} />}
               {networkFilter !== "todas" && <input type="hidden" name="red" value={networkFilter} />}
+              {range && <input type="hidden" name="desde" value={range.since} />}
+              {range && <input type="hidden" name="hasta" value={range.until} />}
               <label htmlFor="inbox-search" className="sr-only">
                 Buscar
               </label>
@@ -312,7 +350,10 @@ export default async function MensajesPage({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className={`truncate text-sm ${r.unread ? "font-bold text-ink" : "font-medium text-ink"}`}>{r.customerName}</p>
-                      <span className="flex-none text-[11px] text-ink-faint">{listTime(r.updatedAt, now)}</span>
+                      <span className="flex flex-none items-center text-[11px] text-ink-faint">
+                        {listTime(r.updatedAt, now)}
+                        <LinkPending />
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <p className={`truncate text-xs ${r.unread ? "font-semibold text-ink" : "text-ink-muted"}`}>
@@ -328,7 +369,11 @@ export default async function MensajesPage({
             ))}
             {visible.length === 0 && (
               <li className="px-4 py-10 text-center text-sm text-ink-muted">
-                {rows.length === 0 ? "Todavía no hay mensajes de Messenger ni Instagram." : filter === "pendientes" ? "¡Todo al día! No hay conversaciones sin resolver." : "Nada por aquí con estos filtros."}
+                {rows.length === 0
+                  ? "Todavía no hay mensajes de Messenger ni Instagram."
+                  : inRange.length === 0
+                    ? "No hay conversaciones con actividad en estas fechas."
+                    : filter === "pendientes" ? "¡Todo al día! No hay conversaciones sin resolver." : "Nada por aquí con estos filtros."}
               </li>
             )}
           </ul>

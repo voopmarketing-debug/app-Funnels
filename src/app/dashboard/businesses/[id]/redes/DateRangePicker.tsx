@@ -103,25 +103,34 @@ export function DateRangePicker({
   to = "hasta",
   align = "left",
   label,
+  emptyLabel,
+  hint = "Se compara con el mismo número de días justo antes.",
+  resetParams = [],
 }: {
-  value: DayRange;
+  /** null = no date filter (only with `emptyLabel`). */
+  value: DayRange | null;
   today: string;
   from?: string;
   to?: string;
   align?: "left" | "right";
   /** Shown before the dates, e.g. "Anuncios". */
   label?: string;
+  /** With it, the picker can be cleared: "Todas las fechas". */
+  emptyLabel?: string;
+  hint?: string;
+  /** Other params dropped when the dates change (e.g. the open conversation). */
+  resetParams?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
-  const [start, setStart] = useState<string | null>(value.since);
-  const [end, setEnd] = useState<string | null>(value.until);
+  const [start, setStart] = useState<string | null>(value?.since ?? null);
+  const [end, setEnd] = useState<string | null>(value?.until ?? null);
   const [hover, setHover] = useState<string | null>(null);
   // The right-hand month; the left one is the month before.
-  const [month, setMonth] = useState(ym(value.until));
+  const [month, setMonth] = useState(ym(value?.until ?? today));
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -139,9 +148,18 @@ export function DateRangePicker({
   function go(r: DayRange) {
     setOpen(false);
     const params = new URLSearchParams(searchParams.toString());
+    for (const k of resetParams) params.delete(k);
     params.set(from, r.since);
     params.set(to, r.until);
     startTransition(() => router.push(`${pathname}?${params}`, { scroll: false }));
+  }
+
+  function clear() {
+    setOpen(false);
+    const params = new URLSearchParams(searchParams.toString());
+    for (const k of [...resetParams, from, to]) params.delete(k);
+    const qs = params.toString();
+    startTransition(() => router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
   }
 
   function pick(day: string) {
@@ -158,7 +176,7 @@ export function DateRangePicker({
   const tooLong = draft ? rangeLength(draft) > MAX_RANGE_DAYS : false;
   const activePreset = RANGE_PRESETS.find((p) => {
     const r = p.range(today);
-    return r.since === value.since && r.until === value.until;
+    return !!value && r.since === value.since && r.until === value.until;
   });
 
   return (
@@ -166,9 +184,9 @@ export function DateRangePicker({
       <button
         type="button"
         onClick={() => {
-          setStart(value.since);
-          setEnd(value.until);
-          setMonth(ym(value.until));
+          setStart(value?.since ?? null);
+          setEnd(value?.until ?? null);
+          setMonth(ym(value?.until ?? today));
           setOpen((v) => !v);
         }}
         aria-expanded={open}
@@ -181,7 +199,7 @@ export function DateRangePicker({
           </svg>
         </span>
         {label && <span className="hidden font-normal text-ink-muted sm:inline">{label}:</span>}
-        <span className="tabular-nums">{rangeLabel(value)}</span>
+        <span className="tabular-nums">{value ? rangeLabel(value) : emptyLabel}</span>
         {activePreset && <span className="hidden font-normal text-ink-muted sm:inline">· {activePreset.label}</span>}
         <span className="text-ink-muted" aria-hidden="true">
           ⌄
@@ -215,7 +233,7 @@ export function DateRangePicker({
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
                 <p className="text-xs text-ink-muted">
-                  {tooLong ? `Máximo ${MAX_RANGE_DAYS} días.` : draft ? `${rangeLabel(draft)} · ${rangeLength(draft)} días` : "Se compara con el mismo número de días justo antes."}
+                  {tooLong ? `Máximo ${MAX_RANGE_DAYS} días.` : draft ? `${rangeLabel(draft)} · ${rangeLength(draft)} días` : hint}
                 </p>
                 <button
                   type="button"
@@ -228,6 +246,19 @@ export function DateRangePicker({
               </div>
             </div>
             <ul className="flex flex-wrap gap-1.5 border-border md:w-44 md:flex-col md:flex-nowrap md:gap-0.5 md:border-l md:pl-3">
+              {emptyLabel && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={clear}
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${
+                      !value ? "bg-accent/15 text-ink" : "text-ink-muted hover:bg-surface-2 hover:text-ink"
+                    } max-md:border max-md:border-border max-md:py-1.5 max-md:text-xs`}
+                  >
+                    {emptyLabel}
+                  </button>
+                </li>
+              )}
               {RANGE_PRESETS.map((p) => (
                 <li key={p.key}>
                   <button
