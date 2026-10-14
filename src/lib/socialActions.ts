@@ -67,6 +67,7 @@ export async function refreshSocialData(businessId: string): Promise<{ ok: boole
   await requireBusinessMembership(await userId(), businessId);
   const cleared = await clearSocialCache(businessId);
   revalidatePath(`/dashboard/businesses/${businessId}/redes`);
+  revalidatePath(`/dashboard/businesses/${businessId}/redes/anuncios`);
   return { ok: cleared };
 }
 

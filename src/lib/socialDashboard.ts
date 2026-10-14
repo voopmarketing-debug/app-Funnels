@@ -241,7 +241,7 @@ export async function getSocialDashboard(businessId: string, range: DayRange): P
   return fresh;
 }
 
-export type AdsSection = { ads: SectionResult<AdsWithPrevious> | null; needsReconnect: boolean; throttled?: boolean };
+export type AdsSection = { ads: SectionResult<AdsWithPrevious> | null; needsReconnect: boolean; throttled?: boolean; fetchedAt?: string };
 
 /**
  * Only the ads, for their own dates (to look back at older campaigns without
@@ -250,7 +250,7 @@ export type AdsSection = { ads: SectionResult<AdsWithPrevious> | null; needsReco
 export async function getAdsSection(businessId: string, range: DayRange): Promise<AdsSection> {
   const key = `ads:${range.since}:${range.until}`;
   const cached = await prisma.socialMetricCache.findUnique({ where: { businessId_key: { businessId, key } } });
-  if (cached && Date.now() - cached.fetchedAt.getTime() < ttlFor(range)) return cached.data as unknown as AdsSection;
+  if (cached && Date.now() - cached.fetchedAt.getTime() < ttlFor(range)) return { ...(cached.data as unknown as AdsSection), fetchedAt: cached.fetchedAt.toISOString() };
   if (await overHourlyReads(businessId)) return { ads: null, needsReconnect: false, throttled: true };
 
   const connection = await prisma.socialConnection.findUnique({ where: { businessId } });
@@ -259,7 +259,7 @@ export async function getAdsSection(businessId: string, range: DayRange): Promis
   const userToken = decryptSecret(connection.userAccessToken);
   let section: AdsSection;
   try {
-    section = { ads: await settle(() => loadAds(adAccountId, userToken, range, connection.adCurrency ?? "USD")), needsReconnect: false };
+    section = { ads: await settle(() => loadAds(adAccountId, userToken, range, connection.adCurrency ?? "USD")), needsReconnect: false, fetchedAt: new Date().toISOString() };
   } catch (err) {
     if (err instanceof MetaApiError && err.needsReconnect) return { ads: null, needsReconnect: true };
     throw err;

@@ -214,21 +214,19 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
   return (
     <section className="fl-ai-frame rounded-[1.35rem] p-[1.5px]">
       <div className="space-y-5 rounded-[1.3rem] bg-surface p-4 md:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="flex min-w-0 items-center gap-3">
             <span className="fl-ai-badge flex h-10 w-10 flex-none items-center justify-center rounded-xl text-lg text-white">✦</span>
             <div className="min-w-0">
               <h2 className="text-lg font-semibold leading-tight text-ink">Diagnóstico con IA</h2>
-              <p className="text-sm text-ink-muted">
-                La IA revisa tus publicaciones y tus anuncios reales, te dice qué funciona, qué cambiar en cada campaña y te da ideas listas para usar.
-              </p>
+              <p className="max-w-xl text-sm text-ink-muted">Revisa tus publicaciones y tus anuncios reales y te dice qué hacer.</p>
             </div>
           </div>
           <button
             type="button"
             onClick={generate}
             disabled={isPending}
-            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            className="flex flex-none items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
           >
             {isPending && <span className="h-2 w-2 animate-pulse rounded-full bg-accent-ink" />}
             {isPending ? "Analizando…" : current ? "Actualizar" : "Analizar con IA"}
@@ -243,10 +241,22 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
         )}
         {notice && <p className="rounded-lg border border-border-strong bg-surface-2 p-3 text-sm text-ink">{notice}</p>}
         {!current && !notice && !isPending && (
-          <p className="text-sm text-ink-muted">
-            Toca «Analizar con IA» y en un minuto sabrás qué publicaciones le gustan a tu audiencia, cuándo publicar, qué cambiar en tus campañas y qué
-            hacer esta semana.
-          </p>
+          <div className="space-y-3 border-t border-border pt-4">
+            <p className="text-sm font-semibold text-ink">En un minuto sabrás:</p>
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                ["📝", "Qué publicaciones le gustan a tu audiencia"],
+                ["🕒", "Qué días y horas publicar"],
+                ["📣", "Qué cambiar en cada campaña y dónde poner tu dinero"],
+                ["💡", "Ideas de publicaciones y anuncios listas para copiar"],
+              ].map(([icon, text]) => (
+                <li key={text} className="flex items-start gap-2.5 rounded-xl bg-surface-2/60 p-3 text-sm leading-snug text-ink">
+                  <span aria-hidden="true">{icon}</span>
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {d?.anuncios && (

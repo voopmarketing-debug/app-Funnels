@@ -3,7 +3,7 @@ import { InfoTip } from "./InfoTip";
 // Status colors are a small fixed scale with reserved meaning, never reused
 // for chart series identity. They always ship with a dot + a text label,
 // never color alone.
-const STATUS_STYLES: Record<"good" | "warning" | "critical" | "neutral", { dot: string; label: string; bg: string; fg: string }> = {
+export const STATUS_STYLES: Record<"good" | "warning" | "critical" | "neutral", { dot: string; label: string; bg: string; fg: string }> = {
   good: { dot: "#0ca30c", label: "Bien", bg: "rgba(12,163,12,0.12)", fg: "var(--status-good)" },
   warning: { dot: "#fab219", label: "Atención", bg: "rgba(250,178,25,0.16)", fg: "var(--status-warn)" },
   critical: { dot: "#d03b3b", label: "Mejorar", bg: "rgba(208,59,59,0.12)", fg: "var(--status-bad)" },

@@ -180,7 +180,7 @@ export function DateRangePicker({
             <path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </span>
-        {label && <span className="font-normal text-ink-muted">{label}:</span>}
+        {label && <span className="hidden font-normal text-ink-muted sm:inline">{label}:</span>}
         <span className="tabular-nums">{rangeLabel(value)}</span>
         {activePreset && <span className="hidden font-normal text-ink-muted sm:inline">· {activePreset.label}</span>}
         <span className="text-ink-muted" aria-hidden="true">
