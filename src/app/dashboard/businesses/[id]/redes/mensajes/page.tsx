@@ -1,12 +1,13 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { MetaApiError, friendlyMetaError } from "@/lib/metaSocial";
-import { REPLY_WINDOW_MS, isConversationId, isMissingPermission, listThreads, threadMessages, type InboxMessage, type InboxNetwork, type InboxThread } from "@/lib/metaInbox";
+import { REPLY_WINDOW_MS, isMissingPermission, listThreads, threadMessages, type InboxMessage, type InboxNetwork, type InboxThread } from "@/lib/metaInbox";
 import { cachedThreads } from "@/lib/inboxCache";
-import { parseRange, rangeLabel, todayInColombia } from "@/lib/socialRanges";
+import { parseRange, rangeLabel, todayInColombia, type DayRange } from "@/lib/socialRanges";
 import { RedesTabs } from "../RedesTabs";
 import { FacebookGlyph, InstagramGlyph } from "../icons";
 import { shortDateTime } from "../format";
@@ -95,18 +96,51 @@ function MessageBubble({ m }: { m: InboxMessage }) {
   );
 }
 
-export default async function MensajesPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ c?: string; f?: string; red?: string; q?: string; desde?: string; hasta?: string }>;
-}) {
+type InboxSearch = { c?: string; f?: string; red?: string; q?: string; desde?: string; hasta?: string };
+
+function InboxSkeleton() {
+  return (
+    <div className="grid min-h-[70vh] overflow-hidden rounded-2xl border border-border bg-surface md:grid-cols-[minmax(17rem,22rem)_1fr]" aria-busy="true">
+      <div className="space-y-3 border-border p-3 md:border-r">
+        <div className="h-8 w-2/3 animate-pulse rounded-lg bg-surface-2" />
+        <div className="h-9 animate-pulse rounded-lg bg-surface-2" />
+        <div className="h-9 animate-pulse rounded-lg bg-surface-2" />
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="flex gap-3 pt-2">
+            <div className="h-10 w-10 flex-none animate-pulse rounded-full bg-surface-2" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-1/2 animate-pulse rounded bg-surface-2" />
+              <div className="h-3 w-4/5 animate-pulse rounded bg-surface-2" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden items-center justify-center p-10 text-sm text-ink-muted md:flex">Trayendo tus conversaciones de Meta…</div>
+    </div>
+  );
+}
+
+function PaneSkeleton() {
+  return (
+    <>
+      <div className="max-h-[55vh] flex-1 space-y-3 bg-background/40 p-4" aria-busy="true">
+        {[["w-2/5", "justify-start"], ["w-1/2", "justify-end"], ["w-1/3", "justify-start"]].map(([w, side], i) => (
+          <div key={i} className={`flex ${side}`}>
+            <div className={`h-12 animate-pulse rounded-2xl bg-surface-2 ${w}`} />
+          </div>
+        ))}
+        <p className="pt-2 text-center text-xs text-ink-muted">Cargando la conversación…</p>
+      </div>
+      <div className="border-t border-border p-3">
+        <div className="h-11 animate-pulse rounded-lg bg-surface-2" />
+      </div>
+    </>
+  );
+}
+
+export default async function MensajesPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<InboxSearch> }) {
   const { id } = await params;
   const sp = await searchParams;
-  const filter: FilterKey = FILTERS.some((f) => f.key === sp.f) ? (sp.f as FilterKey) : "pendientes";
-  const networkFilter: InboxNetwork | "todas" = sp.red === "facebook" || sp.red === "instagram" ? sp.red : "todas";
-  const query = (sp.q ?? "").trim().toLowerCase();
   // Optional date filter ("this month"): by the conversation's last activity.
   const today = todayInColombia();
   const range = sp.desde && sp.hasta ? parseRange({ desde: sp.desde, hasta: sp.hasta }, today) : null;
@@ -152,28 +186,64 @@ export default async function MensajesPage({
     );
   }
 
-  const pageId = connection.fbPageId;
-  const igUserId = connection.igUserId;
-  const pageToken = decryptSecret(connection.pageAccessToken);
+  // Header, filters and the date picker show at once; the conversations
+  // (from Meta, cached) stream in after them.
+  return (
+    <div className="min-w-0 space-y-6">
+      {header}
+      <InboxPoller />
+      <div className="flex flex-wrap items-center gap-3">
+        <DateRangePicker
+          value={range}
+          today={today}
+          emptyLabel="Todas las fechas"
+          hint="Se muestran las conversaciones con actividad en esas fechas."
+          resetParams={["c"]}
+          label="Fechas"
+        />
+      </div>
+      <Suspense fallback={<InboxSkeleton />}>
+        <InboxBody
+          businessId={id}
+          sp={sp}
+          range={range}
+          canManage={canManage}
+          pageId={connection.fbPageId}
+          igUserId={connection.igUserId}
+          encryptedPageToken={connection.pageAccessToken}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+async function InboxBody({
+  businessId: id,
+  sp,
+  range,
+  canManage,
+  pageId,
+  igUserId,
+  encryptedPageToken,
+}: {
+  businessId: string;
+  sp: InboxSearch;
+  range: DayRange | null;
+  canManage: boolean;
+  pageId: string;
+  igUserId: string | null;
+  encryptedPageToken: string;
+}) {
+  const filter: FilterKey = FILTERS.some((f) => f.key === sp.f) ? (sp.f as FilterKey) : "pendientes";
+  const networkFilter: InboxNetwork | "todas" = sp.red === "facebook" || sp.red === "instagram" ? sp.red : "todas";
+  const query = (sp.q ?? "").trim().toLowerCase();
+  const pageToken = decryptSecret(encryptedPageToken);
   const networks: InboxNetwork[] = igUserId ? ["facebook", "instagram"] : ["facebook"];
 
   let missingPermission = false;
   let needsReconnect = false;
   const errors: string[] = [];
-  // The lists (cached for a few seconds) and the open conversation's messages
-  // are read at the same time: they don't depend on each other.
-  const openId = sp.c && isConversationId(sp.c) ? sp.c : null;
-  const openRead = openId
-    ? threadMessages({ conversationId: openId, pageId, igUserId, pageToken }).then(
-        (m) => ({ messages: m, error: null as string | null }),
-        (err) => {
-          console.error("[social inbox] thread failed", err);
-          return { messages: [] as InboxMessage[], error: friendlyMetaError(err) };
-        },
-      )
-    : null;
-  const [fetched, open] = await Promise.all([
-    Promise.all(
+  const fetched = await Promise.all(
     networks.map((network) =>
       cachedThreads(id, network, () => listThreads({ pageId, igUserId, pageToken, network })).catch((err) => {
         if (err instanceof MetaApiError && err.needsReconnect) needsReconnect = true;
@@ -183,9 +253,7 @@ export default async function MensajesPage({
         return [] as InboxThread[];
       }),
     ),
-    ),
-    openRead,
-  ]);
+  );
   const threads = fetched.flat();
   const states = await prisma.socialThreadState.findMany({ where: { businessId: id, conversationId: { in: threads.map((t) => t.id) } } });
   const stateById = new Map(states.map((s) => [s.conversationId, s]));
@@ -213,22 +281,9 @@ export default async function MensajesPage({
   );
   const counts = { pendientes: inRange.filter((r) => !r.resolved).length, "sin-leer": inRange.filter((r) => r.unread).length, todos: inRange.length };
 
-  const selected = sp.c ? rows.find((r) => r.id === sp.c) ?? null : null;
   // Only a conversation of this Page's list is shown (the id comes from the URL).
-  const messages: InboxMessage[] = selected && open ? open.messages : [];
-  const threadError: string | null = selected && open ? open.error : null;
-  if (selected) {
-    if (selected.unread) {
-      await prisma.socialThreadState.upsert({
-        where: { businessId_conversationId: { businessId: id, conversationId: selected.id } },
-        create: { businessId: id, conversationId: selected.id, network: selected.network, readAt: new Date() },
-        update: { readAt: new Date() },
-      });
-    }
-  }
-  const lastCustomerAt = [...messages].reverse().find((m) => m.fromCustomer)?.createdAt ?? selected?.lastCustomerAt ?? null;
+  const selected = sp.c ? (rows.find((r) => r.id === sp.c) ?? null) : null;
   const now = nowMs();
-  const windowOpen = !!lastCustomerAt && now - Date.parse(lastCustomerAt) < REPLY_WINDOW_MS;
 
   const href = (over: Record<string, string | null>) => {
     const p = new URLSearchParams();
@@ -240,9 +295,6 @@ export default async function MensajesPage({
 
   return (
     <div className="min-w-0 space-y-6">
-      {header}
-      <InboxPoller />
-
       {(missingPermission || needsReconnect) && (
         <section className="fl-card-hero space-y-3 p-5">
           <h2 className="text-base font-semibold">{needsReconnect ? "Tu conexión con Facebook venció" : "Falta dar permiso para leer tus mensajes"}</h2>
@@ -263,22 +315,11 @@ export default async function MensajesPage({
       {errors.length > 0 && (
         <p className="rounded-xl border border-border bg-surface p-3 text-sm text-ink-muted">Meta no devolvió algunos mensajes ahora: {errors.join(" · ")}</p>
       )}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <DateRangePicker
-          value={range}
-          today={today}
-          emptyLabel="Todas las fechas"
-          hint="Se muestran las conversaciones con actividad en esas fechas."
-          resetParams={["c"]}
-          label="Fechas"
-        />
-        {range && (
-          <p className="text-xs text-ink-muted">
-            {inRange.length} {inRange.length === 1 ? "conversación" : "conversaciones"} con actividad del {rangeLabel(range).replace(" – ", " al ")}
-          </p>
-        )}
-      </div>
+      {range && (
+        <p className="text-xs text-ink-muted">
+          {inRange.length} {inRange.length === 1 ? "conversación" : "conversaciones"} con actividad del {rangeLabel(range).replace(" – ", " al ")}
+        </p>
+      )}
 
       <div className="grid min-h-[70vh] overflow-hidden rounded-2xl border border-border bg-surface md:grid-cols-[minmax(17rem,22rem)_1fr]">
         {/* Thread list (hidden on phones while a conversation is open). */}
@@ -403,22 +444,9 @@ export default async function MensajesPage({
                   resolved={selected.resolved}
                 />
               </div>
-              <div className="max-h-[55vh] flex-1 space-y-2.5 overflow-y-auto bg-background/40 p-4">
-                {threadError ? (
-                  <p className="text-sm text-ink-muted">No pudimos traer los mensajes: {threadError}</p>
-                ) : (
-                  messages.map((m) => <MessageBubble key={m.id} m={m} />)
-                )}
-                <ScrollToBottom dep={`${selected.id}:${messages.length}`} />
-              </div>
-              <div className="border-t border-border p-3">
-                <ReplyBox
-                  key={selected.id}
-                  businessId={id}
-                  thread={{ conversationId: selected.id, network: selected.network, recipientId: selected.customerId }}
-                  windowOpen={windowOpen}
-                />
-              </div>
+              <Suspense key={selected.id} fallback={<PaneSkeleton />}>
+                <ThreadPane businessId={id} selected={selected} pageId={pageId} igUserId={igUserId} pageToken={pageToken} />
+              </Suspense>
             </>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-10 text-center">
@@ -432,5 +460,56 @@ export default async function MensajesPage({
         </section>
       </div>
     </div>
+  );
+}
+
+/** The open conversation's messages, read live from Meta; the list around it is already on screen. */
+async function ThreadPane({
+  businessId,
+  selected,
+  pageId,
+  igUserId,
+  pageToken,
+}: {
+  businessId: string;
+  selected: Row;
+  pageId: string;
+  igUserId: string | null;
+  pageToken: string;
+}) {
+  const markRead = selected.unread
+    ? prisma.socialThreadState.upsert({
+        where: { businessId_conversationId: { businessId, conversationId: selected.id } },
+        create: { businessId, conversationId: selected.id, network: selected.network, readAt: new Date() },
+        update: { readAt: new Date() },
+      })
+    : null;
+  let messages: InboxMessage[] = [];
+  let threadError: string | null = null;
+  try {
+    messages = await threadMessages({ conversationId: selected.id, pageId, igUserId, pageToken });
+  } catch (err) {
+    console.error("[social inbox] thread failed", err);
+    threadError = friendlyMetaError(err);
+  }
+  await markRead;
+  const lastCustomerAt = [...messages].reverse().find((m) => m.fromCustomer)?.createdAt ?? selected.lastCustomerAt ?? null;
+  const windowOpen = !!lastCustomerAt && nowMs() - Date.parse(lastCustomerAt) < REPLY_WINDOW_MS;
+
+  return (
+    <>
+      <div className="max-h-[55vh] flex-1 space-y-2.5 overflow-y-auto bg-background/40 p-4">
+        {threadError ? <p className="text-sm text-ink-muted">No pudimos traer los mensajes: {threadError}</p> : messages.map((m) => <MessageBubble key={m.id} m={m} />)}
+        <ScrollToBottom dep={`${selected.id}:${messages.length}`} />
+      </div>
+      <div className="border-t border-border p-3">
+        <ReplyBox
+          key={selected.id}
+          businessId={businessId}
+          thread={{ conversationId: selected.id, network: selected.network, recipientId: selected.customerId }}
+          windowOpen={windowOpen}
+        />
+      </div>
+    </>
   );
 }

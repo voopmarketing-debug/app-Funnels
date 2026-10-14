@@ -7,7 +7,7 @@ import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { friendlyMetaError, listAdAccounts, listPages } from "@/lib/metaSocial";
 import { isConversationId, sendReply, threadParticipantIds } from "@/lib/metaInbox";
-import { clearInboxCache } from "@/lib/inboxCache";
+import { invalidateInboxCache } from "@/lib/inboxCache";
 import { isCommentId, privateReplyToComment, replyToComment, setCommentHidden, type CommentNetwork } from "@/lib/metaComments";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { MAX_RULES, parseKeywords, subscribePageToComments, sweepCommentAutoReplies } from "@/lib/commentAutoReply";
@@ -172,7 +172,7 @@ export async function sendSocialReply(
     create: { businessId, conversationId: thread.conversationId, network: thread.network, readAt: new Date() },
     update: { readAt: new Date() },
   });
-  await clearInboxCache(businessId);
+  await invalidateInboxCache(businessId);
   revalidatePath(inboxPath(businessId));
   return { ok: true };
 }
