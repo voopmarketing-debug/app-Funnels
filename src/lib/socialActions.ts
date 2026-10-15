@@ -8,6 +8,7 @@ import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/au
 import { friendlyMetaError, listAdAccounts, listPages } from "@/lib/metaSocial";
 import { isConversationId, sendReply, threadParticipantIds } from "@/lib/metaInbox";
 import { invalidateInboxCache } from "@/lib/inboxCache";
+import { THREAD_ACTIONS, threadPatch, type ThreadAction } from "@/lib/threadState";
 import { isCommentId, privateReplyToComment, replyToComment, setCommentHidden, type CommentNetwork } from "@/lib/metaComments";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { MAX_RULES, parseKeywords, subscribePageToComments, sweepCommentAutoReplies } from "@/lib/commentAutoReply";
@@ -177,17 +178,19 @@ export async function sendSocialReply(
   return { ok: true };
 }
 
-export async function setSocialThreadResolved(
+/** The "three dots" menu of a conversation: read / unread, answered, closed (see lib/threadState.ts). */
+export async function updateSocialThread(
   businessId: string,
   thread: { conversationId: string; network: "facebook" | "instagram" },
-  resolved: boolean,
+  action: ThreadAction,
 ): Promise<void> {
   await requireBusinessMembership(await userId(), businessId);
-  if (!isConversationId(thread.conversationId) || !NETWORKS.has(thread.network)) return;
+  if (!isConversationId(thread.conversationId) || !NETWORKS.has(thread.network) || !THREAD_ACTIONS.includes(action)) return;
+  const patch = threadPatch(action, new Date());
   await prisma.socialThreadState.upsert({
     where: { businessId_conversationId: { businessId, conversationId: thread.conversationId } },
-    create: { businessId, conversationId: thread.conversationId, network: thread.network, resolvedAt: resolved ? new Date() : null, readAt: new Date() },
-    update: { resolvedAt: resolved ? new Date() : null },
+    create: { businessId, conversationId: thread.conversationId, network: thread.network, ...patch },
+    update: patch,
   });
   revalidatePath(inboxPath(businessId));
 }

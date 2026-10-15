@@ -1035,7 +1035,12 @@ model SocialThreadState {
   conversationId String
   network        String
   readAt         DateTime?
+  // Closed by the team; a new message from the customer reopens it.
   resolvedAt     DateTime?
+  // Answered outside the platform (from the phone, in person); also reopened by a new message.
+  answeredAt     DateTime?
+  // Marked as unread by hand.
+  unreadAt       DateTime?
   updatedAt      DateTime  @updatedAt
 
   @@unique([businessId, conversationId])

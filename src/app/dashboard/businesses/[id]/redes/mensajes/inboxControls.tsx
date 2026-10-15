@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useLinkStatus } from "next/link";
 import { useRouter } from "next/navigation";
-import { sendSocialReply, setSocialThreadResolved } from "@/lib/socialActions";
+import { sendSocialReply, updateSocialThread } from "@/lib/socialActions";
+import type { ThreadAction, ThreadFlags } from "@/lib/threadState";
 
 const POLL_MS = 30_000;
 const IDLE_STOP_MS = 30 * 60_000;
@@ -64,13 +65,128 @@ export function ResolveButton({ businessId, thread, resolved }: { businessId: st
     <button
       type="button"
       disabled={pending}
-      onClick={() => start(() => setSocialThreadResolved(businessId, thread, !resolved))}
+      onClick={() => start(() => updateSocialThread(businessId, thread, resolved ? "reopen" : "close"))}
       className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 ${
         resolved ? "border-border text-ink-muted hover:text-ink" : "border-accent/50 bg-accent/10 text-ink hover:bg-accent/20"
       }`}
     >
-      {resolved ? "Reabrir" : "✓ Marcar como resuelta"}
+      {resolved ? "Reabrir" : "✓ Cerrar conversación"}
     </button>
+  );
+}
+
+type MenuItem = { action: ThreadAction; label: string; hint: string };
+
+/**
+ * The "⋯" menu of a conversation (in the list and in the open conversation):
+ * mark it read or unread, answered outside the platform, or closed. It opens
+ * over everything (fixed position) so the scrolling list can't cut it off.
+ */
+export function ThreadMenu({ businessId, thread, flags }: { businessId: string; thread: ThreadRef; flags: Pick<ThreadFlags, "unread" | "answered" | "closed"> }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+  const [pending, start] = useTransition();
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!menu.current?.contains(t) && !button.current?.contains(t)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        button.current?.focus();
+      }
+    };
+    // The menu is positioned from the button when it opens: scrolling the list or resizing closes it.
+    // (Not the first instant: focusing the first item can fire a scroll event of its own.)
+    let armed = false;
+    const arm = setTimeout(() => (armed = true), 150);
+    const away = () => armed && setOpen(false);
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", esc);
+    window.addEventListener("scroll", away, true);
+    window.addEventListener("resize", away);
+    menu.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    return () => {
+      clearTimeout(arm);
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", esc);
+      window.removeEventListener("scroll", away, true);
+      window.removeEventListener("resize", away);
+    };
+  }, [open]);
+
+  const items: MenuItem[] = [
+    flags.unread
+      ? { action: "read", label: "Marcar como leída", hint: "Quita el punto de sin leer" }
+      : { action: "unread", label: "Marcar como no leída", hint: "Para volver a ella después" },
+    flags.answered
+      ? { action: "unanswered", label: "Quitar “respondida”", hint: "Vuelve a esperar tu respuesta" }
+      : { action: "answered", label: "Marcar como respondida", hint: "Ya la atendiste por otro medio" },
+    flags.closed
+      ? { action: "reopen", label: "Reabrir conversación", hint: "Vuelve a la lista de abiertas" }
+      : { action: "close", label: "Cerrar conversación", hint: "Ya está resuelta" },
+  ];
+
+  function toggle(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!open && button.current) {
+      const r = button.current.getBoundingClientRect();
+      // Below the button, or above it when the list's bottom is close.
+      const room = window.innerHeight - r.bottom;
+      setPos({ top: room < 200 ? Math.max(8, r.top - 176) : r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+    }
+    setOpen((v) => !v);
+  }
+
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        onClick={toggle}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Más opciones de esta conversación"
+        title="Más opciones"
+        disabled={pending}
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-lg leading-none text-ink-muted transition hover:bg-surface-2 hover:text-ink focus-visible:bg-surface-2 disabled:opacity-50"
+      >
+        ⋯
+      </button>
+      {open && (
+        <ul
+          ref={menu}
+          role="menu"
+          style={{ position: "fixed", top: pos.top, right: pos.right }}
+          className="z-50 w-64 rounded-xl border border-border-strong bg-surface p-1 shadow-2xl"
+        >
+          {items.map((it) => (
+            <li key={it.action} role="none">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOpen(false);
+                  start(() => updateSocialThread(businessId, thread, it.action));
+                }}
+                className="block w-full rounded-lg px-3 py-2 text-left transition hover:bg-surface-2 focus-visible:bg-surface-2"
+              >
+                <span className="block text-sm font-semibold text-ink">{it.label}</span>
+                <span className="block text-[11px] text-ink-muted">{it.hint}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

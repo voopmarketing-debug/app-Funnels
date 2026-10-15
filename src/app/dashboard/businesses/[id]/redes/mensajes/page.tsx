@@ -12,16 +12,18 @@ import { RedesTabs } from "../RedesTabs";
 import { FacebookGlyph, InstagramGlyph } from "../icons";
 import { shortDateTime } from "../format";
 import { DateRangePicker } from "../DateRangePicker";
-import { InboxPoller, LinkPending, ReplyBox, ResolveButton, ScrollToBottom } from "./inboxControls";
+import { threadFlags } from "@/lib/threadState";
+import { InboxPoller, LinkPending, ReplyBox, ResolveButton, ScrollToBottom, ThreadMenu } from "./inboxControls";
 
 // Messenger + Instagram Direct for the connected Page, answered by people on
 // the team. Read live from Meta on every visit (and every 30 s while open and in use);
 // only read/resolved state is stored here.
 
 const FILTERS = [
-  { key: "pendientes", label: "Sin resolver" },
+  { key: "pendientes", label: "Abiertas" },
   { key: "sin-leer", label: "Sin leer" },
-  { key: "todos", label: "Todos" },
+  { key: "cerradas", label: "Cerradas" },
+  { key: "todos", label: "Todas" },
 ] as const;
 type FilterKey = (typeof FILTERS)[number]["key"];
 
@@ -30,7 +32,7 @@ const NETWORK_STYLE: Record<InboxNetwork, { label: string; color: string; glyph:
   instagram: { label: "Instagram", color: "var(--series-ig)", glyph: <InstagramGlyph />, tile: "linear-gradient(135deg, #f58529, #dd2a7b 55%, #8134af)" },
 };
 
-type Row = InboxThread & { unread: boolean; resolved: boolean };
+type Row = InboxThread & { unread: boolean; waiting: boolean; resolved: boolean; answered: boolean };
 
 const nowMs = () => Date.now();
 
@@ -260,12 +262,9 @@ async function InboxBody({
 
   const rows: Row[] = threads
     .map((t) => {
-      const s = stateById.get(t.id);
-      const updated = Date.parse(t.updatedAt);
-      // A new message from the customer reopens a resolved thread.
-      const resolved = !!s?.resolvedAt && !(t.lastFromCustomer && updated > s.resolvedAt.getTime());
-      const unread = t.lastFromCustomer && (!s?.readAt || updated > s.readAt.getTime());
-      return { ...t, unread, resolved };
+      // Read / answered / closed marks by the team; a new message from the customer reopens the thread.
+      const { unread, waiting, answered, closed } = threadFlags(t, stateById.get(t.id));
+      return { ...t, unread, waiting, answered, resolved: closed };
     })
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
@@ -276,10 +275,15 @@ async function InboxBody({
   const visible = inRange.filter(
     (r) =>
       (networkFilter === "todas" || r.network === networkFilter) &&
-      (filter === "todos" || (filter === "pendientes" ? !r.resolved : r.unread)) &&
+      (filter === "todos" || (filter === "pendientes" ? !r.resolved : filter === "cerradas" ? r.resolved : r.unread)) &&
       (!query || r.customerName.toLowerCase().includes(query) || r.snippet.toLowerCase().includes(query)),
   );
-  const counts = { pendientes: inRange.filter((r) => !r.resolved).length, "sin-leer": inRange.filter((r) => r.unread).length, todos: inRange.length };
+  const counts = {
+    pendientes: inRange.filter((r) => !r.resolved).length,
+    "sin-leer": inRange.filter((r) => r.unread).length,
+    cerradas: inRange.filter((r) => r.resolved).length,
+    todos: inRange.length,
+  };
 
   // Only a conversation of this Page's list is shown (the id comes from the URL).
   const selected = sp.c ? (rows.find((r) => r.id === sp.c) ?? null) : null;
@@ -365,14 +369,14 @@ async function InboxBody({
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
               />
             </form>
-            <div role="tablist" className="fl-seg grid w-full grid-cols-3">
+            <div role="tablist" className="fl-seg grid w-full grid-cols-4">
               {FILTERS.map((f) => (
                 <Link
                   key={f.key}
                   href={href({ f: f.key, c: null })}
                   role="tab"
                   aria-selected={filter === f.key}
-                  className="fl-seg-item px-1 text-xs"
+                  className="fl-seg-item flex-col gap-0 px-0.5 py-1.5 text-[11px] leading-tight"
                 >
                   {f.label}
                   <span className="font-normal opacity-75">{counts[f.key]}</span>
@@ -382,10 +386,10 @@ async function InboxBody({
           </div>
           <ul className="max-h-[65vh] flex-1 divide-y divide-border overflow-y-auto">
             {visible.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} className="relative">
                 <Link
                   href={href({ c: r.id })}
-                  className={`flex gap-3 px-3 py-3 transition hover:bg-surface-2/70 ${selected?.id === r.id ? "bg-accent/10" : ""}`}
+                  className={`flex gap-3 py-3 pl-3 pr-11 transition hover:bg-surface-2/70 ${selected?.id === r.id ? "bg-accent/10" : ""}`}
                 >
                   <Avatar name={r.customerName} network={r.network} />
                   <div className="min-w-0 flex-1">
@@ -402,10 +406,23 @@ async function InboxBody({
                         {r.snippet || "Archivo o foto"}
                       </p>
                       {r.unread && <span className="ml-auto h-2.5 w-2.5 flex-none rounded-full bg-accent" aria-label="Sin leer" />}
-                      {r.resolved && <span className="ml-auto flex-none text-[11px] text-ink-faint">✓ Resuelta</span>}
+                      {r.resolved ? (
+                        <span className="ml-auto flex-none text-[11px] text-ink-faint">✓ Cerrada</span>
+                      ) : r.answered ? (
+                        <span className="ml-auto flex-none text-[11px] text-ink-faint">✓ Respondida</span>
+                      ) : null}
                     </div>
                   </div>
                 </Link>
+                {/* Outside the link (a button can't live inside one): the conversation's "⋯" menu. */}
+                {/* No transform here: it would make the menu's fixed position relative to this box. */}
+                <div className="absolute inset-y-0 right-1.5 flex items-center">
+                  <ThreadMenu
+                    businessId={id}
+                    thread={{ conversationId: r.id, network: r.network, recipientId: r.customerId }}
+                    flags={{ unread: r.unread, answered: r.answered, closed: r.resolved }}
+                  />
+                </div>
               </li>
             ))}
             {visible.length === 0 && (
@@ -438,11 +455,19 @@ async function InboxBody({
                     </p>
                   </div>
                 </div>
-                <ResolveButton
-                  businessId={id}
-                  thread={{ conversationId: selected.id, network: selected.network, recipientId: selected.customerId }}
-                  resolved={selected.resolved}
-                />
+                <div className="flex items-center gap-1.5">
+                  {selected.answered && <span className="rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-ink-muted">✓ Respondida</span>}
+                  <ResolveButton
+                    businessId={id}
+                    thread={{ conversationId: selected.id, network: selected.network, recipientId: selected.customerId }}
+                    resolved={selected.resolved}
+                  />
+                  <ThreadMenu
+                    businessId={id}
+                    thread={{ conversationId: selected.id, network: selected.network, recipientId: selected.customerId }}
+                    flags={{ unread: selected.unread, answered: selected.answered, closed: selected.resolved }}
+                  />
+                </div>
               </div>
               <Suspense key={selected.id} fallback={<PaneSkeleton />}>
                 <ThreadPane businessId={id} selected={selected} pageId={pageId} igUserId={igUserId} pageToken={pageToken} />
@@ -477,7 +502,8 @@ async function ThreadPane({
   igUserId: string | null;
   pageToken: string;
 }) {
-  const markRead = selected.unread
+  // Opening a conversation reads what the customer wrote; a hand-made "unread" mark is left alone.
+  const markRead = selected.waiting
     ? prisma.socialThreadState.upsert({
         where: { businessId_conversationId: { businessId, conversationId: selected.id } },
         create: { businessId, conversationId: selected.id, network: selected.network, readAt: new Date() },
