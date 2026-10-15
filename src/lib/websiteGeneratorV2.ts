@@ -14,6 +14,7 @@ import {
   formatMoney,
 } from "@/lib/websiteContentV2";
 import { recordAnthropicUsage } from "@/lib/aiUsage";
+import { carryOver, MAX_SECTIONS } from "@/lib/websiteBlocks";
 import { AiPageSchema, fromAiPage, keepKnownImages, toAiSection, type AiPage } from "@/lib/websiteAiFormat";
 
 // Same model the v1 generator has been running on in production — a page
@@ -225,7 +226,7 @@ PASO 7 · REVISIÓN FINAL ANTES DE RESPONDER
 ¿El titular solo podría ser de este negocio? ¿Cada sección tiene un dato concreto? ¿Hay algo inventado? ¿El estilo encaja con el rubro y el brief? ¿Algún texto suena a relleno de IA? Corrige lo que falle. La primera sección es siempre "hero"; entre 6 y 10 secciones en total.`;
 }
 
-function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: string | null; allowedImages?: ReadonlySet<string> }): WebsiteContentV2 {
+function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: string | null; allowedImages?: ReadonlySet<string>; maxSections?: number }): WebsiteContentV2 {
   const ids = new Set(ctx.products.map((p) => p.id));
   const allowed = ctx.allowedImages ?? new Set<string>();
   const sections = ai.sections
@@ -240,7 +241,7 @@ function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: 
       return s;
     })
     .map((s) => keepKnownImages(s, allowed))
-    .slice(0, 12);
+    .slice(0, ctx.maxSections ?? 12);
   // Always open with a hero.
   const heroIndex = sections.findIndex((s) => s.type === "hero");
   if (heroIndex > 0) sections.unshift(...sections.splice(heroIndex, 1));
@@ -284,10 +285,9 @@ Lo que cambies debe tener nivel de agencia premium: copy concreto, sin relleno d
   const ai = fromAiPage(await generatePageJson(prompt));
   // What the page already uses stays valid even if the photo left the library list.
   const allowedImages = new Set([...photos.map((p) => p.url), ...current.sections.flatMap((s) => [s.image, s.bgImage]).filter((u): u is string => !!u)]);
-  const next = normalize(ai, { products, ctaUrl: current.heroCtaUrl, allowedImages });
-  // Keep the owner's hide toggles only while the section list is the same shape.
-  const sameShape = next.sections.length === current.sections.length && next.sections.every((s, i) => s.type === current.sections[i].type);
-  return { ...next, hidden: sameShape ? current.hidden : [] };
+  const next = normalize(ai, { products, ctaUrl: current.heroCtaUrl, allowedImages, maxSections: MAX_SECTIONS });
+  // The owner's own styling and hidden blocks follow their sections, even when the AI reordered or retitled them.
+  return carryOver(current, next);
 }
 
 // ---------------------------------------------------------------------------

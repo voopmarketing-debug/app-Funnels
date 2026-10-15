@@ -1,6 +1,7 @@
 import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS } from "@/lib/websiteContent";
 import { readableTextColor, sanitizeHexColor } from "@/lib/websiteTemplate";
+import { LOOK_CSS, lookParts } from "@/lib/websiteLook";
 import {
   formatMoney,
   type CatalogProduct,
@@ -418,11 +419,19 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   const decorate = (html: string, s: Section, index: number): string =>
     html.replace(/^(\s*)<section\b([^>]*)>/, (_m, lead: string, attrs: string) => {
       const bgUrl = safeUrl(s.bgImage);
-      let a = attrs;
-      if (bgUrl && !/class="hero hero-full"/.test(a)) {
-        a = /class="/.test(a) ? a.replace(/class="([^"]*)"/, 'class="$1 has-bg"') : `${a} class="has-bg"`;
-        a += ` style="--bgimg:url('${cssUrl(bgUrl)}')"`;
+      const photoBg = !!bgUrl || /class="hero hero-full"/.test(attrs);
+      const classes: string[] = [];
+      const styles: string[] = [];
+      if (bgUrl && !/class="hero hero-full"/.test(attrs)) {
+        classes.push("has-bg");
+        styles.push(`--bgimg:url('${cssUrl(bgUrl)}')`);
       }
+      const look = lookParts(s.look, { photoBg, showAll: edit });
+      classes.push(...look.classes);
+      styles.push(...Object.entries(look.vars).map(([k, v]) => `${k}:${v}`));
+      let a = attrs;
+      if (classes.length) a = /class="/.test(a) ? a.replace(/class="([^"]*)"/, `class="$1 ${classes.join(" ")}"`) : `${a} class="${classes.join(" ")}"`;
+      if (styles.length) a = /style="/.test(a) ? a.replace(/style="([^"]*)"/, (_x, css: string) => `style="${css};${styles.join(";")}"`) : `${a} style="${styles.join(";")}"`;
       return `${lead}<section${a}${edit ? ` data-sec="${index}" data-type="${s.type}"` : ""}>`;
     });
   const body = sections.map(({ s, i }) => decorate(renderSection(s, i), s, i)).join("\n");
@@ -461,8 +470,8 @@ html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--bf);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
 img{max-width:100%;display:block}
 h1,h2,h3{font-family:var(--hf);font-weight:${style.headingWeight};letter-spacing:${style.headingTracking};text-transform:${style.headingTransform};line-height:1.06;margin:0 0 .5em;text-wrap:balance}
-h1{font-size:${style.h1}}
-h2{font-size:${style.h2};line-height:1.1}
+h1{font-size:calc(${style.h1} * var(--ts,1))}
+h2{font-size:calc(${style.h2} * var(--ts,1));line-height:1.1}
 h3{font-size:19px;line-height:1.25;letter-spacing:-.01em;text-transform:none}
 p{margin:0 0 1em}
 a{color:inherit}
@@ -654,6 +663,7 @@ footer.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
   ${isShop ? ".mbar{display:block;position:sticky;bottom:0;z-index:30;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-top:1px solid var(--line)} .mbar .btn{width:100%}" : ""}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+${LOOK_CSS}
 </style>
 </head>
 <body class="st-${content.style} pt-${content.pageType}">

@@ -4,7 +4,9 @@ import { TrackingSettings } from "./TrackingSettings";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { applyWebsitePromptV2, regenerateWebsitePageV2, setWebsiteSectionImageV2, updateWebsiteDesignV2, updateWebsiteTextV2 } from "@/lib/actions";
+import { applyWebsitePromptV2, editWebsiteBlocksV2, regenerateWebsitePageV2, restoreWebsiteContentV2, setWebsiteSectionImageV2, updateWebsiteDesignV2, updateWebsiteTextV2 } from "@/lib/actions";
+import type { BlockOp } from "@/lib/websiteBlocks";
+import { lookParts, type Look } from "@/lib/websiteLook";
 import {
   PAGE_TYPE_LABELS,
   SECTION_LABELS,
@@ -18,9 +20,12 @@ import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import { ImagePicker } from "./ImagePicker";
-import { attachPreviewEditor, type EditorHandlers } from "./previewEditor";
+import { BlocksPanel } from "./BlocksPanel";
+import { BlockLibraryDialog } from "./BlockLibrary";
+import { StylePanel } from "./StylePanel";
+import { attachPreviewEditor, showSection, type EditorHandlers } from "./previewEditor";
 
-type Tab = "chat" | "diseno" | "secciones" | "ajustes";
+type Tab = "chat" | "bloques" | "estilo" | "diseno" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
 type ChatEntry = { role: "user" | "assistant"; text: string; error?: boolean };
 
@@ -37,17 +42,11 @@ const SUGGESTIONS = [
   "Agrega una franja con una promoción",
 ];
 
-function sectionTitle(s: WebsiteContentV2["sections"][number]): string {
-  if ("heading" in s && typeof s.heading === "string") return s.heading;
-  if (s.type === "trustBar") return s.items.map((i) => i.title).join(" · ");
-  if (s.type === "stats") return s.items.map((i) => i.value).join(" · ");
-  return "";
-}
-
 /**
  * Full-screen builder for v2 pages: live preview in the middle (desktop /
  * tablet / phone), and on the side the AI chat for any change in plain
- * words, the style gallery, and the section list (show/hide, reorder).
+ * words, the block list (add from a library, drag to reorder, duplicate,
+ * delete), the style of each block, the page's colors and fonts, and undo/redo.
  */
 export function WebsiteBuilder({
   businessId,
@@ -73,6 +72,16 @@ export function WebsiteBuilder({
 }) {
   const router = useRouter();
   const [content, setContent] = useState(initialContent);
+  // Undo / redo: the versions of the page before and after this one (this session only).
+  const contentRef = useRef(initialContent);
+  const pastRef = useRef<WebsiteContentV2[]>([]);
+  const futureRef = useRef<WebsiteContentV2[]>([]);
+  const [history, setHistory] = useState({ undo: 0, redo: 0 });
+  const [selected, setSelected] = useState<number | null>(null);
+  // Bumped when the page changes from outside the style panel (undo, AI, another block op): the panel starts over from it.
+  const [rev, setRev] = useState(0);
+  const [library, setLibrary] = useState<{ at: number } | null>(null);
+  const focusAfterLoad = useRef<number | null>(null);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [device, setDevice] = useState<Device>("desktop");
   const [previewVersion, setPreviewVersion] = useState(0);
@@ -101,6 +110,11 @@ export function WebsiteBuilder({
   const [imageTarget, setImageTarget] = useState<{ index: number; field: "image" | "bgImage" } | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [toast, setToast] = useState<string | null>(null);
+  const [toastUndo, setToastUndo] = useState(false);
+  const showToast = (text: string, undo = false) => {
+    setToast(text);
+    setToastUndo(undo);
+  };
   const [hintDismissed, setHintDismissed] = useState(false);
   useEffect(() => {
     try {
@@ -142,6 +156,10 @@ export function WebsiteBuilder({
       // Not scrollable yet: harmless.
     }
     detachRef.current = attachPreviewEditor(doc, () => handlersRef.current!);
+    if (focusAfterLoad.current !== null) {
+      showSection(doc, focusAfterLoad.current);
+      focusAfterLoad.current = null;
+    }
   }
 
   // The first preview can finish loading before React hydrates this page, and then its
@@ -160,10 +178,10 @@ export function WebsiteBuilder({
       try {
         const res = await setWebsiteSectionImageV2(businessId, websiteId, index, field, url);
         if (!res.ok) {
-          setToast(res.error);
+          showToast(res.error);
           return;
         }
-        setContent(res.content);
+        adopt(res.content);
         refreshPreview();
       } finally {
         setBusy(null);
@@ -176,7 +194,7 @@ export function WebsiteBuilder({
     startTransition(async () => {
       try {
         const next = await updateWebsiteDesignV2(businessId, websiteId, patch);
-        setContent(next);
+        adopt(next);
         refreshPreview();
       } finally {
         setBusy(null);
@@ -194,7 +212,7 @@ export function WebsiteBuilder({
       try {
         const result = await applyWebsitePromptV2(businessId, websiteId, t);
         if (!result.ok) throw new Error(result.error);
-        setContent(result.content);
+        adopt(result.content);
         refreshPreview();
         setChat((c) => [...c, { role: "assistant", text: "Listo, ya está aplicado. Revísalo en la vista previa y dime si quieres ajustar algo más." }]);
         setMobilePanel("preview");
@@ -236,9 +254,122 @@ export function WebsiteBuilder({
   }
 
   // Server re-renders hand us fresh content after regenerate.
+  // (Saving an edit refreshes the page too: a version we already know from this session is not news.)
   useEffect(() => {
+    const incoming = JSON.stringify(initialContent);
+    const known = [contentRef.current, ...pastRef.current, ...futureRef.current].some((c) => JSON.stringify(c) === incoming);
+    if (known) return;
     setContent(initialContent);
+    contentRef.current = initialContent;
+    pastRef.current = [];
+    futureRef.current = [];
+    setHistory({ undo: 0, redo: 0 });
+    setRev((r) => r + 1);
   }, [initialContent]);
+
+  /** Every change to the page goes through here, so it can be undone. */
+  function adopt(next: WebsiteContentV2, opts: { quiet?: boolean } = {}) {
+    if (!opts.quiet) setRev((r) => r + 1);
+    const previous = contentRef.current;
+    if (JSON.stringify(previous) !== JSON.stringify(next)) {
+      pastRef.current = [...pastRef.current.slice(-49), previous];
+      futureRef.current = [];
+      setHistory({ undo: pastRef.current.length, redo: 0 });
+    }
+    contentRef.current = next;
+    setContent(next);
+  }
+
+  function travel(direction: "undo" | "redo") {
+    if (busy) return;
+    const from = direction === "undo" ? pastRef : futureRef;
+    const to = direction === "undo" ? futureRef : pastRef;
+    const target = from.current.at(-1);
+    if (!target) return;
+    setBusy(direction === "undo" ? "Deshaciendo…" : "Rehaciendo…");
+    startTransition(async () => {
+      try {
+        const res = await restoreWebsiteContentV2(businessId, websiteId, target);
+        if (!res.ok) {
+          showToast(res.error);
+          return;
+        }
+        from.current = from.current.slice(0, -1);
+        to.current = [...to.current, contentRef.current];
+        contentRef.current = res.content;
+        setContent(res.content);
+        setRev((r) => r + 1);
+        setHistory({ undo: pastRef.current.length, redo: futureRef.current.length });
+        refreshPreview();
+      } finally {
+        setBusy(null);
+      }
+    });
+  }
+
+  // Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z, unless the person is typing in a field of this page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      travel(e.shiftKey ? "redo" : "undo");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  /** Add / duplicate / delete / move a block. */
+  function runBlock(op: BlockOp, label = "Actualizando…") {
+    setBusy(label);
+    startTransition(async () => {
+      try {
+        const res = await editWebsiteBlocksV2(businessId, websiteId, op);
+        if (!res.ok) {
+          showToast(res.error);
+          return;
+        }
+        adopt(res.content);
+        setSelected(op.kind === "remove" ? null : res.focus);
+        focusAfterLoad.current = op.kind === "remove" ? null : res.focus;
+        if (op.kind === "remove") showToast("Bloque eliminado.", true);
+        refreshPreview();
+      } finally {
+        setBusy(null);
+      }
+    });
+  }
+
+  /** The style panel saves quietly in the background: the preview already shows the change. */
+  async function saveLook(index: number, look: Look | undefined) {
+    const patch = Object.fromEntries((["bg", "color", "padY", "width", "align", "size", "hideOn"] as const).map((k) => [k, look?.[k] ?? null]));
+    const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "look", index, patch });
+    if (!res.ok) {
+      showToast(res.error);
+      refreshPreview();
+      return;
+    }
+    adopt(res.content, { quiet: true });
+  }
+
+  /** Shows a style in the preview right away, before it is saved. */
+  function liveLook(index: number, look: Look | undefined) {
+    const el = iframeRef.current?.contentDocument?.querySelector<HTMLElement>(`section[data-sec="${index}"]`);
+    if (!el) return;
+    [...el.classList].filter((c) => c.startsWith("lk-")).forEach((c) => el.classList.remove(c));
+    el.style.removeProperty("--lkbg");
+    el.style.removeProperty("--lkc");
+    const parts = lookParts(look, { photoBg: el.classList.contains("has-bg") || el.classList.contains("hero-full"), showAll: true });
+    parts.classes.forEach((c) => el.classList.add(c));
+    for (const [k, v] of Object.entries(parts.vars)) el.style.setProperty(k, v);
+  }
+
+  function selectBlock(index: number) {
+    setSelected(index);
+    const doc = iframeRef.current?.contentDocument;
+    if (doc) showSection(doc, index);
+  }
 
   // What the preview's own editor can do: save a text, open the image window, move or hide a block.
   const editorHandlers: EditorHandlers = {
@@ -249,7 +380,7 @@ export function WebsiteBuilder({
         setSaveState("error");
         return { ok: false, error: res.error };
       }
-      setContent(res.content);
+      adopt(res.content);
       setSaveState("saved");
       setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 2500);
       // Something appeared or disappeared (an emptied text, the highlighted words of the headline): redraw.
@@ -259,24 +390,36 @@ export function WebsiteBuilder({
       return { ok: true, refresh };
     },
     pickImage: (index, field) => setImageTarget({ index, field }),
-    move: (index, direction) => runDesign("Moviendo…", { move: { from: index, to: index + direction } }),
+    move: (index, direction) => runBlock({ kind: "move", from: index, to: index + direction }, "Moviendo…"),
     hide: (index) => runDesign("Ocultando…", { hidden: [...content.hidden, index] }),
+    style(index) {
+      setSelected(index);
+      setTab("estilo");
+      setMobilePanel("panel");
+    },
+    add: (index) => setLibrary({ at: index + 1 }),
+    duplicate: (index) => runBlock({ kind: "duplicate", index }, "Duplicando…"),
+    remove: (index) => runBlock({ kind: "remove", index }, "Eliminando…"),
+    select: (index) => setSelected(index),
+    undo: () => travel("undo"),
+    redo: () => travel("redo"),
     section(index) {
       const s = content.sections[index];
       if (!s) return null;
-      return { index, label: SECTION_LABELS[s.type], canMoveUp: index >= 2, canMoveDown: index >= 1 && index < content.sections.length - 1, hasBg: !!s.bgImage };
+      return { index, label: SECTION_LABELS[s.type], canMoveUp: index >= 2, canMoveDown: index >= 1 && index < content.sections.length - 1, canRemove: index >= 1, hasBg: !!s.bgImage };
     },
-    notice: (message) => setToast(message),
+    notice: (message) => showToast(message),
   };
   useEffect(() => {
     handlersRef.current = editorHandlers;
   });
 
-  const hidden = new Set(content.hidden);
+  const sel = selected !== null && selected < content.sections.length ? selected : null;
   const TABS: { key: Tab; label: string }[] = [
-    { key: "chat", label: "✦ Chat IA" },
+    { key: "chat", label: "✦ IA" },
+    { key: "bloques", label: "Bloques" },
+    { key: "estilo", label: "Estilo" },
     { key: "diseno", label: "Diseño" },
-    { key: "secciones", label: "Secciones" },
     { key: "ajustes", label: "Ajustes" },
   ];
 
@@ -292,6 +435,14 @@ export function WebsiteBuilder({
           <p className="truncate text-[11px] text-ink-faint">
             {PAGE_TYPE_LABELS[content.pageType]} · {STYLE_INFO[content.style].label}
           </p>
+        </div>
+        <div className="flex items-center gap-1" role="group" aria-label="Deshacer y rehacer">
+          <button type="button" onClick={() => travel("undo")} disabled={!!busy || history.undo === 0} title="Deshacer (Ctrl+Z)" aria-label="Deshacer" className="h-8 w-8 rounded-md border border-border text-base hover:border-accent disabled:opacity-35">
+            ↶
+          </button>
+          <button type="button" onClick={() => travel("redo")} disabled={!!busy || history.redo === 0} title="Rehacer (Ctrl+Mayús+Z)" aria-label="Rehacer" className="h-8 w-8 rounded-md border border-border text-base hover:border-accent disabled:opacity-35">
+            ↷
+          </button>
         </div>
         <div className="fl-seg mx-auto hidden md:inline-flex" role="radiogroup" aria-label="Vista">
           {(["desktop", "tablet", "mobile"] as Device[]).map((d) => (
@@ -440,43 +591,42 @@ export function WebsiteBuilder({
             </div>
           )}
 
-          {tab === "secciones" && (
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-              <p className="text-[12px] text-ink-faint">Oculta o reordena secciones. Para agregar una nueva, pídesela al Chat IA (ej. “agrega una comparación con la competencia”).</p>
-              {content.sections.map((s, i) => (
-                <div key={i} className={`flex items-center gap-2 rounded-lg border border-border bg-background p-2 ${hidden.has(i) ? "opacity-50" : ""}`}>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold">{SECTION_LABELS[s.type]}</p>
-                    <p className="truncate text-[12px] text-ink-muted">{sectionTitle(s) || "—"}</p>
-                  </div>
-                  {i > 0 && (
-                    <>
-                      <button type="button" disabled={!!busy || i <= 1} onClick={() => runDesign("Moviendo…", { move: { from: i, to: i - 1 } })} aria-label="Subir" className="h-7 w-7 rounded-md border border-border text-xs disabled:opacity-30">
-                        ↑
-                      </button>
-                      <button type="button" disabled={!!busy || i >= content.sections.length - 1} onClick={() => runDesign("Moviendo…", { move: { from: i, to: i + 1 } })} aria-label="Bajar" className="h-7 w-7 rounded-md border border-border text-xs disabled:opacity-30">
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!!busy}
-                        onClick={() =>
-                          runDesign("Actualizando…", {
-                            hidden: hidden.has(i) ? content.hidden.filter((h) => h !== i) : [...content.hidden, i],
-                          })
-                        }
-                        aria-label={hidden.has(i) ? "Mostrar sección" : "Ocultar sección"}
-                        className="h-7 rounded-md border border-border px-2 text-[11px] font-semibold"
-                      >
-                        {hidden.has(i) ? "Mostrar" : "Ocultar"}
-                      </button>
-                    </>
-                  )}
-                  {i === 0 && <span className="text-[11px] text-ink-faint">Fija</span>}
-                </div>
-              ))}
-            </div>
+          {tab === "bloques" && (
+            <BlocksPanel
+              content={content}
+              selected={sel}
+              busy={!!busy}
+              onSelect={selectBlock}
+              onOp={(op) => runBlock(op, op.kind === "add" ? "Agregando el bloque…" : op.kind === "remove" ? "Eliminando…" : op.kind === "duplicate" ? "Duplicando…" : "Moviendo…")}
+              onStyle={(i) => {
+                setSelected(i);
+                setTab("estilo");
+              }}
+              onToggleHidden={(i) => runDesign("Actualizando…", { hidden: content.hidden.includes(i) ? content.hidden.filter((h) => h !== i) : [...content.hidden, i] })}
+            />
           )}
+
+          {tab === "estilo" &&
+            (sel === null ? (
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4 text-sm text-ink-muted">
+                <p className="font-semibold text-ink">Elige un bloque</p>
+                <p>Toca un bloque en la página o en la pestaña Bloques para cambiar su fondo, colores, espacios y tamaños.</p>
+                <button type="button" onClick={() => setTab("bloques")} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-ink hover:border-accent">
+                  Ver los bloques
+                </button>
+              </div>
+            ) : (
+              <StylePanel
+                key={`${sel}:${rev}`}
+                section={content.sections[sel]}
+                index={sel}
+                theme={content.theme}
+                busy={!!busy}
+                onLive={(look) => liveLook(sel, look)}
+                onSave={(look) => void saveLook(sel, look)}
+                onPickBgImage={() => setImageTarget({ index: sel, field: "bgImage" })}
+              />
+            ))}
 
           {tab === "ajustes" && (
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
@@ -514,7 +664,7 @@ export function WebsiteBuilder({
         {!hintDismissed && (
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
             <p className="min-w-0 flex-1">
-              <strong>✏️ Edita directo en la página:</strong> toca un texto para escribir sobre él, toca una imagen para cambiarla y usa la barra que aparece sobre cada bloque para ponerle una foto de fondo o moverlo.
+              <strong>✏️ Edita directo en la página:</strong> toca un texto para escribir sobre él o una imagen para cambiarla. La barra sobre cada bloque te deja cambiar su estilo, moverlo, duplicarlo, agregar otro o eliminarlo. Si te equivocas, usa ↶ Deshacer.
             </p>
             <button
               type="button"
@@ -552,13 +702,37 @@ export function WebsiteBuilder({
             )}
           </div>
           {toast && (
-            <p role="status" className="absolute bottom-4 left-1/2 z-10 max-w-[90%] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-center text-sm font-semibold text-background shadow-lg">
+            <p role="status" className="absolute bottom-4 left-1/2 z-10 flex max-w-[90%] -translate-x-1/2 items-center gap-3 rounded-full bg-ink px-4 py-2 text-center text-sm font-semibold text-background shadow-lg">
               {toast}
+              {toastUndo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToast(null);
+                    travel("undo");
+                  }}
+                  className="rounded-full bg-background/20 px-2.5 py-0.5 text-xs font-bold hover:bg-background/30"
+                >
+                  Deshacer
+                </button>
+              )}
             </p>
           )}
         </main>
         </div>
       </div>
+
+      {library && (
+        <BlockLibraryDialog
+          where={library.at >= content.sections.length ? "al final de la página" : "justo debajo del bloque que elegiste"}
+          onClose={() => setLibrary(null)}
+          onPick={(type) => {
+            const at = library.at;
+            setLibrary(null);
+            runBlock({ kind: "add", type, at }, "Agregando el bloque…");
+          }}
+        />
+      )}
 
       {imageTarget && (() => {
         const section = content.sections[imageTarget.index];

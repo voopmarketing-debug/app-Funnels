@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
+import { LookSchema } from "@/lib/websiteLook";
 
 // Version 2 of a generated page: instead of six fixed blocks, an ordered
 // list of typed sections chosen per page type (servicios, producto, tienda,
@@ -92,7 +93,8 @@ const imageUrl = z
   .nullable()
   .optional()
   .catch(null);
-const media = { image: imageUrl, bgImage: imageUrl };
+// `look`: the owner's own style for this section (see websiteLook.ts).
+const media = { image: imageUrl, bgImage: imageUrl, look: LookSchema };
 
 const HeroSection = z.object({
   ...media,

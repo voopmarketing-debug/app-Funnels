@@ -35,7 +35,9 @@ import { withAiUsage } from "@/lib/aiUsage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { z } from "zod";
 import { setSectionImage, setTextAtPath, type SectionImageField } from "@/lib/websiteEdit";
+import { applyBlockOp, BLOCK_LIBRARY, MAX_SECTIONS, type BlockOp } from "@/lib/websiteBlocks";
 import {
   generateWebsiteContentV2,
   applyWebsiteEditV2,
@@ -3262,6 +3264,67 @@ export async function uploadWebsiteImageV2(businessId: string, formData: FormDat
     return { ok: true, url, label };
   } catch (err) {
     return builderError(`uploadWebsiteImageV2(${businessId})`, err);
+  }
+}
+
+const BlockOpSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("add"), type: z.enum(BLOCK_LIBRARY.map((b) => b.type) as [string, ...string[]]), at: z.number().int().optional() }),
+  z.object({ kind: z.literal("duplicate"), index: z.number().int() }),
+  z.object({ kind: z.literal("remove"), index: z.number().int() }),
+  z.object({ kind: z.literal("move"), from: z.number().int(), to: z.number().int() }),
+  z.object({ kind: z.literal("look"), index: z.number().int(), patch: z.record(z.string(), z.union([z.string().max(12), z.null()])) }),
+]);
+
+/**
+ * One structural change from the builder: add a block from the library,
+ * duplicate, delete, move, or restyle one (see lib/websiteBlocks.ts).
+ */
+export async function editWebsiteBlocksV2(businessId: string, websiteId: string, rawOp: unknown): Promise<BuilderResult<{ content: WebsiteContentV2; focus: number }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    const parsedOp = BlockOpSchema.safeParse(rawOp);
+    if (!parsedOp.success) throw new Error("No se pudo hacer ese cambio.");
+
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const op = parsedOp.data as BlockOp;
+    const firstProduct = op.kind === "add" && op.type === "productSpotlight" ? await prisma.product.findFirst({ where: { businessId, active: true }, orderBy: { createdAt: "asc" }, select: { id: true } }) : null;
+    const result = applyBlockOp(WebsiteContentV2Schema.parse(website.content), op, { firstProductId: firstProduct?.id ?? null });
+    if (!result.ok) throw new Error(result.error);
+    await prisma.website.update({ where: { id: websiteId }, data: { content: result.content } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, content: result.content, focus: result.focus };
+  } catch (err) {
+    return builderError(`editWebsiteBlocksV2(${websiteId})`, err);
+  }
+}
+
+/**
+ * Undo / redo: puts back a version of the page the builder had before. The
+ * browser sends the whole content, so it is validated like any other and its
+ * pictures must be ones the page already used or the business owns.
+ */
+export async function restoreWebsiteContentV2(businessId: string, websiteId: string, raw: unknown): Promise<BuilderResult<{ content: WebsiteContentV2 }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    if (JSON.stringify(raw ?? null).length > 300_000) throw new Error("No se pudo deshacer ese cambio.");
+    const parsed = WebsiteContentV2Schema.safeParse(raw);
+    if (!parsed.success || parsed.data.sections[0]?.type !== "hero" || parsed.data.sections.length > MAX_SECTIONS) throw new Error("No se pudo deshacer ese cambio.");
+
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const allowed = await ownImageUrls(businessId, website.aiImageUrl);
+    for (const s of WebsiteContentV2Schema.parse(website.content).sections) for (const u of [s.image, s.bgImage]) if (u) allowed.add(u);
+    for (const s of parsed.data.sections) for (const u of [s.image, s.bgImage]) if (u && !allowed.has(u)) throw new Error("Una foto de esa versión ya no está en tu biblioteca.");
+
+    const content = { ...parsed.data, hidden: parsed.data.hidden.filter((i) => i > 0 && i < parsed.data.sections.length) };
+    await prisma.website.update({ where: { id: websiteId }, data: { content } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, content };
+  } catch (err) {
+    return builderError(`restoreWebsiteContentV2(${websiteId})`, err);
   }
 }
 

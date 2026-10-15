@@ -8,7 +8,7 @@
 // this module, running in the dashboard, listens to the iframe's document.
 // Nothing runs inside the public page itself (it ships with script-src 'none').
 
-export type SectionInfo = { index: number; label: string; canMoveUp: boolean; canMoveDown: boolean; hasBg: boolean };
+export type SectionInfo = { index: number; label: string; canMoveUp: boolean; canMoveDown: boolean; canRemove: boolean; hasBg: boolean };
 
 export type EditorHandlers = {
   /** Saves one edited text. `refresh` asks for a reload of the preview (something appeared or disappeared). */
@@ -16,6 +16,16 @@ export type EditorHandlers = {
   pickImage(index: number, field: "image" | "bgImage"): void;
   move(index: number, direction: -1 | 1): void;
   hide(index: number): void;
+  /** The block's own style panel. */
+  style(index: number): void;
+  /** Opens the block library to add one right below this block. */
+  add(index: number): void;
+  duplicate(index: number): void;
+  remove(index: number): void;
+  /** A block was touched in the page: the side panel follows it. */
+  select(index: number): void;
+  undo(): void;
+  redo(): void;
   section(index: number): SectionInfo | null;
   notice(message: string): void;
 };
@@ -30,11 +40,14 @@ const CSS = `
 img[data-img]{cursor:pointer;transition:filter .12s}
 img[data-img]:hover{outline:3px solid ${ACCENT};outline-offset:-3px;filter:brightness(.9)}
 section[data-sec].fl-active{box-shadow:inset 0 0 0 2px rgba(91,108,240,.55)}
-.fl-bar-wrap{position:absolute;right:12px;top:8px;z-index:2147483000;font:600 12px/1 system-ui,sans-serif;text-transform:none;letter-spacing:0;text-align:left}
-.fl-bar{display:flex;align-items:center;gap:2px;padding:4px;background:#111827;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+section[data-sec].fl-picked{box-shadow:inset 0 0 0 3px ${ACCENT}}
+.fl-bar-wrap{position:absolute;right:12px;top:8px;max-width:calc(100% - 24px);z-index:2147483000;font:600 12px/1 system-ui,sans-serif;text-transform:none;letter-spacing:0;text-align:left}
+.fl-bar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:2px;padding:4px;background:#111827;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .fl-label{color:#9ca3af;padding:0 8px 0 6px;font-weight:600;white-space:nowrap}
 .fl-bar button{all:unset;box-sizing:border-box;cursor:pointer;color:#fff;padding:8px 10px;border-radius:8px;white-space:nowrap;font:600 12px/1 system-ui,sans-serif}
 .fl-bar button:hover{background:#374151}
+.fl-bar button.fl-danger:hover{background:#b42318}
+.fl-bar button.fl-icon{padding:8px 9px;font-size:14px}
 .fl-bar button:focus-visible{outline:2px solid #fff}
 .fl-bar button[disabled]{opacity:.3;cursor:default}
 .fl-bar button[disabled]:hover{background:none}
@@ -93,9 +106,10 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     label.className = "fl-label";
     label.textContent = info.label;
     bar.appendChild(label);
-    const add = (act: string, text: string, title: string, disabled = false) => {
+    const add = (act: string, text: string, title: string, disabled = false, icon = false, extra = "") => {
       const b = doc.createElement("button");
       b.type = "button";
+      b.className = `${icon ? "fl-icon" : ""} ${extra}`.trim();
       b.dataset.act = act;
       b.textContent = text;
       b.title = title;
@@ -103,10 +117,14 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
       b.disabled = disabled;
       bar.appendChild(b);
     };
-    add("bg", info.hasBg ? "🖼 Cambiar fondo" : "🖼 Imagen de fondo", "Pon una foto detrás de este bloque");
-    add("up", "↑", "Subir este bloque", !info.canMoveUp);
-    add("down", "↓", "Bajar este bloque", !info.canMoveDown);
-    add("hide", "Ocultar", "Ocultar este bloque de la página", index === 0);
+    add("style", "🎨 Estilo", "Colores, espacios y tamaños de este bloque");
+    add("bg", info.hasBg ? "🖼 Fondo" : "🖼 Fondo", info.hasBg ? "Cambiar la foto de fondo de este bloque" : "Pon una foto detrás de este bloque");
+    add("up", "↑", "Subir este bloque", !info.canMoveUp, true);
+    add("down", "↓", "Bajar este bloque", !info.canMoveDown, true);
+    add("add", "＋", "Agregar un bloque debajo de este", false, true);
+    add("dup", "⧉", "Duplicar este bloque", !info.canRemove, true);
+    add("hide", "👁", "Ocultar este bloque de la página", index === 0, true);
+    add("del", "🗑", "Eliminar este bloque", !info.canRemove, true, "fl-danger");
     return true;
   }
 
@@ -229,8 +247,12 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
       const h = getHandlers();
       const act = button.dataset.act;
       if (act === "bg") h.pickImage(index, "bgImage");
+      else if (act === "style") h.style(index);
       else if (act === "up") h.move(index, -1);
       else if (act === "down") h.move(index, 1);
+      else if (act === "add") h.add(index);
+      else if (act === "dup") h.duplicate(index);
+      else if (act === "del") h.remove(index);
       else if (act === "hide") h.hide(index);
       return;
     }
@@ -254,11 +276,21 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
       return;
     }
     const section = sectionOf(t);
-    if (section) setActive(section);
+    if (section) {
+      setActive(section);
+      getHandlers().select(Number(section.dataset.sec));
+    }
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
     const el = editing;
+    // Undo / redo work from the page too, except while typing in a text (the text has its own).
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !(el && isInside(el, e.target))) {
+      e.preventDefault();
+      if (e.shiftKey) getHandlers().redo();
+      else getHandlers().undo();
+      return;
+    }
     if (!el || !isInside(el, e.target)) return;
     // Keys typed in a title inside a <summary> must not fold the answer.
     e.stopPropagation();
@@ -323,4 +355,14 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     wrap.remove();
     style.remove();
   };
+}
+
+/** Scrolls the preview to a block and outlines it for a moment, so the person sees which one the panel means. */
+export function showSection(doc: Document, index: number, opts: { scroll?: boolean } = {}): void {
+  const section = doc.querySelector<HTMLElement>(`section[data-sec="${index}"]`);
+  if (!section) return;
+  doc.querySelectorAll(".fl-picked").forEach((el) => el.classList.remove("fl-picked"));
+  if (opts.scroll !== false) section.scrollIntoView({ behavior: "smooth", block: "start" });
+  section.classList.add("fl-picked");
+  setTimeout(() => section.classList.remove("fl-picked"), 1400);
 }
