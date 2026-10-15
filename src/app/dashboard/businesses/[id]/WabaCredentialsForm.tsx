@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { FacebookConnect } from "./FacebookConnect";
 import { discoverWhatsAppNumbers, updateWabaCredentials, type DiscoverNumbersResult } from "@/lib/actions";
 
 // WhatsApp's own brand green — deliberately not one of the shared KPI
@@ -27,10 +28,13 @@ export function WabaCredentialsForm({
   businessId,
   wabaPhoneNumberId,
   wabaId,
+  signup,
 }: {
   businessId: string;
   wabaPhoneNumberId: string;
   wabaId: string;
+  /** Present only when the server has the Meta app and the Embedded Signup configuration. */
+  signup?: { appId: string; configId: string } | null;
 }) {
   const connected = Boolean(wabaPhoneNumberId);
   const [token, setToken] = useState("");
@@ -103,6 +107,16 @@ export function WabaCredentialsForm({
           </>
         )}
       </p>
+
+      {signup && (
+        <>
+          <FacebookConnect businessId={businessId} appId={signup.appId} configId={signup.configId} connected={connected} />
+          <p className="flex items-center gap-3 text-xs text-ink-faint">
+            <span className="h-px flex-1 bg-border" />o conéctalo con un token
+            <span className="h-px flex-1 bg-border" />
+          </p>
+        </>
+      )}
 
       <form action={formAction} className="space-y-5">
         <input type="hidden" name="wabaPhoneNumberId" value={phoneId} />

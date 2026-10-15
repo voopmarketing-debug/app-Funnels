@@ -304,6 +304,11 @@ export default async function BusinessPage({
                 businessId={id}
                 wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""}
                 wabaId={business.wabaId ?? ""}
+                signup={
+                  process.env.META_APP_ID && process.env.META_WA_CONFIG_ID
+                    ? { appId: process.env.META_APP_ID, configId: process.env.META_WA_CONFIG_ID }
+                    : null
+                }
               />
             </IntegrationCard>
             <IntegrationCard

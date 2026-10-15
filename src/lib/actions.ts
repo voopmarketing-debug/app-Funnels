@@ -46,6 +46,7 @@ import {
 import { getCatalogProducts } from "@/lib/websiteRender";
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import { isValidEmail, normalizePhone } from "@/lib/phone";
+import { exchangeSignupCode, registerPhoneNumber } from "@/lib/whatsappSignup";
 import { resubscribeWhatsAppWebhook, runWhatsAppHealthCheck, type WhatsAppHealth } from "@/lib/whatsappHealth";
 import { MAX_IMPORT_ROWS, type ImportContactRow } from "@/lib/contactImport";
 import { AvailabilitySchema, DEFAULT_AVAILABILITY, type Availability } from "@/lib/agenda";
@@ -513,6 +514,70 @@ export async function discoverWhatsAppNumbers(businessId: string, rawToken: stri
     };
   }
   return { ok: true, numbers, expiresAt };
+}
+
+export type FacebookConnectResult = { ok: true; displayPhoneNumber: string | null } | { ok: false; error: string };
+
+/**
+ * Finishes "Conectar con Facebook" (Meta's WhatsApp Embedded Signup): the
+ * browser hands over the one-time code and, when Meta's window reported them,
+ * the account and number IDs. Everything else — the token, the number's
+ * activation and the webhook subscription — happens here, so the person never
+ * sees a token. Returns the error instead of throwing so the form can show it.
+ */
+export async function connectWhatsAppWithFacebook(
+  businessId: string,
+  input: { code: string; phoneNumberId?: string; wabaId?: string },
+): Promise<FacebookConnectResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Tu sesión venció. Vuelve a entrar." };
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+
+  const code = sanitizeAsciiToken(input.code);
+  if (!code) return { ok: false, error: "Meta no nos envió la autorización. Vuelve a intentarlo." };
+
+  const exchanged = await exchangeSignupCode(code);
+  if (!exchanged.ok) return exchanged;
+  const accessToken = exchanged.accessToken;
+
+  let phoneNumberId = sanitizeAsciiToken(input.phoneNumberId ?? "");
+  let wabaId = sanitizeAsciiToken(input.wabaId ?? "");
+  if (!phoneNumberId || !wabaId) {
+    // Meta's window didn't report the IDs (a blocked pop-up message): ask Meta what this token can reach.
+    const info = await inspectWabaToken(accessToken);
+    if (!info.ok) return { ok: false, error: info.error };
+    const numbers = (await Promise.all(info.wabaIds.map((id) => listWabaPhoneNumbers({ wabaId: id, accessToken })))).flat();
+    if (numbers.length === 0) {
+      return { ok: false, error: "No encontramos ningún número de WhatsApp en tu cuenta. Termina de agregar el número en la ventana de Meta y vuelve a intentarlo." };
+    }
+    phoneNumberId = numbers[0].phoneNumberId;
+    wabaId = numbers[0].wabaId;
+  }
+
+  const verification = await verifyWabaConnection({ phoneNumberId, accessToken });
+  if (!verification.ok) return { ok: false, error: verification.error };
+
+  // Activates a number that was just added; harmless for one that already works.
+  const registered = await registerPhoneNumber({ phoneNumberId, accessToken });
+  if (!registered.ok) console.warn(`WhatsApp number registration for business ${businessId}: ${registered.error}`);
+
+  try {
+    await prisma.business.update({
+      where: { id: businessId },
+      data: { wabaPhoneNumberId: phoneNumberId, wabaId, wabaAccessToken: encryptSecret(accessToken) },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return { ok: false, error: "Ese número de WhatsApp ya está conectado a otro agente de la plataforma. Cada agente necesita su propio número." };
+    }
+    throw err;
+  }
+
+  const subscribed = await subscribeAppToWaba({ wabaId, accessToken });
+  if (!subscribed.ok) console.warn(`Could not subscribe app to WABA for business ${businessId}: ${subscribed.error}`);
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  await runWhatsAppHealthCheck(businessId).catch((err) => console.error("Health check after Facebook connect failed:", err));
+  return { ok: true, displayPhoneNumber: verification.displayPhoneNumber };
 }
 
 const TEMPLATE_CATEGORIES = new Set(["MARKETING", "UTILITY"]);
