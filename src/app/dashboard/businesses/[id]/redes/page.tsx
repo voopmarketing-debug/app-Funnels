@@ -8,7 +8,7 @@ import { PageSkeleton } from "@/components/PageSkeleton";
 import { daysIn, listAdAccounts, listPages, type SocialPost } from "@/lib/metaSocial";
 import { getSocialDashboard, type NetworkSummary, type SectionResult } from "@/lib/socialDashboard";
 import { parseRange, todayInColombia, type DayRange } from "@/lib/socialRanges";
-import { MAX_SPLIT_PRODUCTS, type ContentDiagnosis } from "@/lib/contentDiagnosis";
+import type { ContentDiagnosis } from "@/lib/contentDiagnosis";
 import { StatTile } from "../analytics/StatTile";
 import { AccountPicker, DisconnectButton, NetworkChart, RefreshButton } from "./controls";
 import { DateRangePicker } from "./DateRangePicker";
@@ -151,13 +151,11 @@ async function Dashboard({
   range,
   canManage,
   initialDiagnosis,
-  splitProducts,
 }: {
   businessId: string;
   range: DayRange;
   canManage: boolean;
   initialDiagnosis: InitialDiagnosis;
-  splitProducts: string[];
 }) {
   const data = await getSocialDashboard(businessId, range);
   if (data.throttled) {
@@ -280,7 +278,7 @@ async function Dashboard({
         </Section>
       )}
 
-      {data.posts && <ContentDiagnosisPanel businessId={businessId} initial={initialDiagnosis} splitProducts={splitProducts} />}
+      {data.posts && <ContentDiagnosisPanel businessId={businessId} initial={initialDiagnosis} />}
 
       {data.posts?.ok && posts.length > 0 && (
         <details className="group space-y-3">
@@ -345,10 +343,6 @@ export default async function RedesPage({
     connection?.contentDiagnosis && connection.contentDiagnosisAt
       ? { diagnosis: connection.contentDiagnosis as unknown as ContentDiagnosis, generatedAt: connection.contentDiagnosisAt.toISOString() }
       : null;
-
-  // A few distinct products: the diagnosis is split by them (see contentDiagnosis.ts).
-  const catalog = await prisma.product.findMany({ where: { businessId: id, active: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], take: MAX_SPLIT_PRODUCTS + 1, select: { name: true } });
-  const splitProducts = catalog.length >= 2 && catalog.length <= MAX_SPLIT_PRODUCTS ? catalog.map((p) => p.name) : [];
 
   let picker: React.ReactNode = null;
   if (connection?.userAccessToken && canManage && (choose === "1" || !hasSelection)) {
@@ -442,7 +436,7 @@ export default async function RedesPage({
         <>
           {picker}
           <Suspense key={`${range.since}:${range.until}`} fallback={<PageSkeleton />}>
-            <Dashboard businessId={id} range={range} canManage={canManage} initialDiagnosis={initialDiagnosis} splitProducts={splitProducts} />
+            <Dashboard businessId={id} range={range} canManage={canManage} initialDiagnosis={initialDiagnosis} />
           </Suspense>
         </>
       )}
