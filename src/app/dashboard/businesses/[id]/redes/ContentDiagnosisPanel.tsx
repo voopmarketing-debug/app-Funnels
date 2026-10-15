@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { generateContentDiagnosis } from "@/lib/socialActions";
-import type { AdIdea, AdsDiagnosis, ContentDiagnosis, ContentIdea } from "@/lib/contentDiagnosis";
+import type { AdIdea, AdsDiagnosis, ContentDiagnosis, ContentIdea, ProductDiagnosis } from "@/lib/contentDiagnosis";
 import { ScoreRing } from "../analytics/SalesDiagnosisPanel";
 import { shortDateTime } from "./format";
 
@@ -25,6 +25,96 @@ const NETWORK_STYLE: Record<ContentIdea["red"], string> = {
   Facebook: "var(--series-fb)",
   Ambas: "var(--ink-muted)",
 };
+
+// One color per product, in the order of the report, so a product keeps its color on every card.
+const PRODUCT_COLORS = ["#6366f1", "#0ea5e9", "#f59e0b", "#10b981", "#ec4899", "#8b5cf6"];
+const productColor = (names: string[], name: string | undefined) => {
+  const i = names.indexOf(name ?? "");
+  return i < 0 ? "var(--ink-faint)" : PRODUCT_COLORS[i % PRODUCT_COLORS.length];
+};
+
+function ProductTag({ name, names }: { name?: string; names: string[] }) {
+  if (!name || names.length === 0) return null;
+  return (
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-ink">
+      <span className="h-2 w-2 flex-none rounded-full" style={{ background: productColor(names, name) }} />
+      <span className="truncate">{name === "General" ? "Toda la marca" : name}</span>
+    </span>
+  );
+}
+
+const STATE_STYLE: Record<ProductDiagnosis["estado"], string> = {
+  "Bien trabajado": "bg-[#0ca30c]/12 text-[var(--status-good)]",
+  "Poco contenido": "bg-[#fab219]/18 text-[var(--status-warn)]",
+  "Sin contenido": "bg-[#d03b3b]/12 text-[var(--status-bad)]",
+};
+
+/** The report split by product: how much content each has, how it did, and what to publish next. Tap one to see only its ideas. */
+function ProductsView({ items, selected, onSelect }: { items: ProductDiagnosis[]; selected: string | null; onSelect: (name: string | null) => void }) {
+  const names = items.map((p) => p.nombre);
+  return (
+    <div className="space-y-3">
+      <div>
+        <h3 className="text-base font-semibold text-ink">Tu contenido por producto</h3>
+        <p className="text-sm text-ink-muted">Cada producto tiene su propio público y su propio mensaje. Toca uno para ver solo sus ideas.</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {items.map((p) => {
+          const on = selected === p.nombre;
+          return (
+            <button
+              key={p.nombre}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onSelect(on ? null : p.nombre)}
+              className={`flex min-w-0 flex-col gap-2 rounded-2xl border p-4 text-left transition ${on ? "border-accent bg-accent/10" : "border-border bg-surface-2/50 hover:border-border-strong"}`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: productColor(names, p.nombre) }} />
+                <span className="truncate text-[15px] font-semibold text-ink">{p.nombre}</span>
+              </span>
+              <span className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+                <span className={`rounded-full px-2 py-0.5 ${STATE_STYLE[p.estado]}`}>{p.estado}</span>
+                <span className="text-ink-muted">
+                  {p.publicaciones} {p.publicaciones === 1 ? "publicación" : "publicaciones"}
+                </span>
+              </span>
+              <span className="text-sm leading-relaxed text-ink-muted">{p.resumen}</span>
+              <span className="mt-auto rounded-xl border border-border bg-surface p-2.5 text-sm leading-relaxed text-ink">
+                <span className="block text-xs font-semibold uppercase tracking-wide text-ink-faint">Próximo paso</span>
+                {p.proximo}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** "Todos · App Bodytech · My Coach…" with how many ideas each has. */
+function ProductFilter({ names, ideas, selected, onSelect }: { names: string[]; ideas: { producto?: string }[]; selected: string | null; onSelect: (name: string | null) => void }) {
+  if (names.length === 0) return null;
+  const count = (n: string) => ideas.filter((i) => i.producto === n).length;
+  return (
+    <div role="radiogroup" aria-label="Filtrar por producto" className="flex flex-wrap gap-1.5">
+      {[null, ...names].map((n) => (
+        <button
+          key={n ?? "todos"}
+          type="button"
+          role="radio"
+          aria-checked={selected === n}
+          onClick={() => onSelect(n)}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${selected === n ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-border-strong hover:text-ink"}`}
+        >
+          {n && <span className="h-2 w-2 rounded-full" style={{ background: productColor(names, n) }} />}
+          {n ?? "Todos"}
+          <span className="font-normal text-ink-faint">{n ? count(n) : ideas.length}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -53,10 +143,13 @@ function adsVerdict(score: number) {
   return { label: "Estás gastando más de lo que te traen", color: "#d03b3b", bg: "rgba(208,59,59,0.12)", text: "var(--status-bad)" };
 }
 
-function AdIdeaCard({ idea }: { idea: AdIdea }) {
+function AdIdeaCard({ idea, names }: { idea: AdIdea; names: string[] }) {
   return (
     <article className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-surface-2/50 p-4">
-      <span className="w-fit rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">{idea.formato}</span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <ProductTag name={idea.producto} names={names} />
+        <span className="w-fit rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">{idea.formato}</span>
+      </div>
       <h4 className="text-[15px] font-semibold leading-snug text-ink">{idea.titulo}</h4>
       <div className="space-y-1">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Empieza con</p>
@@ -80,7 +173,7 @@ function AdIdeaCard({ idea }: { idea: AdIdea }) {
   );
 }
 
-function AdsDiagnosisView({ a, generatedAt }: { a: AdsDiagnosis; generatedAt: string }) {
+function AdsDiagnosisView({ a, generatedAt, names, selected, onSelect }: { a: AdsDiagnosis; generatedAt: string; names: string[]; selected: string | null; onSelect: (name: string | null) => void }) {
   const v = adsVerdict(a.puntuacion);
   const [first, ...rest] = a.mejoras;
   return (
@@ -139,20 +232,24 @@ function AdsDiagnosisView({ a, generatedAt }: { a: AdsDiagnosis; generatedAt: st
           <h3 className="text-base font-semibold text-ink">Anuncios nuevos para probar</h3>
           <p className="text-sm text-ink-muted">Basados en lo que ya te funcionó. Copia el texto y créalos en el Administrador de anuncios de Meta.</p>
         </div>
+        <ProductFilter names={names} ideas={a.ideas} selected={selected} onSelect={onSelect} />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {a.ideas.map((idea, i) => (
-            <AdIdeaCard key={i} idea={idea} />
-          ))}
+          {a.ideas
+            .filter((idea) => !selected || idea.producto === selected)
+            .map((idea, i) => (
+              <AdIdeaCard key={i} idea={idea} names={names} />
+            ))}
         </div>
       </div>
     </>
   );
 }
 
-function IdeaCard({ idea }: { idea: ContentIdea }) {
+function IdeaCard({ idea, names }: { idea: ContentIdea; names: string[] }) {
   return (
     <article className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-surface-2/50 p-4">
       <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+        <ProductTag name={idea.producto} names={names} />
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-ink-muted">
           <span className="h-2 w-2 rounded-full" style={{ background: NETWORK_STYLE[idea.red] }} />
           {idea.red === "Ambas" ? "Facebook e Instagram" : idea.red}
@@ -182,12 +279,14 @@ function IdeaCard({ idea }: { idea: ContentIdea }) {
   );
 }
 
-export function ContentDiagnosisPanel({ businessId, initial }: { businessId: string; initial: Current }) {
+export function ContentDiagnosisPanel({ businessId, initial, splitProducts = [] }: { businessId: string; initial: Current; splitProducts?: string[] }) {
   const [isPending, start] = useTransition();
   const [current, setCurrent] = useState<Current>(initial);
   const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("todo");
   const [view, setView] = useState<"contenido" | "anuncios">("contenido");
+  // Which product's ideas are shown (null = all of them).
+  const [product, setProduct] = useState<string | null>(null);
 
   function generate() {
     setNotice(null);
@@ -209,6 +308,8 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
 
   const d = current?.diagnosis;
   const v = d ? verdict(d.puntuacion) : null;
+  const names = d?.productos?.map((p) => p.nombre) ?? [];
+  const needsSplit = !!d && !d.productos?.length && splitProducts.length >= 2;
   const list = d ? (tab === "todo" ? d.recomendaciones.slice(1) : tab === "good" ? d.funciona : d.noFunciona) : [];
 
   return (
@@ -272,7 +373,7 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
           </div>
         )}
 
-        {d?.anuncios && current && view === "anuncios" && <AdsDiagnosisView a={d.anuncios} generatedAt={current.generatedAt} />}
+        {d?.anuncios && current && view === "anuncios" && <AdsDiagnosisView a={d.anuncios} generatedAt={current.generatedAt} names={names} selected={product} onSelect={setProduct} />}
 
         {d && v && current && (view === "contenido" || !d.anuncios) && (
           <>
@@ -307,6 +408,14 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
                 </div>
               </div>
             </div>
+
+            {needsSplit && (
+              <p className="rounded-xl border border-accent/40 bg-accent/10 p-3 text-sm text-ink">
+                Vendes {splitProducts.length} productos ({splitProducts.join(", ")}). Toca <strong>Actualizar</strong> y el diagnóstico se divide por producto, con ideas para cada uno.
+              </p>
+            )}
+
+            {d.productos && d.productos.length > 0 && <ProductsView items={d.productos} selected={product} onSelect={setProduct} />}
 
             <div>
               <div role="tablist" aria-label="Detalle del diagnóstico" className="fl-seg grid w-full grid-cols-3">
@@ -350,10 +459,13 @@ export function ContentDiagnosisPanel({ businessId, initial }: { businessId: str
                 <h3 className="text-base font-semibold text-ink">Ideas para tus próximas publicaciones</h3>
                 <p className="text-sm text-ink-muted">Basadas en lo que ya le gusta a tu audiencia. Copia el texto y publícalas tal cual o ajústalas a tu estilo.</p>
               </div>
+              <ProductFilter names={names} ideas={d.ideas} selected={product} onSelect={setProduct} />
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {d.ideas.map((idea, i) => (
-                  <IdeaCard key={i} idea={idea} />
-                ))}
+                {d.ideas
+                  .filter((idea) => !product || idea.producto === product)
+                  .map((idea, i) => (
+                    <IdeaCard key={i} idea={idea} names={names} />
+                  ))}
               </div>
             </div>
           </>

@@ -14,12 +14,23 @@ import { adviseCampaign, campaignOutcome, VERDICT_LABELS } from "@/lib/adsAdvice
 // change in each campaign and proposes new ads. Grounded in the data on purpose: generic social-media tips
 // are free anywhere, the value is "your carousels about X get 3x the rest".
 
+/**
+ * A business that sells 2 to 6 distinct products or services (e.g. the three
+ * virtual products of a gym brand) gets its report split by product, so each
+ * idea says which one it is for. Beyond that the list is a catalog, not a
+ * handful of product lines, and the report stays whole.
+ */
+export const MAX_SPLIT_PRODUCTS = 6;
+
 /** Fewer posts than this and any "pattern" would be noise. */
 export const MIN_POSTS = 4;
 const MAX_POSTS = 40;
 const MAX_CAMPAIGNS = 25;
 
+const PRODUCT_HINT = "Nombre EXACTO de uno de los productos de la lista, o 'General' si no es de un producto en particular. 'General' si no se te dio una lista de productos a dividir.";
+
 const ContentIdeaSchema = z.object({
+  producto: z.string().describe(PRODUCT_HINT),
   titulo: z.string().describe("Nombre corto de la idea, ej. 'Antes y después de un blanqueamiento'."),
   red: z.enum(["Instagram", "Facebook", "Ambas"]).describe("Dónde publicarla, según dónde funcionó mejor ese tipo de contenido."),
   formato: z.enum(["Reel", "Carrusel", "Foto", "Video", "Historia", "Texto"]),
@@ -29,6 +40,14 @@ const ContentIdeaSchema = z.object({
   porque: z.string().describe("Por qué debería funcionar, citando el dato o la publicación real en que se basa."),
 });
 
+const ProductDiagnosisSchema = z.object({
+  nombre: z.string().describe("Nombre EXACTO del producto, tal como está en la lista."),
+  publicaciones: z.number().int().min(0).describe("Cuántas de las publicaciones analizadas son de este producto (cuenta solo las que lo promueven o lo mencionan de verdad)."),
+  estado: z.enum(["Bien trabajado", "Poco contenido", "Sin contenido"]).describe("Qué tanto contenido tiene hoy este producto frente a los demás y a su peso para el negocio."),
+  resumen: z.string().describe("1-2 frases: qué se ha publicado de este producto y cómo le ha ido, citando publicaciones o cifras reales. Si no hay contenido, dilo."),
+  proximo: z.string().describe("La acción de contenido más importante para este producto, concreta y en una frase que empieza con un verbo."),
+});
+
 const ContentDiagnosisSchema = z.object({
   resumen: z.string().describe("2-3 frases para el dueño del negocio sobre cómo le está yendo con su contenido."),
   puntuacion: z.number().int().min(1).max(10).describe("De 1 a 10, qué tan bien está funcionando el contenido para atraer y mantener a su audiencia."),
@@ -36,7 +55,7 @@ const ContentDiagnosisSchema = z.object({
   noFunciona: z.array(z.string()).min(1).max(5).describe("Patrones concretos de lo que no está funcionando, con datos."),
   recomendaciones: z.array(z.string()).min(1).max(5).describe("Acciones concretas en orden de impacto. La primera es la más importante."),
   cuandoPublicar: z.string().describe("Qué días y horarios dieron mejores resultados, o qué probar si no hay datos suficientes."),
-  ideas: z.array(ContentIdeaSchema).min(3).max(6).describe("Ideas de publicaciones nuevas basadas en lo que ya funciona para este negocio."),
+  ideas: z.array(ContentIdeaSchema).min(3).max(12).describe("Ideas de publicaciones nuevas basadas en lo que ya funciona para este negocio. Con varios productos: 2 o 3 por cada uno."),
 });
 
 const AdImprovementSchema = z.object({
@@ -46,6 +65,7 @@ const AdImprovementSchema = z.object({
 });
 
 const AdIdeaSchema = z.object({
+  producto: z.string().describe(PRODUCT_HINT),
   titulo: z.string().describe("Nombre corto del anuncio, ej. 'Promo de blanqueamiento con testimonio'."),
   formato: z.enum(["Video", "Reel", "Imagen", "Carrusel"]),
   gancho: z.string().describe("La primera frase o los primeros 3 segundos, lo que hace que la persona se detenga."),
@@ -59,20 +79,26 @@ const AdsDiagnosisSchema = z.object({
   puntuacion: z.number().int().min(1).max(10).describe("De 1 a 10, qué tan bien están rindiendo sus anuncios para lo que invierte."),
   mejoras: z.array(AdImprovementSchema).min(1).max(5).describe("Cambios concretos por campaña, en orden de impacto. La primera es la más importante."),
   presupuesto: z.string().describe("Dónde poner el dinero de ahora en adelante: qué apagar, qué subir y cuánto, en 2-3 frases."),
-  ideas: z.array(AdIdeaSchema).min(2).max(3).describe("Anuncios nuevos para probar, basados en lo que ya funcionó."),
+  ideas: z.array(AdIdeaSchema).min(2).max(6).describe("Anuncios nuevos para probar, basados en lo que ya funcionó. Con varios productos: al menos 1 por cada uno."),
 });
 
 const DiagnosisSchema = ContentDiagnosisSchema.extend({
+  productos: z.array(ProductDiagnosisSchema).nullable().describe("Una entrada por cada producto de la lista a dividir, en el mismo orden. null si no se te dio esa lista."),
   anuncios: AdsDiagnosisSchema.nullable().describe("El diagnóstico de los anuncios. null si no se te dieron datos de anuncios."),
 });
 
-export type ContentDiagnosis = z.infer<typeof ContentDiagnosisSchema> & {
+export type ContentDiagnosis = Omit<z.infer<typeof ContentDiagnosisSchema>, "ideas"> & {
+  /** Reports made before the split by product have no `producto` on an idea. */
+  ideas: (Omit<z.infer<typeof ContentIdeaSchema>, "producto"> & { producto?: string })[];
   /** Missing in reports made before ads were included. */
-  anuncios?: AdsDiagnosis | null;
+  anuncios?: (Omit<z.infer<typeof AdsDiagnosisSchema>, "ideas"> & { ideas: (Omit<z.infer<typeof AdIdeaSchema>, "producto"> & { producto?: string })[] }) | null;
+  /** The report split by product. Missing in older reports and when the business has fewer than 2 products. */
+  productos?: z.infer<typeof ProductDiagnosisSchema>[] | null;
 };
-export type AdsDiagnosis = z.infer<typeof AdsDiagnosisSchema>;
-export type AdIdea = z.infer<typeof AdIdeaSchema>;
-export type ContentIdea = z.infer<typeof ContentIdeaSchema>;
+export type AdsDiagnosis = NonNullable<ContentDiagnosis["anuncios"]>;
+export type AdIdea = AdsDiagnosis["ideas"][number];
+export type ContentIdea = ContentDiagnosis["ideas"][number];
+export type ProductDiagnosis = z.infer<typeof ProductDiagnosisSchema>;
 
 const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -136,7 +162,14 @@ Si recibes datos de anuncios, haz también su diagnóstico (campo "anuncios"):
 - Cada mejora nombra la campaña exacta y dice qué hacer: apagarla, cambiar el anuncio (imagen, video, primera frase), cambiar el público, o subir el presupuesto de a poco (20% cada 3-4 días).
 - Una campaña apagada que funcionó bien es un modelo a repetir; una que gastó sin resultados no se repite.
 - Las ideas de anuncios se basan en la campaña que mejor rindió y en las publicaciones con más interacción: lo que ya conectó de forma orgánica suele funcionar como anuncio.
-- Sin datos de anuncios, "anuncios" es null.`;
+- Sin datos de anuncios, "anuncios" es null.
+
+Si recibes una lista de PRODUCTOS A DIVIDIR (varios productos o servicios distintos del mismo negocio), el diagnóstico no es uno solo, es por producto:
+- Decide a qué producto pertenece cada publicación (y cada campaña) por lo que dice y muestra; si no se nota o es de la marca en general, no se la atribuyas a ninguno.
+- Llena "productos" con una entrada por producto, en el mismo orden de la lista: cuántas publicaciones tiene, qué tan trabajado está frente a los demás, cómo le ha ido y cuál es la acción de contenido más importante.
+- Cada idea de publicación y cada idea de anuncio lleva en "producto" el nombre EXACTO del producto para el que es. Reparte las ideas entre todos los productos (2 o 3 por producto en publicaciones, al menos 1 en anuncios), dando más a los que tienen menos contenido. Cada idea habla solo de su producto: su público, su promesa y su llamado a escribir; no mezcles los productos en una misma idea.
+- Las recomendaciones, lo que funciona y lo que no pueden citar a qué producto se refieren.
+- Sin esa lista, "productos" es null y "producto" de cada idea es "General".`;
 
 export async function generateContentDiagnosis(
   businessId: string,
@@ -150,12 +183,20 @@ export async function generateContentDiagnosis(
 
   const [business, products] = await Promise.all([
     prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { name: true, industry: true } }),
-    prisma.product.findMany({ where: { businessId, active: true }, orderBy: { createdAt: "asc" }, take: 15, select: { name: true, kind: true } }),
+    prisma.product.findMany({ where: { businessId, active: true }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], take: 15, select: { name: true, kind: true, description: true } }),
   ]);
   const industry = INDUSTRY_OPTIONS.find((o) => o.value === business.industry)?.label ?? "otro";
   const catalog = products.length
     ? products.map((p) => `${p.name}${p.kind === "SERVICE" ? " (servicio)" : ""}`).join(", ")
     : "No tiene catálogo cargado; deduce lo que vende de sus publicaciones.";
+
+  // A handful of distinct products: the report is split by them, each with what it is.
+  const split = products.length >= 2 && products.length <= MAX_SPLIT_PRODUCTS ? products : null;
+  const splitBlock = split
+    ? `PRODUCTOS A DIVIDIR (usa estos nombres exactos, en este orden):\n${split
+        .map((p, i) => `${i + 1}. ${p.name}${p.kind === "SERVICE" ? " (servicio)" : ""}${p.description.trim() ? `: ${p.description.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`)
+        .join("\n")}\n`
+    : "Sin lista de productos a dividir: \"productos\" es null.\n";
 
   // Best first, so the strongest examples are what the model reads first.
   const sample = [...posts].sort((a, b) => b.interactions - a.interactions).slice(0, MAX_POSTS);
@@ -170,7 +211,7 @@ export async function generateContentDiagnosis(
         role: "user",
         content: `Negocio: ${business.name} (rubro: ${industry}).
 Lo que vende: ${catalog}
-Período analizado: ${data.range.since} a ${data.range.until}.
+${splitBlock}Período analizado: ${data.range.since} a ${data.range.until}.
 
 Cuenta:
 ${describeAccount(data)}
@@ -187,5 +228,22 @@ Haz el diagnóstico del contenido${hasAds ? " y de los anuncios" : ""} y propone
   await recordAnthropicUsage("claude-opus-5-5", response.usage);
 
   if (!response.parsed_output) throw new Error("Claude no devolvió un diagnóstico válido");
-  return { status: "ok", diagnosis: response.parsed_output };
+  return { status: "ok", diagnosis: alignProducts(response.parsed_output, split?.map((p) => p.name) ?? []) };
+}
+
+/**
+ * Makes the product names in a report match the catalog exactly (the model may
+ * change a case or an accent), and anything it can't place becomes "General".
+ */
+export function alignProducts(d: ContentDiagnosis, names: string[]): ContentDiagnosis {
+  const plain = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+  const fix = (name: string | undefined) => names.find((n) => plain(n) === plain(name ?? "")) ?? "General";
+  return {
+    ...d,
+    ideas: d.ideas.map((i) => ({ ...i, producto: fix(i.producto) })),
+    anuncios: d.anuncios ? { ...d.anuncios, ideas: d.anuncios.ideas.map((i) => ({ ...i, producto: fix(i.producto) })) } : d.anuncios,
+    productos: names.length
+      ? names.map((n) => d.productos?.find((p) => plain(p.nombre) === plain(n))).filter((p): p is NonNullable<typeof p> => !!p).map((p, i) => ({ ...p, nombre: names.find((n) => plain(n) === plain(p.nombre)) ?? names[i] }))
+      : null,
+  };
 }
