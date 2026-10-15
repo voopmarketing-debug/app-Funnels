@@ -25,6 +25,9 @@ import {
   uploadTemplateHeaderImage,
   type TemplateButton,
   subscribeAppToWaba,
+  inspectWabaToken,
+  listWabaPhoneNumbers,
+  type WabaPhoneNumber,
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
 import { generateHeroImage } from "@/lib/websiteHeroImage";
@@ -477,6 +480,39 @@ export async function updateWabaCredentials(
   }
   await runWhatsAppHealthCheck(businessId).catch((err) => console.error("Health check after saving credentials failed:", err));
   return { verified: true, displayPhoneNumber: verification.displayPhoneNumber };
+}
+
+export type DiscoverNumbersResult =
+  | { ok: true; numbers: WabaPhoneNumber[]; expiresAt: string | null; reason?: string }
+  | { ok: false; error: string };
+
+/**
+ * From a pasted token alone: which numbers it can use (so the person picks
+ * one instead of copying IDs) and when the token stops working. Returns the
+ * error instead of throwing so the form can show Meta's reason.
+ */
+export async function discoverWhatsAppNumbers(businessId: string, rawToken: string): Promise<DiscoverNumbersResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Tu sesión venció. Vuelve a entrar." };
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+
+  const token = sanitizeAsciiToken(rawToken);
+  if (!token) return { ok: false, error: "Pega primero el token." };
+  const info = await inspectWabaToken(token);
+  if (!info.ok) return { ok: false, error: info.error };
+
+  const lists = await Promise.all(info.wabaIds.map((wabaId) => listWabaPhoneNumbers({ wabaId, accessToken: token })));
+  const numbers = lists.flat();
+  const expiresAt = info.expiresAt ? info.expiresAt.toISOString() : null;
+  if (numbers.length === 0) {
+    return {
+      ok: true,
+      numbers,
+      expiresAt,
+      reason: "El token es válido, pero no encontramos números de WhatsApp con él. Revisa que, al crearlo, le diste acceso a tu cuenta de WhatsApp Business.",
+    };
+  }
+  return { ok: true, numbers, expiresAt };
 }
 
 const TEMPLATE_CATEGORIES = new Set(["MARKETING", "UTILITY"]);

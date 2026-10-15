@@ -1,6 +1,6 @@
 import { createHmac } from "crypto";
-import { describe, expect, it } from "vitest";
-import { UNREADABLE_PREFIX, parseInboundMessages, verifyWebhookSignature } from "./whatsapp";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { UNREADABLE_PREFIX, inspectWabaToken, listWabaPhoneNumbers, parseInboundMessages, verifyWebhookSignature } from "./whatsapp";
 
 describe("verifyWebhookSignature", () => {
   const appSecret = "test-app-secret";
@@ -186,5 +186,65 @@ describe("parseInboundMessages", () => {
   it("returns an empty array for malformed payloads", () => {
     expect(parseInboundMessages(null)).toEqual([]);
     expect(parseInboundMessages({})).toEqual([]);
+  });
+});
+
+describe("inspectWabaToken / listWabaPhoneNumbers", () => {
+  const realFetch = globalThis.fetch;
+  const ENV = { id: process.env.META_APP_ID, secret: process.env.META_APP_SECRET };
+
+  beforeEach(() => {
+    process.env.META_APP_ID = "app1";
+    process.env.META_APP_SECRET = "sec1";
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    process.env.META_APP_ID = ENV.id;
+    process.env.META_APP_SECRET = ENV.secret;
+  });
+
+  const reply = (body: unknown, status = 200) => vi.fn(async () => new Response(JSON.stringify(body), { status }));
+
+  it("reads the accounts and a permanent token from Meta's debug endpoint", async () => {
+    const fake = reply({
+      data: {
+        is_valid: true,
+        expires_at: 0,
+        scopes: ["whatsapp_business_messaging"],
+        granular_scopes: [
+          { scope: "whatsapp_business_management", target_ids: ["W1", "W2"] },
+          { scope: "whatsapp_business_messaging", target_ids: ["W1"] },
+          { scope: "business_management" },
+        ],
+      },
+    });
+    globalThis.fetch = fake as unknown as typeof fetch;
+    const info = await inspectWabaToken("tok");
+    expect(info).toEqual({ ok: true, expiresAt: null, wabaIds: ["W1", "W2"], scopes: ["whatsapp_business_messaging"] });
+    const called = String((fake.mock.calls as unknown as unknown[][])[0][0]);
+    expect(called).toContain("debug_token");
+    expect(called).toContain("input_token=tok");
+  });
+
+  it("reports an expiry date for a temporary token", async () => {
+    globalThis.fetch = reply({ data: { is_valid: true, expires_at: 1_900_000_000, granular_scopes: [] } }) as unknown as typeof fetch;
+    const info = await inspectWabaToken("tok");
+    expect(info.ok && info.expiresAt?.getTime()).toBe(1_900_000_000_000);
+  });
+
+  it("says so when the token is expired or unknown", async () => {
+    globalThis.fetch = reply({ data: { is_valid: false } }) as unknown as typeof fetch;
+    expect(await inspectWabaToken("tok")).toMatchObject({ ok: false, error: expect.stringContaining("venció") });
+    globalThis.fetch = reply({ error: { message: "bad" } }, 400) as unknown as typeof fetch;
+    expect(await inspectWabaToken("tok")).toMatchObject({ ok: false });
+  });
+
+  it("lists the numbers of an account", async () => {
+    globalThis.fetch = reply({ data: [{ id: "P1", display_phone_number: "+57 300 1112233", verified_name: "Funnels" }] }) as unknown as typeof fetch;
+    expect(await listWabaPhoneNumbers({ wabaId: "W1", accessToken: "tok" })).toEqual([
+      { phoneNumberId: "P1", displayPhoneNumber: "+57 300 1112233", verifiedName: "Funnels", wabaId: "W1" },
+    ]);
+    globalThis.fetch = reply({ error: {} }, 403) as unknown as typeof fetch;
+    expect(await listWabaPhoneNumbers({ wabaId: "W1", accessToken: "tok" })).toEqual([]);
   });
 });

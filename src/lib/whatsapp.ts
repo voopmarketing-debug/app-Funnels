@@ -157,6 +157,80 @@ export async function verifyWabaConnection(params: {
   };
 }
 
+export type WabaTokenInfo =
+  | { ok: true; expiresAt: Date | null; wabaIds: string[]; scopes: string[] }
+  | { ok: false; error: string };
+
+/**
+ * What a pasted token is worth: whether Meta accepts it, when it expires
+ * (null = never: a System User token) and which WhatsApp Business Accounts it
+ * can reach. Meta's own debug endpoint, read with our app's credentials, so
+ * the person never has to hunt for the account ID.
+ */
+export async function inspectWabaToken(accessToken: string): Promise<WabaTokenInfo> {
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appId || !appSecret) return { ok: false, error: "Falta configurar la app de Meta en el servidor." };
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/debug_token`);
+  url.searchParams.set("input_token", accessToken);
+  url.searchParams.set("access_token", `${appId}|${appSecret}`);
+  let response: Response;
+  try {
+    response = await fetch(url, { cache: "no-store" });
+  } catch {
+    return { ok: false, error: "No se pudo contactar a Meta. Inténtalo de nuevo en un momento." };
+  }
+  const body = (await response.json().catch(() => null)) as {
+    data?: {
+      is_valid?: boolean;
+      expires_at?: number;
+      data_access_expires_at?: number;
+      scopes?: string[];
+      granular_scopes?: { scope: string; target_ids?: string[] }[];
+      error?: { message?: string };
+    };
+    error?: { message?: string };
+  } | null;
+  const data = body?.data;
+  if (!response.ok || !data) {
+    return { ok: false, error: "Meta no reconoció ese token. Cópialo completo, sin espacios." };
+  }
+  if (!data.is_valid) {
+    return { ok: false, error: "Ese token ya venció o no es válido. Genera uno nuevo y pégalo aquí." };
+  }
+  const wabaIds = (data.granular_scopes ?? [])
+    .filter((g) => g.scope === "whatsapp_business_management" || g.scope === "whatsapp_business_messaging")
+    .flatMap((g) => g.target_ids ?? []);
+  return {
+    ok: true,
+    expiresAt: data.expires_at ? new Date(data.expires_at * 1000) : null,
+    wabaIds: [...new Set(wabaIds)],
+    scopes: data.scopes ?? [],
+  };
+}
+
+export type WabaPhoneNumber = { phoneNumberId: string; displayPhoneNumber: string; verifiedName: string | null; wabaId: string };
+
+/** The numbers of one WhatsApp Business Account, to pick from instead of pasting an ID. */
+export async function listWabaPhoneNumbers(params: { wabaId: string; accessToken: string }): Promise<WabaPhoneNumber[]> {
+  const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${params.wabaId}/phone_numbers`);
+  url.searchParams.set("fields", "id,display_phone_number,verified_name");
+  url.searchParams.set("limit", "50");
+  try {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${params.accessToken}` }, cache: "no-store" });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { data?: { id: string; display_phone_number?: string; verified_name?: string }[] };
+    return (body.data ?? []).map((n) => ({
+      phoneNumberId: n.id,
+      displayPhoneNumber: n.display_phone_number ?? n.id,
+      verifiedName: n.verified_name ?? null,
+      wabaId: params.wabaId,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Which Meta apps are subscribed to this WhatsApp Business Account's
  * webhooks. If OUR app isn't in the list, Meta never sends us inbound

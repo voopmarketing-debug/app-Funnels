@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { updateWabaCredentials } from "@/lib/actions";
+import { useActionState, useState, useTransition } from "react";
+import { discoverWhatsAppNumbers, updateWabaCredentials, type DiscoverNumbersResult } from "@/lib/actions";
 
 // WhatsApp's own brand green — deliberately not one of the shared KPI
 // tones (accent/secondary/amber/blue), so this card reads as "WhatsApp"
@@ -10,6 +10,18 @@ import { updateWabaCredentials } from "@/lib/actions";
 const WHATSAPP_GREEN = "37, 211, 102";
 
 type SaveState = { saved: boolean; error: string | null; connectedNumber: string | null };
+
+type Found = Extract<DiscoverNumbersResult, { ok: true }>;
+
+const inputClass = "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-ink outline-none focus:border-accent";
+
+function expiryLabel(iso: string | null): { text: string; good: boolean } {
+  if (!iso) return { text: "Token permanente: no vence", good: true };
+  const hours = Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000);
+  if (hours > 24 * 30) return { text: `Vence en ${Math.floor(hours / 24)} días`, good: true };
+  const when = hours <= 48 ? `${Math.max(hours, 0)} horas` : `${Math.floor(hours / 24)} días`;
+  return { text: `Este token vence en ${when}. Cuando venza, el agente deja de responder; mejor usa uno permanente`, good: false };
+}
 
 export function WabaCredentialsForm({
   businessId,
@@ -20,8 +32,20 @@ export function WabaCredentialsForm({
   wabaPhoneNumberId: string;
   wabaId: string;
 }) {
+  const connected = Boolean(wabaPhoneNumberId);
+  const [token, setToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
+  const [phoneId, setPhoneId] = useState(wabaPhoneNumberId);
+  const [accountId, setAccountId] = useState(wabaId);
+  const [found, setFound] = useState<Found | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [searching, startSearch] = useTransition();
+
   const [state, formAction, isPending] = useActionState<SaveState, FormData>(
     async (_prevState, formData) => {
+      if (!String(formData.get("wabaPhoneNumberId") ?? "").trim()) {
+        return { saved: false, connectedNumber: null, error: "Elige tu número de la lista (o escribe el Phone Number ID en la opción manual)." };
+      }
       try {
         const result = await updateWabaCredentials(businessId, formData);
         if (!result.verified) {
@@ -43,86 +67,183 @@ export function WabaCredentialsForm({
     { saved: false, error: null, connectedNumber: null },
   );
 
-  return (
-    <div className="space-y-4">
+  function search() {
+    setLookupError(null);
+    setFound(null);
+    startSearch(async () => {
+      const res = await discoverWhatsAppNumbers(businessId, token);
+      if (!res.ok) {
+        setLookupError(res.error);
+        return;
+      }
+      setFound(res);
+      if (res.reason) setLookupError(res.reason);
+      const current = res.numbers.find((n) => n.phoneNumberId === phoneId);
+      const pick = current ?? (res.numbers.length === 1 ? res.numbers[0] : null);
+      if (pick) {
+        setPhoneId(pick.phoneNumberId);
+        setAccountId(pick.wabaId);
+      }
+    });
+  }
 
+  const expiry = found ? expiryLabel(found.expiresAt) : null;
+
+  return (
+    <div className="space-y-5">
       <p className="mt-4 text-sm text-ink">
-        Sin esto bien puesto, tu agente de IA <strong>no puede enviar ni recibir</strong> mensajes
-        de WhatsApp. Los dos datos de abajo no te los inventas tú: te los entrega Meta (el dueño de
-        WhatsApp) cuando conectas tu número al WhatsApp Business API. Sigue los pasos:
+        {connected ? (
+          <>
+            Tu WhatsApp ya está conectado. Solo vuelve aquí si Meta te avisa que el token <strong>venció</strong> o si quieres cambiar de número.
+          </>
+        ) : (
+          <>
+            Sin esto tu agente de IA <strong>no puede enviar ni recibir</strong> mensajes de WhatsApp. Solo necesitas <strong>un dato: el token</strong> que te da Meta. Con él
+            encontramos tu número por ti.
+          </>
+        )}
       </p>
 
-      <form action={formAction} className="mt-4 space-y-5">
-        <div className="space-y-1">
-          <label htmlFor="wabaPhoneNumberId" className="fl-mono text-xs tracking-wide text-ink uppercase">
-            1. Phone Number ID (te lo da Meta)
-          </label>
-          <p className="text-xs text-ink-muted">
-            Es el identificador que Meta le asigna a tu número dentro de WhatsApp Business API — no
-            es tu número de teléfono normal. Lo encuentras entrando a{" "}
-            <span className="fl-mono text-ink">business.facebook.com → WhatsApp Manager</span>, en{" "}
-            <span className="fl-mono text-ink">Configuración de la API → Números de teléfono</span>{" "}
-            (ahí dice &quot;Phone number ID&quot;). Cópialo y pégalo tal cual aquí abajo.
-          </p>
-          <input
-            id="wabaPhoneNumberId"
-            name="wabaPhoneNumberId"
-            defaultValue={wabaPhoneNumberId}
-            required
-            autoComplete="off"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
-        </div>
+      <form action={formAction} className="space-y-5">
+        <input type="hidden" name="wabaPhoneNumberId" value={phoneId} />
+        <input type="hidden" name="wabaId" value={accountId} />
 
-        <div className="space-y-1">
-          <label htmlFor="wabaAccessToken" className="fl-mono text-xs tracking-wide text-ink uppercase">
-            2. Token de acceso (te lo da Meta)
-          </label>
-          <p className="text-xs text-ink-muted">
-            Es la clave secreta que autoriza a tu agente de IA a usar tu WhatsApp. También la
-            genera Meta, en{" "}
-            <span className="fl-mono text-ink">developers.facebook.com → tu App → WhatsApp → Configuración de la API</span>
-            . Ya está guardado uno funcionando — solo tienes que pegar uno nuevo aquí{" "}
-            <strong>cuando Meta te avise que venció</strong> (con tokens de prueba, cada ~24 horas).
-            Cuando eso pase, hacerlo es obligatorio: si no actualizas el token, el agente deja de
-            responder en WhatsApp.
-          </p>
-          <input
-            id="wabaAccessToken"
-            name="wabaAccessToken"
-            type="text"
-            placeholder="Pega aquí el token nuevo que te dio Meta"
-            autoComplete="off"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
-        </div>
+        <section className="space-y-2.5 rounded-xl border border-border p-4">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-ink">1</span>
+            Pega tu token de acceso
+          </h3>
+          <p className="text-[13px] text-ink-muted">Es la clave que le da permiso a tu agente de usar tu WhatsApp. La genera Meta; abajo te explicamos cómo.</p>
+          <div className="flex gap-2">
+            <input
+              id="wabaAccessToken"
+              name="wabaAccessToken"
+              type={showToken ? "text" : "password"}
+              value={token}
+              onChange={(e) => {
+                setToken(e.target.value);
+                setFound(null);
+                setLookupError(null);
+              }}
+              placeholder={connected ? "Pega aquí el token nuevo (déjalo vacío para conservar el actual)" : "Pega aquí el token que te dio Meta"}
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Token de acceso"
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={() => setShowToken((v) => !v)}
+              className="flex-none rounded-lg border border-border px-3 text-xs font-semibold text-ink-muted hover:text-ink"
+            >
+              {showToken ? "Ocultar" : "Ver"}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={search}
+            disabled={searching || !token.trim()}
+            className="rounded-lg border border-accent/60 bg-accent/10 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-accent/20 disabled:opacity-50"
+          >
+            {searching ? "Buscando tus números…" : "Buscar mis números"}
+          </button>
+          {lookupError && <p className="rounded-lg border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">{lookupError}</p>}
 
-        <div className="space-y-1">
-          <label htmlFor="wabaId" className="fl-mono text-xs tracking-wide text-ink uppercase">
-            3. WABA ID (solo si vas a usar plantillas de difusión)
-          </label>
-          <p className="text-xs text-ink-muted">
-            Es el ID de tu cuenta de WhatsApp Business (distinto al Phone Number ID de arriba) — solo hace falta
-            para crear <strong>plantillas de mensajes</strong> (ver sección Plantillas), no para el agente normal.
-            Lo encuentras en{" "}
-            <span className="fl-mono text-ink">business.facebook.com → WhatsApp Manager → Configuración de la API</span>{" "}
-            (ahí dice &quot;ID de la cuenta de WhatsApp Business&quot;).
-          </p>
-          <input
-            id="wabaId"
-            name="wabaId"
-            defaultValue={wabaId}
-            autoComplete="off"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
-        </div>
+          <details className="group rounded-lg bg-surface-2/60 p-3 text-[13px] text-ink-muted">
+            <summary className="cursor-pointer font-semibold text-ink">¿Cómo consigo el token? (paso a paso)</summary>
+            <ol className="mt-2 list-decimal space-y-1.5 pl-5">
+              <li>
+                Entra a <span className="fl-mono text-ink">business.facebook.com</span> → <strong>Configuración del negocio</strong> (la rueda).
+              </li>
+              <li>
+                Ve a <strong>Usuarios → Usuarios del sistema</strong> y crea uno (nombre: Funnels, rol <strong>Administrador</strong>).
+              </li>
+              <li>
+                Pulsa <strong>Asignar activos</strong> y dale control total a tu <strong>cuenta de WhatsApp</strong> y a tu <strong>app</strong>.
+              </li>
+              <li>
+                Pulsa <strong>Generar token</strong>, elige la app, en vencimiento escoge <strong>Nunca</strong> y marca{" "}
+                <span className="fl-mono text-ink">whatsapp_business_management</span> y <span className="fl-mono text-ink">whatsapp_business_messaging</span>.
+              </li>
+              <li>Copia el token y pégalo arriba. Con un token permanente no tendrás que volver a hacer esto.</li>
+            </ol>
+            <p className="mt-2">
+              ¿Usas el token de prueba que aparece en <span className="fl-mono text-ink">developers.facebook.com → tu app → WhatsApp → Configuración de la API</span>? Sirve para
+              probar, pero vence cada ~24 horas.
+            </p>
+          </details>
+        </section>
+
+        {found && found.numbers.length > 0 && (
+          <section className="space-y-2.5 rounded-xl border border-border p-4">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-ink">2</span>
+              Elige el número que atenderá el agente
+            </h3>
+            {expiry && (
+              <p className={`rounded-lg px-3 py-2 text-[13px] font-medium ${expiry.good ? "bg-accent/10 text-ink" : "border border-error/40 bg-error/10 text-error"}`}>
+                {expiry.good ? "✓ " : "⚠ "}
+                {expiry.text}
+              </p>
+            )}
+            <ul className="space-y-1.5" role="radiogroup" aria-label="Números de WhatsApp">
+              {found.numbers.map((n) => {
+                const on = n.phoneNumberId === phoneId;
+                return (
+                  <li key={n.phoneNumberId}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => {
+                        setPhoneId(n.phoneNumberId);
+                        setAccountId(n.wabaId);
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${on ? "border-accent bg-accent/10" : "border-border hover:border-border-strong"}`}
+                    >
+                      <span className={`flex h-4 w-4 flex-none items-center justify-center rounded-full border-2 ${on ? "border-accent" : "border-border-strong"}`}>
+                        {on && <span className="h-2 w-2 rounded-full bg-accent" />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-ink">{n.displayPhoneNumber}</span>
+                        {n.verifiedName && <span className="block truncate text-xs text-ink-muted">{n.verifiedName}</span>}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        <details className="rounded-xl border border-border p-4 text-[13px] text-ink-muted" open={!found && !connected && Boolean(lookupError)}>
+          <summary className="cursor-pointer text-sm font-semibold text-ink">Prefiero escribir los IDs a mano (opción avanzada)</summary>
+          <div className="mt-3 space-y-3">
+            <div className="space-y-1">
+              <label htmlFor="manualPhoneId" className="fl-mono text-xs tracking-wide text-ink uppercase">
+                Phone Number ID
+              </label>
+              <p>
+                Lo ves en <span className="fl-mono text-ink">WhatsApp Manager → Configuración de la API → Números de teléfono</span>. No es tu número de teléfono normal.
+              </p>
+              <input id="manualPhoneId" value={phoneId} onChange={(e) => setPhoneId(e.target.value)} autoComplete="off" className={inputClass} />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="manualWabaId" className="fl-mono text-xs tracking-wide text-ink uppercase">
+                ID de la cuenta de WhatsApp Business (WABA ID)
+              </label>
+              <p>Hace falta para crear plantillas de mensajes y para recibir los mensajes. Está en la misma pantalla de Meta.</p>
+              <input id="manualWabaId" value={accountId} onChange={(e) => setAccountId(e.target.value)} autoComplete="off" className={inputClass} />
+            </div>
+          </div>
+        </details>
 
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+          className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
         >
-          {isPending ? "Guardando..." : "Guardar credenciales"}
+          {isPending ? "Guardando y verificando…" : connected ? "Guardar cambios" : "Guardar y conectar"}
         </button>
 
         {state.saved && !isPending && (

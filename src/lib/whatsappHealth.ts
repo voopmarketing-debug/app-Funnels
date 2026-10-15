@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { sendEmail } from "@/lib/email";
 import { checkAnthropic, checkOpenAi } from "@/lib/aiServiceHealth";
-import { fetchWabaSubscribedApps, subscribeAppToWaba, verifyWabaConnection } from "@/lib/whatsapp";
+import { fetchWabaSubscribedApps, inspectWabaToken, subscribeAppToWaba, verifyWabaConnection } from "@/lib/whatsapp";
 
 // Why this exists: when WhatsApp stops delivering to us (expired token, the
 // app unsubscribed from the number's account, a wrong app secret…) nothing
@@ -61,6 +61,25 @@ export async function checkWhatsAppHealth(business: HealthBusiness): Promise<Wha
         }
       : { label: "Número y token", ok: false, detail: connection.error },
   );
+
+  if (connection.ok) {
+    // A token that works today but expires soon is the quiet way the agent stops answering.
+    const info = await inspectWabaToken(accessToken).catch(() => null);
+    if (info?.ok && info.expiresAt) {
+      const hours = Math.round((info.expiresAt.getTime() - Date.now()) / 3_600_000);
+      const days = Math.floor(hours / 24);
+      checks.push({
+        label: "Duración del token",
+        ok: hours > 24 * 7,
+        detail:
+          hours > 24 * 7
+            ? `El token vence en ${days} días.`
+            : `El token vence en ${hours <= 48 ? `${Math.max(hours, 0)} horas` : `${days} días`}. Cuando venza, el agente deja de responder. Reemplázalo por un token permanente en «Conectar WhatsApp».`,
+      });
+    } else if (info?.ok) {
+      checks.push({ label: "Duración del token", ok: true, detail: "Token permanente: no vence." });
+    }
+  }
 
   if (!business.wabaId) {
     checks.push({
