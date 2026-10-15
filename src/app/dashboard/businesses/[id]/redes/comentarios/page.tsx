@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 import { MetaApiError, friendlyMetaError } from "@/lib/metaSocial";
 import { isMissingPermission } from "@/lib/metaInbox";
-import { PRIVATE_REPLY_WINDOW_MS, adComments, facebookComments, instagramComments, mergeComments, type CommentNetwork, type SocialComment } from "@/lib/metaComments";
+import { PRIVATE_REPLY_WINDOW_MS, adComments, facebookComments, instagramComments, mergeComments, missingCommentPermissions, type CommentNetwork, type SocialComment } from "@/lib/metaComments";
 import { RedesTabs } from "../RedesTabs";
 import { FacebookGlyph, InstagramGlyph } from "../icons";
 import { shortDateTime } from "../format";
@@ -136,6 +136,7 @@ export default async function ComentariosPage({
   );
   // Ad comments need the ad account (user token with ads_read); a failure there never hides the rest.
   let adsUnavailable = false;
+  const adStats = { unreadable: 0 };
   const hasAds = !!connection.adAccountId && !!connection.userAccessToken;
   const ads = hasAds
     ? await adComments({
@@ -144,6 +145,7 @@ export default async function ComentariosPage({
         pageId,
         igUserId,
         pageToken,
+        stats: adStats,
       }).catch((err) => {
         if (err instanceof MetaApiError && err.needsReconnect) needsReconnect = true;
         else adsUnavailable = true;
@@ -182,6 +184,25 @@ export default async function ComentariosPage({
   );
   const now = nowMs();
 
+  // Meta leaves out who wrote a comment when the login lacks "read comments" (or the app isn't
+  // approved for it): say which one it is instead of showing a nameless list.
+  const nameless = rows.filter((r) => !r.authorKnown).length;
+  const missingPermissions = nameless > 0 && connection.userAccessToken ? await missingCommentPermissions(decryptSecret(connection.userAccessToken)) : null;
+
+  // One card per publication with its comments underneath (not the same post repeated on every comment).
+  const pendingByPost = new Map<string, number>();
+  for (const r of inNetwork) if (!r.done && !r.hidden) pendingByPost.set(`${r.network}:${r.post.id}`, (pendingByPost.get(`${r.network}:${r.post.id}`) ?? 0) + 1);
+  const groups = new Map<string, { key: string; first: Row; comments: Row[] }>();
+  for (const r of visible) {
+    const key = `${r.network}:${r.post.id}`;
+    const g = groups.get(key);
+    if (g) g.comments.push(r);
+    else groups.set(key, { key, first: r, comments: [r] });
+  }
+  // `visible` is newest first, so each group's first comment is its newest and groups come out newest first.
+  const groupList = [...groups.values()];
+  const SHOWN_PER_POST = 5;
+
   const href = (over: Record<string, string | null>) => {
     const p = new URLSearchParams();
     const merged = { f: filter, red: networkFilter, tipo: typeFilter, q: sp.q ?? "", ...over };
@@ -216,6 +237,27 @@ export default async function ComentariosPage({
       )}
       {errors.length > 0 && (
         <p className="rounded-xl border border-border bg-surface p-3 text-sm text-ink-muted">Meta no devolvió algunos comentarios ahora: {errors.join(" · ")}</p>
+      )}
+      {nameless > 0 && (
+        <section className="rounded-xl border border-border bg-surface p-4 text-sm">
+          <p className="font-semibold text-ink">Meta no nos dio el nombre de {nameless === 1 ? "1 persona" : `${nameless} personas`} que comentaron</p>
+          <p className="mt-1 text-ink-muted">
+            {missingPermissions?.includes("pages_read_user_content")
+              ? "Tu conexión no tiene el permiso para leer quién comenta (pages_read_user_content). Reconecta Facebook y acepta todos los permisos: los nombres aparecen solos. El comentario y las respuestas funcionan igual."
+              : "Aunque la conexión tiene el permiso, Meta solo entrega los nombres de quienes comentan cuando la app tiene aprobado el acceso avanzado (la revisión de Meta). Mientras tanto ves lo que escribieron, pero no quiénes son; responder y ocultar funcionan igual."}
+          </p>
+          {missingPermissions?.includes("pages_read_user_content") && canManage && (
+            <a href={`/api/social/meta/connect?businessId=${id}`} className="mt-3 inline-block rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ background: "#1877f2" }}>
+              Reconectar con Facebook
+            </a>
+          )}
+        </section>
+      )}
+      {adStats.unreadable > 0 && (
+        <p className="rounded-xl border border-border bg-surface p-3 text-sm text-ink-muted">
+          Meta no dejó leer los comentarios de {adStats.unreadable === 1 ? "1 publicación de tus anuncios" : `${adStats.unreadable} publicaciones de tus anuncios`} (suele pasar con anuncios de Instagram o ya
+          eliminados). Los demás se muestran completos.
+        </p>
       )}
       {adsUnavailable && (
         <p className="rounded-xl border border-border bg-surface p-3 text-sm text-ink-muted">
@@ -292,87 +334,114 @@ export default async function ComentariosPage({
         </div>
       </div>
 
-      <ul className="space-y-3">
-        {visible.map((c) => (
-          <li key={c.id} className={`fl-card space-y-3 p-4 ${c.hidden ? "opacity-75" : ""}`}>
-            <div className="flex gap-3">
-              <span className="relative h-10 w-10 flex-none">
-                <span className="fl-mono flex h-full w-full items-center justify-center rounded-full border border-border bg-surface-2 text-[13px] font-bold text-ink-muted">{initials(c.authorName)}</span>
-                <span className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-surface">
-                  <NetworkBadge network={c.network} />
+      <ul className="space-y-4">
+        {groupList.map((g) => {
+          const post = g.first.post;
+          const ad = g.first.ad;
+          const network = g.first.network;
+          const pending = pendingByPost.get(g.key) ?? 0;
+          const shown = g.comments.slice(0, SHOWN_PER_POST);
+          const rest = g.comments.slice(SHOWN_PER_POST);
+          const renderComment = (c: Row) => (
+            <li key={c.id} className={`space-y-3 p-4 ${c.hidden ? "opacity-75" : ""}`}>
+              <div className="flex gap-3">
+                <span className="relative h-10 w-10 flex-none">
+                  <span className="fl-mono flex h-full w-full items-center justify-center rounded-full border border-border bg-surface-2 text-[13px] font-bold text-ink-muted">
+                    {c.authorKnown ? initials(c.authorName) : "?"}
+                  </span>
+                  <span className="absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-surface">
+                    <NetworkBadge network={c.network} />
+                  </span>
                 </span>
-              </span>
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <p className="font-semibold text-ink">{c.authorName}</p>
-                  <span className="text-xs text-ink-faint">{ago(c.createdAt, now)}</span>
-                  {c.likeCount > 0 && <span className="text-xs text-ink-faint">♥ {c.likeCount}</span>}
-                  {c.ad && (
-                    <span
-                      title={c.ad.campaign ? `Campaña: ${c.ad.campaign}` : undefined}
-                      className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-ink"
-                    >
-                      📣 Anuncio
-                    </span>
-                  )}
-                  {c.hidden && <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">🙈 Oculto</span>}
-                  {c.answered ? (
-                    <span className="rounded-full bg-[#0ca30c]/15 px-2 py-0.5 text-[11px] font-semibold text-[var(--status-good)]">✓ Respondido</span>
-                  ) : c.done ? (
-                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">✓ Listo</span>
-                  ) : null}
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <p className={`font-semibold ${c.authorKnown ? "text-ink" : "text-ink-muted"}`} title={c.authorKnown ? undefined : "Meta no entregó el nombre de esta persona"}>
+                      {c.authorKnown ? c.authorName : "Nombre no disponible"}
+                    </p>
+                    <span className="text-xs text-ink-faint">{ago(c.createdAt, now)}</span>
+                    {c.likeCount > 0 && <span className="text-xs text-ink-faint">♥ {c.likeCount}</span>}
+                    {c.hidden && <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">🙈 Oculto</span>}
+                    {c.answered ? (
+                      <span className="rounded-full bg-[#0ca30c]/15 px-2 py-0.5 text-[11px] font-semibold text-[var(--status-good)]">✓ Respondido</span>
+                    ) : c.done ? (
+                      <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">✓ Listo</span>
+                    ) : null}
+                  </div>
+                  <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-ink">{c.text || <span className="italic text-ink-muted">Comentario con foto o sticker</span>}</p>
                 </div>
-                <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-ink">{c.text || <span className="italic text-ink-muted">Comentario con foto o sticker</span>}</p>
               </div>
-            </div>
 
-            {c.replies.length > 0 && (
-              <ul className="ml-[3.25rem] space-y-1.5 border-l-2 border-border pl-3">
-                {c.replies.map((r) => (
-                  <li key={r.id} className="text-sm">
-                    <span className={`font-semibold ${r.fromUs ? "text-accent" : "text-ink"}`}>{r.authorName}</span>{" "}
-                    <span className="text-ink-muted">{r.text}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+              {c.replies.length > 0 && (
+                <ul className="ml-[3.25rem] space-y-1.5 border-l-2 border-border pl-3">
+                  {c.replies.map((r) => (
+                    <li key={r.id} className="text-sm">
+                      <span className={`font-semibold ${r.fromUs ? "text-accent" : "text-ink"}`}>{r.authorName}</span> <span className="text-ink-muted">{r.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-            <div className="ml-[3.25rem] space-y-3">
+              <div className="ml-[3.25rem]">
+                <CommentActions
+                  businessId={id}
+                  comment={{ id: c.id, network: c.network }}
+                  hidden={c.hidden}
+                  done={c.done}
+                  canPrivate={now - Date.parse(c.createdAt) < PRIVATE_REPLY_WINDOW_MS}
+                  authorName={c.authorKnown ? c.authorName : "esta persona"}
+                />
+              </div>
+            </li>
+          );
+          return (
+            <li key={g.key} className="fl-card overflow-hidden p-0">
               <a
-                href={c.post.permalink ?? undefined}
+                href={post.permalink ?? undefined}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex max-w-xl items-center gap-2.5 rounded-xl border border-border bg-surface-2/50 p-2 transition hover:border-border-strong"
+                className="flex items-center gap-3 border-b border-border bg-surface-2/50 p-3 transition hover:bg-surface-2"
               >
-                {c.post.image ? (
+                {post.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.post.image} alt="" className="h-10 w-10 flex-none rounded-lg object-cover" loading="lazy" />
+                  <img src={post.image} alt="" className="h-14 w-14 flex-none rounded-lg object-cover" loading="lazy" />
                 ) : (
-                  <span className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-surface text-lg" aria-hidden="true">
+                  <span className="flex h-14 w-14 flex-none items-center justify-center rounded-lg bg-surface text-xl" aria-hidden="true">
                     📝
                   </span>
                 )}
-                <span className="min-w-0">
-                  <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
-                    {c.ad ? `En tu anuncio de ${NETWORK_STYLE[c.network].label}${c.ad.campaign ? ` · ${c.ad.campaign}` : ""}` : `En tu publicación de ${NETWORK_STYLE[c.network].label}`}
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-x-2 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                    <NetworkBadge network={network} />
+                    {ad ? `Anuncio de ${NETWORK_STYLE[network].label}${ad.campaign ? ` · ${ad.campaign}` : ""}` : `Publicación de ${NETWORK_STYLE[network].label}`}
                   </span>
-                  <span className="block truncate text-xs text-ink-muted">{c.post.text || "Publicación sin texto"}</span>
+                  <span className="mt-0.5 line-clamp-2 block text-sm text-ink">{post.text || "Publicación sin texto"}</span>
                 </span>
-                <span className="ml-auto flex-none text-xs text-ink-faint" aria-hidden="true">
-                  ↗
+                <span className="flex flex-none flex-col items-end gap-1 text-xs">
+                  {pending > 0 ? (
+                    <span className="rounded-full bg-accent/20 px-2.5 py-1 font-semibold text-ink">
+                      {pending} sin responder
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-surface px-2.5 py-1 font-semibold text-ink-muted">✓ Al día</span>
+                  )}
+                  <span className="text-ink-faint">
+                    {g.comments.length} {g.comments.length === 1 ? "comentario" : "comentarios"} ↗
+                  </span>
                 </span>
               </a>
-              <CommentActions
-                businessId={id}
-                comment={{ id: c.id, network: c.network }}
-                hidden={c.hidden}
-                done={c.done}
-                canPrivate={now - Date.parse(c.createdAt) < PRIVATE_REPLY_WINDOW_MS}
-                authorName={c.authorName}
-              />
-            </div>
-          </li>
-        ))}
+              <ul className="divide-y divide-border">{shown.map(renderComment)}</ul>
+              {rest.length > 0 && (
+                <details className="group border-t border-border">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-accent hover:bg-surface-2/60">
+                    <span className="group-open:hidden">Ver {rest.length === 1 ? "el otro comentario" : `los otros ${rest.length} comentarios`} de esta publicación</span>
+                    <span className="hidden group-open:inline">Ocultar los demás</span>
+                  </summary>
+                  <ul className="divide-y divide-border border-t border-border">{rest.map(renderComment)}</ul>
+                </details>
+              )}
+            </li>
+          );
+        })}
         {visible.length === 0 && (
           <li className="fl-card px-4 py-12 text-center">
             <p className="text-3xl" aria-hidden="true">

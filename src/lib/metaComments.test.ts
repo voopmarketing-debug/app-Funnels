@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MetaApiError } from "./metaSocial";
-import { adComments, facebookComments, instagramComments, isCommentId, mergeComments, privateReplyToComment, replyToComment, setCommentHidden } from "./metaComments";
+import { adComments, facebookComments, instagramComments, isCommentId, mergeComments, missingCommentPermissions, privateReplyToComment, replyToComment, setCommentHidden } from "./metaComments";
 
 function mockFetch(handler: (url: URL, init?: RequestInit) => { status?: number; body: unknown }) {
   const fn = vi.fn(async (input: URL | string, init?: RequestInit) => {
@@ -158,9 +158,51 @@ describe("adComments", () => {
   });
 
   it("keeps one copy of a boosted post's comment, labelled as an ad", () => {
-    const base = { network: "facebook" as const, post: { id: "p", text: "", permalink: null, image: null }, authorName: "Ana", text: "hola", createdAt: "2026-10-10", hidden: false, likeCount: 0, replies: [], answered: false };
+    const base = { network: "facebook" as const, authorKnown: true, post: { id: "p", text: "", permalink: null, image: null }, authorName: "Ana", text: "hola", createdAt: "2026-10-10", hidden: false, likeCount: 0, replies: [], answered: false };
     const merged = mergeComments([{ ...base, id: "c1", ad: null }, { ...base, id: "c2", ad: null }], [{ ...base, id: "c1", ad: { name: "Promo", campaign: "Oct" } }]);
     expect(merged).toHaveLength(2);
     expect(merged.find((c) => c.id === "c1")?.ad).toEqual({ name: "Promo", campaign: "Oct" });
+  });
+});
+
+describe("who wrote it", () => {
+  it("says so when Meta leaves out the author, instead of passing a placeholder off as a name", async () => {
+    mockFetch(() => ({
+      body: { data: [{ id: "p1", message: "Promo", comments: { data: [{ id: "c1", message: "IA", created_time: "2026-10-10T10:00:00+0000" }, { id: "c2", message: "Info", created_time: "2026-10-10T11:00:00+0000", from: { id: "u1", name: "Laura" } }] } }] },
+    }));
+    const comments = await facebookComments("page1", "tok");
+    expect(comments.find((c) => c.id === "c1")).toMatchObject({ authorName: "Alguien en Facebook", authorKnown: false, text: "IA" });
+    expect(comments.find((c) => c.id === "c2")).toMatchObject({ authorName: "Laura", authorKnown: true });
+  });
+});
+
+describe("missingCommentPermissions", () => {
+  it("lists the comment permissions the login did not grant", async () => {
+    mockFetch((url) => {
+      expect(url.pathname).toContain("/me/permissions");
+      return { body: { data: [{ permission: "pages_manage_engagement", status: "granted" }, { permission: "pages_read_user_content", status: "declined" }] } };
+    });
+    expect(await missingCommentPermissions("user-tok")).toEqual(["pages_read_user_content", "instagram_manage_comments"]);
+  });
+
+  it("returns null when Meta can't answer", async () => {
+    mockFetch(() => ({ status: 400, body: { error: { message: "nope" } } }));
+    expect(await missingCommentPermissions("user-tok")).toBeNull();
+  });
+});
+
+describe("adComments", () => {
+  it("counts the ad posts Meta wouldn't let it read, and keeps the rest", async () => {
+    mockFetch((url) => {
+      if (url.pathname.endsWith("/act_1/ads")) {
+        return { body: { data: [{ id: "a1", name: "A", updated_time: "2026-10-10", creative: { effective_object_story_id: "page1_1", effective_instagram_media_id: "ig-gone" } }] } };
+      }
+      if (url.pathname.endsWith("/ig-gone")) return { status: 400, body: { error: { message: "Unsupported get request", code: 100 } } };
+      return { body: { id: "page1_1", message: "Ad", comments: { data: [{ id: "c1", message: "IA", created_time: "2026-10-10T10:00:00+0000" }] } } };
+    });
+    const stats = { unreadable: 0 };
+    const comments = await adComments({ adAccountId: "act_1", userToken: "u", pageId: "page1", igUserId: "ig1", pageToken: "p", stats });
+    expect(comments.map((c) => c.id)).toEqual(["c1"]);
+    expect(stats.unreadable).toBe(1);
   });
 });

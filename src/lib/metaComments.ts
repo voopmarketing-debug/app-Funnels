@@ -17,6 +17,8 @@ export type SocialComment = {
   /** Set when the comment is on a post used by an ad (dark posts included). */
   ad: { name: string; campaign: string | null } | null;
   authorName: string;
+  /** False when Meta didn't say who wrote it (the name shown is a placeholder). */
+  authorKnown: boolean;
   text: string;
   createdAt: string;
   hidden: boolean;
@@ -64,6 +66,7 @@ function fbPostComments(p: FbPost, pageId: string): SocialComment[] {
         ad: null,
         // Without pages_read_user_content Meta leaves out who wrote it.
         authorName: c.from?.name ?? "Alguien en Facebook",
+        authorKnown: !!c.from?.name,
         text: c.message ?? "",
         createdAt: c.created_time,
         hidden: !!c.is_hidden,
@@ -126,6 +129,7 @@ function igMediaComments(m: IgMedia, igUserId: string): SocialComment[] {
         },
         ad: null,
         authorName: c.username ? `@${c.username}` : c.from?.username ? `@${c.from.username}` : "Alguien en Instagram",
+        authorKnown: !!(c.username || c.from?.username),
         text: c.text ?? "",
         createdAt: c.timestamp,
         hidden: !!c.hidden,
@@ -168,6 +172,8 @@ export async function adComments(params: {
   pageId: string;
   igUserId: string | null;
   pageToken: string;
+  /** Filled in with how many ad posts Meta wouldn't let us read (so the page can say so). */
+  stats?: { unreadable: number };
 }): Promise<SocialComment[]> {
   const ads = await graph<{ data: RawAd[] }>(
     `${params.adAccountId}/ads`,
@@ -201,6 +207,7 @@ export async function adComments(params: {
         } catch (err) {
           if (err instanceof MetaApiError && err.needsReconnect) throw err;
           console.error("[social comments] ad post unreadable", id, err);
+          if (params.stats) params.stats.unreadable += 1;
           return null;
         }
       }),
@@ -222,6 +229,20 @@ export function mergeComments(organic: SocialComment[], ads: SocialComment[]): S
   const byId = new Map(organic.map((c) => [c.id, c]));
   for (const c of ads) byId.set(c.id, { ...(byId.get(c.id) ?? c), ad: c.ad });
   return [...byId.values()];
+}
+
+/** Permissions the comments section needs; without the first one Meta leaves out who wrote each comment. */
+export const COMMENT_PERMISSIONS = ["pages_read_user_content", "pages_manage_engagement", "instagram_manage_comments"] as const;
+
+/** Which of the comment permissions this login did not grant (null when Meta can't say). */
+export async function missingCommentPermissions(userToken: string): Promise<string[] | null> {
+  try {
+    const res = await graph<{ data: { permission: string; status: string }[] }>("me/permissions", {}, userToken);
+    const granted = new Set(res.data.filter((p) => p.status === "granted").map((p) => p.permission));
+    return COMMENT_PERMISSIONS.filter((p) => !granted.has(p));
+  } catch {
+    return null;
+  }
 }
 
 /** Comment ids are opaque Meta ids: digits, letters and "_". */
