@@ -157,29 +157,37 @@ export default function OfertaPage() {
 
       {/* Más que un chatbot */}
       <section className="relative mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-center text-3xl font-bold">Y no es solo contestar WhatsApp</h2>
+        <h2 className="text-center text-3xl font-bold sm:text-4xl">Y no es solo contestar WhatsApp</h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-lg text-ink-muted">También te deja el negocio ordenado y trayendo clientes nuevos.</p>
-        <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {BENEFITS.map((b) => (
-            <article key={b.title} className="fl-card flex flex-col overflow-hidden">
-              {b.image && (
-                <div className="relative aspect-[3/2] overflow-hidden border-b border-border bg-surface-2">
-                  {/* Already sized and compressed (1400 px, about 100 KB), so the image optimizer is not needed. */}
-                  <Image src={b.image} alt={b.alt ?? ""} fill unoptimized sizes="(min-width:1024px) 30vw, (min-width:768px) 45vw, 100vw" className="object-cover object-top" />
-                </div>
-              )}
-              <div className="flex flex-1 flex-col p-5">
-                <h3 className="text-lg font-semibold leading-snug">{b.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{b.text}</p>
-                <p className="mt-auto pt-4 text-sm">
+        <div className="mt-14 space-y-20 sm:space-y-28">
+          {BENEFITS.map((b, i) => (
+            <article key={b.title} className={`grid items-center gap-8 lg:gap-14 ${i % 2 === 1 ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)]" : "lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.5fr)]"}`}>
+              <div className={i % 2 === 1 ? "lg:order-2" : ""}>
+                <p className="fl-mono text-xs font-semibold uppercase tracking-[0.14em] text-accent">{String(i + 1).padStart(2, "0")}</p>
+                <h3 className="mt-2 text-2xl font-bold leading-tight sm:text-3xl">{b.title}</h3>
+                <p className="mt-4 text-base leading-relaxed text-ink-muted sm:text-lg">{b.text}</p>
+                <p className="mt-5 rounded-lg border border-border bg-surface px-4 py-3 text-sm">
                   <span className="font-semibold text-accent">Por ejemplo: </span>
                   <span className="text-ink-muted">{b.example}</span>
                 </p>
               </div>
+              <div className={i % 2 === 1 ? "lg:order-1" : ""}>
+                {/* Marco de navegador: la plataforma se ve completa, sin recortes. */}
+                <div className="overflow-hidden rounded-xl border border-border-strong bg-surface shadow-2xl">
+                  <div className="flex items-center gap-1.5 border-b border-border bg-surface-2 px-3 py-2" aria-hidden="true">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+                    <span className="ml-3 truncate rounded-md bg-background px-3 py-0.5 text-[11px] text-ink-faint">agente.funnelslabs.app</span>
+                  </div>
+                  {/* Imagen ya ajustada y comprimida (1800 px), no necesita el optimizador. */}
+                  <Image src={b.image} alt={b.alt} width={b.width} height={b.height} unoptimized loading="lazy" sizes="(min-width:1024px) 60vw, 100vw" className="block h-auto w-full" />
+                </div>
+              </div>
             </article>
           ))}
         </div>
-        <p className="mt-4 text-center text-xs text-ink-faint">Las capturas son de un negocio de ejemplo.</p>
+        <p className="mt-12 text-center text-xs text-ink-faint">Capturas de la plataforma con un negocio de ejemplo.</p>
       </section>
 
       {/* Para quién */}
@@ -197,7 +205,7 @@ export default function OfertaPage() {
 
       {/* Confianza */}
       <section className="relative mx-auto max-w-5xl px-6 py-20">
-        <h2 className="text-center text-3xl font-bold">Tus clientes y tus datos siguen siendo tuyos</h2>
+        <h2 className="text-center text-3xl font-bold">Tú tienes el control</h2>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           {TRUST.map((t) => (
             <div key={t.title} className="fl-card p-5">

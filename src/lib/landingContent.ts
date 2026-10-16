@@ -20,7 +20,7 @@ export const STEPS = [
   { n: "3", title: "Tú sigues mandando", text: "El asistente contesta y agenda. Tú ves todos los chats y, cuando quieras, lo pausas y respondes tú." },
 ];
 
-export type Benefit = { title: string; text: string; example: string; image?: string; alt?: string };
+export type Benefit = { title: string; text: string; example: string; image: string; alt: string; width: number; height: number };
 
 export const BENEFITS: Benefit[] = [
   {
@@ -28,6 +28,8 @@ export const BENEFITS: Benefit[] = [
     text: "Responde precios y horarios, manda fotos y deja la cita pedida. Si quieres meterte a un chat, entras tú.",
     example: "La clínica que contesta a las 10 de la noche.",
     image: "/landing/chat.jpg",
+    width: 1800,
+    height: 1125,
     alt: "Conversación abierta en el CRM, con el botón para pausar la IA",
   },
   {
@@ -35,6 +37,8 @@ export const BENEFITS: Benefit[] = [
     text: "La IA arma una página con tu estilo y tú la cambias tocando los textos y las fotos, sin saber diseñar. Y agrega un calendario donde la gente reserva sola.",
     example: "Una página para tus tratamientos o servicios.",
     image: "/landing/web.jpg",
+    width: 1800,
+    height: 1125,
     alt: "Editor de páginas web con la vista previa",
   },
   {
@@ -42,6 +46,8 @@ export const BENEFITS: Benefit[] = [
     text: "Manda una promoción o un aviso a muchos contactos a la vez, con las plantillas que aprueba Meta.",
     example: "Avisar de una campaña de limpieza a todos tus pacientes.",
     image: "/landing/plantillas.jpg",
+    width: 1800,
+    height: 800,
     alt: "Lista de plantillas de WhatsApp con su estado de aprobación",
   },
   {
@@ -49,6 +55,8 @@ export const BENEFITS: Benefit[] = [
     text: "Cada conversación queda guardada y puesta en su etapa: nuevo, interesado, ganado. Ves de un vistazo quién espera respuesta.",
     example: "Saber a quién te falta llamar hoy.",
     image: "/landing/crm.jpg",
+    width: 1800,
+    height: 1012,
     alt: "Tablero del CRM con las conversaciones por etapas",
   },
   {
@@ -56,6 +64,8 @@ export const BENEFITS: Benefit[] = [
     text: "Los mensajes de Instagram y Messenger, los comentarios y las métricas de tus anuncios, sin saltar entre aplicaciones. La IA te dice además qué publicar.",
     example: "Contestar todo desde un mismo sitio.",
     image: "/landing/redes.jpg",
+    width: 1800,
+    height: 1125,
     alt: "Bandeja de mensajes de Instagram y Messenger",
   },
   {
@@ -63,6 +73,8 @@ export const BENEFITS: Benefit[] = [
     text: "Le escribes «crea una plantilla de bienvenida» o «muéstrame las métricas de la semana» y lo prepara. Tú apruebas antes de que cambie algo.",
     example: "Menos tiempo peleando con el panel.",
     image: "/landing/asistente.jpg",
+    width: 1800,
+    height: 1125,
     alt: "El asistente de Funnels abierto dentro del panel",
   },
 ];
@@ -78,7 +90,6 @@ export const SEGMENTS = [
 export const TRUST = [
   { title: "Es la conexión oficial de WhatsApp", text: "Usamos la API oficial de Meta, la misma que usan las empresas grandes." },
   { title: "Tú mandas", text: "Ves todos los chats, pausas la IA en el que quieras y respondes tú." },
-  { title: "Tus datos son tuyos", text: "No usamos tus conversaciones para entrenar modelos de IA ni se las vendemos a nadie." },
   { title: "No da consejos médicos ni legales", text: "Informa, agenda y toma datos. Tú le dices qué no debe responder y puedes enseñarle a pasarte el chat cuando no sepa." },
 ];
 
@@ -98,7 +109,6 @@ export const FAQ = [
   { q: "¿De verdad hay que hacer una llamada?", a: "Te acompañamos en una llamada de 30 a 45 minutos para conectar tu número a la API oficial de Meta. Es lo único un poco técnico y lo hacemos juntos." },
   { q: "¿Pierdo el control de lo que dice?", a: "No. Ves todos los chats, pausas la IA en el que quieras y respondes tú. El asistente nunca actúa a tus espaldas." },
   { q: "¿Puede dar consejos médicos o legales?", a: "No. Está hecho para informar, agendar y tomar datos. Tú le dices qué no debe responder y puedes enseñarle a pasarte el chat cuando no sepa algo." },
-  { q: "¿Qué pasa con los datos de mis clientes?", a: "Son tuyos. No usamos tus conversaciones para entrenar modelos de IA ni se las vendemos a nadie. Solo sirven para que tu asistente responda y para tus propias métricas." },
   { q: "¿Cuántos clientes puedo atender?", a: "El plan Starter atiende hasta 400 clientes distintos al mes, y a cada uno le responde todas las veces que haga falta. Tu CRM guarda tus contactos sin que tengas que contarlos (el uso justo es de 20.000 en Starter). Si te quedas corto, agregas un paquete desde tu panel." },
   { q: "¿Cuántos mensajes masivos puedo enviar?", a: "Starter incluye 2.000 envíos al mes y Pro 10.000, por línea de WhatsApp. Se renuevan el día 1 de cada mes y se mandan con plantillas que aprueba Meta." },
   { q: "¿Puedo cancelar cuando quiera?", a: "Sí. Sigues con acceso hasta el final del periodo que ya pagaste, sin penalización." },
