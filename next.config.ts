@@ -15,7 +15,7 @@ import { SECURITY_HEADERS, SITE_CSP } from "./src/lib/securityHeaders";
 // load anything, which is exactly what broke playback of sent/received
 // voice notes right after this CSP first shipped.
 const APP_CSP =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://vercel.com/api/blob/ https://www.facebook.com https://graph.facebook.com; frame-src 'self' https://www.facebook.com https://web.facebook.com https://staticxx.facebook.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+  "default-src 'self'; script-src 'self' 'unsafe-inline' https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://vercel.com/api/blob/ https://www.facebook.com https://graph.facebook.com; frame-src 'self' https://www.facebook.com https://web.facebook.com https://staticxx.facebook.com https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
 const nextConfig: NextConfig = {
   // Server Actions cap request bodies at 1MB by default — too small for a
