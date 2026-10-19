@@ -299,8 +299,8 @@
 .lp-play {
   position: relative;
   display: flex;
-  height: 4.5rem;
-  width: 4.5rem;
+  height: 4rem;
+  width: 4rem;
   align-items: center;
   justify-content: center;
   border-radius: 999px;

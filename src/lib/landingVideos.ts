@@ -6,7 +6,7 @@ export const LANDING_VIDEOS = {
   /** Under the headline: the hook and the promise (about 45 seconds). */
   hero: { src: "/landing/vsl-hero.mp4", poster: "/landing/vsl-hero-poster.jpg" },
   /** In "Cómo funciona": the platform on screen. */
-  how: { src: "", poster: "" },
+  how: { src: "/landing/vsl-como.mp4", poster: "/landing/vsl-como-poster.jpg" },
 } as const;
 
 /**
