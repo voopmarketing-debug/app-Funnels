@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { Analytics } from "@vercel/analytics/next";
 
 // Applies the client's saved theme choice (see ThemeToggle.tsx) before the
 // page paints, so light mode doesn't load dark on every refresh. Rendered as
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
