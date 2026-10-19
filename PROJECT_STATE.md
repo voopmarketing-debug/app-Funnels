@@ -441,3 +441,14 @@ entrar a esta URL directamente.
   por una llamada de onboarding manual.
 - Plan de marketing y calendario de contenidos por segmento (clínicas,
   coaches, ecommerce) — pendiente de definir canales y presupuesto de pauta.
+
+## Ventas internas (fuera de la plataforma)
+
+`ventas/` + `.claude/agents/vendedor.md` + `.claude/skills/ventas-*` son el
+sistema interno de Funnels Labs para conseguir clientes de forma orgánica
+(DM por Instagram, Facebook y LinkedIn + correo en frío): estrategia en
+`ventas/PLAN.md` y un tracker CLI sin dependencias en
+`ventas/scripts/ventas.mjs`. La app no importa nada de ahí. Los datos de
+prospectos van en `ventas/datos/` (en `.gitignore`, porque el repo es
+público) y se sincronizan con la carpeta de Drive "Funnels Labs — Ventas
+(interno)" (ver `.claude/skills/ventas-metricas/SKILL.md`).

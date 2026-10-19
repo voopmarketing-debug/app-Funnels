@@ -53,3 +53,6 @@ next-env.d.ts
 
 # impeccable design-critique snapshots/screenshots (local audit scratch, not app code)
 .impeccable/
+
+# Internal sales tracker: real prospects, never in this public repo (synced to Google Drive instead, see ventas/README.md)
+/ventas/datos/
