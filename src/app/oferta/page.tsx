@@ -126,7 +126,7 @@ export default function OfertaPage() {
           <div className="lp-arc" />
           <div className="relative">
             <div className="relative z-10 mx-auto max-w-4xl">
-              <VideoSlot slot="hero" src={v.hero.src} poster={v.hero.poster} title="Mira cómo funciona en menos de un minuto" hint="Video principal (VSL)" />
+              <VideoSlot slot="hero" priority src={v.hero.src} poster={v.hero.poster} title="Mira cómo funciona en menos de un minuto" hint="Video principal (VSL)" />
             </div>
 
             <div className="relative z-20 mt-6 grid gap-4 sm:grid-cols-2 lg:mt-0 lg:block">

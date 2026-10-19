@@ -9,7 +9,7 @@ import { IconPlay } from "./Icons";
  * if it had no video. Without a valid link it shows a framed placeholder (see
  * SHOW_VIDEO_PLACEHOLDERS) or nothing at all.
  */
-export function VideoSlot({ src, poster, title, caption, slot, hint }: { src: string; poster?: string; title: string; caption?: string; slot: string; hint?: string }) {
+export function VideoSlot({ src, poster, title, caption, slot, hint, priority = false }: { src: string; poster?: string; title: string; caption?: string; slot: string; hint?: string; priority?: boolean }) {
   const [playing, setPlaying] = useState(false);
   const source = videoSource(src);
   if (!source && !SHOW_VIDEO_PLACEHOLDERS) return null;
@@ -49,9 +49,14 @@ export function VideoSlot({ src, poster, title, caption, slot, hint }: { src: st
               onClick={play}
               aria-label={`Reproducir: ${title}`}
               className="group absolute inset-0 flex items-center justify-center"
-              style={poster ? { backgroundImage: `url(${poster})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
             >
-              {!poster && <span className="lp-vph absolute inset-0" />}
+              {poster ? (
+                // Plain <img> so the browser can load it lazily: the video below the fold costs nothing until it is near.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={poster} alt="" width={1280} height={720} loading={priority ? "eager" : "lazy"} decoding="async" fetchPriority={priority ? "high" : "auto"} className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <span className="lp-vph absolute inset-0" />
+              )}
               <span className="absolute inset-0 bg-black/30 transition group-hover:bg-black/15" />
               <span className="lp-play relative">
                 <IconPlay size={30} />
