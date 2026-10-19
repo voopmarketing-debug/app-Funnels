@@ -30,11 +30,14 @@ const nextConfig: NextConfig = {
     staleTimes: { dynamic: 30 },
   },
   // ffmpeg-static ships a native binary (voice-note conversion, see
-  // lib/audioConvert.ts) — keep it out of the server bundle and make sure
-  // Vercel's file tracer actually copies the binary into the deployment.
-  serverExternalPackages: ["ffmpeg-static"],
+  // lib/audioConvert.ts). Vercel's file tracer only copies it into the routes
+  // listed here: the pages that render the message box, whose server action
+  // (sendManualMessage) converts the audio. Do not use "/*": it puts the 80 MB
+  // binary in every function and fills the plan's function storage. Dynamic
+  // segments are written as * because [id] would be read as a glob character class.
   outputFileTracingIncludes: {
-    "/*": ["node_modules/ffmpeg-static/**/*"],
+    "/dashboard/businesses/*/conversations/*": ["node_modules/ffmpeg-static/ffmpeg*"],
+    "/dashboard/businesses/*/crm": ["node_modules/ffmpeg-static/ffmpeg*"],
   },
   async headers() {
     return [

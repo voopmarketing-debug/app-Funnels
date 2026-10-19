@@ -1,8 +1,21 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import ffmpegPath from "ffmpeg-static";
+
+// The ffmpeg binary (80 MB) comes from the ffmpeg-static package, but it is NOT
+// imported: an import makes Vercel copy it into every serverless function of
+// the app (62 of 63 of them), and each deploy then costs gigabytes of function
+// storage. Instead next.config.ts copies it only into the routes that send
+// voice notes, and it is looked up by path here.
+function ffmpegPath(): string | null {
+  const file = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+  // Built from parts so the file tracer cannot see the path and copy the binary everywhere.
+  const pkg = ["ffmpeg", "static"].join("-");
+  const found = path.join(process.cwd(), "node_modules", pkg, file);
+  return existsSync(found) ? found : null;
+}
 
 /**
  * WhatsApp only accepts/plays voice notes in Ogg/Opus — a browser's
@@ -19,8 +32,8 @@ const MAX_SECONDS = 600;
 const TIMEOUT_MS = 45_000;
 
 export async function convertToOggOpus(bytes: Buffer): Promise<Buffer> {
-  if (!ffmpegPath) throw new Error("ffmpeg binary not available on this server");
-  const ffmpegBinary: string = ffmpegPath;
+  const ffmpegBinary = ffmpegPath();
+  if (!ffmpegBinary) throw new Error("ffmpeg binary not available on this server");
 
   const dir = await mkdtemp(path.join(tmpdir(), "voice-"));
   const inputPath = path.join(dir, "input");
