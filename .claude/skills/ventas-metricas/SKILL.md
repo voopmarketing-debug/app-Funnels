@@ -27,8 +27,9 @@ carpeta **"Funnels Labs — Ventas (interno)"** (id de carpeta
 (ver abajo), así que siempre se buscan por nombre dentro de la carpeta.
 
 1. `mcp__Google_Drive__search_files` con
-   `title = 'ventas-leads' and '19jy4E4aDAQwI2igc1MzIFaTBsJ1oOIbB' in parents and trashed = false`
-   (y después lo mismo con `ventas-actividad`).
+   `parentId = '19jy4E4aDAQwI2igc1MzIFaTBsJ1oOIbB'` (el conector no acepta
+   `in parents` ni `trashed`; los archivos de la papelera no aparecen) y
+   tomar los ids de `ventas-leads` y `ventas-actividad`.
 2. `mcp__Google_Drive__download_file_content` con
    `exportMimeType: "text/csv"` → decodificar el base64 → escribir
    `ventas/datos/leads.csv` y `ventas/datos/actividad.csv`.
