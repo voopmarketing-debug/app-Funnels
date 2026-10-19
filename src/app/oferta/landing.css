@@ -1,0 +1,726 @@
+/*
+ * Look of the offer landing (/oferta). Everything is scoped under .lp so the
+ * platform's own styles are untouched. The page is always dark (the brand
+ * look), whatever theme the visitor saved in the app.
+ *
+ * Motion is only decoration: every animation sits behind
+ * prefers-reduced-motion: no-preference, and nothing is left hidden if the
+ * browser does not support scroll-driven animations.
+ */
+
+.lp {
+  color-scheme: dark;
+  --background: #0a0a0a;
+  --surface: #161616;
+  --surface-2: #1e1e1e;
+  --border: #2a2a2a;
+  --border-strong: #3d3d3d;
+  --ink: #f5f5f0;
+  --ink-muted: #a8a8a2;
+  --ink-faint: #7d7d77;
+  --accent: #b5ff2b;
+  --accent-hover: #8fd400;
+  --accent-ink: #0a0a0a;
+  --accent-secondary: #c9a9ff;
+  --glow-accent: 181, 255, 43;
+  --glow-secondary: 201, 169, 255;
+  --lp-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  position: relative;
+  overflow-x: clip;
+  background: var(--background);
+  color: var(--ink);
+}
+
+.lp ::selection {
+  background: rgba(var(--glow-accent), 0.35);
+  color: #fff;
+}
+
+/* ───────── Type ───────── */
+
+.lp-eyebrow {
+  font-family: var(--lp-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lp-h1 {
+  font-size: clamp(2.2rem, 5.6vw, 4.3rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+  background: linear-gradient(180deg, #ffffff 30%, #9b9b95 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lp-h2 {
+  font-size: clamp(1.9rem, 4.2vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1.07;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  color: #fff;
+}
+
+.lp-lime {
+  background: linear-gradient(90deg, #b5ff2b 0%, #e9ff9a 45%, #b5ff2b 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ───────── Backgrounds ───────── */
+
+.lp-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.lp-hero-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 45% at 50% 0%, rgba(var(--glow-accent), 0.16), transparent 70%),
+    radial-gradient(35% 30% at 85% 20%, rgba(var(--glow-secondary), 0.1), transparent 70%);
+}
+
+.lp-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 15%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 15%, #000 20%, transparent 75%);
+}
+
+/* The glowing horizon behind the video. */
+.lp-arc {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  width: max(1900px, 190vw);
+  aspect-ratio: 1 / 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, #0a0a0a 0 97%, rgba(var(--glow-accent), 0.12) 100%);
+  box-shadow:
+    0 -1px 0 0 rgba(var(--glow-accent), 0.95),
+    0 -22px 90px -12px rgba(var(--glow-accent), 0.5),
+    inset 0 30px 90px -40px rgba(var(--glow-accent), 0.6);
+}
+
+/* ───────── Buttons ───────── */
+
+.lp-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  overflow: hidden;
+  border-radius: 999px;
+  padding: 0.5rem 0.5rem 0.5rem 1.6rem;
+  background: var(--accent);
+  color: #0a0a0a;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 12px 40px -10px rgba(var(--glow-accent), 0.65);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.lp-btn:hover {
+  background: #c6ff55;
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+    0 18px 50px -10px rgba(var(--glow-accent), 0.8);
+}
+
+.lp-btn:active {
+  transform: translateY(0);
+}
+
+.lp-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%);
+  transform: translateX(-120%);
+}
+
+.lp-btn:hover::after {
+  transform: translateX(120%);
+  transition: transform 0.7s ease;
+}
+
+.lp-btn-arrow {
+  display: inline-flex;
+  height: 2.4rem;
+  width: 2.4rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #0a0a0a;
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+
+.lp-btn:hover .lp-btn-arrow {
+  transform: rotate(45deg);
+}
+
+.lp-btn-sm {
+  padding: 0.3rem 0.3rem 0.3rem 1.1rem;
+  font-size: 0.9rem;
+  gap: 0.5rem;
+}
+
+.lp-btn-sm .lp-btn-arrow {
+  height: 1.9rem;
+  width: 1.9rem;
+}
+
+.lp-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: 999px;
+  padding: 0.85rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.lp-btn-ghost:hover {
+  border-color: rgba(var(--glow-accent), 0.6);
+  background: rgba(var(--glow-accent), 0.08);
+  transform: translateY(-2px);
+}
+
+.lp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(8px);
+  padding: 0.4rem 0.5rem 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  transition: border-color 0.2s ease;
+}
+
+.lp-pill:hover {
+  border-color: rgba(var(--glow-accent), 0.5);
+}
+
+.lp-dot {
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(var(--glow-accent), 0.7);
+}
+
+/* ───────── Glass cards ───────── */
+
+.lp-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  transition: border-color 0.25s ease, transform 0.25s ease;
+}
+
+.lp-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(var(--glow-accent), 0.14), transparent 45%);
+  transition: opacity 0.3s ease;
+}
+
+.lp-card:hover {
+  border-color: rgba(var(--glow-accent), 0.35);
+}
+
+.lp-card:hover::before {
+  opacity: 1;
+}
+
+.lp-card > * {
+  position: relative;
+}
+
+.lp-icon {
+  display: inline-flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(var(--glow-accent), 0.3);
+  background: rgba(var(--glow-accent), 0.08);
+  color: var(--accent);
+}
+
+/* floating mini-cards of the hero */
+.lp-float {
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 18, 18, 0.78);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+}
+
+/* ───────── Video frame ───────── */
+
+.lp-vframe {
+  position: relative;
+  border-radius: 1.5rem;
+  padding: 1px;
+  background: linear-gradient(160deg, rgba(var(--glow-accent), 0.7), rgba(255, 255, 255, 0.08) 35%, rgba(var(--glow-secondary), 0.35));
+  box-shadow: 0 40px 120px -30px rgba(var(--glow-accent), 0.35), 0 30px 80px -30px rgba(0, 0, 0, 0.9);
+}
+
+.lp-vframe-in {
+  position: relative;
+  overflow: hidden;
+  border-radius: calc(1.5rem - 1px);
+  background: #0b0c0b;
+}
+
+.lp-vph {
+  background:
+    radial-gradient(60% 70% at 50% 0%, rgba(var(--glow-accent), 0.18), transparent 70%),
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px) 0 0 / 100% 40px,
+    #0b0c0b;
+}
+
+.lp-play {
+  position: relative;
+  display: flex;
+  height: 4.5rem;
+  width: 4.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0a0a;
+  box-shadow: 0 10px 40px -8px rgba(var(--glow-accent), 0.8);
+  transition: transform 0.2s ease;
+}
+
+.lp-play::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(var(--glow-accent), 0.7);
+}
+
+.group:hover .lp-play {
+  transform: scale(1.08);
+}
+
+/* ───────── Marquee ───────── */
+
+.lp-marquee {
+  display: flex;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+
+.lp-track {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2.5rem;
+  padding-right: 2.5rem;
+  white-space: nowrap;
+}
+
+.lp-big {
+  font-size: clamp(2rem, 5vw, 3.75rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.lp-outline {
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.42);
+}
+
+.lp-star {
+  flex: none;
+  color: var(--accent);
+}
+
+/* ───────── Feature stack ───────── */
+
+.lp-panel {
+  --g: var(--glow-accent);
+  position: relative;
+  border-radius: 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background:
+    radial-gradient(70% 90% at var(--gx, 100%) 0%, rgba(var(--g), 0.12), transparent 65%),
+    #0e0f10;
+  box-shadow: 0 -20px 60px -30px rgba(0, 0, 0, 0.9), 0 30px 90px -40px rgba(0, 0, 0, 0.9);
+}
+
+.lp-panel[data-alt="1"] {
+  --g: var(--glow-secondary);
+  --gx: 0%;
+}
+
+.lp-shot {
+  position: relative;
+}
+
+.lp-shot::before {
+  content: "";
+  position: absolute;
+  inset: 8% -4% -6%;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(var(--g, var(--glow-accent)), 0.35), transparent 75%);
+  filter: blur(36px);
+}
+
+.lp-browser {
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #121314;
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.9);
+}
+
+@media (min-width: 768px) {
+  .lp-stack > .lp-panel {
+    position: sticky;
+    top: calc(5.2rem + var(--i, 0) * 12px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .lp-shot {
+    transform: perspective(1500px) rotateY(var(--ry, -4deg)) rotateX(2deg);
+    transition: transform 0.5s ease;
+  }
+  .lp-panel[data-alt="1"] .lp-shot {
+    --ry: 4deg;
+  }
+  .lp-panel:hover .lp-shot {
+    transform: perspective(1500px) rotateY(0) rotateX(0);
+  }
+}
+
+/* ───────── Bento ───────── */
+
+.lp-tile-lime {
+  background: linear-gradient(150deg, #c4ff4d 0%, #a4f000 100%);
+  border-color: transparent;
+  color: #0a0a0a;
+}
+
+.lp-tile-lime::before {
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.45), transparent 45%);
+}
+
+.lp-tile-violet {
+  background: linear-gradient(160deg, rgba(var(--glow-secondary), 0.22), rgba(var(--glow-secondary), 0.05));
+  border-color: rgba(var(--glow-secondary), 0.3);
+}
+
+.lp-tile-light {
+  background: #f0f0eb;
+  border-color: transparent;
+  color: #16160f;
+}
+
+.lp-tile-light::before {
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(var(--glow-accent), 0.35), transparent 45%);
+}
+
+/* ───────── Steps ───────── */
+
+.lp-steps {
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .lp-steps::before {
+    content: "";
+    position: absolute;
+    left: 16%;
+    right: 16%;
+    top: 2.1rem;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(var(--glow-accent), 0.6), transparent);
+  }
+}
+
+.lp-num {
+  display: inline-flex;
+  height: 4.2rem;
+  width: 4.2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--glow-accent), 0.5);
+  background: #0e0f10;
+  font-family: var(--lp-mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  box-shadow: 0 0 40px -6px rgba(var(--glow-accent), 0.5);
+}
+
+/* ───────── Pricing ───────── */
+
+@property --lp-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.lp-hot {
+  position: relative;
+  border-radius: 1.5rem;
+  padding: 1.5px;
+  background: conic-gradient(from var(--lp-angle), rgba(var(--glow-accent), 0.15), #b5ff2b, rgba(var(--glow-secondary), 0.6), rgba(var(--glow-accent), 0.15));
+  box-shadow: 0 30px 100px -30px rgba(var(--glow-accent), 0.4);
+}
+
+.lp-hot-in {
+  height: 100%;
+  border-radius: calc(1.5rem - 1.5px);
+  background: linear-gradient(180deg, #14170d, #0e0f10 60%);
+}
+
+.lp-dotlist li {
+  position: relative;
+  padding-left: 1.4rem;
+}
+
+.lp-dotlist li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(var(--glow-accent), 0.8);
+}
+
+/* ───────── Closing ───────── */
+
+.lp-close {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2rem;
+  border: 1px solid rgba(var(--glow-accent), 0.25);
+  background: radial-gradient(70% 120% at 50% 130%, rgba(var(--glow-accent), 0.28), transparent 70%), #0d0e0c;
+}
+
+/* ───────── FAQ ───────── */
+
+.lp-faq summary {
+  list-style: none;
+}
+
+.lp-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.lp-faq details[open] {
+  border-color: rgba(var(--glow-accent), 0.3);
+  background: rgba(var(--glow-accent), 0.04);
+}
+
+/* ───────── Header ───────── */
+
+.lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(16px);
+}
+
+.lp a:focus-visible,
+.lp button:focus-visible,
+.lp summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ───────── Motion ───────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-lime {
+    animation: lp-shimmer 7s linear infinite;
+  }
+  .lp-arc {
+    animation: lp-arc 7s ease-in-out infinite;
+  }
+  .lp-dot {
+    animation: lp-ping 2s ease-out infinite;
+  }
+  .lp-play::before {
+    animation: lp-ring 2.2s ease-out infinite;
+  }
+  .lp-bob {
+    animation: lp-bob 7s ease-in-out infinite;
+  }
+  .lp-bob-2 {
+    animation-delay: -3.5s;
+  }
+  .lp-track {
+    animation: lp-marquee 38s linear infinite;
+  }
+  .lp-marquee-rev .lp-track {
+    animation-direction: reverse;
+    animation-duration: 46s;
+  }
+  .lp-marquee:hover .lp-track {
+    animation-play-state: paused;
+  }
+  .lp-hot {
+    animation: lp-spin 7s linear infinite;
+  }
+  .lp-msg {
+    animation: lp-msg 0.35s ease both;
+  }
+
+  @supports (animation-timeline: view()) {
+    .lp-rise {
+      animation: lp-rise linear both;
+      animation-timeline: view();
+      animation-range: entry calc(var(--i, 0) * 5%) entry calc(38% + var(--i, 0) * 5%);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-marquee {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .lp-track {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .lp-track[aria-hidden="true"] {
+    display: none;
+  }
+}
+
+@keyframes lp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(34px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lp-shimmer {
+  to {
+    background-position: -200% center;
+  }
+}
+
+@keyframes lp-arc {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes lp-ping {
+  70%,
+  100% {
+    box-shadow: 0 0 0 0.6rem rgba(var(--glow-accent), 0);
+  }
+}
+
+@keyframes lp-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes lp-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes lp-marquee {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes lp-spin {
+  to {
+    --lp-angle: 360deg;
+  }
+}
+
+@keyframes lp-msg {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

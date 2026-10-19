@@ -1,15 +1,20 @@
-// The three videos of the offer landing (/oferta). Paste the links here when
-// they are ready: a YouTube or Vimeo link, or the direct link of an .mp4 (for
-// example one uploaded to the platform's file storage). An empty string hides
-// that slot, so the page works the same before the videos exist.
+// The two videos of the offer landing (/oferta). Paste the links here: a
+// YouTube or Vimeo link, an https link to an .mp4, or a file kept in this
+// project's public folder (for example "/landing/vsl-hero.mp4"). An empty
+// string leaves the slot as a placeholder (see SHOW_VIDEO_PLACEHOLDERS).
 export const LANDING_VIDEOS = {
-  /** Under the headline: the promise in 35 to 45 seconds. */
-  hero: { src: "", poster: "" },
+  /** Under the headline: the hook and the promise (about 45 seconds). */
+  hero: { src: "/landing/vsl-hero.mp4", poster: "/landing/vsl-hero-poster.jpg" },
   /** In "Cómo funciona": the platform on screen. */
   how: { src: "", poster: "" },
-  /** Next to the price: the doubts, answered. */
-  trust: { src: "", poster: "" },
 } as const;
+
+/**
+ * While a video is missing, its slot shows a framed placeholder so the layout
+ * (and where each video goes) can be reviewed. Set to false before launch to
+ * hide the slots that still have no link.
+ */
+export const SHOW_VIDEO_PLACEHOLDERS = true;
 
 export type VideoSource = { kind: "youtube" | "vimeo" | "file"; url: string };
 
@@ -20,6 +25,8 @@ export type VideoSource = { kind: "youtube" | "vimeo" | "file"; url: string };
 export function videoSource(raw: string | null | undefined): VideoSource | null {
   const text = (raw ?? "").trim();
   if (!text) return null;
+  // A file served by this same site (public folder).
+  if (/^\/(?!\/)[\w\-./]+\.(mp4|webm|mov)$/i.test(text) && !text.includes("..")) return { kind: "file", url: text };
   let u: URL;
   try {
     u = new URL(text);

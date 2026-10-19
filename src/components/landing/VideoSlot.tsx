@@ -1,51 +1,67 @@
 "use client";
 
 import { useState } from "react";
-import { videoSource } from "@/lib/landingVideos";
+import { SHOW_VIDEO_PLACEHOLDERS, videoSource } from "@/lib/landingVideos";
+import { IconPlay } from "./Icons";
 
 /**
  * A video that loads only when someone taps play: the page opens as fast as
- * if it had no video. Shows nothing when there is no valid link yet.
+ * if it had no video. Without a valid link it shows a framed placeholder (see
+ * SHOW_VIDEO_PLACEHOLDERS) or nothing at all.
  */
-export function VideoSlot({ src, poster, title, caption, slot }: { src: string; poster?: string; title: string; caption?: string; slot: string }) {
+export function VideoSlot({ src, poster, title, caption, slot, hint }: { src: string; poster?: string; title: string; caption?: string; slot: string; hint?: string }) {
   const [playing, setPlaying] = useState(false);
   const source = videoSource(src);
-  if (!source) return null;
+  if (!source && !SHOW_VIDEO_PLACEHOLDERS) return null;
+
+  const play = () => {
+    setPlaying(true);
+    (window as unknown as { dataLayer?: unknown[] }).dataLayer?.push({ event: "video_play", slot });
+  };
 
   return (
     <figure className="w-full" data-video-slot={slot}>
-      <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-border bg-black shadow-2xl">
-        {playing ? (
-          source.kind === "file" ? (
-            <video src={source.url} poster={poster || undefined} controls autoPlay playsInline className="h-full w-full" />
+      <div className="lp-vframe">
+        <div className="lp-vframe-in relative aspect-video w-full">
+          {!source ? (
+            <div className="lp-vph absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+              <span className="lp-play" aria-hidden="true">
+                <IconPlay size={30} />
+              </span>
+              <p className="max-w-md text-base font-semibold text-white sm:text-lg">{title}</p>
+              <p className="lp-eyebrow !text-white/50">{hint ?? "Aquí va el video"}</p>
+            </div>
+          ) : playing ? (
+            source.kind === "file" ? (
+              <video src={source.url} poster={poster || undefined} controls autoPlay playsInline className="h-full w-full" />
+            ) : (
+              <iframe
+                src={`${source.url}${source.kind === "youtube" ? "?autoplay=1&rel=0&modestbranding=1" : "?autoplay=1"}`}
+                title={title}
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                allowFullScreen
+                className="h-full w-full border-0"
+              />
+            )
           ) : (
-            <iframe
-              src={`${source.url}${source.kind === "youtube" ? "?autoplay=1&rel=0&modestbranding=1" : "?autoplay=1"}`}
-              title={title}
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              allowFullScreen
-              className="h-full w-full border-0"
-            />
-          )
-        ) : (
-          <button
-            type="button"
-            onClick={() => setPlaying(true)}
-            aria-label={`Reproducir: ${title}`}
-            className="group absolute inset-0 flex items-center justify-center"
-            style={poster ? { backgroundImage: `url(${poster})`, backgroundSize: "cover", backgroundPosition: "center" } : { background: "linear-gradient(135deg,#1d5413,#2c7a1d 55%,#0f2f0a)" }}
-          >
-            <span className="absolute inset-0 bg-black/25 transition group-hover:bg-black/15" />
-            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#1d5413] shadow-xl transition group-hover:scale-105 sm:h-20 sm:w-20">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" />
-              </svg>
-            </span>
-            {!poster && <span className="absolute bottom-4 left-4 right-4 text-left text-sm font-semibold text-white drop-shadow">{title}</span>}
-          </button>
-        )}
+            <button
+              type="button"
+              onClick={play}
+              aria-label={`Reproducir: ${title}`}
+              className="group absolute inset-0 flex items-center justify-center"
+              style={poster ? { backgroundImage: `url(${poster})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+            >
+              {!poster && <span className="lp-vph absolute inset-0" />}
+              <span className="absolute inset-0 bg-black/30 transition group-hover:bg-black/15" />
+              <span className="lp-play relative">
+                <IconPlay size={30} />
+              </span>
+              {!poster && <span className="absolute bottom-5 left-5 right-5 text-left text-sm font-semibold text-white">{title}</span>}
+            </button>
+          )}
+        </div>
       </div>
-      {caption && <figcaption className="mt-2 text-center text-xs text-ink-muted">{caption}</figcaption>}
+      {caption && <figcaption className="mt-3 text-center text-xs text-ink-muted">{caption}</figcaption>}
     </figure>
   );
 }
