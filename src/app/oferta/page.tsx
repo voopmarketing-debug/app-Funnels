@@ -106,14 +106,7 @@ export default function OfertaPage() {
         <div className="lp-grid" />
 
         <div className="relative mx-auto max-w-6xl px-6 pt-12 text-center sm:pt-16">
-          <a href="#funciona-para" className="lp-pill">
-            <span className="lp-dot" />
-            <span>Para clínicas, odontólogos, estéticas, abogados y más</span>
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white">
-              <IconArrow size={13} />
-            </span>
-          </a>
-          <h1 className="lp-h1 mx-auto mt-7 max-w-6xl">
+          <h1 className="lp-h1 mx-auto max-w-6xl">
             Que ningún cliente se quede sin respuesta en tu <span className="lp-lime">WhatsApp</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-ink-muted sm:text-lg">
