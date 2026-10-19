@@ -282,6 +282,7 @@ export function metrics(leads, acts, { desde = "", hasta = "9999-12-31" } = {}) 
     total: funnel(cohort),
     canal: by((a) => a.canal),
     segmento: by((a) => leadById[a.lead_id]?.segmento || "(sin segmento)"),
+    ciudad: by((a) => leadById[a.lead_id]?.ciudad || "(sin ciudad)"),
     plantilla: by((a) => a.plantilla || "(sin plantilla)"),
     actividad,
     mensajes_enviados: salidas.length,
@@ -316,6 +317,7 @@ export function report(m, { desde, hasta, metaDiaria }) {
   s += "\n\n";
   s += funnelTable("Canal", m.canal);
   s += funnelTable("Segmento", m.segmento);
+  s += funnelTable("Ciudad", m.ciudad);
   s += funnelTable("Plantilla", m.plantilla);
   s += `### Pipeline actual (todas las etapas)\n\n` + ETAPAS.filter((e) => m.etapas[e]).map((e) => `- ${e}: ${m.etapas[e]}`).join("\n") + "\n\n";
   s += `### Actividad registrada en el periodo\n\n` + (Object.entries(m.actividad).map(([k, v]) => `- ${k}: ${v}`).join("\n") || "- (nada)") + "\n";

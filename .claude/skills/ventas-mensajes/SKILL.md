@@ -6,6 +6,10 @@ description: Redacta los mensajes de prospección de Funnels Labs (DM de Instagr
 # Escribir mensajes que se respondan
 
 Plan completo: `ventas/PLAN.md`. Guiones base por canal: `references/guiones.md`.
+**Para clínicas (odontología, estética, medicina) en Bogotá y Medellín, usar
+el flujo completo de `references/flujo-clinicas.md`** (códigos `CL-…`):
+primer mensaje con 5 variantes, seguimientos, respuestas, reunión, prueba,
+cliente, correo y reactivación.
 
 ## Antes de escribir
 
