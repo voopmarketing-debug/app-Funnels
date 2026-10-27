@@ -88,7 +88,7 @@ export function FacebookConnect({ businessId, appId, configId, connected }: { bu
     setPhase("saving");
     // Meta reports the IDs in a message that can land just after the login callback.
     for (let i = 0; i < 20 && !ids.current; i++) await new Promise((r) => setTimeout(r, 200));
-    const res = await connectWhatsAppWithFacebook(businessId, { code, ...ids.current });
+    const res = await connectWhatsAppWithFacebook(businessId, { code, pageUrl: window.location.href, ...ids.current });
     if (!res.ok) {
       setError(res.error);
       setPhase("idle");

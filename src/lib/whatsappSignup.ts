@@ -8,31 +8,55 @@ import { randomInt } from "crypto";
 const GRAPH = "https://graph.facebook.com/v21.0";
 
 /**
+ * The page address the browser reports, kept only when it belongs to this
+ * platform (never a value another site could make us send to Meta).
+ */
+export function ownPageUrl(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const host = process.env.APP_HOST ?? "agente.funnelslabs.app";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.host !== host) return undefined;
+    return `${url.origin}${url.pathname}${url.search}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The window opened by Meta's JavaScript SDK has no redirect of its own, and
  * Meta checks the one sent when trading the code against the one used to open
- * it. Which value it accepts is not obvious (none, empty, or the site), so a
- * refusal that names redirect_uri is retried with the next one. The code is
- * not spent by a refusal.
+ * it. Which value it accepts is not obvious, so each refusal about the
+ * redirect is retried with the next candidate: none, empty, the page the
+ * button was pressed on, and the site. A refusal does not spend the code.
  */
-function redirectUriAttempts(): (string | undefined)[] {
+function redirectUriAttempts(pageUrl: string | undefined): { label: string; value: string | undefined }[] {
   const host = process.env.APP_HOST ?? "agente.funnelslabs.app";
-  return [undefined, "", `https://${host}/`];
+  const attempts: { label: string; value: string | undefined }[] = [
+    { label: "sin redirect_uri", value: undefined },
+    { label: "redirect_uri vacío", value: "" },
+  ];
+  if (pageUrl) attempts.push({ label: "página del botón", value: pageUrl });
+  attempts.push({ label: "raíz del sitio", value: `https://${host}/` });
+  return attempts;
 }
+
+const REDIRECT_REFUSAL = /redirect_uri|can't load url|verification code|app's domains/i;
 
 type TokenReply = { access_token?: string; error?: { message?: string } } | null;
 
 /** Trades the one-time code from the Meta window for the business's access token. */
-export async function exchangeSignupCode(code: string): Promise<{ ok: true; accessToken: string } | { ok: false; error: string }> {
+export async function exchangeSignupCode(code: string, pageUrl?: string): Promise<{ ok: true; accessToken: string } | { ok: false; error: string }> {
   const appId = process.env.META_APP_ID;
   const appSecret = process.env.META_APP_SECRET;
   if (!appId || !appSecret) return { ok: false, error: "Falta configurar la app de Meta en el servidor." };
   let lastMessage: string | null = null;
-  for (const redirectUri of redirectUriAttempts()) {
+  for (const attempt of redirectUriAttempts(ownPageUrl(pageUrl))) {
     const url = new URL(`${GRAPH}/oauth/access_token`);
     url.searchParams.set("client_id", appId);
     url.searchParams.set("client_secret", appSecret);
     url.searchParams.set("code", code);
-    if (redirectUri !== undefined) url.searchParams.set("redirect_uri", redirectUri);
+    if (attempt.value !== undefined) url.searchParams.set("redirect_uri", attempt.value);
     let response: Response;
     try {
       response = await fetch(url, { cache: "no-store" });
@@ -40,9 +64,13 @@ export async function exchangeSignupCode(code: string): Promise<{ ok: true; acce
       return { ok: false, error: "No se pudo contactar a Meta. Inténtalo de nuevo." };
     }
     const body = (await response.json().catch(() => null)) as TokenReply;
-    if (response.ok && body?.access_token) return { ok: true, accessToken: body.access_token };
+    if (response.ok && body?.access_token) {
+      console.info(`WhatsApp signup code accepted (${attempt.label}).`);
+      return { ok: true, accessToken: body.access_token };
+    }
     lastMessage = body?.error?.message ?? null;
-    if (!lastMessage || !/redirect_uri/i.test(lastMessage)) break;
+    console.warn(`WhatsApp signup code refused (${attempt.label}): ${lastMessage ?? `HTTP ${response.status}`}`);
+    if (!lastMessage || !REDIRECT_REFUSAL.test(lastMessage)) break;
   }
   return { ok: false, error: lastMessage ? `Meta no aceptó la conexión: ${lastMessage}` : "Meta no aceptó la conexión. Vuelve a intentarlo." };
 }

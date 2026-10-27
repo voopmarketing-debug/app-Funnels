@@ -564,7 +564,7 @@ export type FacebookConnectResult = { ok: true; displayPhoneNumber: string | nul
  */
 export async function connectWhatsAppWithFacebook(
   businessId: string,
-  input: { code: string; phoneNumberId?: string; wabaId?: string },
+  input: { code: string; phoneNumberId?: string; wabaId?: string; /** The page the button was pressed on: one of the redirect values Meta may expect. */ pageUrl?: string },
 ): Promise<FacebookConnectResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "Tu sesión venció. Vuelve a entrar." };
@@ -573,7 +573,7 @@ export async function connectWhatsAppWithFacebook(
   const code = sanitizeAsciiToken(input.code);
   if (!code) return { ok: false, error: "Meta no nos envió la autorización. Vuelve a intentarlo." };
 
-  const exchanged = await exchangeSignupCode(code);
+  const exchanged = await exchangeSignupCode(code, input.pageUrl);
   if (!exchanged.ok) return exchanged;
   const accessToken = exchanged.accessToken;
 

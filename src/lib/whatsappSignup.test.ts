@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { exchangeSignupCode, isValidPin, parseSignupMessage, registerPhoneNumber } from "./whatsappSignup";
+import { exchangeSignupCode, isValidPin, ownPageUrl, parseSignupMessage, registerPhoneNumber } from "./whatsappSignup";
 
 describe("parseSignupMessage", () => {
   it("reads the IDs of a finished signup", () => {
@@ -47,6 +47,26 @@ describe("exchangeSignupCode / registerPhoneNumber", () => {
     const calls = fake.mock.calls as unknown as unknown[][];
     expect(String(calls[0][0])).not.toContain("redirect_uri");
     expect(String(calls[1][0])).toContain("redirect_uri=");
+  });
+  it("keeps trying past a 'Can't load URL' refusal until one value is accepted", async () => {
+    const cantLoad = "Can't load URL: The domain of this URL isn't included in the app's domains.";
+    const fake = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Error validating verification code. Please make sure your redirect_uri is identical" } }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: cantLoad } }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOK" }), { status: 200 }));
+    globalThis.fetch = fake as unknown as typeof fetch;
+    const res = await exchangeSignupCode("CODE", "https://agente.funnelslabs.app/dashboard/businesses/b1");
+    expect(res).toEqual({ ok: true, accessToken: "TOK" });
+    const calls = fake.mock.calls as unknown as unknown[][];
+    expect(decodeURIComponent(String(calls[2][0]))).toContain("redirect_uri=https://agente.funnelslabs.app/dashboard/businesses/b1");
+  });
+  it("only accepts a page address from this platform", () => {
+    expect(ownPageUrl("https://agente.funnelslabs.app/dashboard/businesses/b1#x")).toBe("https://agente.funnelslabs.app/dashboard/businesses/b1");
+    expect(ownPageUrl("https://evil.example/dashboard")).toBeUndefined();
+    expect(ownPageUrl("http://agente.funnelslabs.app/")).toBeUndefined();
+    expect(ownPageUrl("not a url")).toBeUndefined();
+    expect(ownPageUrl(undefined)).toBeUndefined();
   });
   it("does not retry for other refusals", async () => {
     const fake = reply({ error: { message: "This authorization code has expired" } }, 400);
