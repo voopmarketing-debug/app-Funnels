@@ -7,26 +7,44 @@ import { randomInt } from "crypto";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
+/**
+ * The window opened by Meta's JavaScript SDK has no redirect of its own, and
+ * Meta checks the one sent when trading the code against the one used to open
+ * it. Which value it accepts is not obvious (none, empty, or the site), so a
+ * refusal that names redirect_uri is retried with the next one. The code is
+ * not spent by a refusal.
+ */
+function redirectUriAttempts(): (string | undefined)[] {
+  const host = process.env.APP_HOST ?? "agente.funnelslabs.app";
+  return [undefined, "", `https://${host}/`];
+}
+
+type TokenReply = { access_token?: string; error?: { message?: string } } | null;
+
 /** Trades the one-time code from the Meta window for the business's access token. */
 export async function exchangeSignupCode(code: string): Promise<{ ok: true; accessToken: string } | { ok: false; error: string }> {
   const appId = process.env.META_APP_ID;
   const appSecret = process.env.META_APP_SECRET;
   if (!appId || !appSecret) return { ok: false, error: "Falta configurar la app de Meta en el servidor." };
-  const url = new URL(`${GRAPH}/oauth/access_token`);
-  url.searchParams.set("client_id", appId);
-  url.searchParams.set("client_secret", appSecret);
-  url.searchParams.set("code", code);
-  let response: Response;
-  try {
-    response = await fetch(url, { cache: "no-store" });
-  } catch {
-    return { ok: false, error: "No se pudo contactar a Meta. Inténtalo de nuevo." };
+  let lastMessage: string | null = null;
+  for (const redirectUri of redirectUriAttempts()) {
+    const url = new URL(`${GRAPH}/oauth/access_token`);
+    url.searchParams.set("client_id", appId);
+    url.searchParams.set("client_secret", appSecret);
+    url.searchParams.set("code", code);
+    if (redirectUri !== undefined) url.searchParams.set("redirect_uri", redirectUri);
+    let response: Response;
+    try {
+      response = await fetch(url, { cache: "no-store" });
+    } catch {
+      return { ok: false, error: "No se pudo contactar a Meta. Inténtalo de nuevo." };
+    }
+    const body = (await response.json().catch(() => null)) as TokenReply;
+    if (response.ok && body?.access_token) return { ok: true, accessToken: body.access_token };
+    lastMessage = body?.error?.message ?? null;
+    if (!lastMessage || !/redirect_uri/i.test(lastMessage)) break;
   }
-  const body = (await response.json().catch(() => null)) as { access_token?: string; error?: { message?: string } } | null;
-  if (!response.ok || !body?.access_token) {
-    return { ok: false, error: body?.error?.message ? `Meta no aceptó la conexión: ${body.error.message}` : "Meta no aceptó la conexión. Vuelve a intentarlo." };
-  }
-  return { ok: true, accessToken: body.access_token };
+  return { ok: false, error: lastMessage ? `Meta no aceptó la conexión: ${lastMessage}` : "Meta no aceptó la conexión. Vuelve a intentarlo." };
 }
 
 export type RegisterResult = { ok: true } | { ok: false; error: string; /** The number has two-step verification on: Meta wants its 6-digit PIN. */ needsPin: boolean };

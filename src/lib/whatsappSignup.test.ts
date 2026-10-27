@@ -36,6 +36,24 @@ describe("exchangeSignupCode / registerPhoneNumber", () => {
     expect(url).toContain("code=CODE");
     expect(url).toContain("client_id=app1");
   });
+  it("retries with another redirect_uri when Meta refuses the first", async () => {
+    const mismatch = "Error validating verification code. Please make sure your redirect_uri is identical to the one you used in the OAuth dialog request";
+    const fake = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: mismatch } }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOK" }), { status: 200 }));
+    globalThis.fetch = fake as unknown as typeof fetch;
+    expect(await exchangeSignupCode("CODE")).toEqual({ ok: true, accessToken: "TOK" });
+    const calls = fake.mock.calls as unknown as unknown[][];
+    expect(String(calls[0][0])).not.toContain("redirect_uri");
+    expect(String(calls[1][0])).toContain("redirect_uri=");
+  });
+  it("does not retry for other refusals", async () => {
+    const fake = reply({ error: { message: "This authorization code has expired" } }, 400);
+    globalThis.fetch = fake as unknown as typeof fetch;
+    expect(await exchangeSignupCode("CODE")).toMatchObject({ ok: false });
+    expect(fake).toHaveBeenCalledTimes(1);
+  });
   it("explains a refused code", async () => {
     globalThis.fetch = reply({ error: { message: "This authorization code has been used" } }, 400) as unknown as typeof fetch;
     const res = await exchangeSignupCode("CODE");
