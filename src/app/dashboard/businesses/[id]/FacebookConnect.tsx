@@ -159,6 +159,13 @@ export function FacebookConnect({ businessId, appId, configId, connected }: { bu
             Probarlo ahora
           </a>
         )}
+        <p className="mx-auto max-w-sm text-xs text-ink-muted">
+          Meta cobra los mensajes de plantilla a <strong className="text-ink">tu cuenta de WhatsApp</strong>. Agrega tu método de pago en{" "}
+          <a href="https://business.facebook.com/wa/manage/home" target="_blank" rel="noopener noreferrer" className="font-semibold text-accent hover:underline">
+            WhatsApp Manager ↗
+          </a>
+          .
+        </p>
       </div>
     );
   }

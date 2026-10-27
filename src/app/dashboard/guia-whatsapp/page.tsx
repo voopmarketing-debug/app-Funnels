@@ -140,6 +140,14 @@ export default function WhatsAppGuidePage() {
         </Steps>
       </section>
 
+      <section id="pagos" className="scroll-mt-6 space-y-3">
+        <h2 className="text-xl font-bold text-ink">¿Quién paga los mensajes?</h2>
+        <p className="max-w-prose text-sm leading-relaxed text-ink-muted">
+          Tú, directamente a Meta, desde <strong className="text-ink">tu propia cuenta de WhatsApp Business</strong>. Agrega tu tarjeta en <strong className="text-ink">WhatsApp Manager → Configuración de pagos</strong>. Las respuestas dentro de las 24 horas desde que tu cliente escribe suelen no tener costo; las plantillas (difusiones y recordatorios) se cobran por mensaje, según las tarifas de Meta.
+        </p>
+        <OpenLink href="https://business.facebook.com/wa/manage/home">Abrir WhatsApp Manager</OpenLink>
+      </section>
+
       <section id="problemas" className="scroll-mt-6 space-y-3">
         <h2 className="text-xl font-bold text-ink">Si algo no sale</h2>
         <Trouble problem="Meta dice que el número ya está registrado" fix={<>Está abierto en la app de WhatsApp o en otra plataforma. Elimina esa cuenta o desactívalo allí y vuelve a intentarlo.</>} />
