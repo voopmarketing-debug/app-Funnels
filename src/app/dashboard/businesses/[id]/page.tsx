@@ -9,6 +9,7 @@ import { findPack } from "@/lib/addonPacks";
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
+import { isAgencyAdmin } from "@/lib/authz";
 import { AgentMediaManager } from "./AgentMediaManager";
 import { AgentPowerButton } from "./AgentPowerButton";
 import { PlanUsageCard } from "./PlanUsageCard";
@@ -96,6 +97,7 @@ export default async function BusinessPage({
 
   if (!membership) notFound();
   const { business } = membership;
+  const agencyViewer = await isAgencyAdmin(session.user.id);
   // A MEMBER is an invited teammate (e.g. a salesperson) — full CRM access,
   // but locked out of business-wide settings (see requireBusinessOwnerOrAdmin
   // in lib/authz.ts). Everything below that's owner/admin-only is skipped
@@ -304,6 +306,7 @@ export default async function BusinessPage({
                 businessId={id}
                 wabaPhoneNumberId={business.wabaPhoneNumberId ?? ""}
                 wabaId={business.wabaId ?? ""}
+                isAgency={agencyViewer}
                 signup={
                   process.env.META_APP_ID && process.env.META_WA_CONFIG_ID
                     ? { appId: process.env.META_APP_ID, configId: process.env.META_WA_CONFIG_ID }

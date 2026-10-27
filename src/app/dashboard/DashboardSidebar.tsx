@@ -244,6 +244,12 @@ function NavLinks({
           </Link>
         )}
         {isAgencyAdmin && (
+          <Link href="/dashboard/meta" className="fl-nav-item" data-active={isActive("/dashboard/meta")}>
+            <WhatsAppIcon />
+            Conexión Meta
+          </Link>
+        )}
+        {isAgencyAdmin && (
           <Link href="/dashboard/novedades" className="fl-nav-item" data-active={isActive("/dashboard/novedades")}>
             <MegaphoneIcon />
             Novedades

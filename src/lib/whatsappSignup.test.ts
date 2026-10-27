@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { exchangeSignupCode, parseSignupMessage, registerPhoneNumber } from "./whatsappSignup";
+import { exchangeSignupCode, isValidPin, parseSignupMessage, registerPhoneNumber } from "./whatsappSignup";
 
 describe("parseSignupMessage", () => {
   it("reads the IDs of a finished signup", () => {
@@ -45,6 +45,20 @@ describe("exchangeSignupCode / registerPhoneNumber", () => {
     globalThis.fetch = reply({ success: true }) as unknown as typeof fetch;
     expect(await registerPhoneNumber({ phoneNumberId: "P1", accessToken: "t" })).toEqual({ ok: true });
     globalThis.fetch = reply({ error: { message: "already registered" } }, 400) as unknown as typeof fetch;
-    expect(await registerPhoneNumber({ phoneNumberId: "P1", accessToken: "t" })).toEqual({ ok: false, error: "already registered" });
+    expect(await registerPhoneNumber({ phoneNumberId: "P1", accessToken: "t" })).toEqual({ ok: false, error: "already registered", needsPin: false });
+  });
+  it("asks for the PIN when the number comes with two-step verification", async () => {
+    globalThis.fetch = reply({ error: { message: "Two step verification PIN Mismatch", code: 133005 } }, 400) as unknown as typeof fetch;
+    expect(await registerPhoneNumber({ phoneNumberId: "P1", accessToken: "t" })).toMatchObject({ ok: false, needsPin: true });
+  });
+  it("sends the PIN the person typed", async () => {
+    const fake = reply({ success: true });
+    globalThis.fetch = fake as unknown as typeof fetch;
+    expect(await registerPhoneNumber({ phoneNumberId: "P1", accessToken: "t", pin: "123456" })).toEqual({ ok: true });
+    const init = (fake.mock.calls as unknown as [string, RequestInit][])[0][1];
+    expect(JSON.parse(String(init.body)).pin).toBe("123456");
+    expect(isValidPin("123456")).toBe(true);
+    expect(isValidPin("12345")).toBe(false);
+    expect(isValidPin("12345a")).toBe(false);
   });
 });

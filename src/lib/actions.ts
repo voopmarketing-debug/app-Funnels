@@ -51,7 +51,7 @@ import {
 import { getCatalogProducts } from "@/lib/websiteRender";
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import { isValidEmail, normalizePhone } from "@/lib/phone";
-import { exchangeSignupCode, registerPhoneNumber } from "@/lib/whatsappSignup";
+import { exchangeSignupCode, isValidPin, registerPhoneNumber } from "@/lib/whatsappSignup";
 import { resubscribeWhatsAppWebhook, runWhatsAppHealthCheck, type WhatsAppHealth } from "@/lib/whatsappHealth";
 import { MAX_IMPORT_ROWS, type ImportContactRow } from "@/lib/contactImport";
 import { AvailabilitySchema, DEFAULT_AVAILABILITY, type Availability } from "@/lib/agenda";
@@ -553,7 +553,7 @@ export async function discoverWhatsAppNumbers(businessId: string, rawToken: stri
   return { ok: true, numbers, expiresAt };
 }
 
-export type FacebookConnectResult = { ok: true; displayPhoneNumber: string | null } | { ok: false; error: string };
+export type FacebookConnectResult = { ok: true; displayPhoneNumber: string | null; /** The number has a two-step verification PIN (it came from another provider): ask for it. */ needsPin: boolean } | { ok: false; error: string };
 
 /**
  * Finishes "Conectar con Facebook" (Meta's WhatsApp Embedded Signup): the
@@ -597,6 +597,7 @@ export async function connectWhatsAppWithFacebook(
   // Activates a number that was just added; harmless for one that already works.
   const registered = await registerPhoneNumber({ phoneNumberId, accessToken });
   if (!registered.ok) console.warn(`WhatsApp number registration for business ${businessId}: ${registered.error}`);
+  const needsPin = !registered.ok && registered.needsPin;
 
   try {
     await prisma.business.update({
@@ -614,7 +615,30 @@ export async function connectWhatsAppWithFacebook(
   if (!subscribed.ok) console.warn(`Could not subscribe app to WABA for business ${businessId}: ${subscribed.error}`);
   revalidatePath(`/dashboard/businesses/${businessId}`);
   await runWhatsAppHealthCheck(businessId).catch((err) => console.error("Health check after Facebook connect failed:", err));
-  return { ok: true, displayPhoneNumber: verification.displayPhoneNumber };
+  return { ok: true, displayPhoneNumber: verification.displayPhoneNumber, needsPin };
+}
+
+/**
+ * For a number that came with two-step verification (from another provider):
+ * registers it with the PIN the person typed, using the token saved when they
+ * connected. One field, one click.
+ */
+export async function activateWhatsAppNumber(businessId: string, pin: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Tu sesión venció. Vuelve a entrar." };
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+  const cleanPin = pin.trim();
+  if (!isValidPin(cleanPin)) return { ok: false, error: "El PIN tiene 6 números." };
+
+  const business = await prisma.business.findUnique({ where: { id: businessId }, select: { wabaPhoneNumberId: true, wabaAccessToken: true } });
+  if (!business?.wabaPhoneNumberId || !business.wabaAccessToken) return { ok: false, error: "Primero conecta tu número con Facebook." };
+  const result = await registerPhoneNumber({ phoneNumberId: business.wabaPhoneNumberId, accessToken: decryptSecret(business.wabaAccessToken), pin: cleanPin });
+  if (!result.ok) {
+    return { ok: false, error: result.needsPin ? "Ese PIN no es el correcto. Es el de 6 números de la verificación en dos pasos de tu número." : `Meta no pudo activar el número: ${result.error}` };
+  }
+  await runWhatsAppHealthCheck(businessId).catch((err) => console.error("Health check after activating the number failed:", err));
+  revalidatePath(`/dashboard/businesses/${businessId}`);
+  return { ok: true };
 }
 
 const TEMPLATE_CATEGORIES = new Set(["MARKETING", "UTILITY"]);

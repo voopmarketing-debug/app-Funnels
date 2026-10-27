@@ -29,24 +29,37 @@ export async function exchangeSignupCode(code: string): Promise<{ ok: true; acce
   return { ok: true, accessToken: body.access_token };
 }
 
+export type RegisterResult = { ok: true } | { ok: false; error: string; /** The number has two-step verification on: Meta wants its 6-digit PIN. */ needsPin: boolean };
+
+/** Meta's 6-digit two-step verification PIN. */
+export const isValidPin = (pin: string): boolean => /^\d{6}$/.test(pin);
+
+// 133005: PIN mismatch; the number already has a two-step verification PIN
+// (it came from another provider) and ours is not it.
+const PIN_ERROR_CODES = new Set([133005]);
+
 /**
- * Activates a freshly added number for the Cloud API. A number that is
- * already active answers with an error that is safe to ignore, so this never
+ * Activates a number for the Cloud API. With no PIN it picks a new one (right
+ * for a number just added). A number that comes from another provider usually
+ * has two-step verification on: Meta then answers that the PIN does not match,
+ * and the person's own PIN has to be sent (see the "pin" argument). Never
  * blocks the connection: it only reports.
  */
-export async function registerPhoneNumber(params: { phoneNumberId: string; accessToken: string }): Promise<{ ok: boolean; error?: string }> {
+export async function registerPhoneNumber(params: { phoneNumberId: string; accessToken: string; pin?: string }): Promise<RegisterResult> {
   try {
     const response = await fetch(`${GRAPH}/${params.phoneNumberId}/register`, {
       method: "POST",
       headers: { Authorization: `Bearer ${params.accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ messaging_product: "whatsapp", pin: String(randomInt(100000, 1000000)) }),
+      body: JSON.stringify({ messaging_product: "whatsapp", pin: params.pin ?? String(randomInt(100000, 1000000)) }),
       cache: "no-store",
     });
     if (response.ok) return { ok: true };
-    const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
-    return { ok: false, error: body?.error?.message ?? `Meta respondió ${response.status}` };
+    const body = (await response.json().catch(() => null)) as { error?: { message?: string; code?: number } } | null;
+    const code = body?.error?.code;
+    const message = body?.error?.message ?? `Meta respondió ${response.status}`;
+    return { ok: false, error: message, needsPin: (code !== undefined && PIN_ERROR_CODES.has(code)) || /two.?step.*pin|pin.*mismatch/i.test(message) };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "sin respuesta" };
+    return { ok: false, error: err instanceof Error ? err.message : "sin respuesta", needsPin: false };
   }
 }
 
