@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { readStoredButtons } from "@/lib/templateButtons";
 import { TemplateManager } from "./TemplateManager";
 
 export default async function TemplatesPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,7 +22,7 @@ export default async function TemplatesPage({ params }: { params: Promise<{ id: 
   });
   const templates = templateRows.map((t) => ({
     ...t,
-    buttons: Array.isArray(t.buttons) ? (t.buttons as { type: "URL"; text: string; url: string }[]) : [],
+    buttons: readStoredButtons(t.buttons),
   }));
 
   return (

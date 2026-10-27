@@ -1,3 +1,4 @@
+import { metaButton, type TemplateButton } from "@/lib/templateButtons";
 import { isBsuid } from "@/lib/contactDisplay";
 import { createHmac, timingSafeEqual } from "crypto";
 
@@ -366,7 +367,7 @@ export async function downloadWhatsAppMedia(params: { url: string; accessToken: 
 
 export type TemplateCategory = "MARKETING" | "UTILITY";
 
-export type TemplateButton = { type: "URL"; text: string; url: string };
+export type { TemplateButton } from "@/lib/templateButtons";
 
 /**
  * Uploads a file to Meta's Resumable Upload API and returns the "handle"
@@ -437,7 +438,7 @@ export async function createWhatsAppTemplate(params: {
   }
   components.push({ type: "BODY", text: bodyText });
   if (buttons && buttons.length > 0) {
-    components.push({ type: "BUTTONS", buttons: buttons.map((b) => ({ type: b.type, text: b.text, url: b.url })) });
+    components.push({ type: "BUTTONS", buttons: buttons.map(metaButton) });
   }
 
   const response = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${wabaId}/message_templates`, {

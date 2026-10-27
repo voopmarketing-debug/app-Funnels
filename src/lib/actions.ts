@@ -13,6 +13,7 @@ import { cleanGoogleTagId, cleanMetaPixelId } from "@/lib/siteTracking";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { checkCustomDomain } from "@/lib/customDomain";
+import { normalizeButtons } from "@/lib/templateButtons";
 import { passwordProblem } from "@/lib/passwordPolicy";
 import { buildTrackedLink } from "@/lib/broadcastTracking";
 import {
@@ -618,18 +619,33 @@ export async function connectWhatsAppWithFacebook(
 
 const TEMPLATE_CATEGORIES = new Set(["MARKETING", "UTILITY"]);
 
-/** Reads up to 2 CTA/URL buttons out of a template form (buttonNText/buttonNUrl pairs) — a slot only counts if both fields are filled. */
+/**
+ * Reads the buttons of a template form: the new form sends them as one JSON
+ * list ("buttonsJson"); the assistant still sends the older buttonNText /
+ * buttonNUrl pairs (link buttons only). Both go through the same checks.
+ */
 function parseTemplateButtons(formData: FormData): TemplateButton[] {
-  const buttons: TemplateButton[] = [];
-  for (const n of [1, 2] as const) {
-    const text = String(formData.get(`button${n}Text`) ?? "").trim();
-    const url = String(formData.get(`button${n}Url`) ?? "").trim();
-    if (!text && !url) continue;
-    if (!text || !url) throw new Error(`El botón ${n} necesita tanto el texto como el enlace`);
-    if (!/^https?:\/\//i.test(url)) throw new Error(`El enlace del botón ${n} debe empezar con https://`);
-    buttons.push({ type: "URL", text, url });
+  const json = formData.get("buttonsJson");
+  let raw: { type: string; text?: string; url?: string; phone?: string }[] = [];
+  if (typeof json === "string" && json.trim()) {
+    try {
+      const parsed: unknown = JSON.parse(json);
+      if (!Array.isArray(parsed)) throw new Error("not a list");
+      raw = parsed.slice(0, 10).map((b) => (b && typeof b === "object" ? (b as { type: string; text?: string; url?: string; phone?: string }) : { type: "" }));
+    } catch {
+      throw new Error("No pudimos leer los botones. Recarga la página e inténtalo de nuevo.");
+    }
+  } else {
+    for (const n of [1, 2] as const) {
+      const text = String(formData.get(`button${n}Text`) ?? "").trim();
+      const url = String(formData.get(`button${n}Url`) ?? "").trim();
+      if (!text && !url) continue;
+      raw.push({ type: "URL", text, url });
+    }
   }
-  return buttons;
+  const checked = normalizeButtons(raw);
+  if (!checked.ok) throw new Error(checked.error);
+  return checked.buttons;
 }
 
 /** Submits a new WhatsApp message template to Meta for approval — see lib/whatsapp.ts for the API call itself. */
