@@ -17,7 +17,7 @@ export function ownPageUrl(raw: string | undefined): string | undefined {
   try {
     const url = new URL(raw);
     if (url.protocol !== "https:" || url.host !== host) return undefined;
-    return `${url.origin}${url.pathname}${url.search}`;
+    return `${url.origin}${url.pathname}${url.search}${url.hash}`;
   } catch {
     return undefined;
   }
@@ -27,17 +27,17 @@ export function ownPageUrl(raw: string | undefined): string | undefined {
  * The window opened by Meta's JavaScript SDK has no redirect of its own, and
  * Meta checks the one sent when trading the code against the one used to open
  * it. Which value it accepts is not obvious, so each refusal about the
- * redirect is retried with the next candidate: none, empty, the page the
- * button was pressed on, and the site. A refusal does not spend the code.
+ * redirect is retried with the next candidate: the page the button was pressed
+ * on (fragment included), none, empty, and the site. A refusal does not spend
+ * the code (what the logs show is which candidate Meta accepted).
  */
 function redirectUriAttempts(pageUrl: string | undefined): { label: string; value: string | undefined }[] {
   const host = process.env.APP_HOST ?? "agente.funnelslabs.app";
-  const attempts: { label: string; value: string | undefined }[] = [
-    { label: "sin redirect_uri", value: undefined },
-    { label: "redirect_uri vacío", value: "" },
-  ];
+  const attempts: { label: string; value: string | undefined }[] = [];
+  // Meta's dialog reports the page it was opened from as "fallback_redirect_uri",
+  // fragment included; the code appears to be tied to that address.
   if (pageUrl) attempts.push({ label: "página del botón", value: pageUrl });
-  attempts.push({ label: "raíz del sitio", value: `https://${host}/` });
+  attempts.push({ label: "sin redirect_uri", value: undefined }, { label: "redirect_uri vacío", value: "" }, { label: "raíz del sitio", value: `https://${host}/` });
   return attempts;
 }
 

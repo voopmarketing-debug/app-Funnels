@@ -48,21 +48,29 @@ describe("exchangeSignupCode / registerPhoneNumber", () => {
     expect(String(calls[0][0])).not.toContain("redirect_uri");
     expect(String(calls[1][0])).toContain("redirect_uri=");
   });
+  it("tries the page the button was pressed on first, fragment included", async () => {
+    const fake = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOK" }), { status: 200 }));
+    globalThis.fetch = fake as unknown as typeof fetch;
+    await exchangeSignupCode("CODE", "https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
+    const first = decodeURIComponent(String((fake.mock.calls as unknown as unknown[][])[0][0]));
+    expect(first).toContain("redirect_uri=https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
+  });
   it("keeps trying past a 'Can't load URL' refusal until one value is accepted", async () => {
     const cantLoad = "Can't load URL: The domain of this URL isn't included in the app's domains.";
     const fake = vi
       .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Error validating verification code. Please make sure your redirect_uri is identical" } }), { status: 400 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: cantLoad } }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Error validating verification code. Please make sure your redirect_uri is identical" } }), { status: 400 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOK" }), { status: 200 }));
     globalThis.fetch = fake as unknown as typeof fetch;
-    const res = await exchangeSignupCode("CODE", "https://agente.funnelslabs.app/dashboard/businesses/b1");
+    const res = await exchangeSignupCode("CODE", "https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
     expect(res).toEqual({ ok: true, accessToken: "TOK" });
     const calls = fake.mock.calls as unknown as unknown[][];
-    expect(decodeURIComponent(String(calls[2][0]))).toContain("redirect_uri=https://agente.funnelslabs.app/dashboard/businesses/b1");
+    expect(String(calls[1][0])).not.toContain("redirect_uri");
+    expect(String(calls[2][0])).toContain("redirect_uri=");
   });
   it("only accepts a page address from this platform", () => {
-    expect(ownPageUrl("https://agente.funnelslabs.app/dashboard/businesses/b1#x")).toBe("https://agente.funnelslabs.app/dashboard/businesses/b1");
+    expect(ownPageUrl("https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp")).toBe("https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
     expect(ownPageUrl("https://evil.example/dashboard")).toBeUndefined();
     expect(ownPageUrl("http://agente.funnelslabs.app/")).toBeUndefined();
     expect(ownPageUrl("not a url")).toBeUndefined();
