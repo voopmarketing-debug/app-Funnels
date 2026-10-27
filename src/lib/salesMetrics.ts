@@ -6,7 +6,11 @@ import { resolveDateRange, type DateRangeKey } from "@/lib/analytics";
 // whose conversation the AI had answered — the "tu agente generó $X" number.
 
 export type SalesSummary = {
+  // The currency of the figures below: the one most of the period's sales used.
   currency: string;
+  // Sales in any other currency are not added to those figures (US$97 is not $97
+  // pesos): they are listed apart, each in its own currency.
+  otherCurrencies: { currency: string; revenue: number; count: number }[];
   revenue: number;
   count: number;
   avgTicket: number | null;
@@ -36,7 +40,7 @@ export async function getSalesSummary(businessId: string, rangeKey: DateRangeKey
   const length = until.getTime() - since.getTime();
   const previousSince = new Date(since.getTime() - length);
 
-  const [sales, previous, newContacts, clicks] = await Promise.all([
+  const [allSales, newContacts, clicks] = await Promise.all([
     prisma.sale.findMany({
       where: { businessId, closedAt: { gte: since, lt: until } },
       orderBy: { closedAt: "desc" },
@@ -52,7 +56,6 @@ export async function getSalesSummary(businessId: string, rangeKey: DateRangeKey
         conversation: { select: { customerName: true, customerPhone: true } },
       },
     }),
-    prisma.sale.aggregate({ where: { businessId, closedAt: { gte: previousSince, lt: since } }, _sum: { amount: true } }),
     prisma.conversation.count({ where: { businessId, createdAt: { gte: since, lt: until } } }),
     prisma.websiteEvent.groupBy({
       by: ["label"],
@@ -60,6 +63,21 @@ export async function getSalesSummary(businessId: string, rangeKey: DateRangeKey
       _count: true,
     }),
   ]);
+
+  // The main currency: the one with the most sales (the latest wins a tie).
+  const tally = new Map<string, number>();
+  for (const s of allSales) tally.set(s.currency, (tally.get(s.currency) ?? 0) + 1);
+  const currency = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "COP";
+  const sales = allSales.filter((s) => s.currency === currency);
+  const otherTotals = new Map<string, { revenue: number; count: number }>();
+  for (const s of allSales) {
+    if (s.currency === currency) continue;
+    const row = otherTotals.get(s.currency) ?? { revenue: 0, count: 0 };
+    row.revenue += s.amount;
+    row.count += 1;
+    otherTotals.set(s.currency, row);
+  }
+  const previous = await prisma.sale.aggregate({ where: { businessId, currency, closedAt: { gte: previousSince, lt: since } }, _sum: { amount: true } });
 
   const revenue = sales.reduce((sum, s) => sum + s.amount, 0);
   const ai = sales.filter((s) => s.aiAssisted);
@@ -74,7 +92,8 @@ export async function getSalesSummary(businessId: string, rangeKey: DateRangeKey
   }
 
   return {
-    currency: sales[0]?.currency ?? "COP",
+    currency,
+    otherCurrencies: [...otherTotals.entries()].map(([code, v]) => ({ currency: code, ...v })),
     revenue,
     count: sales.length,
     avgTicket: sales.length ? Math.round(revenue / sales.length) : null,

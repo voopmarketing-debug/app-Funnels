@@ -5,6 +5,7 @@ import { AGENT_PROMPT_TEMPLATE } from "@/lib/promptTemplate";
 import { ASSISTANT_OPEN_EVENT } from "@/components/assistant/AssistantChat";
 import { updateAgent } from "@/lib/actions";
 import { TONE_OPTIONS, LENGTH_OPTIONS, INDUSTRY_OPTIONS } from "@/lib/agentOptions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 type SaveState = { saved: boolean };
 
@@ -30,10 +31,10 @@ export function AgentForm({
   );
   const promptRef = useRef<HTMLTextAreaElement>(null);
 
-  function applyTemplate() {
+  async function applyTemplate() {
     const el = promptRef.current;
     if (!el) return;
-    if (el.value.trim() && !confirm("Esto reemplaza las instrucciones actuales por la plantilla maestra (aún no se guarda). ¿Continuar?")) return;
+    if (el.value.trim() && !(await askConfirm({ title: "¿Reemplazar tus instrucciones?", message: "Se cambian las instrucciones actuales por la plantilla maestra. Todavía no se guarda: puedes revisarla antes.", confirmLabel: "Sí, reemplazar" }))) return;
     el.value = AGENT_PROMPT_TEMPLATE;
     el.focus();
     el.setSelectionRange(0, 0);

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ADDON_PACKS } from "@/lib/addonPacks";
 import { grantAddonManually } from "@/lib/addonActions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 /** Agency-only: see a client's active packs and grant one by hand. */
 export function AddonGrantCell({
@@ -18,9 +19,9 @@ export function AddonGrantCell({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  function grant() {
+  async function grant() {
     const pack = ADDON_PACKS.find((p) => p.key === packKey);
-    if (!pack || !confirm(`¿Activar ${pack.title} por 30 días a este cliente?`)) return;
+    if (!pack || !(await askConfirm({ title: `¿Activar ${pack.title}?`, message: "Se activa por 30 días a este cliente.", confirmLabel: "Sí, activar" }))) return;
     setError(null);
     startTransition(async () => {
       try {

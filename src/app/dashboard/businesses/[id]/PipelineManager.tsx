@@ -11,6 +11,7 @@ import {
   deletePipelineStage,
   movePipelineStage,
 } from "@/lib/actions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export type PipelineStageData = { id: string; name: string; position: number };
 export type PipelineData = { id: string; name: string; isDefault: boolean; stages: PipelineStageData[] };
@@ -129,8 +130,8 @@ function PipelineSection({
     });
   }
 
-  function handleDeletePipeline() {
-    if (!confirm(`¿Borrar el embudo "${pipeline.name}"? Sus conversaciones pasan al embudo principal.`)) return;
+  async function handleDeletePipeline() {
+    if (!(await askConfirm({ title: `¿Borrar el embudo "${pipeline.name}"?`, message: "Sus conversaciones pasan al embudo principal.", confirmLabel: "Sí, borrar", tone: "danger" }))) return;
     setDeleteError(null);
     startTransition(async () => {
       try {
@@ -205,8 +206,8 @@ function PipelineSection({
             canDelete={pipeline.stages.length > 1}
             movePending={isPending}
             onMove={(direction) => run(() => movePipelineStage(businessId, pipeline.id, stage.id, direction))}
-            onDelete={() => {
-              if (confirm(`¿Borrar la etapa "${stage.name}"? Sus conversaciones pasan a la primera etapa de este embudo.`)) {
+            onDelete={async () => {
+              if (await askConfirm({ title: `¿Borrar la etapa "${stage.name}"?`, message: "Sus conversaciones pasan a la primera etapa de este embudo.", confirmLabel: "Sí, borrar", tone: "danger" })) {
                 run(() => deletePipelineStage(businessId, pipeline.id, stage.id));
               }
             }}

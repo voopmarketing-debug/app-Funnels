@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { regenerateWebsitePageV2 } from "@/lib/actions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 /** Pages made before the new builder: one click rebuilds them with the 12 styles + chat editor. */
 export function UpgradeToBuilderBanner({ businessId, websiteId }: { businessId: string; websiteId: string }) {
@@ -10,8 +11,8 @@ export function UpgradeToBuilderBanner({ businessId, websiteId }: { businessId: 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  function upgrade() {
-    if (!confirm("La IA va a rehacer esta página con el nuevo constructor (nuevos estilos y secciones). El diseño actual se reemplaza. ¿Continuar?")) return;
+  async function upgrade() {
+    if (!(await askConfirm({ title: "¿Pasar al nuevo constructor?", message: "La IA va a rehacer esta página con el nuevo constructor (nuevos estilos y secciones). El diseño actual se reemplaza.", confirmLabel: "Sí, continuar" }))) return;
     setError(null);
     startTransition(async () => {
       const result = await regenerateWebsitePageV2(businessId, websiteId);

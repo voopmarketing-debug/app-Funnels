@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/currency";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { getConversationSales, registerSale } from "@/lib/saleActions";
 import type { SaleProductOption, SaleRow } from "@/lib/sales";
@@ -132,7 +133,7 @@ export function SaleDialog({
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
-                  {p.price ? ` · $${p.price.toLocaleString("es-CO")}` : ""}
+                  {p.price ? ` · ${formatMoney(p.price, p.currency)}` : ""}
                   {p.stock !== null ? (p.stock <= 0 ? " · agotado" : ` · quedan ${p.stock}`) : ""}
                 </option>
               ))}

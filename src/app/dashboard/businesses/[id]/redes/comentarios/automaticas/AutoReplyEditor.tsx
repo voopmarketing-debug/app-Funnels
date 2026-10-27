@@ -9,6 +9,7 @@ import {
   setCommentAutoReplyEnabled,
   type AutoReplyInput,
 } from "@/lib/socialActions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export type RuleView = {
   id: string;
@@ -313,8 +314,8 @@ export function AutoReplyManager({ businessId, rules, hasIg, canEdit }: { busine
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (!window.confirm(`¿Borrar la regla «${r.name}»?`)) return;
+                        onClick={async () => {
+                          if (!(await askConfirm({ message: `¿Borrar la regla «${r.name}»?`, confirmLabel: "Sí, borrar", tone: "danger" }))) return;
                           start(async () => {
                             await deleteCommentAutoReply(businessId, r.id);
                             router.refresh();

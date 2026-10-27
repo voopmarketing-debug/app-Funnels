@@ -3,16 +3,17 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toggleAgentEnabled } from "@/lib/actions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export function AgentPowerButton({ businessId, enabled }: { businessId: string; enabled: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  function handleClick() {
+  async function handleClick() {
     // Turning it off stops every AI reply on this WhatsApp line, and on a
     // phone this button sits first in a swipeable row, where a stray tap is
     // easy — so switching off needs a confirmation. Turning on doesn't.
-    if (enabled && !confirm("¿Apagar el agente? La IA dejará de responder a todos los clientes de este WhatsApp. Los mensajes seguirán llegando al CRM.")) {
+    if (enabled && !(await askConfirm({ title: "¿Apagar el agente?", message: "La IA dejará de responder a todos los clientes de este WhatsApp. Los mensajes seguirán llegando al CRM.", confirmLabel: "Sí, apagar", tone: "danger" }))) {
       return;
     }
     startTransition(async () => {

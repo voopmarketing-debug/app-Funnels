@@ -9,6 +9,7 @@ import {
   type SaveAnnouncementState,
 } from "@/lib/announcementActions";
 import { AnnouncementBanner, NewsCard } from "../AnnouncementViews";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export type AdminAnnouncement = {
   id: string;
@@ -176,7 +177,9 @@ function AnnouncementList({
                   </button>
                   <button
                     type="button"
-                    onClick={() => confirm(`¿Eliminar "${a.title}"? Esta acción no se puede deshacer.`) && run(() => deleteAnnouncement(a.id))}
+                    onClick={async () => {
+                      if (await askConfirm({ title: `¿Eliminar "${a.title}"?`, message: "Esta acción no se puede deshacer.", confirmLabel: "Sí, eliminar", tone: "danger" })) run(() => deleteAnnouncement(a.id));
+                    }}
                     className="rounded-md px-2 py-1 text-xs text-ink-faint transition hover:text-error"
                     aria-label="Eliminar"
                   >

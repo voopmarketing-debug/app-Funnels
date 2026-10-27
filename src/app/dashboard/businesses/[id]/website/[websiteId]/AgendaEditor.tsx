@@ -10,6 +10,7 @@ import { formatDateInZone } from "@/lib/timezone";
 import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
 import { DomainSection } from "./WebsiteEditor";
 import { ClientDate } from "@/components/ClientDate";
+import { askConfirm } from "@/components/ConfirmHost";
 
 /** `#RRGGBB` + a 2-digit hex alpha (e.g. "26" ≈ 15%) — used to tint the calendar with the clinic's own primary color without a CSS color-mix dependency. */
 function withAlpha(hex: string, alpha: string): string {
@@ -569,8 +570,8 @@ function ProfessionalRow({
     });
   }
 
-  function remove() {
-    if (!confirm(`¿Quitar a "${professional.name}"? Sus citas ya agendadas se conservan.`)) return;
+  async function remove() {
+    if (!(await askConfirm({ title: `¿Quitar a "${professional.name}"?`, message: "Sus citas ya agendadas se conservan.", confirmLabel: "Sí, quitar", tone: "danger" }))) return;
     startDeleting(async () => {
       await deleteProfessional(businessId, professional.id);
       router.refresh();

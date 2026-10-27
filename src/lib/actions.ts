@@ -340,7 +340,8 @@ export async function createClientAccount(
   return { error: null, success: { password: newPassword, businessId, businessName } };
 }
 
-export async function createBusiness(formData: FormData): Promise<void> {
+/** createBusiness answers with the reason (a thrown message is hidden in production) instead of throwing for what the person can fix. */
+export async function createBusiness(formData: FormData): Promise<{ error: string } | void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
 
@@ -356,9 +357,9 @@ export async function createBusiness(formData: FormData): Promise<void> {
 
   const lineStatus = await getAccountLineStatus(session.user.id);
   if (lineStatus.atLimit) {
-    throw new Error(
-      `Alcanzaste el límite de líneas de WhatsApp de tu plan ${PLAN_LABELS[lineStatus.planTier]} (${lineStatus.limit}). Actualiza de plan o contáctanos para agregar más.`,
-    );
+    return {
+      error: `Alcanzaste el límite de líneas de WhatsApp de tu plan ${PLAN_LABELS[lineStatus.planTier]} (${lineStatus.limit}). Actualiza de plan o contáctanos para agregar más.`,
+    };
   }
 
   // The Phone Number ID is not a secret and routes the WhatsApp webhook, so it
@@ -366,7 +367,7 @@ export async function createBusiness(formData: FormData): Promise<void> {
   // could claim someone else's number and receive their customers' messages.
   const ownership = await verifyWabaConnection({ phoneNumberId: wabaPhoneNumberId, accessToken: wabaAccessToken });
   if (!ownership.ok) {
-    throw new Error(`No pudimos confirmar ese número con Meta: ${ownership.error}`);
+    return { error: `No pudimos confirmar ese número con Meta: ${ownership.error}. Revisa que el Phone Number ID y el token sean los de la misma cuenta de WhatsApp.` };
   }
 
   let business;
@@ -387,9 +388,9 @@ export async function createBusiness(formData: FormData): Promise<void> {
     // a reused Meta test number (or a copy-pasted production one) can't
     // create a second business here either.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      throw new Error(
-        "Ese Phone Number ID ya está conectado a otro negocio en la plataforma. Cada negocio necesita su propio número de WhatsApp — no se puede repetir el mismo Phone Number ID en dos negocios.",
-      );
+      return {
+        error: "Ese Phone Number ID ya está conectado a otro negocio en la plataforma. Cada negocio necesita su propio número de WhatsApp — no se puede repetir el mismo Phone Number ID en dos negocios.",
+      };
     }
     throw err;
   }
@@ -416,7 +417,7 @@ export async function createBusiness(formData: FormData): Promise<void> {
 
 export type UpdateWabaCredentialsResult =
   | { verified: true; displayPhoneNumber: string | null }
-  | { verified: false; verifyError: string };
+  | { verified: false; verifyError: string; /** True when nothing was wrong with Meta's answer: the number belongs to another business here. */ alreadyUsed?: boolean };
 
 export async function updateWabaCredentials(
   businessId: string,
@@ -470,9 +471,12 @@ export async function updateWabaCredentials(
     // developer app): the second save must fail loudly instead of silently
     // stealing the first business's WhatsApp line.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      throw new Error(
-        "Ese Phone Number ID ya está conectado a otro negocio en la plataforma. Cada negocio necesita su propio número de WhatsApp — no se puede repetir el mismo Phone Number ID en dos negocios.",
-      );
+      return {
+        verified: false,
+        alreadyUsed: true,
+        verifyError:
+          "Ese Phone Number ID ya está conectado a otro negocio en la plataforma. Cada negocio necesita su propio número de WhatsApp — no se puede repetir el mismo Phone Number ID en dos negocios.",
+      };
     }
     throw err;
   }
@@ -2765,40 +2769,51 @@ export async function deleteProfessional(businessId: string, professionalId: str
 // Photos/PDFs the AI agent can choose to send mid-conversation — see
 // lib/ai.ts's "send_media" tool. Only image/document are offered here (no
 // audio/video — an AI-initiated voice note or video doesn't make sense).
-export async function addAgentMedia(businessId: string, formData: FormData): Promise<void> {
+/**
+ * Saves a photo or PDF the browser already uploaded straight to Blob (a PDF
+ * of several MB cannot travel through a Server Action: the body limit is 4 MB).
+ * The description is optional: without one, the file's own name stands in.
+ */
+export async function saveAgentMedia(businessId: string, input: { url: string; label?: string }): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
+  if (!session?.user?.id) return { ok: false, error: "Tu sesión venció. Vuelve a entrar." };
   await requireBusinessOwnerOrAdmin(session.user.id, businessId);
-
-  const label = String(formData.get("label") ?? "").trim();
-  const fileEntry = formData.get("file");
-  const file = fileEntry instanceof File && fileEntry.size > 0 ? fileEntry : null;
-  if (!label) throw new Error("Escribe una descripción corta de qué es el archivo");
-  if (!file) throw new Error("Selecciona una foto o un PDF");
 
   const existingCount = await prisma.agentMedia.count({ where: { businessId } });
   if (existingCount >= MAX_AGENT_MEDIA_PER_BUSINESS) {
-    throw new Error(
-      `Ya tienes el máximo de ${MAX_AGENT_MEDIA_PER_BUSINESS} archivos — borra uno para poder subir otro. Deja solo tus ${MAX_AGENT_MEDIA_PER_BUSINESS} productos más importantes.`,
-    );
+    return {
+      ok: false,
+      error: `Ya tienes el máximo de ${MAX_AGENT_MEDIA_PER_BUSINESS} archivos — borra uno para poder subir otro. Deja solo tus ${MAX_AGENT_MEDIA_PER_BUSINESS} productos más importantes.`,
+    };
   }
 
-  const mediaType = resolveMediaType(file.type);
-  if (mediaType !== "image" && mediaType !== "document") {
-    throw new Error("Solo se aceptan fotos o documentos (PDF) para esto");
+  try {
+    const uploaded = await verifyChatUpload({ url: input.url, businessId, folder: "agent-media" });
+    if (uploaded.mediaType !== "image" && uploaded.mediaType !== "document") {
+      await deleteAttachment(uploaded.url);
+      return { ok: false, error: "Solo se aceptan fotos o documentos (PDF) para esto" };
+    }
+    // The stored name, without the folder and the random suffix Blob adds.
+    const filename = decodeURIComponent(uploaded.pathname.split("/").pop() ?? "archivo").replace(/-[A-Za-z0-9]{20,}(?=\.[^.]+$|$)/, "");
+    const label =
+      (input.label ?? "").trim().slice(0, 200) ||
+      filename
+        .replace(/\.[^.]+$/, "")
+        .replace(/[_-]+/g, " ")
+        .trim()
+        .slice(0, 80) ||
+      "Archivo";
+    await prisma.agentMedia.create({
+      data: { businessId, url: uploaded.url, mediaType: uploaded.mediaType, filename, label, sizeBytes: uploaded.size },
+    });
+  } catch (err) {
+    console.error(`saveAgentMedia(${businessId}) failed:`, err);
+    const known = err instanceof Error && /(Archivo inválido|No encontramos|supera el máximo|Tipo de archivo)/.test(err.message);
+    return { ok: false, error: known && err instanceof Error ? err.message : "No se pudo guardar el archivo. Inténtalo de nuevo." };
   }
-  if (file.size > MAX_ATTACHMENT_BYTES[mediaType]) {
-    throw new Error(`El archivo supera el máximo permitido (${maxMbFor(mediaType)} MB)`);
-  }
-
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const { url, size } = await uploadAttachment({ bytes, filename: file.name, contentType: file.type });
-
-  await prisma.agentMedia.create({
-    data: { businessId, url, mediaType, filename: file.name, label, sizeBytes: size },
-  });
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
+  return { ok: true };
 }
 
 export async function deleteAgentMedia(businessId: string, mediaId: string): Promise<void> {

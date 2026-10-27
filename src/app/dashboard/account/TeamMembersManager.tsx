@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { inviteTeamMember, removeTeamMember } from "@/lib/actions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export type TeamMember = { userId: string; name: string | null; email: string };
 
@@ -46,8 +47,8 @@ export function TeamMembersManager({ businesses }: { businesses: TeamBusiness[] 
     });
   }
 
-  function handleRemove(userId: string, label: string) {
-    if (!confirm(`¿Quitar a "${label}" del equipo de "${selected.businessName}"? Ya no podrá entrar a ese negocio.`))
+  async function handleRemove(userId: string, label: string) {
+    if (!(await askConfirm({ title: `¿Quitar a "${label}" del equipo?`, message: `Ya no podrá entrar a "${selected.businessName}".`, confirmLabel: "Sí, quitar", tone: "danger" })))
       return;
     setRemovingId(userId);
     startSubmitting(async () => {

@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
+import { decryptSecret, encryptSecret } from "@/lib/crypto";
 
 // Web Push (the notifications that pop up on a computer or phone even with
 // the app closed). The VAPID key pair identifies this app to the browsers'
@@ -11,21 +12,41 @@ type VapidKeys = { publicKey: string; privateKey: string };
 
 let cached: VapidKeys | null = null;
 
+// The private key is stored encrypted ("enc:" prefix), like the WhatsApp tokens.
+// A key saved before that was plain text: it is read as is and re-saved encrypted.
+const ENCRYPTED = "enc:";
+
+function seal(keys: VapidKeys): string {
+  return JSON.stringify({ publicKey: keys.publicKey, privateKey: ENCRYPTED + encryptSecret(keys.privateKey) });
+}
+
+function unseal(value: string): { keys: VapidKeys; legacy: boolean } {
+  const parsed = JSON.parse(value) as VapidKeys;
+  if (parsed.privateKey.startsWith(ENCRYPTED)) {
+    return { keys: { publicKey: parsed.publicKey, privateKey: decryptSecret(parsed.privateKey.slice(ENCRYPTED.length)) }, legacy: false };
+  }
+  return { keys: parsed, legacy: true };
+}
+
 export async function getVapidKeys(): Promise<VapidKeys> {
   if (cached) return cached;
   const row = await prisma.appSetting.findUnique({ where: { key: VAPID_KEY } });
   if (row) {
-    cached = JSON.parse(row.value) as VapidKeys;
+    const { keys, legacy } = unseal(row.value);
+    cached = keys;
+    if (legacy) {
+      await prisma.appSetting.update({ where: { key: VAPID_KEY }, data: { value: seal(keys) } }).catch((err) => console.error("Could not encrypt the stored VAPID key:", err));
+    }
     return cached;
   }
   const fresh = webpush.generateVAPIDKeys();
   try {
-    await prisma.appSetting.create({ data: { key: VAPID_KEY, value: JSON.stringify(fresh) } });
+    await prisma.appSetting.create({ data: { key: VAPID_KEY, value: seal(fresh) } });
     cached = fresh;
   } catch {
     // Another request created them first: use those.
     const winner = await prisma.appSetting.findUniqueOrThrow({ where: { key: VAPID_KEY } });
-    cached = JSON.parse(winner.value) as VapidKeys;
+    cached = unseal(winner.value).keys;
   }
   return cached;
 }

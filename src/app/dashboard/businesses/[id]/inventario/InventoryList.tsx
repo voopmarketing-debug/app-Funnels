@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { adjustStock, setLowStockAt, setTrackStock } from "@/lib/productActions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export type InventoryRow = {
   id: string;
@@ -84,8 +85,8 @@ function StockRow({ businessId, row }: { businessId: string; row: InventoryRow }
     });
   }
 
-  function stopTracking() {
-    if (!confirm(`¿Dejar de controlar el inventario de "${row.name}"? Volverá a mostrarse siempre como disponible.`)) return;
+  async function stopTracking() {
+    if (!(await askConfirm({ title: `¿Dejar de controlar el inventario de "${row.name}"?`, message: "Volverá a mostrarse siempre como disponible.", confirmLabel: "Sí, dejar de controlar", tone: "danger" }))) return;
     startTransition(async () => {
       await setTrackStock(businessId, row.id, false);
       router.refresh();

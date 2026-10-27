@@ -24,6 +24,7 @@ import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { attachPreviewEditor, showSection, type EditorHandlers } from "./previewEditor";
+import { askConfirm } from "@/components/ConfirmHost";
 
 type Tab = "chat" | "bloques" | "estilo" | "diseno" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
@@ -224,8 +225,8 @@ export function WebsiteBuilder({
     });
   }
 
-  function regenerate() {
-    if (!confirm("¿Rehacer toda la página con IA? Se reemplazan textos, estilo y secciones actuales.")) return;
+  async function regenerate() {
+    if (!(await askConfirm({ title: "¿Rehacer toda la página con IA?", message: "Se reemplazan los textos, el estilo y las secciones actuales.", confirmLabel: "Sí, rehacer" }))) return;
     setBusy("Rehaciendo la página con IA…");
     startTransition(async () => {
       try {

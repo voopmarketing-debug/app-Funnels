@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/currency";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -149,6 +150,7 @@ const PROPOSE_TOOLS = {
       name: z.string().min(1).max(80).optional(),
       description: z.string().max(600).optional(),
       price: z.number().min(0).max(1_000_000_000).nullable().optional(),
+      currency: z.enum(["COP", "USD", "EUR"]).optional(),
       category: z.string().max(40).nullable().optional(),
       active: z.boolean().optional(),
       stock: z.number().int().min(0).max(1_000_000).nullable().optional(),
@@ -539,11 +541,12 @@ export async function buildProposal(name: ProposeToolName, input: unknown, busin
       return { ...base, preview: { title: `Nueva etapa «${p.name}»`, lines: [biz, { label: "Embudo", value: pipeline.name }, { label: "Por qué", value: explanation }] } };
     }
     case "propose_product": {
-      const p = payload as { productId?: string; name?: string; price?: number | null; kind?: string; description?: string; category?: string | null; active?: boolean; stock?: number | null };
-      const existing = p.productId ? await prisma.product.findFirst({ where: { id: p.productId, businessId }, select: { name: true } }) : null;
+      const p = payload as { productId?: string; name?: string; price?: number | null; currency?: string; kind?: string; description?: string; category?: string | null; active?: boolean; stock?: number | null };
+      const existing = p.productId ? await prisma.product.findFirst({ where: { id: p.productId, businessId }, select: { name: true, currency: true } }) : null;
       if (p.productId && !existing) throw new ToolInputError("Ese producto no existe en este negocio. Usa list_products.");
       if (!p.productId && !p.name) throw new ToolInputError("Un producto nuevo necesita nombre");
-      const money = (v: number) => `$${v.toLocaleString("es-CO")}`;
+      const priceCurrency = p.currency ?? existing?.currency ?? "COP";
+      const money = (v: number) => formatMoney(v, priceCurrency);
       return {
         ...base,
         preview: {

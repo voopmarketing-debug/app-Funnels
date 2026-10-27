@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { MAX_CATALOG_PRODUCTS } from "@/lib/inventory";
+import { asCurrency } from "@/lib/currency";
 import { ProductManager, type ManagedProduct } from "./ProductManager";
 
 export default async function ProductsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,6 +27,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ id: s
     description: p.description,
     price: p.price,
     compareAtPrice: p.compareAtPrice,
+    currency: asCurrency(p.currency),
     category: p.category,
     badge: p.badge,
     imageUrl: p.imageUrl,

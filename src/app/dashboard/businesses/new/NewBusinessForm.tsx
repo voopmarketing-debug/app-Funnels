@@ -11,7 +11,8 @@ export function NewBusinessForm({ industryOptions }: { industryOptions: { value:
   const [state, formAction, isPending] = useActionState<CreateState, FormData>(
     async (_prevState, formData) => {
       try {
-        await createBusiness(formData);
+        const result = await createBusiness(formData);
+        if (result?.error) return { error: result.error };
       } catch (err) {
         return { error: err instanceof Error ? err.message : "No se pudo crear el agente, intenta de nuevo" };
       }
@@ -26,6 +27,7 @@ export function NewBusinessForm({ industryOptions }: { industryOptions: { value:
       <Field label="Nombre del negocio" name="name" placeholder="Pizzería El Sabor" required disabled={isPending} />
       <Field
         label="Phone Number ID (Meta Cloud API)"
+        hint="Un número largo (unos 15 dígitos) de WhatsApp Manager → Configuración de la API. No es el teléfono del negocio."
         name="wabaPhoneNumberId"
         placeholder="123456789012345"
         required
@@ -33,6 +35,7 @@ export function NewBusinessForm({ industryOptions }: { industryOptions: { value:
       />
       <Field
         label="Access Token (Meta Cloud API)"
+        hint="El token permanente de tu usuario del sistema en Meta. Comprobamos con Meta que sirva para ese número antes de crear el agente."
         name="wabaAccessToken"
         type="password"
         placeholder="EAAG..."
@@ -85,13 +88,14 @@ export function NewBusinessForm({ industryOptions }: { industryOptions: { value:
   );
 }
 
-function Field(props: { label: string; name: string; placeholder?: string; type?: string; required?: boolean; disabled?: boolean }) {
-  const { label, name, placeholder, type = "text", required, disabled } = props;
+function Field(props: { label: string; hint?: string; name: string; placeholder?: string; type?: string; required?: boolean; disabled?: boolean }) {
+  const { label, hint, name, placeholder, type = "text", required, disabled } = props;
   return (
     <div className="space-y-1">
       <label htmlFor={name} className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
         {label}
       </label>
+      {hint && <p className="text-xs text-ink-muted">{hint}</p>}
       <input
         id={name}
         name={name}

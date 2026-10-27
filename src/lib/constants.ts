@@ -9,6 +9,9 @@ export function supportWhatsAppLink(text: string): string {
 
 export const SUPPORT_WHATSAPP_LINK = supportWhatsAppLink("Hola, necesito soporte con Funnels Labs");
 
+/** Where a client books the guided call (about 30–45 minutes) to connect their WhatsApp. */
+export const AGENDA_CALL_URL = "https://agenda.funnelslabs.app/agenda";
+
 // Meta's own per-message rate for a MARKETING-category template sent to a
 // Colombia number, USD, as published on Meta's WhatsApp Business Platform
 // pricing page (per-message billing, effective since July 2025). Only

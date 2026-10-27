@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { disconnectSocial, refreshSocialData, selectSocialAccounts } from "@/lib/socialActions";
 import { LineChart, type ChartSeries } from "./LineChart";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export function RefreshButton({ businessId, updatedLabel }: { businessId: string; updatedLabel: string }) {
   const [pending, start] = useTransition();
@@ -34,8 +35,8 @@ export function DisconnectButton({ businessId }: { businessId: string }) {
     <button
       type="button"
       disabled={pending}
-      onClick={() => {
-        if (confirm("¿Desconectar Facebook, Instagram y Meta Ads de este negocio? Puedes volver a conectarlos cuando quieras.")) {
+      onClick={async () => {
+        if (await askConfirm({ title: "¿Desconectar tus redes?", message: "Se desconectan Facebook, Instagram y Meta Ads de este negocio. Puedes volver a conectarlos cuando quieras.", confirmLabel: "Sí, desconectar", tone: "danger" })) {
           start(() => disconnectSocial(businessId));
         }
       }}

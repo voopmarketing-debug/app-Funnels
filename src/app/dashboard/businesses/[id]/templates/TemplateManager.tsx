@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { createMessageTemplate, deleteMessageTemplate, refreshTemplateStatus } from "@/lib/actions";
+import { askConfirm } from "@/components/ConfirmHost";
 
 type TemplateButton = { type: "URL"; text: string; url: string };
 
@@ -99,8 +100,8 @@ function TemplateCard({ businessId, template, canDelete }: { businessId: string;
   const [isDeleting, startDelete] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  function remove() {
-    if (!confirm(`¿Eliminar la plantilla "${template.name}"? También se borra en Meta y ya no podrás usarla en difusiones. Si la vuelves a necesitar, tendrás que crearla y esperar la aprobación de nuevo.`)) return;
+  async function remove() {
+    if (!(await askConfirm({ title: `¿Eliminar la plantilla "${template.name}"?`, message: "También se borra en Meta y ya no podrás usarla en difusiones. Si la vuelves a necesitar, tendrás que crearla y esperar la aprobación de nuevo.", confirmLabel: "Sí, eliminar", tone: "danger" }))) return;
     setDeleteError(null);
     startDelete(async () => {
       const res = await deleteMessageTemplate(businessId, template.id);

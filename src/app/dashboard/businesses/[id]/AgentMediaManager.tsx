@@ -2,8 +2,11 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addAgentMedia, deleteAgentMedia } from "@/lib/actions";
+import { upload } from "@vercel/blob/client";
+import { deleteAgentMedia, saveAgentMedia } from "@/lib/actions";
+import { MAX_ATTACHMENT_BYTES, maxMbFor, resolveMediaType } from "@/lib/attachmentLimits";
 import { MAX_AGENT_MEDIA_PER_BUSINESS } from "@/lib/attachments";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export type AgentMediaItem = {
   id: string;
@@ -24,17 +27,52 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
   const [isSubmitting, startSubmitting] = useTransition();
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [percent, setPercent] = useState<number | null>(null);
   const atLimit = media.length >= MAX_AGENT_MEDIA_PER_BUSINESS;
 
-  function handleSubmit(formData: FormData) {
+  function pickFile(picked: File | undefined) {
     setError(null);
+    if (!picked) return setFile(null);
+    const type = resolveMediaType(picked.type);
+    if (type !== "image" && !(type === "document" && picked.type === "application/pdf")) {
+      setFile(null);
+      return setError("Elige una foto (JPG, PNG o WebP) o un PDF.");
+    }
+    if (picked.size > MAX_ATTACHMENT_BYTES[type]) {
+      setFile(null);
+      return setError(`Ese archivo pesa demasiado: el máximo es ${maxMbFor(type)} MB para ${type === "image" ? "fotos" : "PDFs"}.`);
+    }
+    setFile(picked);
+  }
+
+  function handleSubmit(formData: FormData) {
+    if (!file) return;
+    setError(null);
+    setPercent(0);
+    const label = String(formData.get("label") ?? "");
     startSubmitting(async () => {
       try {
-        await addAgentMedia(businessId, formData);
+        // Straight from the browser to storage: a PDF of several MB cannot go through the server.
+        const blob = await upload(`agent-media/${businessId}/${file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "archivo"}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/attachments/upload",
+          clientPayload: JSON.stringify({ businessId }),
+          contentType: file.type,
+          onUploadProgress: ({ percentage }) => setPercent(Math.round(percentage)),
+        });
+        const result = await saveAgentMedia(businessId, { url: blob.url, label });
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
         formRef.current?.reset();
+        setFile(null);
         router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo subir el archivo");
+      } catch {
+        setError("No se pudo subir el archivo. Revisa tu conexión e inténtalo de nuevo.");
+      } finally {
+        setPercent(null);
       }
     });
   }
@@ -53,8 +91,8 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
 
       <p className="mt-4 text-sm text-ink">
         Sube fotos de tus productos o un PDF (catálogo, ficha técnica, lista de precios). La IA decide por su cuenta
-        enviárselo a un cliente por WhatsApp cuando lo pida o cuando claramente ayude a cerrar la venta — describe
-        bien cada archivo para que sepa cuándo usarlo.
+        enviárselo a un cliente por WhatsApp cuando lo pida o cuando claramente ayude a cerrar la venta. Si le pones una
+        descripción, sabrá mejor cuándo usarlo.
       </p>
 
       {media.length > 0 && (
@@ -73,8 +111,8 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
               <button
                 type="button"
                 disabled={isDeletingId === item.id}
-                onClick={() => {
-                  if (confirm(`¿Borrar "${item.label}"? La IA ya no podrá enviarla.`)) handleDelete(item.id);
+                onClick={async () => {
+                  if (await askConfirm({ title: `¿Borrar "${item.label}"?`, message: "La IA ya no podrá enviarla a tus clientes.", confirmLabel: "Sí, borrar", tone: "danger" })) handleDelete(item.id);
                 }}
                 className="flex-none rounded border border-error/40 px-2 py-1 text-xs text-error transition hover:bg-error/10 disabled:opacity-30"
               >
@@ -92,36 +130,42 @@ export function AgentMediaManager({ businessId, media }: { businessId: string; m
         </p>
       ) : (
         <form ref={formRef} action={handleSubmit} className="mt-4 space-y-2 border-t border-border pt-4">
+          <label htmlFor="media-file" className="block text-xs font-semibold text-ink">
+            1. Elige la foto o el PDF
+          </label>
           <input
+            id="media-file"
+            type="file"
+            name="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+            disabled={isSubmitting}
+            onChange={(e) => pickFile(e.target.files?.[0])}
+            className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-ink outline-none file:mr-2 file:rounded file:border-0 file:bg-accent file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent-ink"
+          />
+          <label htmlFor="media-label" className="block pt-1 text-xs font-semibold text-ink">
+            2. Descríbelo <span className="font-normal text-ink-faint">(opcional)</span>
+          </label>
+          <input
+            id="media-label"
             type="text"
             name="label"
-            required
-            placeholder='Describe el archivo, ej: "Foto silla azul, $180.000" o "Catálogo completo de productos"'
+            maxLength={200}
+            placeholder='Ej: "Foto silla azul, $180.000" o "Catálogo completo de productos"'
             disabled={isSubmitting}
             className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
           />
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              type="file"
-              name="file"
-              accept="image/*,application/pdf"
-              required
-              disabled={isSubmitting}
-              className="w-full flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-ink outline-none file:mr-2 file:rounded file:border-0 file:bg-accent file:px-2 file:py-1 file:text-xs file:font-semibold file:text-accent-ink"
-            />
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-none rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
-            >
-              {isSubmitting ? "Subiendo..." : "+ Agregar"}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isSubmitting || !file}
+            className="mt-1 w-full rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-50 sm:w-auto"
+          >
+            {isSubmitting ? (percent !== null && percent > 0 && percent < 100 ? `Subiendo… ${percent}%` : "Guardando…") : file ? "Guardar archivo" : "Elige un archivo para guardar"}
+          </button>
           <p className="text-[13px] text-ink-faint">
             Fotos hasta 5 MB, PDFs hasta 20 MB — máximo {MAX_AGENT_MEDIA_PER_BUSINESS} archivos, deja solo tus
             productos más top.
           </p>
-          {error && <p className="text-xs text-error">{error}</p>}
+          {error && <p role="alert" className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">{error}</p>}
         </form>
       )}
     </div>

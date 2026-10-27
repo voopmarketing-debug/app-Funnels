@@ -4,6 +4,8 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 import { deleteProduct, moveProduct, saveProduct } from "@/lib/productActions";
+import { askConfirm } from "@/components/ConfirmHost";
+import { CURRENCIES, DEFAULT_CURRENCY, currencySymbol, formatMoney, type CurrencyCode } from "@/lib/currency";
 
 export type ManagedProduct = {
   id: string;
@@ -12,6 +14,7 @@ export type ManagedProduct = {
   description: string;
   price: number | null;
   compareAtPrice: number | null;
+  currency: CurrencyCode;
   category: string | null;
   badge: string | null;
   imageUrl: string | null;
@@ -21,7 +24,7 @@ export type ManagedProduct = {
   lowStockAt: number;
 };
 
-const money = (v: number | null) => (v === null ? "" : `$${v.toLocaleString("es-CO")}`);
+const money = (v: number | null, currency: string) => (v === null ? "" : formatMoney(v, currency));
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function safeName(name: string) {
@@ -38,6 +41,12 @@ export function ProductManager({ businessId, products, maxProducts }: { business
   const [isPending, startTransition] = useTransition();
 
   const categories = useMemo(() => Array.from(new Set(products.map((p) => p.category).filter((c): c is string => !!c))), [products]);
+  // A new product starts in the currency most of the catalog already uses.
+  const defaultCurrency = useMemo<CurrencyCode>(() => {
+    const counts = new Map<CurrencyCode, number>();
+    for (const p of products) counts.set(p.currency, (counts.get(p.currency) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? DEFAULT_CURRENCY;
+  }, [products]);
   const serviceCount = products.filter((p) => p.kind === "SERVICE").length;
   const productCount = products.length - serviceCount;
   const visible = products.filter(
@@ -53,8 +62,8 @@ export function ProductManager({ businessId, products, maxProducts }: { business
     dialogRef.current?.showModal();
   }
 
-  function remove(p: ManagedProduct) {
-    if (!confirm(`¿Eliminar "${p.name}"? Dejará de aparecer en tus páginas.`)) return;
+  async function remove(p: ManagedProduct) {
+    if (!(await askConfirm({ title: `¿Eliminar "${p.name}"?`, message: "Dejará de aparecer en tus páginas.", confirmLabel: "Sí, eliminar", tone: "danger" }))) return;
     startTransition(async () => {
       await deleteProduct(businessId, p.id);
       router.refresh();
@@ -160,9 +169,9 @@ export function ProductManager({ businessId, products, maxProducts }: { business
                 {p.category && <p className="text-[11px] uppercase tracking-wide text-ink-faint">{p.category}</p>}
                 <p className="line-clamp-2 text-sm font-semibold">{p.name}</p>
                 <p className="text-sm">
-                  <span className="font-bold">{p.price === null ? "Sin precio" : money(p.price)}</span>
+                  <span className="font-bold">{p.price === null ? "Sin precio" : money(p.price, p.currency)}</span>
                   {p.compareAtPrice && p.price !== null && p.compareAtPrice > p.price && (
-                    <span className="ml-1.5 text-xs text-ink-faint line-through">{money(p.compareAtPrice)}</span>
+                    <span className="ml-1.5 text-xs text-ink-faint line-through">{money(p.compareAtPrice, p.currency)}</span>
                   )}
                 </p>
                 <div className="mt-auto flex items-center gap-1 pt-2">
@@ -189,6 +198,7 @@ export function ProductManager({ businessId, products, maxProducts }: { business
           businessId={businessId}
           product={editing}
           categories={categories}
+          defaultCurrency={defaultCurrency}
           onDone={() => {
             dialogRef.current?.close();
             router.refresh();
@@ -234,6 +244,7 @@ function NumberField({
   onChange,
   placeholder,
   money,
+  symbol = "$",
   hint,
   id,
 }: {
@@ -242,6 +253,8 @@ function NumberField({
   onChange: (digits: string) => void;
   placeholder: string;
   money?: boolean;
+  /** The currency symbol shown inside the field (money fields only). */
+  symbol?: string;
   hint?: string;
   id: string;
 }) {
@@ -251,7 +264,7 @@ function NumberField({
         {label}
       </label>
       <div className="relative">
-        {money && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted">$</span>}
+        {money && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted">{symbol}</span>}
         <input
           id={id}
           value={withThousands(value)}
@@ -263,7 +276,7 @@ function NumberField({
           inputMode="numeric"
           autoComplete="off"
           placeholder={placeholder}
-          className={`fl-mono w-full rounded-md border border-border bg-background py-2 pr-3 text-base tabular-nums text-ink outline-none focus:border-accent md:text-sm ${money ? "pl-7" : "pl-3"}`}
+          className={`fl-mono w-full rounded-md border border-border bg-background py-2 pr-3 text-base tabular-nums text-ink outline-none focus:border-accent md:text-sm ${money ? (symbol.length > 1 ? "pl-11" : "pl-7") : "pl-3"}`}
         />
       </div>
       {hint && <p className="text-[11px] text-ink-faint">{hint}</p>}
@@ -275,12 +288,15 @@ function ProductForm({
   businessId,
   product,
   categories,
+  defaultCurrency,
   onDone,
   onCancel,
 }: {
   businessId: string;
   product: ManagedProduct | null;
   categories: string[];
+  /** For a new product: the currency most of the catalog already uses. */
+  defaultCurrency: CurrencyCode;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -289,6 +305,7 @@ function ProductForm({
   const [description, setDescription] = useState(product?.description ?? "");
   const [price, setPrice] = useState(product?.price?.toString() ?? "");
   const [compareAt, setCompareAt] = useState(product?.compareAtPrice?.toString() ?? "");
+  const [currency, setCurrency] = useState<CurrencyCode>(product?.currency ?? defaultCurrency);
   const [category, setCategory] = useState(product?.category ?? "");
   const [badge, setBadge] = useState(product?.badge ?? "");
   const [active, setActive] = useState(product?.active ?? true);
@@ -340,6 +357,7 @@ function ProductForm({
           description,
           price: toNumber(price),
           compareAtPrice: toNumber(compareAt),
+          currency,
           category: category || null,
           badge: badge || null,
           imageUrl,
@@ -473,9 +491,29 @@ function ProductForm({
 
         <section className="space-y-3">
           <h3 className={sectionTitle}>Precio</h3>
+          <div className="space-y-1">
+            <span id="currency-label" className="text-xs font-medium text-ink-muted">
+              ¿En qué moneda cobras?
+            </span>
+            <div role="radiogroup" aria-labelledby="currency-label" className="inline-flex rounded-xl border border-border p-1">
+              {CURRENCIES.map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  role="radio"
+                  aria-checked={currency === c.code}
+                  onClick={() => setCurrency(c.code)}
+                  className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${currency === c.code ? "bg-accent text-accent-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+                >
+                  {c.short}
+                  <span className="ml-1.5 hidden text-xs font-normal opacity-80 sm:inline">{c.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <NumberField id="product-price" label={isService ? "Precio del servicio" : "Precio de venta"} value={price} onChange={setPrice} placeholder="89.000" money />
-            <NumberField id="product-compare" label="Precio antes (opcional)" value={compareAt} onChange={setCompareAt} placeholder="120.000" money />
+            <NumberField id="product-price" label={isService ? "Precio del servicio" : "Precio de venta"} value={price} onChange={setPrice} placeholder={currency === "COP" ? "89.000" : "97"} money symbol={currencySymbol(currency)} />
+            <NumberField id="product-compare" label="Precio antes (opcional)" value={compareAt} onChange={setCompareAt} placeholder={currency === "COP" ? "120.000" : "147"} money symbol={currencySymbol(currency)} />
             <div className="col-span-2 space-y-1 sm:col-span-1">
               <label htmlFor="product-badge" className="text-xs font-medium text-ink-muted">
                 Etiqueta (opcional)
@@ -486,7 +524,7 @@ function ProductForm({
           <p className={`text-[11px] ${discountTooHigh ? "text-[var(--status-warn)]" : "text-ink-faint"}`}>
             {discountTooHigh
               ? "⚠ El precio antes debe ser mayor que el precio de venta para mostrarse tachado."
-              : "Escribe solo el número: los puntos de miles se ponen solos. Déjalo vacío si el precio es a convenir."}
+              : "Escribe solo el número, sin centavos: los puntos de miles se ponen solos. Déjalo vacío si el precio es a convenir."}
           </p>
         </section>
 

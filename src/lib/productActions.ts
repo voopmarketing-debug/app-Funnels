@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireBusinessMembership } from "@/lib/authz";
 import { verifyChatUpload } from "@/lib/attachments";
+import { asCurrency } from "@/lib/currency";
 import { MAX_CATALOG_PRODUCTS, changeStock, notifyStockLevel } from "@/lib/inventory";
 
 export type ProductInput = {
@@ -13,6 +14,8 @@ export type ProductInput = {
   description: string;
   price: number | null;
   compareAtPrice: number | null;
+  /** COP, USD or EUR. */
+  currency?: string;
   category: string | null;
   badge: string | null;
   imageUrl: string | null;
@@ -38,6 +41,8 @@ function clean(input: ProductInput) {
     description: input.description.trim().slice(0, 1200),
     price: money(input.price),
     compareAtPrice: money(input.compareAtPrice),
+    // Left out when not given, so editing a product never resets its currency.
+    ...(input.currency ? { currency: asCurrency(input.currency) } : {}),
     category: input.category?.trim().slice(0, 60) || null,
     badge: input.badge?.trim().slice(0, 24) || null,
     active: input.active,

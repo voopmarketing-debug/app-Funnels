@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { SessionProvider } from "next-auth/react";
+import { ConfirmHost } from "@/components/ConfirmHost";
 
 // The inline <head> script in layout.tsx applies the saved theme before first
 // paint, but if React ever has to re-render the whole page client-side (e.g.
@@ -25,6 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <ThemeSync />
       {children}
+      <ConfirmHost />
     </SessionProvider>
   );
 }

@@ -4,9 +4,11 @@ import { useEffect, useState, useTransition } from "react";
 import { deleteSale, getConversationSales } from "@/lib/saleActions";
 import type { SaleRow } from "@/lib/sales";
 import { SaleDialog } from "./SaleDialog";
+import { askConfirm } from "@/components/ConfirmHost";
+import { formatMoney } from "@/lib/currency";
 
-function money(value: number): string {
-  return `$${value.toLocaleString("es-CO")}`;
+function money(value: number, currency = "COP"): string {
+  return formatMoney(value, currency);
 }
 
 /** "Ventas" block of the contact's ficha: what this contact has bought. */
@@ -25,8 +27,8 @@ export function LeadSalesSection({ businessId, conversationId }: { businessId: s
     };
   }, [businessId, conversationId]);
 
-  function remove(sale: SaleRow) {
-    if (!confirm(`¿Borrar la venta de ${money(sale.amount)}?`)) return;
+  async function remove(sale: SaleRow) {
+    if (!(await askConfirm({ message: `¿Borrar la venta de ${money(sale.amount, sale.currency)}?`, confirmLabel: "Sí, borrar", tone: "danger" }))) return;
     setSales((prev) => prev?.filter((s) => s.id !== sale.id) ?? null);
     startTransition(async () => {
       const res = await deleteSale(businessId, sale.id);
@@ -34,13 +36,16 @@ export function LeadSalesSection({ businessId, conversationId }: { businessId: s
     });
   }
 
-  const total = sales?.reduce((sum, s) => sum + s.amount, 0) ?? 0;
+  // One total per currency: US$97 and $97.000 pesos are never added together.
+  const totals = new Map<string, number>();
+  for (const s of sales ?? []) totals.set(s.currency, (totals.get(s.currency) ?? 0) + s.amount);
+  const totalLabel = [...totals.entries()].map(([currency, amount]) => money(amount, currency)).join(" · ");
 
   return (
     <section className="border-b border-border p-4">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Ventas</h3>
-        {sales && sales.length > 0 && <span className="fl-mono text-xs font-semibold text-[var(--status-good)]">{money(total)}</span>}
+        {sales && sales.length > 0 && <span className="fl-mono text-xs font-semibold text-[var(--status-good)]">{totalLabel}</span>}
       </div>
 
       {sales === null ? (
@@ -52,7 +57,7 @@ export function LeadSalesSection({ businessId, conversationId }: { businessId: s
           {sales.map((s) => (
             <li key={s.id} className="group flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-2">
               <div className="min-w-0 flex-1">
-                <p className="fl-mono text-sm font-semibold tabular-nums text-ink">{money(s.amount)}</p>
+                <p className="fl-mono text-sm font-semibold tabular-nums text-ink">{money(s.amount, s.currency)}</p>
                 <p className="truncate text-xs text-ink-muted">
                   {s.quantity > 1 ? `${s.quantity} × ` : ""}
                   {s.productName ?? "Venta"} · {new Date(s.closedAt).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}

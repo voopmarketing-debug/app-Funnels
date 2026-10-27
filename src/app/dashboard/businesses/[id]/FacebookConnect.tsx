@@ -119,31 +119,26 @@ export function FacebookConnect({ businessId, appId, configId, connected }: { bu
   if (phase === "done") {
     return (
       <div className="rounded-xl border border-accent/50 bg-accent/10 p-4 text-sm font-medium text-ink">
-        ✓ WhatsApp conectado{number ? ` al número ${number}` : ""}. Tu agente ya puede recibir y responder mensajes.
+        ✓ WhatsApp conectado{number ? ` al número ${number}` : ""}. Tu agente ya puede recibir y responder mensajes. Pruébalo escribiéndole «Hola» desde otro teléfono.
       </div>
     );
   }
 
   const busy = phase !== "idle";
   return (
-    <div className="space-y-2.5 rounded-xl border border-border-strong bg-surface-2/50 p-4">
-      <div>
-        <p className="text-sm font-semibold text-ink">La forma más fácil: conéctalo con tu Facebook</p>
-        <p className="text-[13px] text-ink-muted">
-          Inicias sesión en Meta, eliges tu número de WhatsApp y listo. Sin copiar claves ni códigos, y la conexión no vence.
-        </p>
-      </div>
+    <div className="space-y-2.5">
       <button
         type="button"
         onClick={start}
         disabled={busy}
-        className="inline-flex items-center gap-2 rounded-lg bg-[#1877F2] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#166fe0] disabled:opacity-60"
+        className="inline-flex items-center gap-2.5 rounded-xl bg-[#1877F2] px-6 py-3 text-[15px] font-semibold text-white shadow-md transition hover:bg-[#166fe0] disabled:opacity-60"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12Z" />
         </svg>
         {phase === "loading" ? "Cargando…" : phase === "waiting" ? "Completa la ventana de Meta…" : phase === "saving" ? "Conectando tu número…" : connected ? "Reconectar con Facebook" : "Conectar con Facebook"}
       </button>
+      {phase === "waiting" && <p className="text-xs text-ink-muted">Sigue los pasos de la ventana de Meta. Esta pantalla se actualiza sola cuando termines.</p>}
       {error && <p className="rounded-lg border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">{error}</p>}
     </div>
   );

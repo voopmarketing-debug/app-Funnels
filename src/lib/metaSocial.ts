@@ -61,10 +61,12 @@ export function metaRedirectUri(): string {
 
 // ---- OAuth state (signed, so the callback knows which business it's for) ----
 
-function stateKey(): string {
+// A key of its own for this one job, derived from AUTH_SECRET: a state signed
+// here can never be mistaken for anything else signed with the same secret.
+function stateKey(): Buffer {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error("AUTH_SECRET is not set");
-  return secret;
+  return crypto.createHmac("sha256", secret).update("funnels:meta-oauth-state:v1").digest();
 }
 
 export function signState(payload: { businessId: string; userId: string }): string {

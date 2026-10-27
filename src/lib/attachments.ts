@@ -58,8 +58,9 @@ export function chatUploadPrefix(businessId: string): string {
 export async function verifyChatUpload(params: {
   url: string;
   businessId: string;
-  // Defaults to the chat folder; product photos live under products/.
-  folder?: "chat" | "products";
+  // Defaults to the chat folder; product photos live under products/ and the
+  // files the AI sends on its own (photos, catalog PDFs) under agent-media/.
+  folder?: "chat" | "products" | "agent-media";
 }): Promise<{ url: string; mediaType: MediaType; contentType: string; size: number; pathname: string }> {
   let parsed: URL;
   try {
@@ -70,7 +71,7 @@ export async function verifyChatUpload(params: {
   if (parsed.protocol !== "https:" || !parsed.hostname.endsWith(".public.blob.vercel-storage.com")) {
     throw new Error("Archivo inválido");
   }
-  const prefix = params.folder === "products" ? `products/${params.businessId}/` : chatUploadPrefix(params.businessId);
+  const prefix = params.folder === "products" || params.folder === "agent-media" ? `${params.folder}/${params.businessId}/` : chatUploadPrefix(params.businessId);
   if (!decodeURIComponent(parsed.pathname).startsWith(`/${prefix}`)) throw new Error("Archivo inválido");
 
   const blob = await head(params.url).catch(() => null);

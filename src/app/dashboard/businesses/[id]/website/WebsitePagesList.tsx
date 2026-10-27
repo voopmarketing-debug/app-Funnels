@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createWebsitePageV2, createAgendaPage, deleteWebsitePage, renameWebsitePage } from "@/lib/actions";
 import { ClientDate } from "@/components/ClientDate";
+import { askConfirm } from "@/components/ConfirmHost";
 
 type Page = {
   id: string;
@@ -293,8 +294,8 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
           <button
             type="button"
             disabled={isDeleting}
-            onClick={() => {
-              if (confirm(`¿Eliminar la página "${page.name}"? Esto no se puede deshacer.`)) {
+            onClick={async () => {
+              if (await askConfirm({ title: `¿Eliminar la página "${page.name}"?`, message: "Esto no se puede deshacer.", confirmLabel: "Sí, eliminar", tone: "danger" })) {
                 startTransition(async () => {
                   await deleteWebsitePage(businessId, page.id);
                   router.refresh();

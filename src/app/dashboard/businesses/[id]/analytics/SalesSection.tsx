@@ -58,6 +58,19 @@ export function SalesSection({ businessId, summary, period }: { businessId: stri
         </Link>
       </div>
 
+      {summary.otherCurrencies.length > 0 && (
+        <p className="rounded-lg border border-border bg-surface-2/60 px-3 py-2 text-[13px] text-ink-muted">
+          También vendiste en otra moneda:{" "}
+          {summary.otherCurrencies.map((o, i) => (
+            <span key={o.currency}>
+              {i > 0 && " · "}
+              <strong className="text-ink">{formatMoney(o.revenue, o.currency)}</strong> ({o.count} {o.count === 1 ? "venta" : "ventas"})
+            </span>
+          ))}
+          . No se suma a las cifras de abajo, que están en {summary.currency}.
+        </p>
+      )}
+
       {summary.count === 0 ? (
         <div className="fl-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
           <span className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-accent/15 text-xl" aria-hidden="true">

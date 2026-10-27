@@ -334,7 +334,4 @@ export type CatalogProduct = {
   isService?: boolean;
 };
 
-export function formatMoney(value: number, currency: string): string {
-  if (currency === "USD") return `US$${value.toLocaleString("en-US")}`;
-  return `$${value.toLocaleString("es-CO")}`;
-}
+export { formatMoney } from "@/lib/currency";

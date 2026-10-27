@@ -7,6 +7,7 @@ import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage,
 import { FONT_OPTIONS, type WebsiteContent } from "@/lib/websiteContent";
 import { DownloadCsvButton } from "@/components/DownloadCsvButton";
 import { ClientDate } from "@/components/ClientDate";
+import { askConfirm } from "@/components/ConfirmHost";
 
 export function WebsiteEditor({
   businessId,
@@ -65,8 +66,8 @@ export function WebsiteEditor({
     });
   }
 
-  function regenerate() {
-    if (!confirm("Esto reemplaza todo el texto y los colores actuales con una nueva versión generada por IA. ¿Seguir?")) return;
+  async function regenerate() {
+    if (!(await askConfirm({ title: "¿Generar una nueva versión con IA?", message: "Se reemplazan todo el texto y los colores actuales por una versión nueva.", confirmLabel: "Sí, generar" }))) return;
     setRegenerateError(null);
     startRegenerating(async () => {
       try {

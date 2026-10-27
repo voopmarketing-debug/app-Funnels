@@ -4,7 +4,7 @@ import { TRIAL_DAYS } from "@/lib/plans";
 // a client: short sentences, concrete moments, nothing invented. No figures,
 // reviews or results that the platform cannot back up.
 
-export const AGENDA_CALL_URL = "https://agenda.funnelslabs.app/agenda";
+export { AGENDA_CALL_URL } from "@/lib/constants";
 
 export const AUDIENCE_LINE = ["Clínicas", "Odontólogos", "Estéticas", "Abogados", "Contadores", "Empresas de servicios"];
 

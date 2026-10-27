@@ -37,8 +37,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         }
         if (typeof businessId !== "string" || !businessId) throw new UploadDenied("Falta el negocio");
         await requireBusinessMembership(session.user.id, businessId);
-        // chat/: chat attachments; products/: product photos (see ProductManager).
-        if (!pathname.startsWith(`chat/${businessId}/`) && !pathname.startsWith(`products/${businessId}/`)) {
+        // chat/: chat attachments; products/: product photos (see ProductManager);
+        // agent-media/: photos and PDFs the AI sends by itself (see AgentMediaManager).
+        if (!pathname.startsWith(`chat/${businessId}/`) && !pathname.startsWith(`products/${businessId}/`) && !pathname.startsWith(`agent-media/${businessId}/`)) {
           throw new UploadDenied("Ruta de archivo no permitida");
         }
 

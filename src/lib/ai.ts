@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/currency";
 import type Anthropic from "@anthropic-ai/sdk";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { anthropic } from "@/lib/anthropicClient";
@@ -137,7 +138,7 @@ export type AgentCatalogItem = {
 };
 
 function catalogPrice(value: number, currency: string): string {
-  return currency === "USD" ? `US$${value.toLocaleString("en-US")}` : `$${value.toLocaleString("es-CO")}`;
+  return formatMoney(value, currency);
 }
 
 // The business's product catalog (at most MAX_CATALOG_PRODUCTS, see
