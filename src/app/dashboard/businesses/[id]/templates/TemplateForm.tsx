@@ -155,6 +155,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
   const [buttons, setButtons] = useState<DraftButton[]>([]);
   const [adding, setAdding] = useState(false);
   const [headerImagePreviewUrl, setHeaderImagePreviewUrl] = useState<string | null>(null);
+  const [headerImageName, setHeaderImageName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const keySeq = useRef(0);
 
@@ -355,12 +356,13 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
               <div className="flex items-center gap-3 rounded-xl border border-border p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={headerImagePreviewUrl} alt="" className="h-16 w-24 rounded-lg object-cover" />
-                <p className="min-w-0 flex-1 truncate text-sm text-ink">{fileRef.current?.files?.[0]?.name ?? "Imagen elegida"}</p>
+                <p className="min-w-0 flex-1 truncate text-sm text-ink">{headerImageName || "Imagen elegida"}</p>
                 <button
                   type="button"
                   onClick={() => {
                     if (fileRef.current) fileRef.current.value = "";
                     setHeaderImagePreviewUrl(null);
+                    setHeaderImageName("");
                   }}
                   className="rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:text-error"
                 >
@@ -381,6 +383,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
               className="sr-only"
               onChange={(e) => {
                 const file = e.target.files?.[0] ?? null;
+                setHeaderImageName(file?.name ?? "");
                 setHeaderImagePreviewUrl((prev) => {
                   if (prev) URL.revokeObjectURL(prev);
                   return file ? URL.createObjectURL(file) : null;
