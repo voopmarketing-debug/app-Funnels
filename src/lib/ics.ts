@@ -12,7 +12,7 @@ function escapeIcsText(text: string): string {
   // characters in ICS text values and must be escaped; newlines become
   // literal "\n" sequences (not real line breaks, which would corrupt the
   // file's own line-folding).
-  return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return text.replace(/\r\n?/g, "\n").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 }
 
 function formatIcsDate(date: Date): string {

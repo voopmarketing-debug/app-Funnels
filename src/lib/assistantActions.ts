@@ -3,7 +3,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { isAgencyAdmin } from "@/lib/authz";
+import { isAgencyAdmin, requireActiveAccount } from "@/lib/authz";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { accessibleBusinesses, contextNote, runAssistant } from "@/lib/assistant/run";
 import { READ_TOOL_LABELS, isProposeTool, type ProposalPreview } from "@/lib/assistant/tools";
@@ -118,6 +118,13 @@ export async function sendAssistantMessage(input: {
   const agencyMode = scope === AGENCY_SCOPE;
   const business = agencyMode ? null : (businesses.find((b) => b.id === scope) ?? null);
   if (agencyMode ? !isAgency : !business) return { ok: false, error: "Elige arriba el negocio con el que quieres trabajar." };
+  if (business && !isAgency) {
+    try {
+      await requireActiveAccount(uid, business.id);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Tu cuenta no puede usar el asistente ahora." };
+    }
+  }
 
   // The agency's own line pays for agency-mode chats.
   const chargeBusinessId = business?.id ?? businesses.find((b) => b.role === "OWNER")?.id ?? businesses[0]?.id ?? null;

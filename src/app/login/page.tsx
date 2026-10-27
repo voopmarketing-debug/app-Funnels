@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { SignupShell, CheckList } from "@/components/SignupShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { safeCallbackPath } from "@/lib/safeRedirect";
 
 function EyeIcon() {
   return (
@@ -50,9 +51,8 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Only our own pages (never "//other-site.com").
-  const callbackParam = searchParams.get("callbackUrl");
-  const callbackUrl = callbackParam?.startsWith("/") && !callbackParam.startsWith("//") ? callbackParam : "/dashboard";
+  // Only our own pages (never another site, however the address is written).
+  const callbackUrl = safeCallbackPath(searchParams.get("callbackUrl"));
   // Coming back from Mercado Pago in a browser where they weren't signed in.
   const backFromMercadoPago = callbackUrl.startsWith("/activar") && callbackUrl.includes("estado=listo");
 

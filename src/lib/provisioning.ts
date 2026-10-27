@@ -80,7 +80,7 @@ export async function provisionClientFromPurchase(input: {
     const business = await tx.business.create({
       data: {
         name: businessName,
-        slug: `${slugify(businessName)}-${Math.random().toString(36).slice(2, 7)}`,
+        slug: `${slugify(businessName)}-${crypto.randomBytes(4).toString("hex").slice(0, 6)}`,
         industry,
         subscriptionStartedAt: new Date(),
         ...(input.planTier ? { planTier: input.planTier } : {}),

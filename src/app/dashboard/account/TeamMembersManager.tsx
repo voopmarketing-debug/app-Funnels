@@ -167,9 +167,9 @@ export function TeamMembersManager({ businesses }: { businesses: TeamBusiness[] 
                 type="password"
                 name="password"
                 required
-                minLength={8}
+                minLength={10}
                 autoComplete="new-password"
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Mínimo 10 caracteres"
                 disabled={isSubmitting}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent"
               />

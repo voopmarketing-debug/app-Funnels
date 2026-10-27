@@ -1,3 +1,4 @@
+import { escapeHtml } from "@/lib/htmlEscape";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
@@ -156,10 +157,10 @@ async function grant(purchase: SubscriptionCharge, email: string): Promise<Payme
   }
 
   await alertAgency(newAccount ? `Nuevo cliente: ${purchase.name || email}` : purchase.trialDays ? `Prueba gratis iniciada: ${purchase.name || email}` : `Pago recibido: ${purchase.name || email}`, [
-    `${newAccount ? "Se creó la cuenta y se activó" : "Se renovó"} automáticamente la membresía de <b>${purchase.name || email}</b> (${email}).`,
-    `Producto: ${purchase.productName || "—"}${planTier ? ` · Plan ${PLAN_LABELS[planTier]}` : ""}`,
-    `Activa hasta el <b>${formatDate(endsAt)}</b>. Negocios: ${businesses.map((b) => b.name).join(", ")}.`,
-    `Pago ${PROVIDER_LABEL[purchase.provider]}: ${purchase.transaction}`,
+    `${newAccount ? "Se creó la cuenta y se activó" : "Se renovó"} automáticamente la membresía de <b>${escapeHtml(purchase.name || email)}</b> (${escapeHtml(email)}).`,
+    `Producto: ${escapeHtml(purchase.productName || "—")}${planTier ? ` · Plan ${PLAN_LABELS[planTier]}` : ""}`,
+    `Activa hasta el <b>${formatDate(endsAt)}</b>. Negocios: ${businesses.map((b) => escapeHtml(b.name)).join(", ")}.`,
+    `Pago ${PROVIDER_LABEL[purchase.provider]}: ${escapeHtml(purchase.transaction)}`,
   ]);
 
   return { status: "activated", businessIds, endsAt, newAccount };
@@ -177,7 +178,7 @@ async function sendWelcomeEmail(email: string, name: string, endsAt: Date, trial
     to: email,
     subject: trial ? "Tu prueba gratis de Funnels Labs ya empezó" : "Tu cuenta de Funnels Labs ya está activa",
     html: `
-      <p>Hola${name ? ` ${name}` : ""},</p>
+      <p>Hola${name ? ` ${escapeHtml(name)}` : ""},</p>
       <p>${trial ? "Tu prueba gratis ya está activa" : "Tu cuenta ya está activa"}. Entra con el correo y la contraseña que creaste:</p>
       <p><a href="https://${host}/login">Iniciar sesión en Funnels Labs</a></p>
       ${trial ? `<p>Tu prueba va hasta el ${formatDate(endsAt)}. Ese día se hace el primer cobro a la tarjeta que registraste; puedes cancelar antes desde Mercado Pago.</p>` : ""}
@@ -198,9 +199,9 @@ async function revoke(purchase: SubscriptionCharge, email: string): Promise<Paym
     await prisma.business.updateMany({ where: { id: { in: businessIds } }, data: { subscriptionEndsAt: new Date() } });
   }
   await alertAgency(`Reembolso o contracargo: ${purchase.name || email}`, [
-    `${PROVIDER_LABEL[purchase.provider]} reportó <b>${/CHARGEBACK|charged_back/i.test(purchase.event) ? "un contracargo" : "un reembolso"}</b> de ${purchase.name || email} (${email}).`,
+    `${PROVIDER_LABEL[purchase.provider]} reportó <b>${/CHARGEBACK|charged_back/i.test(purchase.event) ? "un contracargo" : "un reembolso"}</b> de ${escapeHtml(purchase.name || email)} (${escapeHtml(email)}).`,
     `Su membresía quedó vencida desde ahora. Si fue un error, puedes reactivarla en Clientes.`,
-    `Pago ${PROVIDER_LABEL[purchase.provider]}: ${purchase.transaction}`,
+    `Pago ${PROVIDER_LABEL[purchase.provider]}: ${escapeHtml(purchase.transaction)}`,
   ]);
   return { status: "revoked", businessIds };
 }

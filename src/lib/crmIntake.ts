@@ -66,9 +66,16 @@ export async function upsertLeadConversation(params: {
   // board.
   const stageFields = params.pipelineId ? { stageId: targetStage.id } : {};
 
+  // The form is public: anyone who knows a customer's phone could type a
+  // different name for it. A contact that already has a name keeps it.
+  const existing = await prisma.conversation.findUnique({
+    where: { businessId_customerPhone: { businessId: website.businessId, customerPhone: phone } },
+    select: { customerName: true },
+  });
+
   await prisma.conversation.upsert({
     where: { businessId_customerPhone: { businessId: website.businessId, customerPhone: phone } },
-    update: { customerName: name, ...stageFields, ...appointmentFields },
+    update: { ...(existing?.customerName ? {} : { customerName: name }), ...stageFields, ...appointmentFields },
     create: {
       businessId: website.businessId,
       customerPhone: phone,

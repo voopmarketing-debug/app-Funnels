@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isSubscriptionActive } from "@/lib/subscription";
 
 /**
  * Multi-tenant guard: throws unless the given user belongs to the business.
@@ -54,4 +55,27 @@ export async function isAgencyAdmin(userId: string): Promise<boolean> {
 
 export async function requireAgencyAdmin(userId: string): Promise<void> {
   if (!(await isAgencyAdmin(userId))) throw new Error("Solo la agencia puede hacer esto");
+}
+
+/**
+ * For the actions that cost money or reach customers (AI generation, mass
+ * sends): the person must belong to the business AND the account must be in
+ * good standing — card registered (self-sign-ups) and subscription not
+ * expired. The dashboard layouts already block those accounts on screen, but
+ * a server action can be called without the screen, so it is checked here too.
+ * The agency (ADMIN) is exempt, as it is in the layouts.
+ */
+export async function requireActiveAccount(userId: string, businessId: string): Promise<void> {
+  const membership = await prisma.membership.findUnique({
+    where: { userId_businessId: { userId, businessId } },
+    include: { business: { select: { subscriptionEndsAt: true } } },
+  });
+  if (!membership) throw new Error("Not authorized for this business");
+  if (membership.role === "ADMIN" || (await isAgencyAdmin(userId))) return;
+
+  const me = await prisma.user.findUnique({ where: { id: userId }, select: { activationRequired: true } });
+  if (me?.activationRequired) throw new Error("Activa tu prueba gratis registrando tu tarjeta para usar esta función.");
+  if (!isSubscriptionActive(membership.business.subscriptionEndsAt)) {
+    throw new Error("La suscripción de este negocio venció. Renueva para volver a usar esta función.");
+  }
 }

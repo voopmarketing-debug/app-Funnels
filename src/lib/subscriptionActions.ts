@@ -1,5 +1,6 @@
 "use server";
 
+import { escapeHtml } from "@/lib/htmlEscape";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -37,7 +38,7 @@ export async function cancelMySubscription(): Promise<{ ok: true } | { ok: false
     await sendEmail({
       to: agency,
       subject: `Canceló su suscripción: ${user.name || user.email}`,
-      html: `<p><b>${user.name || user.email}</b> (${user.email}) canceló su suscripción de Mercado Pago (${sub.id}) desde Mi perfil. No se le volverá a cobrar; conserva el acceso hasta que termine el período ya cubierto.</p>`,
+      html: `<p><b>${escapeHtml(user.name || user.email)}</b> (${escapeHtml(user.email)}) canceló su suscripción de Mercado Pago (${escapeHtml(sub.id)}) desde Mi perfil. No se le volverá a cobrar; conserva el acceso hasta que termine el período ya cubierto.</p>`,
     }).catch(() => {});
   }
 

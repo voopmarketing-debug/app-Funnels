@@ -34,20 +34,30 @@ export function readableTextColor(hex: string): "#ffffff" | "#0a0a0a" {
 }
 
 /** Turns a YouTube/Vimeo watch/share URL into its embeddable iframe src — accepts whatever format a client pastes. */
-function toEmbedUrl(url: string): string | null {
+const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtube-nocookie.com", "www.youtube-nocookie.com"]);
+const VIMEO_HOSTS = new Set(["vimeo.com", "www.vimeo.com", "player.vimeo.com"]);
+const VIDEO_ID = /^[\w-]{6,20}$/;
+
+// The host is compared whole (never "contains"): "youtube.com.evil.test" is not
+// YouTube. The id is rebuilt into our own embed address, so nothing else from
+// the pasted link survives.
+export function toEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      return `https://www.youtube.com/embed/${u.pathname.slice(1)}`;
+    if (u.protocol !== "https:") return null;
+    const host = u.hostname.toLowerCase();
+    if (host === "youtu.be") {
+      const id = u.pathname.slice(1).split("/")[0];
+      return VIDEO_ID.test(id) ? `https://www.youtube.com/embed/${id}` : null;
     }
-    if (u.hostname.includes("youtube.com")) {
-      const id = u.searchParams.get("v");
-      if (id) return `https://www.youtube.com/embed/${id}`;
-      if (u.pathname.startsWith("/embed/")) return url;
+    if (YOUTUBE_HOSTS.has(host)) {
+      const parts = u.pathname.split("/").filter(Boolean);
+      const id = u.searchParams.get("v") ?? (["embed", "shorts", "live"].includes(parts[0]) ? parts[1] : null);
+      return id && VIDEO_ID.test(id) ? `https://www.youtube.com/embed/${id}` : null;
     }
-    if (u.hostname.includes("vimeo.com")) {
-      const id = u.pathname.split("/").filter(Boolean).pop();
-      if (id) return `https://player.vimeo.com/video/${id}`;
+    if (VIMEO_HOSTS.has(host)) {
+      const id = u.pathname.split("/").filter(Boolean).find((p) => /^\d{5,12}$/.test(p));
+      return id ? `https://player.vimeo.com/video/${id}` : null;
     }
     return null;
   } catch {

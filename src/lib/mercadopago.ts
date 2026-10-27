@@ -18,6 +18,10 @@ export function parseMpNotification(body: unknown, searchParams: URLSearchParams
   const id = (typeof data?.id === "string" && data.id) || searchParams.get("data.id") || searchParams.get("id");
 
   if (!type || !id) return null;
+  // The id goes into the path of our own calls to Mercado Pago (with our access
+  // token), so only the plain characters its ids are made of get through: no
+  // "/", "..", "?" or "#" to steer the request somewhere else.
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
   return { type, id };
 }
 

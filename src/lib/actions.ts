@@ -12,6 +12,8 @@ import { releaseOrphanAccount } from "@/lib/accounts";
 import { cleanGoogleTagId, cleanMetaPixelId } from "@/lib/siteTracking";
 import { prisma } from "@/lib/prisma";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
+import { checkCustomDomain } from "@/lib/customDomain";
+import { passwordProblem } from "@/lib/passwordPolicy";
 import { buildTrackedLink } from "@/lib/broadcastTracking";
 import {
   sendWhatsAppTextMessage,
@@ -66,7 +68,7 @@ import { convertToOggOpus } from "@/lib/audioConvert";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { clientIpFrom, isHoneypotFilled, overLimit } from "@/lib/abuseGuard";
 import { headers } from "next/headers";
-import { isAgencyAdmin, requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
+import { isAgencyAdmin, requireActiveAccount, requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
 import { generateSalesDiagnosis as runSalesDiagnosis, type SalesDiagnosis } from "@/lib/diagnosis";
@@ -91,6 +93,11 @@ function slugify(name: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
+}
+
+/** The random tail of a business slug (from the OS random source, not Math.random). */
+function randomSuffix(): string {
+  return crypto.randomBytes(4).toString("hex").slice(0, 6);
 }
 
 /**
@@ -139,9 +146,8 @@ export async function registerBusiness(
   if (!name || !email || !phone || !password) {
     return { error: "Completa todos los campos" };
   }
-  if (password.length < 8) {
-    return { error: "La contraseña debe tener al menos 8 caracteres" };
-  }
+  const registerProblem = passwordProblem(password);
+  if (registerProblem) return { error: registerProblem };
   const ip = clientIpFrom(await headers());
   if (await overLimit(`register:${ip}`, REGISTER_MAX_PER_IP, REGISTER_WINDOW_MS)) {
     return { error: "Se crearon demasiadas cuentas desde tu conexión. Espera una hora o escríbenos por WhatsApp." };
@@ -164,7 +170,7 @@ export async function registerBusiness(
     const business = await tx.business.create({
       data: {
         name,
-        slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
+        slug: `${slugify(name)}-${randomSuffix()}`,
         industry,
         agent: { create: { systemPrompt: "" } },
       },
@@ -270,7 +276,7 @@ export async function createClientAccount(
     return { error: "Ya existe una cuenta con ese correo", success: null };
   }
 
-  const newPassword = crypto.randomBytes(6).toString("base64url");
+  const newPassword = crypto.randomBytes(9).toString("base64url");
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   // Same auto-grant as registerBusiness, so the agency's shared inbox also
@@ -282,7 +288,7 @@ export async function createClientAccount(
     const business = await tx.business.create({
       data: {
         name: businessName,
-        slug: `${slugify(businessName)}-${Math.random().toString(36).slice(2, 7)}`,
+        slug: `${slugify(businessName)}-${randomSuffix()}`,
         industry,
         agent: { create: { systemPrompt: "" } },
       },
@@ -355,12 +361,20 @@ export async function createBusiness(formData: FormData): Promise<void> {
     );
   }
 
+  // The Phone Number ID is not a secret and routes the WhatsApp webhook, so it
+  // is only saved once Meta confirms this token can use it: otherwise anyone
+  // could claim someone else's number and receive their customers' messages.
+  const ownership = await verifyWabaConnection({ phoneNumberId: wabaPhoneNumberId, accessToken: wabaAccessToken });
+  if (!ownership.ok) {
+    throw new Error(`No pudimos confirmar ese número con Meta: ${ownership.error}`);
+  }
+
   let business;
   try {
     business = await prisma.business.create({
       data: {
         name,
-        slug: `${slugify(name)}-${Math.random().toString(36).slice(2, 7)}`,
+        slug: `${slugify(name)}-${randomSuffix()}`,
         wabaPhoneNumberId,
         wabaAccessToken: encryptSecret(wabaAccessToken),
         industry,
@@ -420,6 +434,22 @@ export async function updateWabaCredentials(
     throw new Error("Missing required fields");
   }
 
+  // Changing to a different number: Meta must confirm the token can use it
+  // BEFORE anything is saved. Saving first would let anyone claim another
+  // business's (non-secret) Phone Number ID and receive its customers' messages.
+  const current = await prisma.business.findUnique({ where: { id: businessId }, select: { wabaPhoneNumberId: true, wabaAccessToken: true } });
+  let preVerification: Awaited<ReturnType<typeof verifyWabaConnection>> | null = null;
+  if (current?.wabaPhoneNumberId !== wabaPhoneNumberId) {
+    const tokenForNumber = wabaAccessToken || (current?.wabaAccessToken ? decryptSecret(current.wabaAccessToken) : "");
+    if (!tokenForNumber) {
+      return { verified: false, verifyError: "Pega el token de acceso que te dio Meta para confirmar este número." };
+    }
+    preVerification = await verifyWabaConnection({ phoneNumberId: wabaPhoneNumberId, accessToken: tokenForNumber });
+    if (!preVerification.ok) {
+      return { verified: false, verifyError: preVerification.error };
+    }
+  }
+
   // The token field is optional here: it only needs to be filled in when the
   // previous one expired. An empty submission just keeps the stored token.
   // wabaId is optional too — only needed to create WhatsApp message
@@ -466,7 +496,7 @@ export async function updateWabaCredentials(
     }
     tokenToVerify = decryptSecret(stored.wabaAccessToken);
   }
-  const verification = await verifyWabaConnection({ phoneNumberId: wabaPhoneNumberId, accessToken: tokenToVerify });
+  const verification = preVerification ?? (await verifyWabaConnection({ phoneNumberId: wabaPhoneNumberId, accessToken: tokenToVerify }));
 
   if (!verification.ok) {
     return { verified: false, verifyError: verification.error };
@@ -1133,6 +1163,7 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
+  await requireActiveAccount(session.user.id, businessId);
 
   const stageIdRaw = String(formData.get("stageId") ?? "");
   const stageId = stageIdRaw && stageIdRaw !== "all" ? stageIdRaw : null;
@@ -1750,6 +1781,7 @@ export async function generateSalesDiagnosis(businessId: string): Promise<SalesD
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
+  await requireActiveAccount(session.user.id, businessId);
 
   let result;
   try {
@@ -1990,7 +2022,8 @@ export async function resetPassword(
   const password = String(formData.get("password") ?? "");
 
   if (!token) return { error: "Enlace inválido. Solicita uno nuevo." };
-  if (password.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres" };
+  const resetProblem = passwordProblem(password);
+  if (resetProblem) return { error: resetProblem };
 
   const resetTokenHash = crypto.createHash("sha256").update(token).digest("hex");
   const user = await prisma.user.findFirst({
@@ -2070,9 +2103,8 @@ export async function changeOwnPassword(
   const newPassword = String(formData.get("newPassword") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-  if (newPassword.length < 8) {
-    return { error: "La nueva contraseña debe tener al menos 8 caracteres", saved: false };
-  }
+  const changeProblem = passwordProblem(newPassword);
+  if (changeProblem) return { error: changeProblem, saved: false };
   if (newPassword !== confirmPassword) {
     return { error: "Las contraseñas no coinciden", saved: false };
   }
@@ -2114,14 +2146,17 @@ export async function adminResetUserPassword(targetUserId: string): Promise<{ pa
     })
   ).map((m) => m.businessId);
 
-  const callerIsAdmin = await prisma.membership.findFirst({
+  // The caller must manage EVERY business the person owns: being ADMIN on one
+  // of them must not be enough to take over the account (and so their other
+  // businesses too).
+  const adminOn = await prisma.membership.count({
     where: { userId: session.user.id, role: "ADMIN", businessId: { in: targetOwnerBusinessIds } },
   });
-  if (!callerIsAdmin) {
+  if (targetOwnerBusinessIds.length === 0 || adminOn !== targetOwnerBusinessIds.length) {
     throw new Error("Only the agency can reset a client's password");
   }
 
-  const newPassword = crypto.randomBytes(6).toString("base64url");
+  const newPassword = crypto.randomBytes(9).toString("base64url");
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   await prisma.user.update({
@@ -2324,6 +2359,7 @@ export async function regenerateWebsitePage(
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
+  await requireActiveAccount(session.user.id, businessId);
   await assertWebsiteGenerationAllowed(businessId);
 
   // Same safety net as createWebsitePage above — see its comment.
@@ -2481,28 +2517,27 @@ export async function updateWebsiteCustomDomain(
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
 
-  const customDomain = String(formData.get("customDomain") ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/\/$/, "");
-
-  if (customDomain && customDomain.split(".").length < 3) {
-    return {
-      ok: false,
-      error: "Pide un subdominio, no el dominio completo solo — ej: pagina.tunegocio.com, no tunegocio.com.",
-    };
-  }
+  const domainCheck = checkCustomDomain(String(formData.get("customDomain") ?? ""));
+  if (!domainCheck.ok) return { ok: false, error: domainCheck.error };
+  const customDomain = domainCheck.domain;
 
   const before = await prisma.website.findUniqueOrThrow({
     where: { id: websiteId, businessId },
     select: { name: true, customDomain: true },
   });
 
-  await prisma.website.update({
-    where: { id: websiteId, businessId },
-    data: { customDomain: customDomain || null },
-  });
+  try {
+    await prisma.website.update({
+      where: { id: websiteId, businessId },
+      data: { customDomain: customDomain || null },
+    });
+  } catch (err) {
+    // customDomain is @unique: it can only point at one page.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return { ok: false, error: "Ese dominio ya está en uso en otra página de la plataforma. Si es tuyo, escríbenos y lo revisamos." };
+    }
+    throw err;
+  }
 
   // Notifies whoever has access to this business (the agency included, same
   // as any other notification here) that a manual step is waiting — the DNS
@@ -2623,14 +2658,21 @@ export async function updateAgendaConfig(
 
   const notificationEmail = input.notificationEmail.trim();
   if (!notificationEmail) throw new Error("Falta el correo de notificaciones");
+  if (!EMAIL_SHAPE.test(notificationEmail) || notificationEmail.length > 254) throw new Error("El correo de notificaciones no es válido");
+  const timezone = input.timezone;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: timezone });
+  } catch {
+    throw new Error("La zona horaria no es válida");
+  }
   const availability = AvailabilitySchema.parse(input.availability);
   const slotMinutes = Math.max(5, Math.min(240, Math.round(input.slotMinutes) || 30));
   const primaryColor = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/.test(input.primaryColor) ? input.primaryColor : "#1f6feb";
 
   await prisma.agendaConfig.upsert({
     where: { websiteId },
-    create: { websiteId, notificationEmail, timezone: input.timezone, slotMinutes, availability, primaryColor },
-    update: { notificationEmail, timezone: input.timezone, slotMinutes, availability, primaryColor },
+    create: { websiteId, notificationEmail, timezone, slotMinutes, availability, primaryColor },
+    update: { notificationEmail, timezone, slotMinutes, availability, primaryColor },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website/${websiteId}`);
@@ -2824,7 +2866,8 @@ export async function inviteTeamMember(businessId: string, formData: FormData): 
     return { status: "existing_user_added", email };
   }
 
-  if (password.length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres");
+  const inviteProblem = passwordProblem(password);
+  if (inviteProblem) throw new Error(inviteProblem);
 
   const passwordHash = await bcrypt.hash(password, 12);
 
@@ -2995,6 +3038,7 @@ export async function websiteCreationChat(
     const session = await auth();
     if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
     await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
 
     const key = `website-chat:${businessId}`;
     if (await isRateLimited(key, 80, 24 * 60 * 60 * 1000)) {
@@ -3032,6 +3076,7 @@ export async function createWebsitePageV2(
     const session = await auth();
     if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
     await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
     await assertWebsiteGenerationAllowed(businessId);
 
     if (input.whatsappNumber?.trim()) {
@@ -3132,6 +3177,7 @@ export async function regenerateWebsitePageV2(businessId: string, websiteId: str
     const session = await auth();
     if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
     await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
     await assertWebsiteGenerationAllowed(businessId);
 
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });

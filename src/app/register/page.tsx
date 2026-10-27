@@ -136,10 +136,10 @@ export default function RegisterPage() {
             name="password"
             type="password"
             required
-            minLength={8}
+            minLength={10}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
           />
-          <p className="text-xs text-ink-muted">Mínimo 8 caracteres.</p>
+          <p className="text-xs text-ink-muted">Mínimo 10 caracteres.</p>
         </div>
 
         {state.error === "EMAIL_TAKEN" ? (

@@ -622,7 +622,7 @@ async function generateAndSendReply(ctx: ReplyContext, modelOverride?: string): 
   }
 
   try {
-    const toolMedia = sendMediaId ? await prisma.agentMedia.findUnique({ where: { id: sendMediaId } }) : null;
+    const toolMedia = sendMediaId ? await prisma.agentMedia.findFirst({ where: { id: sendMediaId, businessId: business.id } }) : null;
 
     // Only when the customer actually spoke (voice note in) and the AI isn't
     // already sending a file via the send_media tool — a reply never carries

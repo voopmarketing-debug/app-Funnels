@@ -36,14 +36,18 @@ export async function registerBroadcastClick(broadcastId: string, conversationId
   if (!conversation) return broadcast.ctaUrl;
 
   try {
-    await prisma.$transaction([
-      prisma.broadcastClick.upsert({
-        where: { broadcastId_conversationId: { broadcastId, conversationId } },
-        update: {},
-        create: { broadcastId, conversationId },
-      }),
-      prisma.broadcast.update({ where: { id: broadcastId }, data: { clickCount: { increment: 1 } } }),
-    ]);
+    // Count a contact's click once: opening the link again (or anyone replaying
+    // the address) must not inflate the number.
+    const already = await prisma.broadcastClick.findUnique({
+      where: { broadcastId_conversationId: { broadcastId, conversationId } },
+      select: { id: true },
+    });
+    if (!already) {
+      await prisma.$transaction([
+        prisma.broadcastClick.create({ data: { broadcastId, conversationId } }),
+        prisma.broadcast.update({ where: { id: broadcastId }, data: { clickCount: { increment: 1 } } }),
+      ]);
+    }
   } catch (err) {
     // Best-effort — a logging failure should never block the redirect the
     // visitor is actually waiting on.

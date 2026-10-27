@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { del, head, put } from "@vercel/blob";
-import { MAX_ATTACHMENT_BYTES, maxMbFor, resolveMediaType, type MediaType } from "@/lib/attachmentLimits";
+import { MAX_ATTACHMENT_BYTES, isAllowedUploadType, maxMbFor, resolveMediaType, type MediaType } from "@/lib/attachmentLimits";
 
 export { MAX_ATTACHMENT_BYTES, maxMbFor, resolveMediaType, type MediaType } from "@/lib/attachmentLimits";
 
@@ -32,6 +32,9 @@ export async function uploadAttachment(params: {
   filename: string;
   contentType: string;
 }): Promise<{ url: string; size: number }> {
+  // The type comes from the browser: HTML, SVG, scripts and the like are not
+  // stored under the platform's public address.
+  if (!isAllowedUploadType(params.contentType)) throw new Error("Ese tipo de archivo no está permitido. Usa una imagen, audio, video, PDF o un documento de Office.");
   const key = `attachments/${randomUUID()}-${sanitizeFilename(params.filename)}`;
   const blob = await put(key, params.bytes, {
     access: "public",

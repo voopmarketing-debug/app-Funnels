@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
-import { requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
+import { requireActiveAccount, requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { friendlyMetaError, listAdAccounts, listPages } from "@/lib/metaSocial";
 import { isConversationId, sendReply, threadParticipantIds } from "@/lib/metaInbox";
 import { invalidateInboxCache } from "@/lib/inboxCache";
@@ -89,7 +89,13 @@ export type ContentDiagnosisResult =
 const DIAGNOSIS_COOLDOWN_MS = 10 * 60 * 1000;
 
 export async function generateContentDiagnosis(businessId: string): Promise<ContentDiagnosisResult> {
-  await requireBusinessMembership(await userId(), businessId);
+  const uid = await userId();
+  await requireBusinessMembership(uid, businessId);
+  try {
+    await requireActiveAccount(uid, businessId);
+  } catch (err) {
+    return { status: "error", message: err instanceof Error ? err.message : "Tu cuenta no puede usar esta función ahora." };
+  }
   const connection = await prisma.socialConnection.findUnique({ where: { businessId }, select: { contentDiagnosisAt: true } });
   if (!connection) return { status: "error", message: "Conecta tus redes primero." };
   if (connection.contentDiagnosisAt && Date.now() - connection.contentDiagnosisAt.getTime() < DIAGNOSIS_COOLDOWN_MS) {

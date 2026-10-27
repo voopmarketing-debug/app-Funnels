@@ -9,7 +9,8 @@ import { resolveClickTarget } from "@/lib/websiteRender";
 // be used as an open redirect.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const label = req.nextUrl.searchParams.get("label") ?? "unknown";
+  // Anyone can open this address: keep the stored label short.
+  const label = (req.nextUrl.searchParams.get("label") ?? "unknown").slice(0, 80);
   // See the matching comment in ../route.ts — set only when this click came
   // from the dashboard's own "Vista previa" iframe, not a real visitor.
   const preview = req.nextUrl.searchParams.get("preview") === "1";

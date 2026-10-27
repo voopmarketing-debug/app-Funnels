@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { auth } from "@/auth";
 import { requireBusinessMembership } from "@/lib/authz";
-import { MAX_ATTACHMENT_BYTES } from "@/lib/attachmentLimits";
+import { ALLOWED_UPLOAD_TYPES, MAX_ATTACHMENT_BYTES } from "@/lib/attachmentLimits";
+
+class UploadDenied extends Error {}
 
 // Issues short-lived tokens so the chat composer can upload a file straight
 // from the browser to Vercel Blob. Server Actions (and Vercel functions in
@@ -26,22 +28,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         const session = await auth();
-        if (!session?.user?.id) throw new Error("Inicia sesión para enviar archivos");
+        if (!session?.user?.id) throw new UploadDenied("Inicia sesión para enviar archivos");
         let businessId: unknown;
         try {
           businessId = (JSON.parse(clientPayload ?? "{}") as { businessId?: unknown }).businessId;
         } catch {
           businessId = undefined;
         }
-        if (typeof businessId !== "string" || !businessId) throw new Error("Falta el negocio");
+        if (typeof businessId !== "string" || !businessId) throw new UploadDenied("Falta el negocio");
         await requireBusinessMembership(session.user.id, businessId);
         // chat/: chat attachments; products/: product photos (see ProductManager).
         if (!pathname.startsWith(`chat/${businessId}/`) && !pathname.startsWith(`products/${businessId}/`)) {
-          throw new Error("Ruta de archivo no permitida");
+          throw new UploadDenied("Ruta de archivo no permitida");
         }
 
         return {
-          allowedContentTypes: ["image/*", "audio/*", "video/*", "application/*", "text/*"],
+          allowedContentTypes: ALLOWED_UPLOAD_TYPES,
           maximumSizeInBytes: Math.max(...Object.values(MAX_ATTACHMENT_BYTES)),
           addRandomSuffix: true,
           validUntil: Date.now() + 10 * 60 * 1000,
@@ -50,6 +52,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
     return NextResponse.json(result);
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "No se pudo autorizar la subida" }, { status: 400 });
+    // Only the reasons written above reach the browser; anything else (a
+    // database or storage error) is logged and answered generically.
+    if (!(err instanceof UploadDenied)) console.error("attachments/upload failed:", err);
+    return NextResponse.json({ error: err instanceof UploadDenied ? err.message : "No se pudo autorizar la subida" }, { status: 400 });
   }
 }

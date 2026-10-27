@@ -5,9 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { cache } from "react";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { maskEmail } from "@/lib/logPrivacy";
+import { clientIpFrom } from "@/lib/abuseGuard";
 
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+// Failed sign-ins from one IP across all emails (password spraying, credential
+// stuffing): generous enough for an office behind one address.
+const LOGIN_MAX_ATTEMPTS_PER_IP = 25;
 
 // Compared against when the email doesn't exist, so a wrong email takes as
 // long as a wrong password and response times don't reveal which emails
@@ -32,13 +36,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      authorize: async (credentials) => {
+      authorize: async (credentials, request) => {
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
 
         const rateLimitKey = `login:${email.toLowerCase()}`;
-        if (await isRateLimited(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS)) {
+        const ipKey = `login-ip:${clientIpFrom(request.headers)}`;
+        if ((await isRateLimited(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS)) || (await isRateLimited(ipKey, LOGIN_MAX_ATTEMPTS_PER_IP, LOGIN_WINDOW_MS))) {
           console.warn("authentication_failed", { email: maskEmail(email), reason: "rate_limited" });
           return null;
         }
@@ -47,6 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user) {
           await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
           await recordRateLimitEvent(rateLimitKey);
+          await recordRateLimitEvent(ipKey);
           console.warn("authentication_failed", { email: maskEmail(email), reason: "no_user" });
           return null;
         }
@@ -54,6 +60,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) {
           await recordRateLimitEvent(rateLimitKey);
+          await recordRateLimitEvent(ipKey);
           console.warn("authentication_failed", { email: maskEmail(email), reason: "bad_password" });
           return null;
         }
