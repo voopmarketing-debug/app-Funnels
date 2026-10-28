@@ -248,3 +248,79 @@ describe("inspectWabaToken / listWabaPhoneNumbers", () => {
     expect(await listWabaPhoneNumbers({ wabaId: "W1", accessToken: "tok" })).toEqual([]);
   });
 });
+
+describe("template sends and Meta errors", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("sends the body variables in order, cleaned up for Meta", async () => {
+    const fake = vi.fn(async () => new Response(JSON.stringify({ messages: [{ id: "wamid.T" }] }), { status: 200 }));
+    globalThis.fetch = fake as unknown as typeof fetch;
+    const { sendWhatsAppTemplateMessage } = await import("./whatsapp");
+    const res = await sendWhatsAppTemplateMessage({
+      phoneNumberId: "P1",
+      accessToken: "tok",
+      to: "573001234567",
+      templateName: "confirmacion_cita",
+      language: "es",
+      bodyParams: ["Ana", "lunes 2 de noviembre", "3:30 p. m.\n"],
+    });
+    expect(res.messageId).toBe("wamid.T");
+    const body = JSON.parse(String((fake.mock.calls as unknown as [string, RequestInit][])[0][1].body));
+    expect(body.template.components).toEqual([
+      { type: "body", parameters: [{ type: "text", text: "Ana" }, { type: "text", text: "lunes 2 de noviembre" }, { type: "text", text: "3:30 p. m." }] },
+    ]);
+  });
+
+  it("cleans template variables Meta would refuse", async () => {
+    const { sanitizeTemplateParam } = await import("./whatsapp");
+    expect(sanitizeTemplateParam("a\nb\t c")).toBe("a b c");
+    expect(sanitizeTemplateParam("   ")).toBe("-");
+  });
+
+  it("throws a classified error with Meta's code, without the token in it", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({ error: { message: "Error validating access token", code: 190 } }), { status: 401 })) as unknown as typeof fetch;
+    const { sendWhatsAppTextMessage } = await import("./whatsapp");
+    const { WhatsAppApiError } = await import("./whatsappErrors");
+    const err = await sendWhatsAppTextMessage({ phoneNumberId: "P1", accessToken: "SECRET-TOKEN", to: "573001234567", text: "hola" }).catch((e) => e);
+    expect(err).toBeInstanceOf(WhatsAppApiError);
+    expect(err.kind).toBe("TOKEN_INVALID");
+    expect(err.code).toBe(190);
+    expect(err.message).not.toContain("SECRET-TOKEN");
+    const logged = (console.error as unknown as { mock: { calls: unknown[][] } }).mock.calls.flat().join(" ");
+    expect(logged).not.toContain("SECRET-TOKEN");
+    expect(logged).toContain("TOKEN_INVALID");
+  });
+});
+
+describe("parseTemplateStatusUpdates", () => {
+  it("reads approvals and rejections for a WABA", async () => {
+    const { parseTemplateStatusUpdates } = await import("./whatsapp");
+    const payload = {
+      entry: [
+        {
+          id: "WABA1",
+          changes: [
+            { field: "message_template_status_update", value: { event: "APPROVED", message_template_name: "confirmacion_cita", message_template_language: "es", reason: "NONE" } },
+            { field: "message_template_status_update", value: { event: "REJECTED", message_template_name: "link_agendamiento", reason: "INVALID_FORMAT" } },
+            { field: "messages", value: { messages: [] } },
+          ],
+        },
+      ],
+    };
+    expect(parseTemplateStatusUpdates(payload)).toEqual([
+      { wabaId: "WABA1", name: "confirmacion_cita", language: "es", event: "APPROVED", reason: undefined },
+      { wabaId: "WABA1", name: "link_agendamiento", language: undefined, event: "REJECTED", reason: "INVALID_FORMAT" },
+    ]);
+  });
+
+  it("ignores junk without throwing", async () => {
+    const { parseTemplateStatusUpdates } = await import("./whatsapp");
+    expect(parseTemplateStatusUpdates(null)).toEqual([]);
+    expect(parseTemplateStatusUpdates({ entry: [{ changes: [{ field: "message_template_status_update", value: {} }] }] })).toEqual([]);
+  });
+});

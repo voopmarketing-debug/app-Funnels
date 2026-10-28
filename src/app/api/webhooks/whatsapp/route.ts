@@ -5,6 +5,7 @@ import {
   countInboundMessages,
   parseInboundMessages,
   parseStatusUpdates,
+  parseTemplateStatusUpdates,
   phoneNumberIdsInPayload,
   verifyWebhookSignature,
 } from "@/lib/whatsapp";
@@ -13,6 +14,7 @@ import { formatPhone } from "@/lib/contactDisplay";
 import { prisma } from "@/lib/prisma";
 import { handleIncomingMessage } from "@/lib/agent";
 import { applyDeliveryStatus } from "@/lib/deliveryTracking";
+import { applyTemplateStatusUpdate } from "@/lib/templateStatusUpdates";
 import { safeEqual } from "@/lib/crypto";
 
 // One-time handshake Meta performs when you save the webhook URL in the App Dashboard.
@@ -54,7 +56,9 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Invalid signature", { status: 401 });
   }
 
-  const payload: unknown = JSON.parse(rawBody);
+  const payload: unknown = safeJsonParse(rawBody);
+  // Signed but not JSON: nothing to process, and an error would only make Meta retry it.
+  if (payload === null) return NextResponse.json({ received: true });
   const messages = parseInboundMessages(payload);
   const phoneNumberIds = phoneNumberIdsInPayload(payload);
   // "Meta is delivering to us" heartbeat for the health panel.
@@ -74,6 +78,8 @@ export async function POST(req: NextRequest) {
   // arrives in the same payload shape as inbound messages, just under
   // "statuses" instead of "messages" — see lib/deliveryTracking.ts.
   const statusUpdates = parseStatusUpdates(payload);
+  // Template approvals / rejections / pauses ("message_template_status_update").
+  const templateUpdates = parseTemplateStatusUpdates(payload);
 
   // Meta requires a fast 200 response; process messages after acknowledging
   // would be ideal with a queue, but for MVP volume we await them inline.
@@ -91,6 +97,7 @@ export async function POST(req: NextRequest) {
       }),
     ),
     ...statusUpdates.map(applyDeliveryStatus),
+    ...templateUpdates.map(applyTemplateStatusUpdate),
   ]);
   for (const result of results) {
     if (result.status === "rejected") {

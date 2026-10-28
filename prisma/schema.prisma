@@ -344,6 +344,8 @@ model Conversation {
   // lib/agendaReminders.ts). Comparing against the current appointmentAt
   // means a rescheduled appointment gets its own reminder.
   appointmentReminderFor DateTime?
+  // Same idea for the "day before" reminder (lib/appointmentDayBefore.ts).
+  appointmentDayBeforeFor DateTime?
 
   business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   stage           PipelineStage    @relation(fields: [stageId], references: [id])
@@ -634,6 +636,10 @@ model Appointment {
   // gone out — see lib/agendaReminders.ts. Null means not sent yet, the only
   // state the reminder cron's WHERE clause looks for; never cleared once set.
   reminderSentAt DateTime?
+
+  // Set once the "day before" WhatsApp reminder went out (lib/appointmentDayBefore.ts).
+  // Independent of reminderSentAt: a booking gets both.
+  dayBeforeReminderSentAt DateTime?
 
   website      Website       @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   professional Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)

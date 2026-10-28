@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/metric-alerts",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/appointment-day-before",
+      "schedule": "0 21 * * *"
     }
   ]
 }

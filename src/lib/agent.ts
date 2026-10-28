@@ -1,3 +1,4 @@
+import { reportWhatsAppSendFailure } from "@/lib/whatsappAlerts";
 import { prisma } from "@/lib/prisma";
 import { sendPushToBusiness } from "@/lib/push";
 import { MAX_CATALOG_PRODUCTS } from "@/lib/inventory";
@@ -707,6 +708,7 @@ async function generateAndSendReply(ctx: ReplyContext, modelOverride?: string): 
     // Tagged so we know it happened during the WhatsApp send, not the
     // Claude call above.
     await logInternalError(conversation.id, "WHATSAPP", err);
+    await reportWhatsAppSendFailure(err, { businessId: business.id, context: "respuesta del agente" });
     throw err;
   }
 }

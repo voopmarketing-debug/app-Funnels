@@ -1,6 +1,7 @@
 import { metaButton, type TemplateButton } from "@/lib/templateButtons";
 import { isBsuid } from "@/lib/contactDisplay";
 import { createHmac, timingSafeEqual } from "crypto";
+import { WhatsAppApiError, parseMetaErrorCodes } from "@/lib/whatsappErrors";
 
 const GRAPH_API_VERSION = "v21.0";
 
@@ -48,6 +49,7 @@ async function postMessage(params: {
     : [{ to: params.to }];
 
   let lastError = "WhatsApp API did not return a message id";
+  let lastInfo: { httpStatus?: number; code?: number; subcode?: number } = {};
   for (const addressing of addressings) {
     for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
       let response: Response;
@@ -70,12 +72,17 @@ async function postMessage(params: {
         return { messageId };
       }
 
-      lastError = parseMetaErrorMessage(response.status, await response.text());
+      const rawBody = await response.text();
+      lastError = parseMetaErrorMessage(response.status, rawBody);
+      lastInfo = { httpStatus: response.status, ...parseMetaErrorCodes(rawBody) };
       if (!RETRYABLE_STATUS.has(response.status)) break; // try the next addressing (BSUID) or give up
       if (attempt < RETRY_DELAYS_MS.length) await sleep(RETRY_DELAYS_MS[attempt]);
     }
   }
-  throw new Error(lastError);
+  const error = new WhatsAppApiError(lastError, lastInfo);
+  // Never the token, the message text or the recipient: only what is needed to see why it failed.
+  console.error(`[whatsapp] send failed: kind=${error.kind} code=${error.code ?? "-"} subcode=${error.subcode ?? "-"} http=${error.httpStatus ?? "-"} phoneNumberId=${params.phoneNumberId}`);
+  throw error;
 }
 
 export async function sendWhatsAppTextMessage(params: {
@@ -499,6 +506,15 @@ export async function fetchWhatsAppTemplateStatus(params: {
   return { status: entry.status, rejectionReason: entry.rejected_reason ?? null };
 }
 
+/**
+ * A {{variable}} value Meta will accept: no line breaks, tabs or runs of four
+ * spaces, not empty, and short. Meta refuses the whole send otherwise (132012).
+ */
+export function sanitizeTemplateParam(value: string): string {
+  const clean = value.replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ").trim().slice(0, 1000);
+  return clean || "-";
+}
+
 /** Sends an approved template message — the only way to message a customer outside Meta's 24h free-form window. */
 export async function sendWhatsAppTemplateMessage(params: {
   phoneNumberId: string;
@@ -511,12 +527,17 @@ export async function sendWhatsAppTemplateMessage(params: {
   // Static URL buttons need nothing here: Meta already has the button's
   // fixed url baked into the approved template.
   headerImageUrl?: string;
+  // Values for the body's {{1}}, {{2}}… in order. The count must match the
+  // approved template exactly (Meta answers 132000 otherwise).
+  bodyParams?: string[];
 }): Promise<{ messageId: string }> {
-  const { phoneNumberId, accessToken, to, templateName, language, headerImageUrl } = params;
+  const { phoneNumberId, accessToken, to, templateName, language, headerImageUrl, bodyParams } = params;
 
-  const components = headerImageUrl
-    ? [{ type: "header", parameters: [{ type: "image", image: { link: headerImageUrl } }] }]
-    : undefined;
+  const components: Record<string, unknown>[] = [];
+  if (headerImageUrl) components.push({ type: "header", parameters: [{ type: "image", image: { link: headerImageUrl } }] });
+  if (bodyParams && bodyParams.length > 0) {
+    components.push({ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text: sanitizeTemplateParam(text) })) });
+  }
 
   return postMessage({
     phoneNumberId,
@@ -524,7 +545,7 @@ export async function sendWhatsAppTemplateMessage(params: {
     to,
     message: {
       type: "template",
-      template: { name: templateName, language: { code: language }, ...(components ? { components } : {}) },
+      template: { name: templateName, language: { code: language }, ...(components.length > 0 ? { components } : {}) },
     },
   });
 }
@@ -766,6 +787,47 @@ export function parseStatusUpdates(payload: unknown): WhatsAppStatusUpdate[] {
     }
   }
 
+  return updates;
+}
+
+export type WhatsAppTemplateStatusUpdate = {
+  /** The WhatsApp Business Account the template belongs to (the entry id). */
+  wabaId: string;
+  name: string;
+  language: string | undefined;
+  /** Meta's event: APPROVED, REJECTED, PENDING, PAUSED, DISABLED, FLAGGED, IN_APPEAL, REINSTATED… */
+  event: string;
+  reason: string | undefined;
+};
+
+/**
+ * "message_template_status_update" webhooks: Meta tells us a template was
+ * approved, rejected, paused or disabled, so the Plantillas list stays right
+ * without anyone pressing "Revisar estado".
+ */
+export function parseTemplateStatusUpdates(payload: unknown): WhatsAppTemplateStatusUpdate[] {
+  const updates: WhatsAppTemplateStatusUpdate[] = [];
+  const entries = isRecord(payload) && Array.isArray(payload.entry) ? payload.entry : [];
+  for (const entry of entries) {
+    if (!isRecord(entry)) continue;
+    const wabaId = typeof entry.id === "string" ? entry.id : typeof entry.id === "number" ? String(entry.id) : undefined;
+    const changes = Array.isArray(entry.changes) ? entry.changes : [];
+    for (const change of changes) {
+      if (!isRecord(change) || change.field !== "message_template_status_update") continue;
+      const value = change.value;
+      if (!isRecord(value) || !wabaId) continue;
+      const name = typeof value.message_template_name === "string" ? value.message_template_name : undefined;
+      const event = typeof value.event === "string" ? value.event.toUpperCase() : undefined;
+      if (!name || !event) continue;
+      updates.push({
+        wabaId,
+        name,
+        language: typeof value.message_template_language === "string" ? value.message_template_language : undefined,
+        event,
+        reason: typeof value.reason === "string" && value.reason && value.reason !== "NONE" ? value.reason : undefined,
+      });
+    }
+  }
   return updates;
 }
 

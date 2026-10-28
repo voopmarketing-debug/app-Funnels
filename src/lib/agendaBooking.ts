@@ -3,6 +3,7 @@ import { formatDateLabel } from "@/lib/agendaTemplate";
 import { sendEmail } from "@/lib/email";
 import { buildIcsEvent } from "@/lib/ics";
 import { upsertLeadConversation } from "@/lib/crmIntake";
+import { sendBookingConfirmation } from "@/lib/appointmentConfirmation";
 
 // The name/contact/email fields below come straight from a public,
 // unauthenticated form — interpolated raw into an HTML email body, they'd
@@ -90,6 +91,12 @@ export async function submitAgendaBooking(params: {
     appointmentNote: `Agendó desde la página — ${dateLabel} a las ${timeStr}${professionalNote}`,
     pipelineId: assignedProfessional?.pipelineId ?? undefined,
   });
+
+  // WhatsApp confirmation (free text inside the 24 h window, the approved
+  // "confirmacion_cita" template outside it). After the lead's conversation
+  // exists, so the sent message is recorded in it. Never throws; the wait is
+  // bounded so a slow Meta can't hold up the booking page.
+  await Promise.race([sendBookingConfirmation(result.appointmentId), new Promise<void>((resolve) => setTimeout(resolve, 6000))]);
 
   // Attached to every notification below so the appointment lands straight
   // on the recipient's own calendar app (Google Calendar, Outlook, Apple
