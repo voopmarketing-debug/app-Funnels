@@ -6,6 +6,11 @@ describe("parseSignupMessage", () => {
     const raw = JSON.stringify({ type: "WA_EMBEDDED_SIGNUP", event: "FINISH", data: { phone_number_id: "P1", waba_id: "W1", business_id: "B1" } });
     expect(parseSignupMessage(raw)).toEqual({ event: "FINISH", phoneNumberId: "P1", wabaId: "W1" });
   });
+  it("reads the v4 finish events that carry both IDs, and ignores one without a number", () => {
+    const withNumber = { type: "WA_EMBEDDED_SIGNUP", event: "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING", data: { phone_number_id: "P2", waba_id: "W2" } };
+    expect(parseSignupMessage(JSON.stringify(withNumber))).toEqual({ event: "FINISH", phoneNumberId: "P2", wabaId: "W2" });
+    expect(parseSignupMessage(JSON.stringify({ type: "WA_EMBEDDED_SIGNUP", event: "FINISH_ONLY_WABA", data: { waba_id: "W3" } }))).toBeNull();
+  });
   it("reports a cancel and ignores unrelated messages", () => {
     expect(parseSignupMessage({ type: "WA_EMBEDDED_SIGNUP", event: "CANCEL", data: {} })).toEqual({ event: "CANCEL" });
     expect(parseSignupMessage("not json")).toBeNull();
@@ -48,25 +53,37 @@ describe("exchangeSignupCode / registerPhoneNumber", () => {
     expect(String(calls[0][0])).not.toContain("redirect_uri");
     expect(String(calls[1][0])).toContain("redirect_uri=");
   });
-  it("tries the page the button was pressed on first, fragment included", async () => {
+  it("trades the code with no redirect_uri first, as Meta's v4 guide does", async () => {
     const fake = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOK" }), { status: 200 }));
     globalThis.fetch = fake as unknown as typeof fetch;
     await exchangeSignupCode("CODE", "https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
-    const first = decodeURIComponent(String((fake.mock.calls as unknown as unknown[][])[0][0]));
-    expect(first).toContain("redirect_uri=https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
+    const first = String((fake.mock.calls as unknown as unknown[][])[0][0]);
+    expect(first).not.toContain("redirect_uri");
+    expect(first).toContain("/v26.0/oauth/access_token");
+  });
+  it("then tries the page the button was pressed on, fragment included", async () => {
+    const mismatch = "Error validating verification code. Please make sure your redirect_uri is identical to the one you used in the OAuth dialog request";
+    const fake = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: mismatch } }), { status: 400 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOK" }), { status: 200 }));
+    globalThis.fetch = fake as unknown as typeof fetch;
+    await exchangeSignupCode("CODE", "https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
+    const second = decodeURIComponent(String((fake.mock.calls as unknown as unknown[][])[1][0]));
+    expect(second).toContain("redirect_uri=https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
   });
   it("keeps trying past a 'Can't load URL' refusal until one value is accepted", async () => {
     const cantLoad = "Can't load URL: The domain of this URL isn't included in the app's domains.";
+    const mismatch = "Error validating verification code. Please make sure your redirect_uri is identical";
     const fake = vi
       .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: mismatch } }), { status: 400 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: cantLoad } }), { status: 400 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Error validating verification code. Please make sure your redirect_uri is identical" } }), { status: 400 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "TOK" }), { status: 200 }));
     globalThis.fetch = fake as unknown as typeof fetch;
     const res = await exchangeSignupCode("CODE", "https://agente.funnelslabs.app/dashboard/businesses/b1#whatsapp");
     expect(res).toEqual({ ok: true, accessToken: "TOK" });
     const calls = fake.mock.calls as unknown as unknown[][];
-    expect(String(calls[1][0])).not.toContain("redirect_uri");
     expect(String(calls[2][0])).toContain("redirect_uri=");
   });
   it("only accepts a page address from this platform", () => {

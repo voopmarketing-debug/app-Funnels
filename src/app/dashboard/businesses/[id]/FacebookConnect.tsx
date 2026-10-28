@@ -18,7 +18,8 @@ declare global {
   }
 }
 
-const SDK_VERSION = "v21.0";
+// Meta's Embedded Signup v4 guide asks for the latest Graph version here; v2 and v3 were retired on 15 October 2026.
+const SDK_VERSION = "v26.0";
 
 function loadSdk(appId: string): Promise<FbSdk> {
   return new Promise((resolve, reject) => {
@@ -131,7 +132,8 @@ export function FacebookConnect({ businessId, appId, configId, connected }: { bu
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
-        extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
+        // Exactly what Meta's v4 guide uses: no "sessionInfoVersion" (that asked for the retired v3 flow).
+        extras: { setup: {} },
       },
     );
   }

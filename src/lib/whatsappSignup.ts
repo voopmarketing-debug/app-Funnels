@@ -6,6 +6,8 @@ import { randomInt } from "crypto";
 // steps that turn that into a working connection.
 
 const GRAPH = "https://graph.facebook.com/v21.0";
+// The window is opened with the SDK at this version (components/FacebookConnect), and the code is traded at the same one.
+const SIGNUP_GRAPH = "https://graph.facebook.com/v26.0";
 
 /**
  * The page address the browser reports, kept only when it belongs to this
@@ -24,20 +26,17 @@ export function ownPageUrl(raw: string | undefined): string | undefined {
 }
 
 /**
- * The window opened by Meta's JavaScript SDK has no redirect of its own, and
- * Meta checks the one sent when trading the code against the one used to open
- * it. Which value it accepts is not obvious, so each refusal about the
- * redirect is retried with the next candidate: the page the button was pressed
- * on (fragment included), none, empty, and the site. A refusal does not spend
- * the code (what the logs show is which candidate Meta accepted).
+ * Meta's v4 guide trades the code with no redirect_uri at all, so that goes
+ * first. Should Meta refuse it over the redirect, the next candidates are
+ * tried: the page the button was pressed on (fragment included), an empty
+ * value, and the site. A refusal does not spend the code, and the log says
+ * which candidate Meta accepted.
  */
 function redirectUriAttempts(pageUrl: string | undefined): { label: string; value: string | undefined }[] {
   const host = process.env.APP_HOST ?? "agente.funnelslabs.app";
-  const attempts: { label: string; value: string | undefined }[] = [];
-  // Meta's dialog reports the page it was opened from as "fallback_redirect_uri",
-  // fragment included; the code appears to be tied to that address.
+  const attempts: { label: string; value: string | undefined }[] = [{ label: "sin redirect_uri", value: undefined }];
   if (pageUrl) attempts.push({ label: "página del botón", value: pageUrl });
-  attempts.push({ label: "sin redirect_uri", value: undefined }, { label: "redirect_uri vacío", value: "" }, { label: "raíz del sitio", value: `https://${host}/` });
+  attempts.push({ label: "redirect_uri vacío", value: "" }, { label: "raíz del sitio", value: `https://${host}/` });
   return attempts;
 }
 
@@ -52,7 +51,7 @@ export async function exchangeSignupCode(code: string, pageUrl?: string): Promis
   if (!appId || !appSecret) return { ok: false, error: "Falta configurar la app de Meta en el servidor." };
   let lastMessage: string | null = null;
   for (const attempt of redirectUriAttempts(ownPageUrl(pageUrl))) {
-    const url = new URL(`${GRAPH}/oauth/access_token`);
+    const url = new URL(`${SIGNUP_GRAPH}/oauth/access_token`);
     url.searchParams.set("client_id", appId);
     url.searchParams.set("client_secret", appSecret);
     url.searchParams.set("code", code);
@@ -126,8 +125,7 @@ export function parseSignupMessage(raw: unknown): { event: "FINISH"; phoneNumber
   if (msg.event === "ERROR") return { event: "ERROR" };
   const phoneNumberId = msg.data?.phone_number_id;
   const wabaId = msg.data?.waba_id;
-  if (msg.event === "FINISH" || phoneNumberId) {
-    if (phoneNumberId && wabaId) return { event: "FINISH", phoneNumberId: String(phoneNumberId), wabaId: String(wabaId) };
-  }
+  // v4 reports FINISH, FINISH_ONLY_WABA, FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING…; only one with both ids can be connected.
+  if (phoneNumberId && wabaId) return { event: "FINISH", phoneNumberId: String(phoneNumberId), wabaId: String(wabaId) };
   return null;
 }
