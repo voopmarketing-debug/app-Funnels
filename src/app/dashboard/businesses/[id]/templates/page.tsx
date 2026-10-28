@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { readStoredButtons } from "@/lib/templateButtons";
 import { TemplateManager } from "./TemplateManager";
+import { AutoBookingLinkCard } from "./AutoBookingLinkCard";
 
 export default async function TemplatesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,7 +13,7 @@ export default async function TemplatesPage({ params }: { params: Promise<{ id: 
 
   const membership = await prisma.membership.findUnique({
     where: { userId_businessId: { userId: session.user.id, businessId: id } },
-    include: { business: { select: { name: true, wabaId: true } } },
+    include: { business: { select: { name: true, wabaId: true, autoBookingLinkEnabled: true } } },
   });
   if (!membership) notFound();
 
@@ -24,6 +25,9 @@ export default async function TemplatesPage({ params }: { params: Promise<{ id: 
     ...t,
     buttons: readStoredButtons(t.buttons),
   }));
+
+  const hasAgendaPage = (await prisma.website.count({ where: { businessId: id, pageType: "agenda" } })) > 0;
+  const templateReady = templateRows.some((t) => t.name === "link_agendamiento" && t.status === "APPROVED");
 
   return (
     <div className="space-y-6">
@@ -38,6 +42,14 @@ export default async function TemplatesPage({ params }: { params: Promise<{ id: 
           aprobada por Meta — la aprobación puede tardar desde minutos hasta 1-2 días, y no depende de nosotros.
         </p>
       </div>
+
+      <AutoBookingLinkCard
+        businessId={id}
+        enabled={membership.business.autoBookingLinkEnabled}
+        hasAgendaPage={hasAgendaPage}
+        templateReady={templateReady}
+        canChange={membership.role !== "MEMBER"}
+      />
 
       <TemplateManager businessId={id} templates={templates} hasWabaId={!!membership.business.wabaId} canDelete={membership.role !== "MEMBER"} />
     </div>

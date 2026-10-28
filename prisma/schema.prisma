@@ -84,6 +84,9 @@ model Business {
   broadcasts       Broadcast[]
   messageTemplates MessageTemplate[]
   websites         Website[]
+  // Off by default: the owner turns on the automatic booking-link follow-up
+  // (lib/bookingLinkFollowUp.ts) from the Plantillas page.
+  autoBookingLinkEnabled Boolean @default(false)
   agentMedia       AgentMedia[]
   sales            Sale[]
   products         Product[]
@@ -673,6 +676,10 @@ model WebsiteLead {
   contact   String
   message   String?
   createdAt DateTime @default(now())
+
+  // Set when the automatic "link_agendamiento" WhatsApp went out for this lead
+  // (lib/bookingLinkFollowUp.ts). One message per person, ever.
+  bookingLinkSentAt DateTime?
 
   website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 
