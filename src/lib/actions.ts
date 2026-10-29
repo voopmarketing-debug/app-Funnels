@@ -53,6 +53,8 @@ import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import { isValidEmail, normalizePhone } from "@/lib/phone";
 import { exchangeSignupCode, isValidPin, registerPhoneNumber } from "@/lib/whatsappSignup";
 import { checkExamples, checkTemplateVariables } from "@/lib/templateVariables";
+import { convertTags } from "@/lib/templateTags";
+import { agendaUrlForBusiness, templateBodyParams } from "@/lib/templateSending";
 import { resubscribeWhatsAppWebhook, runWhatsAppHealthCheck, type WhatsAppHealth } from "@/lib/whatsappHealth";
 import { MAX_IMPORT_ROWS, type ImportContactRow } from "@/lib/contactImport";
 import { AvailabilitySchema, DEFAULT_AVAILABILITY, type Availability } from "@/lib/agenda";
@@ -732,13 +734,23 @@ async function createMessageTemplateOrThrow(businessId: string, formData: FormDa
   const language = String(formData.get("language") ?? "es");
   const categoryRaw = String(formData.get("category") ?? "MARKETING");
   const category = TEMPLATE_CATEGORIES.has(categoryRaw) ? (categoryRaw as "MARKETING" | "UTILITY") : "MARKETING";
-  const bodyText = String(formData.get("bodyText") ?? "").trim();
+  const typedBody = String(formData.get("bodyText") ?? "").trim();
   const buttons = parseTemplateButtons(formData);
 
-  if (!name || !bodyText) throw new Error("El nombre y el texto de la plantilla son obligatorios");
+  if (!name || !typedBody) throw new Error("El nombre y el texto de la plantilla son obligatorios");
+  // Tags like [nombre del lead] become {{1}}, {{2}}… for Meta, with an example
+  // each; the tags are kept so every send can fill them with that person's data.
+  const converted = convertTags(typedBody);
+  const usesTags = converted.tags.length > 0;
+  if (usesTags && /\{\{|\}\}/.test(converted.body.replace(/\{\{\d+\}\}/g, ""))) {
+    throw new Error("No mezcles etiquetas como [nombre del lead] con variables {{1}} en el mismo mensaje.");
+  }
+  if (usesTags && /\{\{\d+\}\}/.test(typedBody)) throw new Error("No mezcles etiquetas como [nombre del lead] con variables {{1}} en el mismo mensaje.");
+  const bodyText = usesTags ? converted.body : typedBody;
+  const variableTags = usesTags ? converted.tags : null;
   const variablesProblem = checkTemplateVariables(bodyText);
   if (variablesProblem) throw new Error(variablesProblem);
-  const bodyExamples = parseBodyExamples(formData);
+  const bodyExamples = usesTags ? converted.examples : parseBodyExamples(formData);
   const examplesProblem = checkExamples(bodyText, bodyExamples);
   if (examplesProblem) throw new Error(examplesProblem);
 
@@ -816,6 +828,7 @@ async function createMessageTemplateOrThrow(businessId: string, formData: FormDa
       bodyText,
       headerImageUrl,
       buttons: buttons.length > 0 ? buttons : undefined,
+      variableTags: variableTags ?? undefined,
       metaTemplateId,
       status: status === "APPROVED" ? "APPROVED" : status === "REJECTED" ? "REJECTED" : "PENDING",
     },
@@ -1247,7 +1260,7 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
   // for the free-text path — a template's own image header (if any) is
   // carried on `template.headerImageUrl` instead.
   let message: string;
-  let template: { name: string; language: string; headerImageUrl?: string } | null = null;
+  let template: { name: string; language: string; headerImageUrl?: string; bodyText: string; variableTags: unknown } | null = null;
   let media: { url: string; type: "image" | "document"; filename?: string } | null = null;
   // Only offered on the free-text path — an approved template's body is
   // fixed by Meta, so a link can't be appended into it. See
@@ -1263,6 +1276,8 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
       name: approvedTemplate.name,
       language: approvedTemplate.language,
       headerImageUrl: approvedTemplate.headerImageUrl ?? undefined,
+      bodyText: approvedTemplate.bodyText,
+      variableTags: approvedTemplate.variableTags,
     };
   } else {
     message = String(formData.get("message") ?? "").trim();
@@ -1303,8 +1318,10 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
 
   const conversations = await prisma.conversation.findMany({
     where: { businessId, ...(selectedIds ? { id: { in: selectedIds } } : stageId ? { stageId } : {}) },
-    select: { id: true, customerPhone: true },
+    select: { id: true, customerPhone: true, customerName: true, appointmentAt: true },
   });
+  // Tags like [enlace de agenda] need the business's agenda link; looked up once for the whole send.
+  const agendaUrl = template ? await agendaUrlForBusiness(businessId) : null;
 
   const broadcastUsage = await getBroadcastUsage(businessId);
   const left = remaining(broadcastUsage);
@@ -1348,6 +1365,17 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
         const trackedLink = ctaUrl ? buildTrackedLink(broadcast.id, conv.id) : null;
         const textForRecipient = trackedLink ? `${message}\n\n${trackedLink}` : message;
 
+        // A template's tags are filled with this person's own data; someone
+        // missing a piece (a date they never booked) is reported, not sent a half message.
+        let filledBody = message;
+        let templateParams: string[] | undefined;
+        if (template) {
+          const filled = templateBodyParams(template, { name: conv.customerName, appointmentAt: conv.appointmentAt, agendaUrl, businessName: business.name });
+          if (!filled.ok) throw new Error(filled.error);
+          templateParams = filled.params;
+          filledBody = filled.filledBody;
+        }
+
         const { messageId } = template
           ? await sendWhatsAppTemplateMessage({
               phoneNumberId,
@@ -1356,6 +1384,7 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
               templateName: template.name,
               language: template.language,
               headerImageUrl: template.headerImageUrl,
+              bodyParams: templateParams,
             })
           : media
             ? await sendWhatsAppMediaMessage({
@@ -1372,7 +1401,7 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
           data: {
             conversationId: conv.id,
             role: "AGENT",
-            content: template ? message : textForRecipient,
+            content: template ? filledBody : textForRecipient,
             whatsappMsgId: messageId,
             sentByHuman: true,
             broadcastId: broadcast.id,
@@ -1812,6 +1841,14 @@ export async function sendTemplateMessage(
   const accessToken = decryptSecret(business.wabaAccessToken);
   const phoneNumberId = business.wabaPhoneNumberId;
 
+  const filled = templateBodyParams(template, {
+    name: conversation.customerName,
+    appointmentAt: conversation.appointmentAt,
+    agendaUrl: await agendaUrlForBusiness(businessId),
+    businessName: business.name,
+  });
+  if (!filled.ok) throw new Error(filled.error);
+
   const { messageId } = await sendWhatsAppTemplateMessage({
     phoneNumberId,
     accessToken,
@@ -1819,13 +1856,14 @@ export async function sendTemplateMessage(
     templateName: template.name,
     language: template.language,
     headerImageUrl: template.headerImageUrl ?? undefined,
+    bodyParams: filled.params,
   });
 
   await prisma.message.create({
     data: {
       conversationId,
       role: "AGENT",
-      content: template.bodyText,
+      content: filled.filledBody,
       whatsappMsgId: messageId,
       sentByHuman: true,
     },

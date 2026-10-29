@@ -3,6 +3,9 @@ import { decryptSecret } from "@/lib/crypto";
 import { fetchWhatsAppTemplateStatus, sendWhatsAppTemplateMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { reportWhatsAppSendFailure } from "@/lib/whatsappAlerts";
 import { whatsAppErrorKind, type WhatsAppErrorKind } from "@/lib/whatsappErrors";
+import { firstName, formatAppointmentWhen, readStoredTags, resolveTags, type TagContext, type TagKey } from "@/lib/templateTags";
+
+export { firstName, formatAppointmentWhen };
 
 // The three appointment messages and how each one is delivered. Inside
 // WhatsApp's 24-hour window the business can write freely; outside it Meta
@@ -29,21 +32,14 @@ export const APPOINTMENT_TEMPLATES: Record<AppointmentMessageKind, { name: strin
   link: { name: "link_agendamiento", language: "es", paramCount: 2 }, // {{1}} nombre, {{2}} URL del calendario
 };
 
-/** "lunes 2 de noviembre" and "3:30 pm", in the business's own time zone. */
-export function formatAppointmentWhen(startsAt: Date, timeZone: string): { date: string; time: string } {
-  // Intl uses a comma after the weekday and non-breaking spaces in the time; plain text reads better in a message.
-  const plain = (text: string) => text.replace(/[\u00a0\u202f]/g, " ").replace(",", "");
-  const date = new Intl.DateTimeFormat("es-CO", { weekday: "long", day: "numeric", month: "long", timeZone }).format(startsAt);
-  const time = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit", timeZone }).format(startsAt);
-  // "3:30 pm", not "3:30 p. m.": the dot would double up with the full stop that ends the sentence.
-  return { date: plain(date), time: plain(time).replace(/\s?([ap])\. ?m\./i, " $1m") };
-}
-
-export function firstName(name: string | null | undefined): string {
-  return name?.trim().split(/\s+/)[0] || "";
-}
-
 type Values = { name: string | null | undefined; date: string; time: string; url?: string };
+
+/** The tags the standard templates are written with, in {{N}} order. */
+const STANDARD_TAGS: Record<AppointmentMessageKind, TagKey[]> = {
+  confirmation: ["nombre", "fecha", "hora"],
+  reminder: ["nombre", "fecha", "hora"],
+  link: ["nombre", "enlace"],
+};
 
 /** The values in the order the templates number them. */
 function orderedValues(kind: AppointmentMessageKind, v: Values): string[] {
@@ -91,12 +87,12 @@ export type AppointmentSendResult =
   | { ok: false; reason: "NO_WHATSAPP" | "NEEDS_TEMPLATE" | "SEND_FAILED"; kind?: WhatsAppErrorKind; error?: string };
 
 /** The approved template to use: the business's own record, or (for one created straight in WhatsApp Manager) Meta's own answer. */
-async function findApprovedTemplate(business: SendBusiness, accessToken: string, kind: AppointmentMessageKind): Promise<{ name: string; language: string; bodyText: string | null } | null> {
+async function findApprovedTemplate(business: SendBusiness, accessToken: string, kind: AppointmentMessageKind): Promise<{ name: string; language: string; bodyText: string | null; variableTags: unknown } | null> {
   const spec = APPOINTMENT_TEMPLATES[kind];
   const stored = await prisma.messageTemplate.findFirst({
     where: { businessId: business.id, status: "APPROVED", name: spec.name },
     orderBy: { updatedAt: "desc" },
-    select: { name: true, language: true, bodyText: true },
+    select: { name: true, language: true, bodyText: true, variableTags: true },
   });
   if (stored) return stored;
   // Reminders also accept any approved template whose name starts with
@@ -105,14 +101,14 @@ async function findApprovedTemplate(business: SendBusiness, accessToken: string,
     const legacy = await prisma.messageTemplate.findFirst({
       where: { businessId: business.id, status: "APPROVED", name: { startsWith: "recordatorio" } },
       orderBy: { updatedAt: "desc" },
-      select: { name: true, language: true, bodyText: true },
+      select: { name: true, language: true, bodyText: true, variableTags: true },
     });
     if (legacy) return legacy;
   }
   if (!business.wabaId) return null;
   try {
     const remote = await fetchWhatsAppTemplateStatus({ wabaId: business.wabaId, accessToken, name: spec.name });
-    return remote?.status === "APPROVED" ? { name: spec.name, language: spec.language, bodyText: null } : null;
+    return remote?.status === "APPROVED" ? { name: spec.name, language: spec.language, bodyText: null, variableTags: null } : null;
   } catch {
     return null;
   }
@@ -151,6 +147,11 @@ export async function sendAppointmentMessage(params: {
     const template = await findApprovedTemplate(business, accessToken, kind);
     if (!template) return { ok: false, reason: "NEEDS_TEMPLATE" };
     const count = template.bodyText === null ? APPOINTMENT_TEMPLATES[kind].paramCount : countTemplateVariables(template.bodyText);
+    // A template written with tags says what each {{N}} is; one made elsewhere gets the standard order.
+    const tags = readStoredTags(template.variableTags) ?? STANDARD_TAGS[kind].slice(0, count);
+    const ctx: TagContext = { name: params.name, appointmentAt: kind === "link" ? null : startsAt, timeZone, agendaUrl: params.url ?? null, businessName: business.name };
+    const resolved = count > 0 ? resolveTags(tags, ctx) : null;
+    if (resolved && !resolved.ok) return { ok: false, reason: "SEND_FAILED", error: resolved.reason };
     try {
       const { messageId } = await sendWhatsAppTemplateMessage({
         phoneNumberId: business.wabaPhoneNumberId!,
@@ -158,7 +159,7 @@ export async function sendAppointmentMessage(params: {
         to,
         templateName: template.name,
         language: template.language,
-        bodyParams: count > 0 ? templateParams(kind, values, count) : undefined,
+        bodyParams: resolved && resolved.ok ? resolved.values : undefined,
       });
       return { ok: true, via: "template", messageId, text };
     } catch (err) {

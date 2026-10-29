@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { deleteMessageTemplate, refreshTemplateStatus } from "@/lib/actions";
 import { askConfirm } from "@/components/ConfirmHost";
 import type { TemplateButton } from "@/lib/templateButtons";
+import { bodyWithExamples, type TagKey } from "@/lib/templateTags";
 import { NewTemplateForm, TemplateMessagePreview } from "./TemplateForm";
 
 type Template = {
@@ -14,6 +15,7 @@ type Template = {
   bodyText: string;
   headerImageUrl: string | null;
   buttons: TemplateButton[];
+  variableTags: TagKey[] | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   rejectionReason: string | null;
   createdAt: Date;
@@ -160,7 +162,7 @@ function TemplateCard({ businessId, template, canDelete }: { businessId: string;
             </ul>
           )}
         </div>
-        <TemplateMessagePreview headerImageUrl={template.headerImageUrl} bodyText={template.bodyText} buttons={template.buttons} />
+        <TemplateMessagePreview headerImageUrl={template.headerImageUrl} bodyText={bodyWithExamples(template.bodyText, template.variableTags)} buttons={template.buttons} />
       </div>
       {deleteError && <p className="text-sm text-error">⚠ {deleteError}</p>}
       {template.status === "REJECTED" && template.rejectionReason && (

@@ -736,6 +736,9 @@ model MessageTemplate {
   headerImageUrl String? @db.Text
   // Up to 2 CTA/URL buttons: [{ type: "URL", text, url }, ...]
   buttons        Json?
+  // The tag behind each {{N}} of the body, in order (lib/templateTags.ts):
+  // ["nombre", "fecha", "hora"]. Null for a template without tags.
+  variableTags   Json?
 
   status          TemplateStatus @default(PENDING)
   metaTemplateId  String? // id Meta assigns once created

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { readStoredButtons } from "@/lib/templateButtons";
+import { readStoredTags } from "@/lib/templateTags";
 import { TemplateManager } from "./TemplateManager";
 import { AutoBookingLinkCard } from "./AutoBookingLinkCard";
 
@@ -24,6 +25,7 @@ export default async function TemplatesPage({ params }: { params: Promise<{ id: 
   const templates = templateRows.map((t) => ({
     ...t,
     buttons: readStoredButtons(t.buttons),
+    variableTags: readStoredTags(t.variableTags),
   }));
 
   const hasAgendaPage = (await prisma.website.count({ where: { businessId: id, pageType: "agenda" } })) > 0;

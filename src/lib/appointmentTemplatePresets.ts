@@ -1,6 +1,7 @@
 // The three appointment templates the platform sends by itself (see
 // lib/appointmentMessaging.ts), ready to submit from "Plantillas" with one
-// click. Plain data on purpose: the form (a client component) imports it.
+// click, written with tags (lib/templateTags.ts). Plain data on purpose: the
+// form (a client component) imports it.
 
 export type TemplatePreset = {
   id: string;
@@ -10,8 +11,6 @@ export type TemplatePreset = {
   language: string;
   category: "MARKETING" | "UTILITY";
   body: string;
-  /** One example per {{N}}, in order: what Meta's reviewers see. */
-  examples: string[];
   buttons: { type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER"; text: string; url: string; phone: string }[];
 };
 
@@ -23,8 +22,7 @@ export const APPOINTMENT_TEMPLATE_PRESETS: TemplatePreset[] = [
     name: "confirmacion_cita",
     language: "es",
     category: "UTILITY",
-    body: "Hola {{1}}, tu cita quedó confirmada para el {{2}} a las {{3}}. Si necesitas cambiarla, respóndenos por aquí.",
-    examples: ["Ana", "lunes 2 de noviembre", "3:30 pm"],
+    body: "Hola [nombre del lead], tu cita quedó confirmada para el [fecha de la cita] a las [hora de la cita]. Si necesitas cambiarla, respóndenos por aquí.",
     buttons: [],
   },
   {
@@ -34,8 +32,7 @@ export const APPOINTMENT_TEMPLATE_PRESETS: TemplatePreset[] = [
     name: "recordatorio_cita",
     language: "es",
     category: "UTILITY",
-    body: "Hola {{1}}, te recordamos tu cita de mañana, {{2}} a las {{3}}. ¿Nos confirmas que vas a asistir?",
-    examples: ["Ana", "lunes 2 de noviembre", "3:30 pm"],
+    body: "Hola [nombre del lead], te recordamos tu cita de mañana, [fecha de la cita] a las [hora de la cita]. ¿Nos confirmas que vas a asistir?",
     buttons: [
       { type: "QUICK_REPLY", text: "Confirmo", url: "", phone: "" },
       { type: "QUICK_REPLY", text: "Necesito reagendar", url: "", phone: "" },
@@ -48,8 +45,7 @@ export const APPOINTMENT_TEMPLATE_PRESETS: TemplatePreset[] = [
     name: "link_agendamiento",
     language: "es",
     category: "UTILITY",
-    body: "Hola {{1}}, gracias por tu interés. Puedes agendar tu cita cuando quieras en este enlace: {{2}} Estamos para ayudarte.",
-    examples: ["Ana", "https://agente.funnelslabs.app/sitio/mi-agenda"],
+    body: "Hola [nombre del lead], gracias por tu interés. Puedes agendar tu cita cuando quieras en este enlace: [enlace de agenda] Estamos para ayudarte.",
     buttons: [],
   },
 ];

@@ -32,8 +32,8 @@ export function checkTemplateVariables(body: string): string | null {
   const numbers = variableNumbers(text).sort((a, b) => a - b);
   if (numbers.length === 0) return null;
   if (numbers.some((n, i) => n !== i + 1)) return "Numera las variables desde 1 y sin saltarte ninguno: {{1}}, {{2}}, {{3}}.";
-  if (/^\{\{\s*\d+\s*\}\}/.test(text)) return "El mensaje no puede empezar con una variable. Escribe antes algo de texto, por ejemplo «Hola {{1}}».";
-  if (/\{\{\s*\d+\s*\}\}$/.test(text)) return "El mensaje no puede terminar con una variable. Agrega una frase después, por ejemplo «¡Te esperamos!».";
+  if (/^\{\{\s*\d+\s*\}\}/.test(text)) return "El mensaje no puede empezar con una variable. Escribe antes algo de texto, por ejemplo «Hola [nombre del lead]».";
+  if (/\{\{\s*\d+\s*\}\}$/.test(text)) return "El mensaje no puede terminar con una variable. Agrega una frase después, por ejemplo «Estamos para ayudarte.».";
   return null;
 }
 

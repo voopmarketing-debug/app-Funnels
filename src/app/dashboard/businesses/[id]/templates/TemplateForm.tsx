@@ -5,6 +5,7 @@ import { createMessageTemplate } from "@/lib/actions";
 import { MAX_BUTTON_TEXT, MAX_TEMPLATE_BUTTONS, normalizeButtons, type TemplateButton } from "@/lib/templateButtons";
 import { APPOINTMENT_TEMPLATE_PRESETS } from "@/lib/appointmentTemplatePresets";
 import { checkExamples, checkTemplateVariables, fillTemplateExamples, variableCount } from "@/lib/templateVariables";
+import { TAGS, convertTags } from "@/lib/templateTags";
 
 const LANGUAGE_OPTIONS = [
   { value: "es", label: "Español" },
@@ -27,7 +28,7 @@ const BUTTON_KINDS: { type: DraftType; icon: string; title: string; help: string
 
 // Starting points: a message already written, with its buttons, so nobody has
 // to face an empty box. Everything can be edited.
-type Example = { id: string; title: string; hint: string; name: string; language?: string; category: Category; body: string; examples?: string[]; buttons: Omit<DraftButton, "key">[] };
+type Example = { id: string; title: string; hint: string; name: string; language?: string; category: Category; body: string; buttons: Omit<DraftButton, "key">[] };
 const EXAMPLES: Example[] = [
   {
     id: "promo",
@@ -152,6 +153,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
   const [headerImagePreviewUrl, setHeaderImagePreviewUrl] = useState<string | null>(null);
   const [headerImageName, setHeaderImageName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const keySeq = useRef(0);
 
   useEffect(() => {
@@ -172,10 +174,16 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
 
   const finalName = slugify(name);
   const nameOk = finalName.length > 0;
-  const varCount = variableCount(bodyText);
-  const variablesProblem = checkTemplateVariables(bodyText);
+  // Tags like [nombre del lead] become {{1}} for Meta (and are filled per person when sending);
+  // raw {{1}} variables are still accepted, with an example typed for each.
+  const converted = useMemo(() => convertTags(bodyText), [bodyText]);
+  const usesTags = converted.tags.length > 0;
+  const mixed = usesTags && /\{\{\s*\d+\s*\}\}/.test(bodyText);
+  const varCount = usesTags ? 0 : variableCount(bodyText);
+  const variablesProblem = mixed ? "No mezcles etiquetas como [nombre del lead] con variables {{1}} en el mismo mensaje." : checkTemplateVariables(usesTags ? converted.body : bodyText);
   const exampleValues = Array.from({ length: varCount }, (_, i) => examples[i] ?? "");
-  const examplesProblem = variablesProblem ? null : checkExamples(bodyText, exampleValues);
+  const examplesProblem = variablesProblem || usesTags ? null : checkExamples(bodyText, exampleValues);
+  const previewBody = usesTags ? fillTemplateExamples(converted.body, converted.examples) : fillTemplateExamples(bodyText, exampleValues);
   const bodyOk = bodyText.trim().length > 0 && bodyText.length <= MAX_BODY && !variablesProblem && !examplesProblem;
   const buttonsOk = checked.ok;
   const canSend = nameOk && bodyOk && buttonsOk && !isPending;
@@ -183,6 +191,21 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
   function changeBody(value: string) {
     setBodyText(value);
     if (!nameTouched) setName(suggestName(value));
+  }
+
+  /** Puts [tag] where the cursor is in the message. */
+  function insertTag(label: string) {
+    const box = bodyRef.current;
+    const tag = `[${label}]`;
+    const start = box?.selectionStart ?? bodyText.length;
+    const end = box?.selectionEnd ?? bodyText.length;
+    const next = `${bodyText.slice(0, start)}${tag}${bodyText.slice(end)}`;
+    if (next.length > MAX_BODY) return;
+    changeBody(next);
+    requestAnimationFrame(() => {
+      box?.focus();
+      box?.setSelectionRange(start + tag.length, start + tag.length);
+    });
   }
 
   function addButton(type: DraftType) {
@@ -199,7 +222,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
     if (!ex) return;
     setCategory(ex.category);
     setLanguage(ex.language ?? "es");
-    setExamples(ex.examples ?? []);
+    setExamples([]);
     setBodyText(ex.body);
     setName(ex.name);
     setNameTouched(true);
@@ -310,21 +333,39 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
             <div className="space-y-1">
               <textarea
                 id="tpl-body"
+                ref={bodyRef}
                 value={bodyText}
                 onChange={(e) => changeBody(e.target.value)}
                 rows={5}
                 maxLength={MAX_BODY}
                 aria-label="Texto del mensaje"
-                placeholder="Hola 👋 Esta semana tenemos una promoción especial para ti…"
+                placeholder="Hola [nombre del lead] 👋 Esta semana tenemos una promoción especial para ti…"
                 className={`${inputClass} resize-none`}
               />
               <div className="flex items-center justify-between text-xs text-ink-faint">
-                <span>Para resaltar: *negrita* y _cursiva_. Para datos que cambian en cada mensaje (nombre, fecha, hora) usa {"{{1}}"}, {"{{2}}"}, {"{{3}}"}.</span>
+                <span>Para resaltar: *negrita* y _cursiva_.</span>
                 <span className="fl-mono tabular-nums">
                   {bodyText.length}/{MAX_BODY}
                 </span>
               </div>
             </div>
+            <div className="space-y-1.5">
+              <p className="text-[13px] text-ink-muted">
+                <span className="font-semibold text-ink">Personaliza para cada persona:</span> toca un dato y se pone donde tengas el cursor. Al enviar, se cambia por el de cada cliente.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {TAGS.map((t) => (
+                  <button key={t.key} type="button" onClick={() => insertTag(t.label)} title={t.help} className="rounded-full border border-border-strong px-3 py-1 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent">
+                    [{t.label}]
+                  </button>
+                ))}
+              </div>
+            </div>
+            {converted.unrecognized.length > 0 && (
+              <p className="rounded-lg border border-[#fab219]/50 bg-[#fab219]/10 px-3 py-2 text-[13px] text-ink">
+                No reconozco {converted.unrecognized.join(", ")}: se enviará tal cual, con los corchetes. Los datos que sí lleno son los botones de arriba.
+              </p>
+            )}
             {variablesProblem && <p className="rounded-lg border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">{variablesProblem}</p>}
             {varCount > 0 && !variablesProblem && (
               <div className="space-y-2 rounded-xl border border-border bg-surface-2/50 p-3">
@@ -507,7 +548,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
 
         <aside className="space-y-3">
           <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">Así se verá en WhatsApp</p>
-          <TemplateMessagePreview sticky headerImageUrl={headerImagePreviewUrl} bodyText={fillTemplateExamples(bodyText, exampleValues)} buttons={previewButtons} />
+          <TemplateMessagePreview sticky headerImageUrl={headerImagePreviewUrl} bodyText={previewBody} buttons={previewButtons} />
           <ul className="space-y-1.5 rounded-xl border border-border p-3 text-[13px]" aria-label="Antes de enviar">
             {[
               { ok: bodyOk, label: "Escribiste el mensaje" },
