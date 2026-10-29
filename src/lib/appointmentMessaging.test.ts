@@ -47,12 +47,12 @@ describe("the 24-hour window", () => {
 
 describe("message content", () => {
   it("writes the date and time in the business's time zone", () => {
-    expect(formatAppointmentWhen(startsAt, "America/Bogota")).toEqual({ date: "lunes 2 de noviembre", time: "3:30 p. m." });
+    expect(formatAppointmentWhen(startsAt, "America/Bogota")).toEqual({ date: "lunes 2 de noviembre", time: "3:30 pm" });
   });
   it("fills the template variables in the standard order and to the template's own count", () => {
-    const v = { name: "Ana María Pérez", date: "lunes 2 de noviembre", time: "3:30 p. m.", url: "https://cal.example/x" };
-    expect(templateParams("confirmation", v, 3)).toEqual(["Ana", "lunes 2 de noviembre", "3:30 p. m."]);
-    expect(templateParams("reminder", v, 3)).toEqual(["Ana", "lunes 2 de noviembre", "3:30 p. m."]);
+    const v = { name: "Ana María Pérez", date: "lunes 2 de noviembre", time: "3:30 pm", url: "https://cal.example/x" };
+    expect(templateParams("confirmation", v, 3)).toEqual(["Ana", "lunes 2 de noviembre", "3:30 pm"]);
+    expect(templateParams("reminder", v, 3)).toEqual(["Ana", "lunes 2 de noviembre", "3:30 pm"]);
     expect(templateParams("link", v, 2)).toEqual(["Ana", "https://cal.example/x"]);
     expect(templateParams("reminder", v, 1)).toEqual(["Ana"]);
     expect(templateParams("link", { ...v, name: null }, 2)[0]).toBe("cliente");
@@ -62,7 +62,7 @@ describe("message content", () => {
     expect(countTemplateVariables("Sin variables")).toBe(0);
   });
   it("has a free-text version of each message", () => {
-    const v = { name: "Ana", date: "lunes 2 de noviembre", time: "3:30 p. m.", url: "https://cal.example/x", businessName: "Clínica Sol" };
+    const v = { name: "Ana", date: "lunes 2 de noviembre", time: "3:30 pm", url: "https://cal.example/x", businessName: "Clínica Sol" };
     expect(appointmentText("confirmation", v)).toContain("confirmada");
     expect(appointmentText("reminder", v)).toContain("Te recordamos");
     expect(appointmentText("link", v)).toContain("https://cal.example/x");

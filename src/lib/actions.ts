@@ -52,6 +52,7 @@ import { getCatalogProducts } from "@/lib/websiteRender";
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import { isValidEmail, normalizePhone } from "@/lib/phone";
 import { exchangeSignupCode, isValidPin, registerPhoneNumber } from "@/lib/whatsappSignup";
+import { checkExamples, checkTemplateVariables } from "@/lib/templateVariables";
 import { resubscribeWhatsAppWebhook, runWhatsAppHealthCheck, type WhatsAppHealth } from "@/lib/whatsappHealth";
 import { MAX_IMPORT_ROWS, type ImportContactRow } from "@/lib/contactImport";
 import { AvailabilitySchema, DEFAULT_AVAILABILITY, type Availability } from "@/lib/agenda";
@@ -643,6 +644,19 @@ export async function activateWhatsAppNumber(businessId: string, pin: string): P
 
 const TEMPLATE_CATEGORIES = new Set(["MARKETING", "UTILITY"]);
 
+/** The example for each {{N}} of a template body, sent by the form as one JSON list ("bodyExamplesJson"). */
+function parseBodyExamples(formData: FormData): string[] {
+  const raw = formData.get("bodyExamplesJson");
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error("not a list");
+    return parsed.slice(0, 10).map((v) => String(v ?? "").trim());
+  } catch {
+    throw new Error("No pudimos leer los ejemplos de las variables. Recarga la página e inténtalo de nuevo.");
+  }
+}
+
 /**
  * Reads the buttons of a template form: the new form sends them as one JSON
  * list ("buttonsJson"); the assistant still sends the older buttonNText /
@@ -722,6 +736,11 @@ async function createMessageTemplateOrThrow(businessId: string, formData: FormDa
   const buttons = parseTemplateButtons(formData);
 
   if (!name || !bodyText) throw new Error("El nombre y el texto de la plantilla son obligatorios");
+  const variablesProblem = checkTemplateVariables(bodyText);
+  if (variablesProblem) throw new Error(variablesProblem);
+  const bodyExamples = parseBodyExamples(formData);
+  const examplesProblem = checkExamples(bodyText, bodyExamples);
+  if (examplesProblem) throw new Error(examplesProblem);
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
   if (!business.wabaAccessToken || !business.wabaId) {
@@ -778,6 +797,7 @@ async function createMessageTemplateOrThrow(businessId: string, formData: FormDa
         bodyText,
         headerImageHandle,
         buttons,
+        bodyExamples: bodyExamples.length > 0 ? bodyExamples : undefined,
       });
       finalName = candidate;
       break;

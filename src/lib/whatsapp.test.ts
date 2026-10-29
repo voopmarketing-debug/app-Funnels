@@ -324,3 +324,28 @@ describe("parseTemplateStatusUpdates", () => {
     expect(parseTemplateStatusUpdates({ entry: [{ changes: [{ field: "message_template_status_update", value: {} }] }] })).toEqual([]);
   });
 });
+
+describe("createWhatsAppTemplate with variables", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  it("sends an example for each body variable", async () => {
+    const fake = vi.fn(async () => new Response(JSON.stringify({ id: "T1", status: "PENDING" }), { status: 200 }));
+    globalThis.fetch = fake as unknown as typeof fetch;
+    const { createWhatsAppTemplate } = await import("./whatsapp");
+    await createWhatsAppTemplate({ wabaId: "W1", accessToken: "t", name: "confirmacion_cita", language: "es", category: "UTILITY", bodyText: "Hola {{1}}, el {{2}}. Gracias.", bodyExamples: ["Ana", "lunes"] });
+    const body = JSON.parse(String((fake.mock.calls as unknown as [string, RequestInit][])[0][1].body));
+    expect(body.components[0]).toEqual({ type: "BODY", text: "Hola {{1}}, el {{2}}. Gracias.", example: { body_text: [["Ana", "lunes"]] } });
+  });
+
+  it("sends no example block for a template without variables", async () => {
+    const fake = vi.fn(async () => new Response(JSON.stringify({ id: "T2", status: "PENDING" }), { status: 200 }));
+    globalThis.fetch = fake as unknown as typeof fetch;
+    const { createWhatsAppTemplate } = await import("./whatsapp");
+    await createWhatsAppTemplate({ wabaId: "W1", accessToken: "t", name: "promo", language: "es", category: "MARKETING", bodyText: "Hola, hay una promoción." });
+    const body = JSON.parse(String((fake.mock.calls as unknown as [string, RequestInit][])[0][1].body));
+    expect(body.components[0]).toEqual({ type: "BODY", text: "Hola, hay una promoción." });
+  });
+});

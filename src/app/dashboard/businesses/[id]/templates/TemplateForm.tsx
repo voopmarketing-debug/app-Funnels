@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createMessageTemplate } from "@/lib/actions";
 import { MAX_BUTTON_TEXT, MAX_TEMPLATE_BUTTONS, normalizeButtons, type TemplateButton } from "@/lib/templateButtons";
+import { APPOINTMENT_TEMPLATE_PRESETS } from "@/lib/appointmentTemplatePresets";
+import { checkExamples, checkTemplateVariables, fillTemplateExamples, variableCount } from "@/lib/templateVariables";
 
 const LANGUAGE_OPTIONS = [
   { value: "es", label: "Español" },
@@ -25,7 +27,8 @@ const BUTTON_KINDS: { type: DraftType; icon: string; title: string; help: string
 
 // Starting points: a message already written, with its buttons, so nobody has
 // to face an empty box. Everything can be edited.
-const EXAMPLES: { id: string; title: string; hint: string; name: string; category: Category; body: string; buttons: Omit<DraftButton, "key">[] }[] = [
+type Example = { id: string; title: string; hint: string; name: string; language?: string; category: Category; body: string; examples?: string[]; buttons: Omit<DraftButton, "key">[] };
+const EXAMPLES: Example[] = [
   {
     id: "promo",
     title: "Promoción",
@@ -36,18 +39,6 @@ const EXAMPLES: { id: string; title: string; hint: string; name: string; categor
     buttons: [
       { type: "QUICK_REPLY", text: "Sí, cuéntame", url: "", phone: "" },
       { type: "QUICK_REPLY", text: "Ahora no", url: "", phone: "" },
-    ],
-  },
-  {
-    id: "recordatorio",
-    title: "Recordatorio de cita",
-    hint: "Para confirmar que vienen",
-    name: "recordatorio_cita",
-    category: "UTILITY",
-    body: "Hola, te recordamos tu cita de mañana. ¿Nos confirmas que vas a asistir?",
-    buttons: [
-      { type: "QUICK_REPLY", text: "Confirmo", url: "", phone: "" },
-      { type: "QUICK_REPLY", text: "Necesito reagendar", url: "", phone: "" },
     ],
   },
   {
@@ -63,6 +54,9 @@ const EXAMPLES: { id: string; title: string; hint: string; name: string; categor
     ],
   },
 ];
+
+// The three appointment templates the platform sends by itself come first.
+const ALL_EXAMPLES: Example[] = [...APPOINTMENT_TEMPLATE_PRESETS, ...EXAMPLES];
 
 const slugify = (text: string) =>
   text
@@ -150,6 +144,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
   const [category, setCategory] = useState<Category>("MARKETING");
   const [language, setLanguage] = useState("es");
   const [bodyText, setBodyText] = useState("");
+  const [examples, setExamples] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
   const [buttons, setButtons] = useState<DraftButton[]>([]);
@@ -177,7 +172,11 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
 
   const finalName = slugify(name);
   const nameOk = finalName.length > 0;
-  const bodyOk = bodyText.trim().length > 0 && bodyText.length <= MAX_BODY;
+  const varCount = variableCount(bodyText);
+  const variablesProblem = checkTemplateVariables(bodyText);
+  const exampleValues = Array.from({ length: varCount }, (_, i) => examples[i] ?? "");
+  const examplesProblem = variablesProblem ? null : checkExamples(bodyText, exampleValues);
+  const bodyOk = bodyText.trim().length > 0 && bodyText.length <= MAX_BODY && !variablesProblem && !examplesProblem;
   const buttonsOk = checked.ok;
   const canSend = nameOk && bodyOk && buttonsOk && !isPending;
 
@@ -196,9 +195,11 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
   }
 
   function applyExample(id: string) {
-    const ex = EXAMPLES.find((e) => e.id === id);
+    const ex = ALL_EXAMPLES.find((e) => e.id === id);
     if (!ex) return;
     setCategory(ex.category);
+    setLanguage(ex.language ?? "es");
+    setExamples(ex.examples ?? []);
     setBodyText(ex.body);
     setName(ex.name);
     setNameTouched(true);
@@ -243,6 +244,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
       <input type="hidden" name="category" value={category} />
       <input type="hidden" name="language" value={language} />
       <input type="hidden" name="bodyText" value={bodyText} />
+      <input type="hidden" name="bodyExamplesJson" value={JSON.stringify(exampleValues)} />
       <input type="hidden" name="buttonsJson" value={JSON.stringify(buttons.map(({ type, text, url, phone }) => ({ type, text, url, phone })))} />
 
       <div className="sticky top-0 z-10 -mx-6 -mt-6 flex items-center justify-between gap-3 border-b border-border bg-surface px-6 py-3">
@@ -261,7 +263,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold text-ink">¿Empiezas de cero? Parte de un ejemplo:</span>
-          {EXAMPLES.map((ex) => (
+          {ALL_EXAMPLES.map((ex) => (
             <button key={ex.id} type="button" onClick={() => applyExample(ex.id)} title={ex.hint} className="rounded-full border border-border-strong px-3 py-1 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent">
               {ex.title}
             </button>
@@ -317,12 +319,35 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
                 className={`${inputClass} resize-none`}
               />
               <div className="flex items-center justify-between text-xs text-ink-faint">
-                <span>Para resaltar: *negrita* y _cursiva_. Por ahora el texto es fijo, sin variables.</span>
+                <span>Para resaltar: *negrita* y _cursiva_. Para datos que cambian en cada mensaje (nombre, fecha, hora) usa {"{{1}}"}, {"{{2}}"}, {"{{3}}"}.</span>
                 <span className="fl-mono tabular-nums">
                   {bodyText.length}/{MAX_BODY}
                 </span>
               </div>
             </div>
+            {variablesProblem && <p className="rounded-lg border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">{variablesProblem}</p>}
+            {varCount > 0 && !variablesProblem && (
+              <div className="space-y-2 rounded-xl border border-border bg-surface-2/50 p-3">
+                <p className="text-sm font-semibold text-ink">Un ejemplo de cada dato que cambia</p>
+                <p className="text-[13px] text-ink-muted">Meta lo pide para revisar la plantilla. No se envía a nadie: solo lo ven sus revisores.</p>
+                {exampleValues.map((value, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <label htmlFor={`tpl-ex-${i}`} className="fl-mono w-14 flex-none text-xs text-ink-muted">
+                      {`{{${i + 1}}}`}
+                    </label>
+                    <input
+                      id={`tpl-ex-${i}`}
+                      value={value}
+                      maxLength={100}
+                      onChange={(e) => setExamples((prev) => Array.from({ length: varCount }, (_, j) => (j === i ? e.target.value : (prev[j] ?? ""))))}
+                      placeholder={i === 0 ? "Ana" : i === 1 ? "lunes 2 de noviembre" : "3:30 p. m."}
+                      className={inputClass}
+                    />
+                  </div>
+                ))}
+                {examplesProblem && bodyText.trim() && <p className="text-xs text-ink-faint">{examplesProblem}</p>}
+              </div>
+            )}
             <div className="space-y-1">
               <label htmlFor="tpl-name" className={fieldLabel}>
                 Nombre para ti <span className="text-xs font-normal text-ink-faint">(solo lo ves tú)</span>
@@ -482,7 +507,7 @@ export function NewTemplateForm({ businessId, onClose }: { businessId: string; o
 
         <aside className="space-y-3">
           <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">Así se verá en WhatsApp</p>
-          <TemplateMessagePreview sticky headerImageUrl={headerImagePreviewUrl} bodyText={bodyText} buttons={previewButtons} />
+          <TemplateMessagePreview sticky headerImageUrl={headerImagePreviewUrl} bodyText={fillTemplateExamples(bodyText, exampleValues)} buttons={previewButtons} />
           <ul className="space-y-1.5 rounded-xl border border-border p-3 text-[13px]" aria-label="Antes de enviar">
             {[
               { ok: bodyOk, label: "Escribiste el mensaje" },

@@ -436,14 +436,16 @@ export async function createWhatsAppTemplate(params: {
   bodyText: string;
   headerImageHandle?: string;
   buttons?: TemplateButton[];
+  // One example per {{N}} in the body, in order; Meta refuses variables without them.
+  bodyExamples?: string[];
 }): Promise<{ id: string; status: string }> {
-  const { wabaId, accessToken, name, language, category, bodyText, headerImageHandle, buttons } = params;
+  const { wabaId, accessToken, name, language, category, bodyText, headerImageHandle, buttons, bodyExamples } = params;
 
   const components: Record<string, unknown>[] = [];
   if (headerImageHandle) {
     components.push({ type: "HEADER", format: "IMAGE", example: { header_handle: [headerImageHandle] } });
   }
-  components.push({ type: "BODY", text: bodyText });
+  components.push({ type: "BODY", text: bodyText, ...(bodyExamples && bodyExamples.length > 0 ? { example: { body_text: [bodyExamples] } } : {}) });
   if (buttons && buttons.length > 0) {
     components.push({ type: "BUTTONS", buttons: buttons.map(metaButton) });
   }

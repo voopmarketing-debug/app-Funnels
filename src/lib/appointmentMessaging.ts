@@ -29,13 +29,14 @@ export const APPOINTMENT_TEMPLATES: Record<AppointmentMessageKind, { name: strin
   link: { name: "link_agendamiento", language: "es", paramCount: 2 }, // {{1}} nombre, {{2}} URL del calendario
 };
 
-/** "lunes 2 de noviembre" and "3:30 p. m.", in the business's own time zone. */
+/** "lunes 2 de noviembre" and "3:30 pm", in the business's own time zone. */
 export function formatAppointmentWhen(startsAt: Date, timeZone: string): { date: string; time: string } {
   // Intl uses a comma after the weekday and non-breaking spaces in the time; plain text reads better in a message.
   const plain = (text: string) => text.replace(/[\u00a0\u202f]/g, " ").replace(",", "");
   const date = new Intl.DateTimeFormat("es-CO", { weekday: "long", day: "numeric", month: "long", timeZone }).format(startsAt);
   const time = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit", timeZone }).format(startsAt);
-  return { date: plain(date), time: plain(time) };
+  // "3:30 pm", not "3:30 p. m.": the dot would double up with the full stop that ends the sentence.
+  return { date: plain(date), time: plain(time).replace(/\s?([ap])\. ?m\./i, " $1m") };
 }
 
 export function firstName(name: string | null | undefined): string {
