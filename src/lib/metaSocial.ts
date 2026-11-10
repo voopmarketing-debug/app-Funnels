@@ -354,6 +354,8 @@ export type SocialPost = {
   interactions: number;
   /** Distinct people reached, when Meta gives it for this kind of post. */
   reach?: number | null;
+  likes?: number | null;
+  comments?: number | null;
   saves?: number | null;
   shares?: number | null;
   /** Average seconds a person watched, for videos and Reels. */
@@ -422,6 +424,8 @@ export async function facebookPosts(pageId: string, pageToken: string, range: Da
     permalink: p.permalink_url ?? null,
     thumbnail: p.full_picture ?? null,
     views: extra[i].views,
+    likes: p.reactions?.summary?.total_count ?? 0,
+    comments: p.comments?.summary?.total_count ?? 0,
     shares: p.shares?.count ?? 0,
     watchSeconds: extra[i].watchSeconds,
     interactions: (p.reactions?.summary?.total_count ?? 0) + (p.comments?.summary?.total_count ?? 0) + (p.shares?.count ?? 0),
@@ -478,6 +482,8 @@ export async function instagramPosts(igUserId: string, pageToken: string, range:
     thumbnail: m.thumbnail_url ?? (m.media_type === "VIDEO" ? null : (m.media_url ?? null)),
     views: extra[i].views,
     reach: extra[i].reach,
+    likes: m.like_count ?? 0,
+    comments: m.comments_count ?? 0,
     saves: extra[i].saved,
     shares: extra[i].shares,
     watchSeconds: extra[i].watchSeconds,

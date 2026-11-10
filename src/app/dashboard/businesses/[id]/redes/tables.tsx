@@ -30,17 +30,19 @@ function SortHeader<K extends string>({
   sort,
   onSort,
   align = "right",
+  title,
 }: {
   label: string;
   k: K;
   sort: { key: K; dir: 1 | -1 };
   onSort: (k: K) => void;
   align?: "left" | "right";
+  title?: string;
 }) {
   const active = sort.key === k;
   return (
     <th className={`whitespace-nowrap px-3 py-2 font-semibold ${align === "right" ? "text-right" : "text-left"}`} aria-sort={active ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
-      <button type="button" onClick={() => onSort(k)} className={`inline-flex items-center gap-1 hover:text-ink ${active ? "text-ink" : ""}`}>
+      <button type="button" onClick={() => onSort(k)} title={title} className={`inline-flex items-center gap-1 hover:text-ink ${active ? "text-ink" : ""}`}>
         {label}
         <span aria-hidden="true" className="text-[10px]">
           {active ? (sort.dir === 1 ? "▲" : "▼") : "↕"}
@@ -125,7 +127,28 @@ export function Pager({
 export const toolbarInput = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none sm:w-64";
 export const toolbarButton = "rounded-lg border border-border px-3 py-2 text-xs font-semibold text-ink-muted transition hover:border-accent hover:text-ink";
 
-type PostSort = "publishedAt" | "views" | "interactions";
+type PostSort = "publishedAt" | "views" | "reach" | "interactions" | "rate" | "likes" | "comments" | "saves" | "shares" | "watchSeconds";
+
+/** Interactions per 100 views, the same rate the "Tasa de interacción" card shows. */
+const rateOf = (p: SocialPost) => (p.views ? (p.interactions / p.views) * 100 : null);
+
+const valueOf = (p: SocialPost, k: PostSort): number | string | null =>
+  k === "publishedAt" ? p.publishedAt : k === "rate" ? rateOf(p) : (p[k] ?? null);
+
+// Each metric with what it means, shown as a tooltip on its header. Posts made
+// before a metric was collected, or kinds of post Meta doesn't report it for
+// (watch time on a photo), show a dash.
+const COLUMNS: { key: Exclude<PostSort, "publishedAt">; label: string; hint: string; show: (p: SocialPost) => string; strong?: boolean }[] = [
+  { key: "views", label: "Visualizaciones", hint: "Veces que se vio la publicación", show: (p) => fmt(p.views) },
+  { key: "reach", label: "Alcance", hint: "Personas distintas que la vieron (solo videos y reels)", show: (p) => fmt(p.reach) },
+  { key: "interactions", label: "Interacciones", hint: "Me gusta, comentarios, guardados y compartidos juntos", show: (p) => fmt(p.interactions), strong: true },
+  { key: "rate", label: "Tasa de interacción", hint: "De cada 100 que la vieron, cuántos interactuaron. 3% o más es buena señal", show: (p) => (rateOf(p) == null ? "—" : `${(rateOf(p) as number).toFixed(1).replace(".", ",")}%`), strong: true },
+  { key: "likes", label: "Me gusta", hint: "Reacciones a la publicación", show: (p) => fmt(p.likes) },
+  { key: "comments", label: "Comentarios", hint: "Comentarios que recibió", show: (p) => fmt(p.comments) },
+  { key: "saves", label: "Guardados", hint: "Personas que la guardaron para volver: la señal de que les sirve (Instagram)", show: (p) => fmt(p.saves) },
+  { key: "shares", label: "Compartidos", hint: "Veces que la enviaron o compartieron: lo que te trae gente nueva", show: (p) => fmt(p.shares) },
+  { key: "watchSeconds", label: "Tiempo visto", hint: "Segundos que se ve en promedio un video o reel", show: (p) => (p.watchSeconds == null ? "—" : `${p.watchSeconds.toFixed(1).replace(".", ",")} s`) },
+];
 
 export function PostsTable({ posts }: { posts: SocialPost[] }) {
   const [query, setQuery] = useState("");
@@ -138,8 +161,10 @@ export function PostsTable({ posts }: { posts: SocialPost[] }) {
     return posts
       .filter((p) => (network === "all" || p.network === network) && (!q || p.text.toLowerCase().includes(q) || p.type.toLowerCase().includes(q)))
       .sort((a, b) => {
-        const av = a[sort.key] ?? -1;
-        const bv = b[sort.key] ?? -1;
+        // A post without the metric goes last whichever way it's sorted.
+        const av = valueOf(a, sort.key);
+        const bv = valueOf(b, sort.key);
+        if (av == null || bv == null) return av == null && bv == null ? 0 : av == null ? 1 : -1;
         return (av < bv ? -1 : av > bv ? 1 : 0) * sort.dir;
       });
   }, [posts, query, network, sort]);
@@ -164,8 +189,8 @@ export function PostsTable({ posts }: { posts: SocialPost[] }) {
           className={`${toolbarButton} sm:ml-auto`}
           onClick={() =>
             downloadCsv("publicaciones.csv", [
-              ["Red", "Fecha", "Tipo", "Texto", "Visualizaciones", "Interacciones", "Enlace"],
-              ...rows.map((p) => [NETWORK[p.network].label, p.publishedAt, p.type, p.text.replace(/\s+/g, " ").slice(0, 300), p.views, p.interactions, p.permalink]),
+              ["Red", "Fecha", "Tipo", "Texto", ...COLUMNS.map((c) => c.label), "Enlace"],
+              ...rows.map((p) => [NETWORK[p.network].label, p.publishedAt, p.type, p.text.replace(/\s+/g, " ").slice(0, 300), ...COLUMNS.map((c) => c.show(p)), p.permalink]),
             ])
           }
         >
@@ -173,20 +198,22 @@ export function PostsTable({ posts }: { posts: SocialPost[] }) {
         </button>
       </div>
 
+      <p className="text-xs text-ink-muted">Desliza la tabla hacia un lado para ver todas las métricas. Toca el título de una columna para ordenar; deja el cursor encima para ver qué significa.</p>
       <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[1180px] text-sm">
           <thead className="bg-surface-2 text-xs text-ink-muted">
             <tr>
-              <th className="px-3 py-2 text-left font-semibold">Publicación</th>
+              <th className="sticky left-0 z-10 bg-surface-2 px-3 py-2 text-left font-semibold">Publicación</th>
               <SortHeader label="Fecha" k="publishedAt" sort={sort} onSort={onSort} align="left" />
-              <SortHeader label="Visualizaciones" k="views" sort={sort} onSort={onSort} />
-              <SortHeader label="Interacciones" k="interactions" sort={sort} onSort={onSort} />
+              {COLUMNS.map((c) => (
+                <SortHeader key={c.key} label={c.label} k={c.key} sort={sort} onSort={onSort} title={c.hint} />
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {visible.map((p) => (
               <tr key={p.id} className="align-top">
-                <td className="px-3 py-2.5">
+                <td className="sticky left-0 z-10 bg-surface px-3 py-2.5">
                   <div className="flex items-start gap-3">
                     {p.thumbnail ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -199,7 +226,7 @@ export function PostsTable({ posts }: { posts: SocialPost[] }) {
                         <span className="h-2 w-2 rounded-full" style={{ background: NETWORK[p.network].color }} />
                         {NETWORK[p.network].label} · {p.type}
                       </p>
-                      <p className="line-clamp-2 max-w-md text-ink">{p.text || <span className="text-ink-faint">Sin texto</span>}</p>
+                      <p className="line-clamp-2 w-64 max-w-full text-ink">{p.text || <span className="text-ink-faint">Sin texto</span>}</p>
                       {p.permalink && (
                         <a href={p.permalink} target="_blank" rel="noopener noreferrer" className="text-xs text-accent underline">
                           Ver publicación
@@ -209,13 +236,16 @@ export function PostsTable({ posts }: { posts: SocialPost[] }) {
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2.5 text-ink-muted">{shortDateTime(p.publishedAt)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{fmt(p.views)}</td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{fmt(p.interactions)}</td>
+                {COLUMNS.map((c) => (
+                  <td key={c.key} className={`whitespace-nowrap px-3 py-2.5 text-right tabular-nums ${c.strong ? "font-semibold" : ""}`}>
+                    {c.show(p)}
+                  </td>
+                ))}
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-8 text-center text-ink-muted">
+                <td colSpan={COLUMNS.length + 2} className="px-3 py-8 text-center text-ink-muted">
                   {posts.length === 0 ? "No hubo publicaciones en este período." : "Ninguna publicación coincide con la búsqueda."}
                 </td>
               </tr>
