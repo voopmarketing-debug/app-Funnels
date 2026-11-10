@@ -118,6 +118,36 @@ describe("parseInboundMessages", () => {
     expect(parsed.map((m) => !!m.unreadable)).toEqual([false, false, false, false, false, true]);
   });
 
+  it("keeps the id of the reply button, list row or template button the customer tapped", () => {
+    const msg = (id: string, extra: Record<string, unknown>) => ({ id, from: "573001234567", ...extra });
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "1234567890" },
+                messages: [
+                  msg("t1", { type: "interactive", interactive: { type: "button_reply", button_reply: { id: "si", title: "Sí" } } }),
+                  msg("t2", { type: "interactive", interactive: { type: "list_reply", list_reply: { id: "r2", title: "Horarios" } } }),
+                  msg("t3", { type: "button", button: { text: "Confirmo", payload: "confirmo" } }),
+                  msg("t4", { type: "text", text: { body: "hola" } }),
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = parseInboundMessages(payload);
+    expect(parsed.map((m) => [m.text, m.replyId])).toEqual([
+      ["Sí", "si"],
+      ["Horarios", "r2"],
+      ["Confirmo", "confirmo"],
+      ["hola", undefined],
+    ]);
+  });
+
   it("marks content-less buttons and unknown types as unreadable", () => {
     const msg = (id: string, extra: Record<string, unknown>) => ({ id, from: "573001234567", ...extra });
     const payload = {

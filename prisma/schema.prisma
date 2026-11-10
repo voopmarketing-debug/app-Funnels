@@ -76,24 +76,26 @@ model Business {
   whatsappHealthMessage   String?
   whatsappHealthCheckedAt DateTime?
 
-  memberships      Membership[]
-  agent            AIAgent?
-  conversations    Conversation[]
-  pipelineStages   PipelineStage[]
-  pipelines        Pipeline[]
-  broadcasts       Broadcast[]
-  messageTemplates MessageTemplate[]
-  websites         Website[]
+  memberships            Membership[]
+  agent                  AIAgent?
+  conversations          Conversation[]
+  pipelineStages         PipelineStage[]
+  pipelines              Pipeline[]
+  broadcasts             Broadcast[]
+  messageTemplates       MessageTemplate[]
+  websites               Website[]
   // Off by default: the owner turns on the automatic booking-link follow-up
   // (lib/bookingLinkFollowUp.ts) from the Plantillas page.
-  autoBookingLinkEnabled Boolean @default(false)
-  agentMedia       AgentMedia[]
-  sales            Sale[]
-  products         Product[]
-  socialConnection SocialConnection?
-  commentAutoReplies CommentAutoReply[]
-  aiUsage          AiUsage[]
-  notifications    Notification[]
+  autoBookingLinkEnabled Boolean            @default(false)
+  agentMedia             AgentMedia[]
+  sales                  Sale[]
+  automations            Automation[]
+  automationRuns         AutomationRun[]
+  products               Product[]
+  socialConnection       SocialConnection?
+  commentAutoReplies     CommentAutoReply[]
+  aiUsage                AiUsage[]
+  notifications          Notification[]
 }
 
 // A photo or document (product shot, PDF catalog, etc.) the client uploads
@@ -121,32 +123,32 @@ model AgentMedia {
 // types render (see lib/websiteContentV2.ts). The AI never invents
 // products or prices; it can only pick from these.
 model Product {
-  id             String   @id @default(cuid())
+  id             String      @id @default(cuid())
   businessId     String
   name           String
   // A physical product or a service (consulta, clase, sesión…): services
   // never track inventory, and the website/agent offer to book them
   // instead of to "order" them.
   kind           ProductKind @default(PRODUCT)
-  description    String   @default("")
+  description    String      @default("")
   // Whole pesos (or the business's currency units) — no cents needed.
   price          Int?
   compareAtPrice Int?
-  currency       String   @default("COP")
+  currency       String      @default("COP")
   category       String?
   imageUrl       String?
   // Short label shown on the card, e.g. "Nuevo", "Más vendido", "-20%".
   badge          String?
-  active         Boolean  @default(true)
+  active         Boolean     @default(true)
   // Inventory (optional, per product: services don't run out). Sales
   // registered in the CRM discount units; lowStockAt triggers the "se está
   // acabando" alert. The agent and the website only see sold-out or not.
-  trackStock     Boolean  @default(false)
-  stock          Int      @default(0)
-  lowStockAt     Int      @default(5)
-  position       Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  trackStock     Boolean     @default(false)
+  stock          Int         @default(0)
+  lowStockAt     Int         @default(5)
+  position       Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -331,22 +333,22 @@ model Conversation {
   // Freeform labels the business/agency sets on this lead (e.g. "Empresa",
   // "Cotización") — shown as chips in the lead detail panel. Not tied to
   // pipeline stage, which already tracks funnel position on its own.
-  tags            String[]  @default([])
+  tags                    String[]  @default([])
   // Manually-set summary of the lead shown in the detail panel — e.g. what
   // the AI agent picked up on, or a note the business owner typed in.
-  notes           String?   @db.Text
+  notes                   String?   @db.Text
   // Set either by hand from the detail panel (see updateConversationDetails
   // in lib/actions.ts) or automatically by the AI agent when it detects the
   // customer confirming a concrete date/time in the chat itself (see the
   // mark_appointment tool in lib/ai.ts and lib/agent.ts) — a Notification
   // row is created alongside an automatic update. Still no live sync from
   // the separate agenda.funnelslabs.app booking project.
-  appointmentAt   DateTime?
-  appointmentNote String?
+  appointmentAt           DateTime?
+  appointmentNote         String?
   // The appointmentAt the 1-hour-before WhatsApp reminder was sent for (see
   // lib/agendaReminders.ts). Comparing against the current appointmentAt
   // means a rescheduled appointment gets its own reminder.
-  appointmentReminderFor DateTime?
+  appointmentReminderFor  DateTime?
   // Same idea for the "day before" reminder (lib/appointmentDayBefore.ts).
   appointmentDayBeforeFor DateTime?
 
@@ -356,6 +358,7 @@ model Conversation {
   notifications   Notification[]
   broadcastClicks BroadcastClick[]
   sales           Sale[]
+  automationRuns  AutomationRun[]
 
   @@unique([businessId, customerPhone])
   @@index([stageId])
@@ -971,6 +974,61 @@ model Sale {
   @@index([conversationId])
 }
 
+// A conversation flow (like Kommo's Salesbot): what starts it (`triggers`) and
+// the steps it follows (`definition`), both validated by lib/automations/flow.ts.
+// Off by default: a flow only runs once the owner turns it on.
+model Automation {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  enabled    Boolean  @default(false)
+  /// [{ type: "new_conversation" } | { type: "message", keywords: [...] } | ...]
+  triggers   Json     @default("[]")
+  /// { start: "stepId", steps: { stepId: { type, ... } } }
+  definition Json
+  /// Per-flow counters kept by the engine (round-robin pointers).
+  state      Json     @default("{}")
+  /// How many conversations entered the flow, and how many reached its end.
+  launches   Int      @default(0)
+  completed  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  runs     AutomationRun[]
+
+  @@index([businessId, enabled])
+}
+
+// One conversation going through one flow. While it is WAITING_REPLY or
+// WAITING_TIME the flow owns the chat and the AI agent stays quiet.
+model AutomationRun {
+  id             String    @id @default(cuid())
+  businessId     String
+  automationId   String
+  conversationId String
+  /// RUNNING | WAITING_REPLY | WAITING_TIME | DONE | STOPPED | FAILED
+  status         String
+  /// The step the run is on (or waiting at).
+  stepId         String?
+  /// When a WAITING_TIME run continues.
+  resumeAt       DateTime?
+  /// Retry counters of validation / list steps, and the last reply read.
+  vars           Json      @default("{}")
+  lastError      String?
+  startedAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  finishedAt     DateTime?
+
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  automation   Automation   @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, status])
+  @@index([status, resumeAt])
+  @@index([automationId])
+}
+
 // Meta (Facebook Page, its Instagram account and an ad account) connected
 // through Facebook Login for the "Redes sociales" module (lib/metaSocial.ts).
 // Tokens are encrypted (lib/crypto.ts). The page token doesn't expire; the
@@ -1127,4 +1185,3 @@ model AssistantAction {
 
   @@index([threadId])
 }
-

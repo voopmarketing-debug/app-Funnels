@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { fireFlowEventInBackground } from "@/lib/automations/engine";
 
 /**
  * Adds (or updates) a CRM Conversation for someone who left their contact
@@ -73,7 +74,7 @@ export async function upsertLeadConversation(params: {
     select: { customerName: true },
   });
 
-  await prisma.conversation.upsert({
+  const conversation = await prisma.conversation.upsert({
     where: { businessId_customerPhone: { businessId: website.businessId, customerPhone: phone } },
     update: { ...(existing?.customerName ? {} : { customerName: name }), ...stageFields, ...appointmentFields },
     create: {
@@ -83,5 +84,10 @@ export async function upsertLeadConversation(params: {
       stageId: targetStage.id,
       ...appointmentFields,
     },
+    select: { id: true },
   });
+  // A real booking can start a conversation flow (lib/automations).
+  if (params.appointmentAt) {
+    fireFlowEventInBackground({ businessId: website.businessId, conversationId: conversation.id, event: { type: "appointment_booked" } });
+  }
 }

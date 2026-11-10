@@ -5,6 +5,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { retryConversationNow } from "@/lib/replyRecovery";
+import { fireFlowEventInBackground } from "@/lib/automations/engine";
 import bcrypt from "bcryptjs";
 import { auth, signIn, signOut } from "@/auth";
 import { getBroadcastUsage, getContactUsage, remaining } from "@/lib/crmLimits";
@@ -941,10 +942,15 @@ export async function updateConversationStage(
   const stage = await prisma.pipelineStage.findFirst({ where: { id: stageId, businessId } });
   if (!stage) throw new Error("Invalid stage");
 
+  const before = await prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { stageId: true } });
   await prisma.conversation.update({
     where: { id: conversationId, businessId },
     data: { stageId },
   });
+  // Only a real move starts a flow, not saving the same stage again.
+  if (before && before.stageId !== stageId) {
+    fireFlowEventInBackground({ businessId, conversationId, event: { type: "stage_changed", stageId } });
+  }
 
   revalidatePath(`/dashboard/businesses/${businessId}`);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
@@ -965,6 +971,8 @@ export async function updateConversationDetails(
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
 
+  const previousTags = data.tags !== undefined ? ((await prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { tags: true } }))?.tags ?? []) : [];
+  const previousAppointment = data.appointmentAt ? (await prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { appointmentAt: true } }))?.appointmentAt : null;
   await prisma.conversation.update({
     where: { id: conversationId, businessId },
     data: {
@@ -976,6 +984,13 @@ export async function updateConversationDetails(
       ...(data.tags !== undefined && { tags: data.tags }),
     },
   });
+  // A tag the team just added, or an appointment just set, can start a flow.
+  for (const tag of (data.tags ?? []).filter((t) => !previousTags.some((p) => p.toLowerCase() === t.toLowerCase())).slice(0, 5)) {
+    fireFlowEventInBackground({ businessId, conversationId, event: { type: "tag_added", tag } });
+  }
+  if (data.appointmentAt && (!previousAppointment || previousAppointment.getTime() !== new Date(data.appointmentAt).getTime())) {
+    fireFlowEventInBackground({ businessId, conversationId, event: { type: "appointment_booked" } });
+  }
 
   revalidatePath(`/dashboard/businesses/${businessId}/crm`);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);

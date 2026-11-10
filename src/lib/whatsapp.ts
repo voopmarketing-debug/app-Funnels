@@ -104,6 +104,72 @@ export async function sendWhatsAppTextMessage(params: {
   });
 }
 
+/** Up to 3 tap-to-answer buttons under a message. Free-form, so only inside Meta's 24 h window. */
+export async function sendWhatsAppReplyButtons(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  body: string;
+  buttons: { id: string; title: string }[];
+}): Promise<{ messageId: string }> {
+  return postMessage({
+    phoneNumberId: params.phoneNumberId,
+    accessToken: params.accessToken,
+    to: params.to,
+    message: {
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: { text: params.body },
+        action: { buttons: params.buttons.map((b) => ({ type: "reply", reply: { id: b.id, title: b.title } })) },
+      },
+    },
+  });
+}
+
+/** A menu of up to 10 options the customer opens and picks from. Free-form, so only inside the 24 h window. */
+export async function sendWhatsAppList(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  body: string;
+  buttonText: string;
+  rows: { id: string; title: string; description?: string }[];
+}): Promise<{ messageId: string }> {
+  return postMessage({
+    phoneNumberId: params.phoneNumberId,
+    accessToken: params.accessToken,
+    to: params.to,
+    message: {
+      type: "interactive",
+      interactive: {
+        type: "list",
+        body: { text: params.body },
+        action: {
+          button: params.buttonText,
+          sections: [{ title: "Opciones", rows: params.rows.map((r) => ({ id: r.id, title: r.title, ...(r.description ? { description: r.description } : {}) })) }],
+        },
+      },
+    },
+  });
+}
+
+/** An emoji reaction on one of the customer's messages. */
+export async function sendWhatsAppReaction(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  to: string;
+  messageId: string;
+  emoji: string;
+}): Promise<{ messageId: string }> {
+  return postMessage({
+    phoneNumberId: params.phoneNumberId,
+    accessToken: params.accessToken,
+    to: params.to,
+    message: { type: "reaction", reaction: { message_id: params.messageId, emoji: params.emoji } },
+  });
+}
+
 /** Looks up the actual dialable WhatsApp number behind a phone_number_id — needed to build a wa.me link (the id itself isn't dialable). */
 export async function fetchWhatsAppDisplayNumber(params: {
   phoneNumberId: string;
@@ -584,6 +650,8 @@ export type WhatsAppInboundMessage = {
   text: string;
   whatsappMsgId: string;
   media?: { type: InboundMediaType; mediaId: string; filename?: string };
+  // The id of the button or list row the customer tapped (the text is its title).
+  replyId?: string;
   // Nothing the AI can read (Meta sent no content: a promo or button message
   // from another business, a view-once photo, a poll…). Saved for the team,
   // never answered by the AI — it would only guess and spend a reply.
@@ -654,6 +722,21 @@ function describeNonTextContent(msg: Record<string, unknown>): string | null {
     default:
       return `${UNREADABLE_PREFIX}: mensaje de tipo "${typeof msg.type === "string" ? msg.type : "desconocido"}". Revísalo en el celular.]`;
   }
+}
+
+/** The id behind a tapped reply button, list row or template quick-reply button. */
+export function replyIdOf(msg: Record<string, unknown>): string | undefined {
+  const obj = (v: unknown) => (isRecord(v) ? v : undefined);
+  if (msg.type === "interactive") {
+    const interactive = obj(msg.interactive);
+    const reply = obj(interactive?.button_reply) ?? obj(interactive?.list_reply);
+    return typeof reply?.id === "string" && reply.id ? reply.id : undefined;
+  }
+  if (msg.type === "button") {
+    const payload = obj(msg.button)?.payload;
+    return typeof payload === "string" && payload ? payload : undefined;
+  }
+  return undefined;
 }
 
 function nonEmpty(v: unknown): string | undefined {
@@ -735,7 +818,7 @@ export function parseInboundMessages(payload: unknown): WhatsAppInboundMessage[]
         // business (and the AI) can read. Reactions are the one exception:
         // an emoji on an earlier message isn't a new message to answer.
         const described = describeNonTextMessage(msg);
-        if (described) messages.push({ phoneNumberId, from, contactName, whatsappMsgId, ...described });
+        if (described) messages.push({ phoneNumberId, from, contactName, whatsappMsgId, ...described, replyId: replyIdOf(msg) });
       }
     }
   }

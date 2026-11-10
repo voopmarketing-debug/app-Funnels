@@ -1,4 +1,5 @@
 import { retryPendingReplies } from "@/lib/replyRecovery";
+import { runDueAutomations } from "@/lib/automations/engine";
 import { safeEqual } from "@/lib/crypto";
 
 // Retries every business's unanswered WhatsApp chats (see lib/replyRecovery.ts).
@@ -13,5 +14,11 @@ export async function GET(request: Request): Promise<Response> {
   if (!authorization || !safeEqual(authorization, `Bearer ${secret}`)) {
     return new Response("Unauthorized", { status: 401 });
   }
-  return Response.json(await retryPendingReplies({ limit: 50 }));
+  const retried = await retryPendingReplies({ limit: 50 });
+  // The same scheduler also continues the pauses of conversation flows (lib/automations).
+  const flows = await runDueAutomations({ limit: 25 }).catch((err) => {
+    console.error("[flows] due run failed:", err instanceof Error ? err.message : err);
+    return null;
+  });
+  return Response.json({ ...retried, flows });
 }

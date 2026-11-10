@@ -34,6 +34,7 @@ import { isWonStageName } from "@/lib/sales";
 import Anthropic from "@anthropic-ai/sdk";
 import { describeAnthropicError } from "@/lib/aiServiceHealth";
 import { reportWebhookProblem } from "@/lib/whatsappHealth";
+import { fireFlowEventInBackground, handleInboundForFlows } from "@/lib/automations/engine";
 
 const MEDIA_TYPE_LABEL: Record<string, string> = {
   image: "Imagen",
@@ -274,11 +275,11 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   // ends up replying (paused conversation, over plan limit, etc.) — those
   // are exactly the cases where a human most needs to know someone wrote in,
   // since the agent won't respond on its own.
+  // First time this person writes in: a new chat, flagged as such.
+  const isNewChat = !previousMessages.some((m) => m.role === "CUSTOMER");
   {
     const leadLabel = contactLabel(conversation.customerName, conversation.customerPhone);
     const excerpt = messageContent.length > 80 ? `${messageContent.slice(0, 80)}...` : messageContent;
-    // First time this person writes in: a new chat, flagged as such.
-    const isNewChat = !previousMessages.some((m) => m.role === "CUSTOMER");
     await prisma.notification.create({
       data: {
         businessId: business.id,
@@ -317,6 +318,21 @@ export async function handleIncomingMessage(message: WhatsAppInboundMessage): Pr
   // before saving anything, so with the agent off, new messages never even
   // reached the CRM.)
   if (unreadable) return;
+
+  // Conversation flows (lib/automations): a flow waiting for this answer, or
+  // one whose trigger this message matches, answers instead of the AI. Never
+  // lets a flow problem block the AI: on any error the AI answers as usual.
+  const flow = await handleInboundForFlows({
+    businessId: business.id,
+    conversationId: conversation.id,
+    text: messageContent,
+    replyId: message.replyId,
+    isNewConversation: isNewChat,
+  }).catch((err) => {
+    console.error("[flows] inbound handling failed:", err instanceof Error ? err.message : err);
+    return { handled: false };
+  });
+  if (flow.handled) return;
 
   if (!business.agent?.enabled) {
     console.warn(`AI agent disabled or not configured for business ${business.id}; message saved without AI reply`);
@@ -463,6 +479,7 @@ async function moveLeadStage(ctx: ReplyContext, target: FunnelStage): Promise<vo
   });
   if (moved.count === 0) return;
   console.log(`[agent] moved conversation ${conversation.id} to stage "${target.name}"`);
+  fireFlowEventInBackground({ businessId: business.id, conversationId: conversation.id, event: { type: "stage_changed", stageId: target.id } });
   if (!isWonStageName(target.name)) return;
 
   // A sale needs a human to confirm the payment and the amount, so the AI
@@ -595,6 +612,7 @@ async function generateAndSendReply(ctx: ReplyContext, modelOverride?: string): 
             message: `${leadLabel} agendó una cita para ${formatAppointmentDate(appointmentAt)}`,
           },
         });
+        fireFlowEventInBackground({ businessId: business.id, conversationId: conversation.id, event: { type: "appointment_booked" } });
       }
     }
 
