@@ -26,6 +26,16 @@ function BotIcon() {
   );
 }
 
+function FlowIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <rect x="3.5" y="4" width="6.5" height="5" rx="1.5" stroke="currentColor" strokeWidth="2" />
+      <rect x="14" y="15" width="6.5" height="5" rx="1.5" stroke="currentColor" strokeWidth="2" />
+      <path d="M6.75 9v3.5a2 2 0 0 0 2 2H14M14 14.5l-2-2M14 14.5l-2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function MegaphoneIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
@@ -229,6 +239,16 @@ function NavLinks({
           >
             <TemplateIcon />
             Plantillas
+          </Link>
+        )}
+        {primaryBusinessId && (
+          <Link
+            href={`/dashboard/businesses/${primaryBusinessId}/automatizaciones`}
+            className="fl-nav-item"
+            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/automatizaciones`)}
+          >
+            <FlowIcon />
+            Automatizaciones
           </Link>
         )}
         {isAgencyAdmin && (
