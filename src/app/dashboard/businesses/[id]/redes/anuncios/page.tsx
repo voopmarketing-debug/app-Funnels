@@ -7,6 +7,7 @@ import { parseRange, todayInColombia } from "@/lib/socialRanges";
 import { RedesTabs } from "../RedesTabs";
 import { DateRangePicker } from "../DateRangePicker";
 import { AdsReport } from "../AdsReport";
+import { CreativesReport } from "../CreativesReport";
 
 // Meta Ads on their own tab, with their own dates: looking back a year at old
 // campaigns shouldn't change the dates of followers and posts.
@@ -16,6 +17,20 @@ function AdsSkeleton() {
     <div className="space-y-8" aria-busy="true">
       <div className="fl-card h-72 animate-pulse" />
       <div className="fl-card h-40 animate-pulse" />
+      <div className="fl-card h-64 animate-pulse" />
+    </div>
+  );
+}
+
+function CreativesSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true">
+      <h2 className="text-lg font-semibold text-ink">Tus anuncios, uno por uno</h2>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="fl-card h-28 animate-pulse" />
+        ))}
+      </div>
       <div className="fl-card h-64 animate-pulse" />
     </div>
   );
@@ -37,7 +52,7 @@ export default async function AnunciosPage({
   if (!session?.user?.id) return null;
   const membership = await prisma.membership.findUnique({
     where: { userId_businessId: { userId: session.user.id, businessId: id } },
-    include: { business: { select: { name: true, socialConnection: { select: { adAccountId: true, adAccountName: true, userAccessToken: true } } } } },
+    include: { business: { select: { name: true, socialConnection: { select: { adAccountId: true, adAccountName: true, adCurrency: true, userAccessToken: true } } } } },
   });
   if (!membership) notFound();
   const { business } = membership;
@@ -69,9 +84,15 @@ export default async function AnunciosPage({
       </header>
 
       {ready ? (
-        <Suspense key={`${range.since}:${range.until}`} fallback={<AdsSkeleton />}>
-          <AdsReport businessId={id} range={range} canManage={canManage} />
-        </Suspense>
+        <>
+          <Suspense key={`${range.since}:${range.until}`} fallback={<AdsSkeleton />}>
+            <AdsReport businessId={id} range={range} canManage={canManage} />
+          </Suspense>
+          {/* Dozens of Meta calls of their own: the account totals above don't wait for them. */}
+          <Suspense key={`creatives:${range.since}:${range.until}`} fallback={<CreativesSkeleton />}>
+            <CreativesReport businessId={id} range={range} currency={connection?.adCurrency ?? "USD"} />
+          </Suspense>
+        </>
       ) : (
         <section className="fl-card-hero space-y-3 p-6">
           <h2 className="text-lg font-semibold">Conecta tu cuenta publicitaria</h2>

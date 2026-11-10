@@ -15,6 +15,7 @@ import { DateRangePicker } from "./DateRangePicker";
 import { RedesTabs } from "./RedesTabs";
 import { PostsTable } from "./tables";
 import { ContentDiagnosisPanel } from "./ContentDiagnosisPanel";
+import { AudienceSection, OrganicInsights } from "./OrganicInsights";
 import { shortDateTime } from "./format";
 import { EyeIcon, FacebookGlyph, GridIcon, HeartIcon, InstagramGlyph, PercentIcon } from "./icons";
 import { ChartCard, Delta, Section, SectionError, dec, fmt, previousText, type Status } from "./ui";
@@ -277,6 +278,10 @@ async function Dashboard({
           )}
         </Section>
       )}
+
+      {data.posts?.ok && <OrganicInsights posts={posts} />}
+
+      {data.audience?.ok && <AudienceSection audience={data.audience.data} />}
 
       {data.posts && <ContentDiagnosisPanel businessId={businessId} initial={initialDiagnosis} />}
 

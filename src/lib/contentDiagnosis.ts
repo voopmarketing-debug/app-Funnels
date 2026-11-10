@@ -80,8 +80,15 @@ function describePost(p: SocialPost, i: number): string {
   // Colombia time (no DST), so "martes 7 p. m." means what the owner thinks it means.
   const d = new Date(Date.parse(p.publishedAt) - 5 * 3_600_000);
   const rate = p.views ? ` (${((p.interactions / p.views) * 100).toFixed(1)}% de interacción)` : "";
+  // Only what Meta reported for this post; a video's watch time says if the first seconds hold people.
+  const more = [
+    p.reach != null ? `alcance: ${p.reach}` : "",
+    p.watchSeconds != null ? `tiempo promedio visto: ${p.watchSeconds.toFixed(1)} s` : "",
+    p.saves != null ? `guardados: ${p.saves}` : "",
+    p.shares != null ? `compartidos: ${p.shares}` : "",
+  ].filter(Boolean);
   const text = p.text.replace(/\s+/g, " ").trim().slice(0, 280) || "(sin texto)";
-  return `${i + 1}. [${p.network === "facebook" ? "Facebook" : "Instagram"} · ${p.type} · ${WEEKDAYS[d.getUTCDay()]} ${d.getUTCHours()}:00 · ${d.toISOString().slice(0, 10)}] visualizaciones: ${p.views ?? "sin dato"} · interacciones: ${p.interactions}${rate}\n   "${text}"`;
+  return `${i + 1}. [${p.network === "facebook" ? "Facebook" : "Instagram"} · ${p.type} · ${WEEKDAYS[d.getUTCDay()]} ${d.getUTCHours()}:00 · ${d.toISOString().slice(0, 10)}] visualizaciones: ${p.views ?? "sin dato"} · interacciones: ${p.interactions}${rate}${more.length ? ` · ${more.join(" · ")}` : ""}\n   "${text}"`;
 }
 
 function describeAccount(data: SocialDashboard): string {
@@ -127,6 +134,7 @@ Recibes las publicaciones reales de un negocio con sus números. Tu trabajo:
 Reglas:
 - Escribe para el dueño del negocio, que no es experto: frases cortas, sin jerga ("engagement" → "interacción", "CTA" → "invitación a escribir").
 - Trata a la persona de "tú".
+- Cuando una publicación trae tiempo promedio visto, guardados o compartidos, úsalos: un video que se ve más tiempo tiene mejor gancho; lo que se guarda es útil para la gente; lo que se comparte atrae gente nueva.
 - La interacción importa más que las visualizaciones: una publicación vista por pocos pero con muchas interacciones indica un tema que conecta.
 - Si hay pocas publicaciones o los números son bajos, dilo con honestidad y basa las ideas en lo poco que sí funcionó y en lo que vende el negocio.
 - Los textos propuestos invitan a escribir por WhatsApp, que es donde el negocio vende. Nada de hashtags en exceso (máximo 3-5).

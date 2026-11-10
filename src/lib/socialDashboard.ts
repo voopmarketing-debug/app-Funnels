@@ -8,6 +8,7 @@ import {
   facebookAccount,
   facebookPosts,
   instagramAccount,
+  instagramAudience,
   instagramPosts,
   instagramTotals,
   metaAdTotals,
@@ -17,11 +18,14 @@ import {
   type AdTotals,
   type AdsData,
   type DayRange,
+  type InstagramAudience,
   type NetworkAccount,
   type Series,
   type SocialPost,
 } from "@/lib/metaSocial";
 import { todayInColombia } from "@/lib/socialRanges";
+import { adAudience, adCreatives, adPlacements, type AdCreative } from "@/lib/adCreatives";
+import type { Segment } from "@/lib/contentKpis";
 
 // Everything the "Redes sociales" page shows, read from Meta once and kept
 // in SocialMetricCache for a few hours: a page with posts and ads makes
@@ -33,7 +37,8 @@ const CACHE_TTL_MS = 3 * 60 * 60 * 1000;
 // again every few minutes instead of every few hours.
 const LIVE_CACHE_TTL_MS = 10 * 60 * 1000;
 const ttlFor = (range: DayRange) => (range.until >= todayInColombia() ? LIVE_CACHE_TTL_MS : CACHE_TTL_MS);
-const MAX_NEW_RANGES_PER_HOUR = 20;
+// Each range now leaves a row for the dashboard and another for the ads' creatives.
+const MAX_NEW_RANGES_PER_HOUR = 30;
 /** "Actualizar" is ignored while the data is younger than this. */
 export const MIN_REFRESH_MS = 2 * 60 * 1000;
 
@@ -61,6 +66,8 @@ export type SocialDashboard = {
   instagram: SectionResult<NetworkSummary> | null;
   posts: SectionResult<SocialPost[]> | null;
   ads: SectionResult<AdsWithPrevious> | null;
+  /** Who sees the Instagram content (null inside when the account is too small for Meta to say). Missing in older cached copies. */
+  audience?: SectionResult<InstagramAudience | null> | null;
   needsReconnect: boolean;
   /** Too many different date ranges asked in the last hour: nothing was read from Meta. */
   throttled?: boolean;
@@ -176,7 +183,7 @@ async function loadFromMeta(businessId: string, range: DayRange): Promise<Social
   const { fbPageId, igUserId, adAccountId } = connection;
 
   try {
-    const [facebook, instagram, posts, ads] = await Promise.all([
+    const [facebook, instagram, posts, ads, audience] = await Promise.all([
       fbPageId && pageToken ? settle(() => summarize(businessId, "facebook", (r) => facebookAccount(fbPageId, pageToken, r), range, previous)) : null,
       igUserId && pageToken
         ? settle(() =>
@@ -200,8 +207,9 @@ async function loadFromMeta(businessId: string, range: DayRange): Promise<Social
           })
         : null,
       adAccountId && userToken ? settle(() => loadAds(adAccountId, userToken, range, connection.adCurrency ?? "USD")) : null,
+      igUserId && pageToken ? settle(() => instagramAudience(igUserId, pageToken)) : null,
     ]);
-    return { ...empty, facebook, instagram, posts, ads };
+    return { ...empty, facebook, instagram, posts, ads, audience };
   } catch (err) {
     if (err instanceof MetaApiError && err.needsReconnect) return { ...empty, needsReconnect: true };
     throw err;
@@ -231,7 +239,7 @@ export async function getSocialDashboard(businessId: string, range: DayRange): P
   }
   const fresh = await loadFromMeta(businessId, range);
   // A section Meta failed on is retried on the next visit instead of being cached for hours.
-  const failed = [fresh.facebook, fresh.instagram, fresh.posts, fresh.ads].some((r) => r && !r.ok);
+  const failed = [fresh.facebook, fresh.instagram, fresh.posts, fresh.ads, fresh.audience].some((r) => r && !r.ok);
   if (!fresh.needsReconnect && !failed) {
     await prisma.socialMetricCache.upsert({
       where: { businessId_key: { businessId, key } },
@@ -268,6 +276,54 @@ export async function getAdsSection(businessId: string, range: DayRange): Promis
     throw err;
   }
   if (section.ads?.ok) {
+    await prisma.socialMetricCache.upsert({
+      where: { businessId_key: { businessId, key } },
+      create: { businessId, key, data: section as object, fetchedAt: new Date() },
+      update: { data: section as object, fetchedAt: new Date() },
+    });
+  }
+  return section;
+}
+
+export type CreativesSection = {
+  creatives: SectionResult<AdCreative[]> | null;
+  audience: SectionResult<{ age: Segment[]; gender: Segment[] }> | null;
+  placements: SectionResult<Segment[]> | null;
+  needsReconnect: boolean;
+  throttled?: boolean;
+  fetchedAt?: string;
+};
+
+/**
+ * The ads one by one (with their video numbers) and who they reach, for the
+ * Anuncios tab. A separate request and cache from the account totals so the
+ * rest of the tab doesn't wait for these (dozens of Meta calls).
+ */
+export async function getCreativesSection(businessId: string, range: DayRange): Promise<CreativesSection> {
+  const key = `creatives:${range.since}:${range.until}`;
+  const cached = await prisma.socialMetricCache.findUnique({ where: { businessId_key: { businessId, key } } });
+  if (cached && Date.now() - cached.fetchedAt.getTime() < ttlFor(range)) return { ...(cached.data as unknown as CreativesSection), fetchedAt: cached.fetchedAt.toISOString() };
+  if (await overHourlyReads(businessId)) return { creatives: null, audience: null, placements: null, needsReconnect: false, throttled: true };
+
+  const connection = await prisma.socialConnection.findUnique({ where: { businessId } });
+  const adAccountId = connection?.adAccountId;
+  if (!connection?.userAccessToken || !adAccountId) return { creatives: null, audience: null, placements: null, needsReconnect: false };
+  const userToken = decryptSecret(connection.userAccessToken);
+
+  let section: CreativesSection;
+  try {
+    const [creatives, audience, placements] = await Promise.all([
+      settle(() => adCreatives(adAccountId, userToken, range)),
+      settle(() => adAudience(adAccountId, userToken, range)),
+      settle(() => adPlacements(adAccountId, userToken, range)),
+    ]);
+    section = { creatives, audience, placements, needsReconnect: false, fetchedAt: new Date().toISOString() };
+  } catch (err) {
+    if (err instanceof MetaApiError && err.needsReconnect) return { creatives: null, audience: null, placements: null, needsReconnect: true };
+    throw err;
+  }
+  // Retried on the next visit when any part failed, like the dashboard.
+  if ([section.creatives, section.audience, section.placements].every((r) => r?.ok)) {
     await prisma.socialMetricCache.upsert({
       where: { businessId_key: { businessId, key } },
       create: { businessId, key, data: section as object, fetchedAt: new Date() },

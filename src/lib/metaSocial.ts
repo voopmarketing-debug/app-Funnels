@@ -352,6 +352,12 @@ export type SocialPost = {
   thumbnail: string | null;
   views: number | null;
   interactions: number;
+  /** Distinct people reached, when Meta gives it for this kind of post. */
+  reach?: number | null;
+  saves?: number | null;
+  shares?: number | null;
+  /** Average seconds a person watched, for videos and Reels. */
+  watchSeconds?: number | null;
 };
 
 async function firstPostMetric(postId: string, candidates: string[], token: string): Promise<number | null> {
@@ -399,7 +405,14 @@ export async function facebookPosts(pageId: string, pageToken: string, range: Da
     2,
   );
   const posts = rows.slice(0, MAX_POSTS);
-  const views = await inBatches(posts, 8, (p) => firstPostMetric(p.id, ["post_media_view", "post_impressions"], pageToken));
+  const extra = await inBatches(posts, 8, async (p) => {
+    const [views, watchMs] = await Promise.all([
+      firstPostMetric(p.id, ["post_media_view", "post_impressions"], pageToken),
+      // Only videos have a watch time; Meta renames these, a refusal just leaves it empty.
+      p.status_type === "added_video" ? firstPostMetric(p.id, ["post_video_avg_time_watched"], pageToken) : Promise.resolve(null),
+    ]);
+    return { views, watchSeconds: watchMs == null ? null : watchMs / 1000 };
+  });
   return posts.map((p, i) => ({
     id: p.id,
     network: "facebook",
@@ -408,7 +421,9 @@ export async function facebookPosts(pageId: string, pageToken: string, range: Da
     publishedAt: p.created_time,
     permalink: p.permalink_url ?? null,
     thumbnail: p.full_picture ?? null,
-    views: views[i],
+    views: extra[i].views,
+    shares: p.shares?.count ?? 0,
+    watchSeconds: extra[i].watchSeconds,
     interactions: (p.reactions?.summary?.total_count ?? 0) + (p.comments?.summary?.total_count ?? 0) + (p.shares?.count ?? 0),
   }));
 }
@@ -441,13 +456,17 @@ export async function instagramPosts(igUserId: string, pageToken: string, range:
       return t >= sinceMs && t <= untilMs;
     })
     .slice(0, MAX_POSTS);
+  const isVideo = (m: (typeof posts)[number]) => m.media_type === "VIDEO" || m.media_product_type === "REELS";
   const extra = await inBatches(posts, 6, async (m) => {
-    const [views, saved, shares] = await Promise.all([
+    const [views, saved, shares, reach, watchMs] = await Promise.all([
       firstPostMetric(m.id, ["views", "impressions", "reach"], pageToken),
       firstPostMetric(m.id, ["saved"], pageToken),
       firstPostMetric(m.id, ["shares"], pageToken),
+      // Reach and watch time only matter (and only exist) for videos: photos skip two calls each.
+      isVideo(m) ? firstPostMetric(m.id, ["reach"], pageToken) : Promise.resolve(null),
+      isVideo(m) ? firstPostMetric(m.id, ["ig_reels_avg_watch_time"], pageToken) : Promise.resolve(null),
     ]);
-    return { views, saved, shares };
+    return { views, saved, shares, reach, watchSeconds: watchMs == null ? null : watchMs / 1000 };
   });
   return posts.map((m, i) => ({
     id: m.id,
@@ -458,8 +477,70 @@ export async function instagramPosts(igUserId: string, pageToken: string, range:
     permalink: m.permalink ?? null,
     thumbnail: m.thumbnail_url ?? (m.media_type === "VIDEO" ? null : (m.media_url ?? null)),
     views: extra[i].views,
+    reach: extra[i].reach,
+    saves: extra[i].saved,
+    shares: extra[i].shares,
+    watchSeconds: extra[i].watchSeconds,
     interactions: (m.like_count ?? 0) + (m.comments_count ?? 0) + (extra[i].saved ?? 0) + (extra[i].shares ?? 0),
   }));
+}
+
+// ---- Who sees the content (Instagram) ----
+
+export type AudienceBucket = { label: string; value: number };
+export type InstagramAudience = {
+  /** Which group of people the numbers describe. */
+  basis: "reached" | "engaged" | "followers";
+  age: AudienceBucket[];
+  gender: AudienceBucket[];
+  cities: AudienceBucket[];
+};
+
+const GENDER_LABELS: Record<string, string> = { F: "Mujeres", M: "Hombres", U: "Sin definir" };
+
+/** The rows of one demographic breakdown, largest first. Meta answers `breakdowns[0].results[{dimension_values, value}]`. */
+export function parseDemographics(body: unknown): AudienceBucket[] {
+  const rows = (body as { data?: { total_value?: { breakdowns?: { results?: { dimension_values?: string[]; value?: number }[] }[] } }[] })?.data?.[0]?.total_value?.breakdowns?.[0]?.results;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((r) => ({ label: String(r.dimension_values?.[0] ?? ""), value: Number(r.value) || 0 }))
+    .filter((r) => r.label && r.value > 0)
+    .sort((a, b) => b.value - a.value);
+}
+
+const AUDIENCE_METRICS: { metric: string; basis: InstagramAudience["basis"] }[] = [
+  { metric: "reached_audience_demographics", basis: "reached" },
+  { metric: "engaged_audience_demographics", basis: "engaged" },
+  { metric: "follower_demographics", basis: "followers" },
+];
+
+/**
+ * Age, gender and top cities of the people who see the account. Instagram
+ * only reports this for accounts with 100+ followers, and renames the metric
+ * now and then, so the first one Meta accepts wins and an account without
+ * enough people simply has no audience block.
+ */
+export async function instagramAudience(igUserId: string, pageToken: string): Promise<InstagramAudience | null> {
+  for (const { metric, basis } of AUDIENCE_METRICS) {
+    const read = async (breakdown: string) => {
+      try {
+        return parseDemographics(await graph<unknown>(`${igUserId}/insights`, { metric, period: "lifetime", metric_type: "total_value", breakdown, timeframe: "last_30_days" }, pageToken));
+      } catch (err) {
+        if (err instanceof MetaApiError && err.needsReconnect) throw err;
+        return [];
+      }
+    };
+    const [age, gender, cities] = await Promise.all([read("age"), read("gender"), read("city")]);
+    if (age.length || gender.length || cities.length) {
+      return {
+        basis,
+        age: age.sort((a, b) => a.label.localeCompare(b.label)),
+        gender: gender.map((g) => ({ ...g, label: GENDER_LABELS[g.label] ?? g.label })),
+        cities: cities.slice(0, 6).map((c) => ({ ...c, label: c.label.split(",")[0] })),
+      };
+    }
+  }
+  return null;
 }
 
 // ---- Ads ----
