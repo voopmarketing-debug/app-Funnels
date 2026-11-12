@@ -267,7 +267,7 @@ export function FlowStudio({ businessId, automationId, initialName, initialEnabl
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <fieldset disabled={!canEdit} className="m-0 min-w-0 space-y-4 border-0 p-0">
-                {panel === "trigger" && <TriggerPanel triggers={triggers} data={data} onChange={setTriggers} />}
+                {panel === "trigger" && <TriggerPanel triggers={triggers} data={data} onChange={setTriggers} compact />}
                 {panel === "step" && selectedStep && (
                   <>
                     {(issues[selectedStep.id] ?? []).length > 0 && (

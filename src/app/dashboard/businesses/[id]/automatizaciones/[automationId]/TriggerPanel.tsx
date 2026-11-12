@@ -78,7 +78,7 @@ function TriggerCard({ index, trigger, data, onChange, onRemove }: { index: numb
   );
 }
 
-export function TriggerPanel({ triggers, data, onChange }: { triggers: Trigger[]; data: EditorData; onChange: (t: Trigger[]) => void }) {
+export function TriggerPanel({ triggers, data, onChange, compact = false }: { triggers: Trigger[]; data: EditorData; onChange: (t: Trigger[]) => void; compact?: boolean }) {
   const [adding, setAdding] = useState(false);
   const free = TYPES.filter((t) => !(["new_conversation", "appointment_booked"].includes(t) && triggers.some((x) => x.type === t)));
   return (
@@ -90,7 +90,7 @@ export function TriggerPanel({ triggers, data, onChange }: { triggers: Trigger[]
         <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">Qué hace que el flujo empiece. Con que pase uno basta. Un chat solo puede estar en un flujo a la vez.</p>
       </div>
       {triggers.length === 0 && <p className="rounded-lg border border-[#fab219]/50 bg-[#fab219]/10 px-3 py-2 text-xs text-ink">Sin disparador, el flujo nunca empieza. Agrega uno.</p>}
-      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <ul className={compact ? "grid grid-cols-1 gap-3" : "grid gap-3 md:grid-cols-2 xl:grid-cols-3"}>
         {triggers.map((t, i) => (
           <TriggerCard key={i} index={i} trigger={t} data={data} onChange={(next) => onChange(triggers.map((x, j) => (j === i ? next : x)))} onRemove={() => onChange(triggers.filter((_, j) => j !== i))} />
         ))}
