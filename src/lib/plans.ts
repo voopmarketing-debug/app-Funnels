@@ -119,6 +119,19 @@ export const PLAN_PRICE_COP: Record<PlanTier, number> = {
   SCALE: 2390000,
 };
 
+// Pesos per dollar behind PLAN_PRICE_COP above, rounded to the nearest 10.000.
+export const COP_PER_USD = 4000;
+
+/**
+ * What an account is charged per month in COP: the price the agency agreed
+ * with them (User.monthlyPriceUsd, converted the same way the list prices
+ * were) or the plan's list price when there is none.
+ */
+export function monthlyPriceCop(planTier: PlanTier, customPriceUsd: number | null): number {
+  if (customPriceUsd === null || !Number.isFinite(customPriceUsd) || customPriceUsd <= 0) return PLAN_PRICE_COP[planTier];
+  return Math.max(10_000, Math.round((customPriceUsd * COP_PER_USD) / 10_000) * 10_000);
+}
+
 // Which models the agency can pick for a client's WhatsApp replies (see
 // setAgentModel in lib/actions.ts). Haiku answers at roughly half the cost
 // per message; Sonnet is the default and the better closer.

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { createMpTrialPlan, fetchMpPreapproval, isMpPlanActive, type MpPreapproval } from "@/lib/mercadopago";
+import { cancelMpPreapproval, createMpTrialPlan, fetchMpPreapproval, isMpPlanActive, type MpPreapproval } from "@/lib/mercadopago";
 import { applySubscriptionCharge } from "@/lib/payments";
 import { mpPlanFor } from "@/lib/mercadopagoPlans";
 import { PLAN_LABELS, PLAN_PRICE_COP, TRIAL_DAYS, TRIAL_PLAN } from "@/lib/plans";
@@ -101,12 +101,28 @@ export async function trialDaysFor(sub: MpPreapproval): Promise<number> {
 }
 
 /** Activates an account from an authorized subscription, once (idempotent per subscription). */
-export async function activateFromPreapproval(sub: MpPreapproval, account: Account): Promise<void> {
+export async function activateFromPreapproval(sub: MpPreapproval, account: Account, opts: { replaceOld?: boolean } = {}): Promise<void> {
+  const link = () =>
+    prisma.user
+      .update({ where: { id: account.id }, data: { mpPreapprovalId: sub.id } })
+      .then(() => true)
+      .catch((err) => {
+        // Unique clash: the subscription is already linked to someone else.
+        console.error("Could not link Mercado Pago subscription", sub.id, "to account", account.id, err);
+        return false;
+      });
   if (!account.mpPreapprovalId) {
-    await prisma.user.update({ where: { id: account.id }, data: { mpPreapprovalId: sub.id } }).catch((err) => {
-      // Unique clash: the subscription is already linked to someone else.
-      console.error("Could not link Mercado Pago subscription", sub.id, "to account", account.id, err);
-    });
+    await link();
+  } else if (opts.replaceOld && account.mpPreapprovalId !== sub.id) {
+    // A renewal after the old subscription failed or was cancelled: the new
+    // one becomes the account's. Linked first, so the old one's cancellation
+    // notification finds no owner and can't cut the period just granted. An
+    // old subscription still charging is cancelled so nobody pays twice.
+    const old = await fetchMpPreapproval(account.mpPreapprovalId);
+    if (old && (await link()) && old.approved) {
+      const res = await cancelMpPreapproval(old.id);
+      if ("error" in res) console.error("Could not cancel the replaced subscription", old.id, res.error);
+    }
   }
   const trialDays = await trialDaysFor(sub);
   await applySubscriptionCharge({

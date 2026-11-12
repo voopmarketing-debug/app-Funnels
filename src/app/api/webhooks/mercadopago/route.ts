@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseMpNotification, fetchMpPayment, fetchMpPreapproval, fetchMpAuthorizedPayment } from "@/lib/mercadopago";
 import { applySubscriptionCharge, endAtCoveredPeriod } from "@/lib/payments";
 import { accountForPreapproval, activateFromPreapproval, savedTrialPlanId } from "@/lib/trial";
+import { applyOneMonthPayment, isRenewalPlan } from "@/lib/renewal";
 import { mpPlanFor } from "@/lib/mercadopagoPlans";
 import { prisma } from "@/lib/prisma";
 import { ADDON_PACKS } from "@/lib/addonPacks";
@@ -92,6 +93,19 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json({ received: true, actioned: true });
       }
+      // One month of the plan paid from the expired-plan screen: our own id
+      // rides along as external_reference, so it lands on the right account
+      // even if they paid with another email (PSE, Nequi, another card).
+      if (payment?.approved && payment.externalReference?.startsWith("renewal:")) {
+        const outcome = await applyOneMonthPayment(payment);
+        if (outcome === "ignored") {
+          await alertAgency(
+            "Pago de renovación sin aplicar",
+            `Pago ${payment.id} (${payment.amount} ${payment.currency}) con referencia ${payment.externalReference} no se pudo asociar a una cuenta. Revísalo en Mercado Pago y renueva a mano desde Clientes.`,
+          );
+        }
+        return NextResponse.json({ received: true, actioned: outcome !== "ignored" });
+      }
       // Packs paid through a fixed Mercado Pago link (no reference): match
       // the pack by its exact price and the account by the payer's email.
       const pack = payment?.approved ? ADDON_PACKS.find((p) => p.priceCop === payment.amount && payment.currency === "COP") : undefined;
@@ -169,8 +183,17 @@ export async function POST(req: NextRequest) {
       if (sub?.approved) {
         const account = await accountForPreapproval(sub);
         console.info("[mercadopago] preapproval account", sub.id, account ? account.id : "none");
+        const isRenewal = await isRenewalPlan(sub.planId);
         if (account) {
-          await activateFromPreapproval(sub, account);
+          await activateFromPreapproval(sub, account, { replaceOld: isRenewal });
+        } else if (isRenewal) {
+          // Paid with a Mercado Pago account whose email isn't the client's:
+          // the return page (which knows who is signed in) normally settles
+          // it. Never create a new account for a renewal.
+          await alertAgency(
+            "Renovación sin cuenta asociada",
+            `Alguien activó la renovación automática (suscripción ${sub.id}${sub.email ? `, correo de Mercado Pago ${sub.email}` : ""}) pero no supimos a qué cuenta pertenece. Si un cliente te escribe porque no se reactivó, renuévalo a mano desde Clientes.`,
+          );
         } else if (sub.planId && sub.planId === (await savedTrialPlanId())) {
           // A free trial we can't tie to anyone (two sign-ups at once, paid
           // with another email): the return page usually settles it; if not,
@@ -200,7 +223,12 @@ export async function POST(req: NextRequest) {
       const charge = await fetchMpAuthorizedPayment(notification.id);
       const sub = charge?.approved && charge.preapprovalId ? await fetchMpPreapproval(charge.preapprovalId) : null;
       const accountEmail = sub ? (await accountForPreapproval(sub))?.email : undefined;
-      if (charge && sub && (accountEmail ?? sub.email)) {
+      if (sub && !accountEmail && (await isRenewalPlan(sub.planId))) {
+        // The first charge can arrive before the return page links the
+        // subscription: the account is activated when it is linked, so
+        // don't let this create a new account for the payer's email.
+        console.info("[mercadopago] renewal charge waiting for its account", sub.id);
+      } else if (charge && sub && (accountEmail ?? sub.email)) {
         const plan = mpPlanFor(sub.reason, sub.amount) ?? { planTier: "STARTER" as const, months: 1 };
         await applySubscriptionCharge({
           provider: "mercadopago",

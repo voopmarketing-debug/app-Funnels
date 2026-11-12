@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isSubscriptionActive } from "@/lib/subscription";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { renewalContext } from "@/lib/renewal";
+import { RenewButtons } from "./RenewButtons";
 
 // Wraps every page scoped to one business (CRM, sitio web, analítica,
 // plantillas, conversaciones, la página del negocio en sí) — one place to
@@ -31,34 +33,38 @@ export default async function BusinessLayout({
   const blocked = membership.role !== "ADMIN" && !isSubscriptionActive(membership.business.subscriptionEndsAt);
   if (!blocked) return <>{children}</>;
 
+  // Only the account's owner can pay; a salesperson is told who to ask.
+  const renewal = membership.role === "OWNER" ? await renewalContext(session.user.id) : null;
+
   return (
-    <div className="mx-auto max-w-lg space-y-4 text-center">
-      <div className="fl-card space-y-3 p-8">
-        <h1 className="text-lg font-bold text-ink">Suscripción vencida</h1>
-        <p className="text-sm text-ink-muted">
-          El acceso de <strong>{membership.business.name}</strong> a Funnels Labs está pausado porque su período
-          pagado venció, y tu agente dejó de responder por ahora.
-        </p>
-        <p className="text-sm text-ink-muted">
-          <strong className="text-ink">No se borró nada:</strong> tus contactos, conversaciones, embudos, páginas y la
-          configuración de tu agente siguen guardados. Apenas renueves, todo vuelve tal cual estaba.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+    <div className="mx-auto max-w-md space-y-4 text-center">
+      <div className="fl-card space-y-5 p-6 sm:p-8">
+        <div className="space-y-2">
+          <h1 className="text-xl font-bold text-ink">Tu plan venció</h1>
+          <p className="text-sm text-ink-muted">
+            {renewal
+              ? "Tu agente dejó de responder. Renueva y vuelve a atender al instante: tus datos siguen aquí."
+              : `El agente de ${membership.business.name} está pausado. Avísale al dueño de la cuenta para que renueve.`}
+          </p>
+        </div>
+        {renewal ? (
+          <RenewButtons
+            priceLabel={`$${new Intl.NumberFormat("es-CO").format(renewal.priceCop)} COP/mes`}
+            supportLink={SUPPORT_WHATSAPP_LINK}
+          />
+        ) : (
           <a
             href={SUPPORT_WHATSAPP_LINK}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
+            className="inline-block rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover"
           >
-            Renovar por WhatsApp
+            Hablar con soporte
           </a>
-          <Link
-            href="/dashboard"
-            className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink transition hover:border-accent"
-          >
-            Volver
-          </Link>
-        </div>
+        )}
+        <Link href="/dashboard" className="block text-xs text-ink-muted underline hover:text-ink">
+          Volver
+        </Link>
       </div>
     </div>
   );
