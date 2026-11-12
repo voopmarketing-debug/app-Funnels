@@ -24,7 +24,7 @@ function fakeIo(over: Partial<LeadView> = {}, hooks: Partial<FlowIo> = {}) {
   const io: FlowIo = {
     lead: () => l,
     now: () => NOW,
-    sendText: async (text, opts) => void log.push(`text:${text}${opts.templateId ? `|tpl:${opts.templateId}` : ""}`),
+    sendText: async (text, opts) => void log.push(`text:${text}${opts.templateId ? `|tpl:${opts.templateId}` : ""}${opts.asTemplate ? "|asTemplate" : ""}`),
     sendButtons: async (text, buttons) => void log.push(`buttons:${text}|${buttons.map((b) => b.title).join(",")}`),
     sendList: async (text, _b, rows) => void log.push(`list:${text}|${rows.map((r) => r.title).join(",")}`),
     react: async (emoji) => void log.push(`react:${emoji}`),
@@ -242,6 +242,19 @@ describe("pause", () => {
     const done = await resumeAfterPause(f, "p", r.vars, io);
     expect(done.status).toBe("DONE");
     expect(log).toEqual(["text:Te escribo en un rato", "text:¿Pudiste verlo?"]);
+  });
+});
+
+describe("a message that is a template", () => {
+  it("is sent as the template, ignores buttons, and waits only if asked", async () => {
+    const { io, log } = fakeIo();
+    const f = flowOf({
+      a: { id: "a", type: "message", asTemplate: true, templateId: "tpl1", text: "Hola [nombre del lead]", buttons: [{ id: "b1", title: "Sí" }], next: "b" },
+      b: { id: "b", type: "message", asTemplate: true, templateId: "tpl2", text: "Gracias", waitForReply: true },
+    });
+    const r = await startFlow(f, io);
+    expect(log).toEqual(["text:Hola Ana|tpl:tpl1|asTemplate", "text:Gracias|tpl:tpl2|asTemplate"]);
+    expect(r.status).toBe("WAITING_REPLY");
   });
 });
 

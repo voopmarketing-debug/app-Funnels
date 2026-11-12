@@ -339,7 +339,7 @@ function Canvas({ flow, triggerSummaries, issues, selectedId, readOnly, data, ca
         </Panel>
         {!readOnly && wide && (
           <Panel position="bottom-left" className="max-w-xs rounded-xl border border-border bg-surface/90 px-3 py-2 text-xs leading-relaxed text-ink-muted shadow-sm">
-            Arrastra desde un punto de la tarjeta a otra para conectarlas. Si la sueltas en un espacio vacío, agregas un paso ahí.
+            Arrastra de un punto a otra tarjeta para conectar.
           </Panel>
         )}
       </ReactFlow>

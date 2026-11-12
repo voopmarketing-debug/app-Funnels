@@ -11,6 +11,10 @@ export function stepIssues(step: Step, flow: Flow): string[] {
   const out: string[] = [];
   switch (step.type) {
     case "message":
+      if (step.asTemplate) {
+        if (blank(step.templateId)) out.push("Elige la plantilla.");
+        break;
+      }
       if (blank(step.text)) out.push("Escribe el mensaje.");
       for (const b of step.buttons ?? []) {
         if (blank(b.title)) out.push("Un botón no tiene texto.");

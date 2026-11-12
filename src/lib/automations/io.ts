@@ -117,6 +117,10 @@ export async function createFlowIo(ctx: FlowRunContext): Promise<{ io: FlowIo; s
     now,
 
     async sendText(text, opts) {
+      if (opts.asTemplate) {
+        if (!opts.templateId) throw new Error("Este paso no tiene plantilla: elige una en el editor.");
+        return sendTemplate(opts.templateId);
+      }
       if (!(await windowOpen())) {
         if (!opts.templateId) throw new Error(WINDOW_CLOSED_ERROR);
         return sendTemplate(opts.templateId);

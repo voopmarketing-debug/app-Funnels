@@ -74,7 +74,7 @@ export function StepNode({ data, selected }: NodeProps<StepFlowNode>) {
       <div className="flex items-center gap-2 px-3 pt-3">
         <span className="fl-mono flex h-6 min-w-6 flex-none items-center justify-center rounded-md border border-border px-1 text-xs font-semibold text-ink-muted">{number}</span>
         <StepIcon type={step.type} size={26} />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{meta.label}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{step.type === "message" && step.asTemplate ? "Plantilla" : meta.label}</span>
         {issues.length > 0 && (
           <span title={issues.join("\n")} className="flex-none rounded-full bg-[#fab219]/20 px-1.5 text-xs font-bold text-[#b97800]" aria-label="Este paso necesita que lo completes">
             ⚠

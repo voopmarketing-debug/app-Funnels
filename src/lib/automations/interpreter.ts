@@ -13,7 +13,7 @@ export interface FlowIo {
   lead(): LeadView;
   now(): Date;
   /** Sends or throws. Inside the 24 h window it goes as written; outside it only an approved template can. */
-  sendText(text: string, opts: { templateId?: string; mediaUrl?: string; mediaType?: "image" | "document" | "video" }): Promise<void>;
+  sendText(text: string, opts: { templateId?: string; asTemplate?: boolean; mediaUrl?: string; mediaType?: "image" | "document" | "video" }): Promise<void>;
   sendButtons(text: string, buttons: { id: string; title: string }[], opts: { templateId?: string }): Promise<void>;
   sendList(text: string, buttonText: string, rows: { id: string; title: string; description?: string }[], opts: { templateId?: string }): Promise<void>;
   /** A failed reaction never stops a flow: implementations swallow their own errors. */
@@ -210,6 +210,11 @@ async function execute(step: Step, io: FlowIo): Promise<StepResult> {
 
 async function runMessage(step: Of<"message">, io: FlowIo): Promise<StepResult> {
   const text = renderText(step.text, io.lead());
+  if (step.asTemplate) {
+    // A template has no reply buttons or media of its own to follow: it is sent as approved.
+    await io.sendText(text, { templateId: step.templateId, asTemplate: true });
+    return step.waitForReply ? { kind: "wait" } : { kind: "next", next: step.next };
+  }
   if (step.buttons?.length) {
     await io.sendButtons(text, step.buttons.map((b) => ({ id: b.id, title: b.title })), { templateId: step.templateId });
     return { kind: "wait" };

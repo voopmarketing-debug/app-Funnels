@@ -7,7 +7,7 @@ import type { StepType } from "@/lib/automations/flow";
 export type StepGroup = "mensajes" | "logica" | "datos" | "tiempo" | "control" | "integracion";
 
 export const STEP_META: Record<StepType, { label: string; hint: string; group: StepGroup }> = {
-  message: { label: "Mensaje", hint: "Envía un texto, con botones para que el cliente elija.", group: "mensajes" },
+  message: { label: "Mensaje", hint: "Envía una plantilla aprobada.", group: "mensajes" },
   reaction: { label: "Reacción", hint: "Pone un emoji al último mensaje del cliente.", group: "mensajes" },
   comment: { label: "Comentario", hint: "Deja una nota interna que solo ve tu equipo.", group: "datos" },
   internal: { label: "Enviar mensaje interno", hint: "Avisa a tu equipo con una notificación.", group: "datos" },

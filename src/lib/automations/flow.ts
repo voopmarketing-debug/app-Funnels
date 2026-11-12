@@ -64,8 +64,10 @@ export const StepSchema = z.discriminatedUnion("type", [
     /** Up to 3 reply buttons: the flow waits and follows the one tapped. */
     buttons: z.array(Button).max(3).optional(),
     waitForReply: z.boolean().optional(),
-    /** The approved template to use when the 24 h window is closed. */
+    /** The approved template: the one to send (asTemplate) or the fallback when the 24 h window is closed. */
     templateId: z.string().max(40).optional(),
+    /** Send `templateId` as a template every time, inside the 24 h window too. `text` is then only a copy of its body, for the card. */
+    asTemplate: z.boolean().optional(),
     mediaUrl: z.string().url().max(2000).optional(),
     mediaType: z.enum(["image", "document", "video"]).optional(),
     next: Next,

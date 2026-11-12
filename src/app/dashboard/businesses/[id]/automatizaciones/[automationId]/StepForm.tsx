@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRef } from "react";
+import { askConfirm } from "@/components/ConfirmHost";
 import type { Action, Flow, Rule, Step } from "@/lib/automations/flow";
 import { stepTitle } from "@/lib/automations/flowEdit";
 import { TAGS } from "@/lib/templateTags";
@@ -12,7 +14,9 @@ import { ACTION_LABELS, RULE_FIELDS, VALIDATION_LABELS } from "../stepMeta";
 export type EditorData = {
   stages: { id: string; name: string; pipelineName: string }[];
   pipelines: { id: string; name: string }[];
-  templates: { id: string; name: string }[];
+  /** The approved templates, each with its body as it reads ([nombre del lead]) and the names of its link buttons. */
+  templates: { id: string; name: string; body: string; imageUrl: string | null; links: string[] }[];
+  templatesHref: string;
   /** The other flows of this business. */
   automations: { id: string; name: string }[];
 };
@@ -230,9 +234,73 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
   switch (step.type) {
     case "message": {
       const buttons = step.buttons ?? [];
+      const wait = (
+        <label className="flex items-center gap-2 text-sm text-ink">
+          <input type="checkbox" id={`${id}-wait`} checked={!!step.waitForReply} onChange={(e) => onChange({ ...step, waitForReply: e.target.checked })} />
+          Esperar la respuesta del cliente
+        </label>
+      );
+
+      if (step.asTemplate) {
+        const chosen = data.templates.find((t) => t.id === step.templateId);
+        return (
+          <div className="space-y-4">
+            {data.templates.length === 0 ? (
+              <div className="space-y-2 rounded-xl border border-dashed border-border p-4 text-sm text-ink-muted">
+                <p>Aún no tienes plantillas aprobadas por Meta.</p>
+                <Link href={data.templatesHref} className="font-semibold text-accent underline">
+                  Crear una plantilla
+                </Link>
+              </div>
+            ) : (
+              <Field label="Plantilla" htmlFor={`${id}-template`}>
+                <select
+                  id={`${id}-template`}
+                  value={chosen?.id ?? ""}
+                  onChange={(e) => {
+                    const t = data.templates.find((x) => x.id === e.target.value);
+                    if (t) onChange({ ...step, templateId: t.id, text: t.body.slice(0, 1000) });
+                  }}
+                  className={inputClass}
+                >
+                  <option value="" disabled>
+                    Elige una plantilla aprobada…
+                  </option>
+                  {data.templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {chosen && (
+              <div className="space-y-2 rounded-2xl rounded-tl-sm border border-border bg-surface-2/60 p-3" aria-label="Así lo ve el cliente">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {chosen.imageUrl && <img src={chosen.imageUrl} alt="" className="max-h-40 w-full rounded-lg object-cover" />}
+                <p className="whitespace-pre-wrap text-sm text-ink [overflow-wrap:anywhere]">{chosen.body}</p>
+                {chosen.links.map((l) => (
+                  <p key={l} className="rounded-lg border border-border bg-surface py-1.5 text-center text-xs font-semibold text-accent">
+                    {l}
+                  </p>
+                ))}
+              </div>
+            )}
+            {wait}
+            <button
+              type="button"
+              onClick={() => onChange({ ...step, asTemplate: undefined, templateId: undefined, text: step.templateId ? step.text : "" })}
+              className="text-xs font-semibold text-ink-muted underline transition hover:text-ink"
+            >
+              Escribir un mensaje en vez de usar plantilla
+            </button>
+          </div>
+        );
+      }
+
       return (
         <div className="space-y-4">
-          <Field label="Mensaje" htmlFor={`${id}-text`}>
+          <Field label="Mensaje" htmlFor={`${id}-text`} hint="Solo llega si el cliente escribió en las últimas 24 horas.">
             <TextWithTags id={`${id}-text`} value={step.text} onChange={(text) => onChange({ ...step, text })} maxLength={1000} />
           </Field>
           <div className="space-y-2">
@@ -265,34 +333,37 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
             >
               + Agregar botón
             </button>
-            <p className="text-xs leading-relaxed text-ink-faint">Cada botón abre su propio camino debajo. El cliente también puede escribir en vez de tocar: eso sigue por «Otra respuesta».</p>
           </div>
+          {buttons.length === 0 && wait}
           {buttons.length === 0 && (
-            <label className="flex items-start gap-2 text-sm text-ink">
-              <input type="checkbox" id={`${id}-wait`} checked={!!step.waitForReply} onChange={(e) => onChange({ ...step, waitForReply: e.target.checked })} className="mt-0.5" />
-              <span>
-                Esperar a que el cliente responda antes de seguir
-                <span className="block text-xs text-ink-faint">Mientras espera, la IA no contesta este chat.</span>
-              </span>
-            </label>
+            <Field label="Si pasaron más de 24 horas, enviar la plantilla" htmlFor={`${id}-template`}>
+              <select id={`${id}-template`} value={step.templateId ?? ""} onChange={(e) => onChange({ ...step, templateId: e.target.value || undefined })} className={inputClass}>
+                <option value="">Ninguna (el paso falla)</option>
+                {data.templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
           )}
-          <Field label="Plantilla para cuando pasaron más de 24 horas" htmlFor={`${id}-template`} hint="WhatsApp solo deja escribir libremente dentro de las 24 horas desde que el cliente te escribió. Después necesita una plantilla aprobada. Con botones no se puede usar plantilla.">
-            <select id={`${id}-template`} value={step.templateId ?? ""} onChange={(e) => onChange({ ...step, templateId: e.target.value || undefined })} disabled={buttons.length > 0} className={inputClass}>
-              <option value="">Ninguna: si pasaron 24 h, el paso falla</option>
-              {data.templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <button
+            type="button"
+            onClick={async () => {
+              if (buttons.length > 0 && !(await askConfirm({ title: "Usar una plantilla", message: "Las plantillas no llevan botones de respuesta: los botones de este paso y los caminos que salen de ellos se quitan.", confirmLabel: "Usar plantilla", tone: "danger" }))) return;
+              onChange({ ...step, asTemplate: true, templateId: undefined, buttons: undefined, mediaUrl: undefined, mediaType: undefined, text: "Elige una plantilla" });
+            }}
+            className="text-xs font-semibold text-ink-muted underline transition hover:text-ink"
+          >
+            Usar una plantilla aprobada
+          </button>
         </div>
       );
     }
 
     case "reaction":
       return (
-        <Field label="Emoji" htmlFor={`${id}-emoji`} hint="Se pone sobre el último mensaje del cliente. Solo dentro de las 24 horas.">
+        <Field label="Emoji" htmlFor={`${id}-emoji`} hint="Sobre el último mensaje del cliente.">
           <div className="flex flex-wrap items-center gap-2">
             <input id={`${id}-emoji`} value={step.emoji} onChange={(e) => onChange({ ...step, emoji: e.target.value.slice(0, 8) })} className={`${inputClass} w-24 text-center text-lg`} />
             {["👍", "❤️", "😊", "🙏", "🔥", "👀"].map((e) => (
@@ -306,14 +377,14 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
 
     case "comment":
       return (
-        <Field label="Nota interna" htmlFor={`${id}-text`} hint="Se agrega a las notas del lead. El cliente no la ve.">
+        <Field label="Nota interna" htmlFor={`${id}-text`} hint="El cliente no la ve.">
           <TextWithTags id={`${id}-text`} value={step.text} onChange={(text) => onChange({ ...step, text })} maxLength={1000} />
         </Field>
       );
 
     case "internal":
       return (
-        <Field label="Aviso para tu equipo" htmlFor={`${id}-text`} hint="Les llega como notificación en el panel y en el celular.">
+        <Field label="Aviso para tu equipo" htmlFor={`${id}-text`} hint="Les llega como notificación.">
           <TextWithTags id={`${id}-text`} value={step.text} onChange={(text) => onChange({ ...step, text })} rows={2} maxLength={500} />
         </Field>
       );
@@ -324,7 +395,7 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
           <Field label="Mensaje" htmlFor={`${id}-text`}>
             <TextWithTags id={`${id}-text`} value={step.text} onChange={(text) => onChange({ ...step, text })} maxLength={1000} />
           </Field>
-          <Field label="Texto del botón que abre el menú" htmlFor={`${id}-button`} hint="Máximo 20 letras.">
+          <Field label="Texto del botón que abre el menú" htmlFor={`${id}-button`} hint="Máximo 20 letras">
             <input id={`${id}-button`} value={step.buttonText} onChange={(e) => onChange({ ...step, buttonText: e.target.value })} maxLength={20} className={inputClass} />
           </Field>
           <div className="space-y-2">
@@ -359,7 +430,7 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
             <button type="button" disabled={step.rows.length >= 10} onClick={() => onChange({ ...step, rows: [...step.rows, { id: freshId("op", step.rows.map((r) => r.id)), title: "" }] })} className={smallButton}>
               + Agregar opción
             </button>
-            <p className="text-xs leading-relaxed text-ink-faint">Cada opción abre su propio camino debajo. Solo se puede enviar dentro de las 24 horas.</p>
+            <p className="text-xs text-ink-faint">Solo dentro de las 24 horas.</p>
           </div>
         </div>
       );
@@ -367,7 +438,7 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
     case "ai_condition":
       return (
         <div className="space-y-4">
-          <Field label="Pregunta para la IA" htmlFor={`${id}-question`} hint="La IA lee lo que escribió el cliente y elige el resultado que mejor encaja. Si ninguno encaja con claridad, sigue por «Ninguna de las anteriores» en vez de adivinar.">
+          <Field label="Pregunta para la IA" htmlFor={`${id}-question`} hint="La IA elige el resultado que mejor encaja.">
             <textarea id={`${id}-question`} value={step.question} onChange={(e) => onChange({ ...step, question: e.target.value })} rows={2} maxLength={300} className={`${inputClass} resize-y`} />
           </Field>
           <div className="space-y-2">
@@ -399,7 +470,7 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
 
     case "pause":
       return (
-        <Field label="Esperar" htmlFor={`${id}-amount`} hint="Máximo 30 días. Si el cliente escribe mientras tanto, la IA le responde y el flujo sigue esperando. La precisión es de unos minutos.">
+        <Field label="Esperar" htmlFor={`${id}-amount`} hint="Máximo 30 días.">
           <div className="flex items-center gap-2">
             <input id={`${id}-amount`} type="number" min={1} value={step.amount} onChange={(e) => onChange({ ...step, amount: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} className={`${inputClass} w-28`} />
             <select id={`${id}-unit`} aria-label="Unidad" value={step.unit} onChange={(e) => onChange({ ...step, unit: e.target.value as "minutes" | "hours" | "days" })} className={`${inputClass} w-36`}>
@@ -463,7 +534,7 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
           <Field label="Pregunta" htmlFor={`${id}-prompt`}>
             <TextWithTags id={`${id}-prompt`} value={step.prompt} onChange={(prompt) => onChange({ ...step, prompt })} rows={2} maxLength={500} />
           </Field>
-          <Field label="Si la respuesta no sirve, le decimos" htmlFor={`${id}-retry`} hint="Opcional. Si lo dejas vacío, se repite la pregunta.">
+          <Field label="Si la respuesta no sirve, le decimos" htmlFor={`${id}-retry`} hint="Opcional.">
             <input id={`${id}-retry`} value={step.retryPrompt ?? ""} onChange={(e) => onChange({ ...step, retryPrompt: e.target.value || undefined })} maxLength={500} placeholder="Ese dato no parece válido, ¿lo escribes de nuevo?" className={inputClass} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -475,7 +546,7 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
                 <option value="notes">Las notas del lead</option>
               </select>
             </Field>
-            <Field label="Veces que se vuelve a preguntar" htmlFor={`${id}-retries`} hint="De 0 a 5. Después sigue por «Sigue sin ser válida».">
+            <Field label="Veces que se vuelve a preguntar" htmlFor={`${id}-retries`} hint="De 0 a 5.">
               <input id={`${id}-retries`} type="number" min={0} max={5} value={step.maxRetries ?? 2} onChange={(e) => onChange({ ...step, maxRetries: Math.min(5, Math.max(0, Math.floor(Number(e.target.value) || 0))) })} className={inputClass} />
             </Field>
           </div>
@@ -484,7 +555,7 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
 
     case "goto":
       return (
-        <Field label="Saltar al paso" htmlFor={`${id}-target`} hint="Sirve para repetir una parte del flujo. Un flujo que da vueltas sin parar se detiene solo.">
+        <Field label="Saltar al paso" htmlFor={`${id}-target`} hint="Para repetir una parte del flujo.">
           <select id={`${id}-target`} value={step.target} onChange={(e) => onChange({ ...step, target: e.target.value })} className={inputClass}>
             {Object.values(flow.steps)
               .filter((s) => s.id !== step.id)
@@ -499,9 +570,9 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
 
     case "start_flow":
       return data.automations.length === 0 ? (
-        <p className="text-sm text-ink-muted">Todavía no tienes otros flujos. Crea otro y vuelve aquí para pasarle la conversación.</p>
+        <p className="text-sm text-ink-muted">Aún no tienes otros flujos.</p>
       ) : (
-        <Field label="Flujo que se inicia" htmlFor={`${id}-flow`} hint="Este flujo termina y la conversación sigue en el otro.">
+        <Field label="Flujo que se inicia" htmlFor={`${id}-flow`} hint="Este flujo termina aquí.">
           <select id={`${id}-flow`} value={step.automationId} onChange={(e) => onChange({ ...step, automationId: e.target.value })} className={inputClass}>
             <option value="">Elige un flujo…</option>
             {data.automations.map((a) => (
@@ -527,14 +598,14 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
               <input id={`${id}-url`} value={step.url} onChange={(e) => onChange({ ...step, url: e.target.value })} maxLength={2000} placeholder="https://tu-sistema.com/aviso" className={inputClass} />
             </Field>
           </div>
-          <p className="text-xs leading-relaxed text-ink-faint">Con POST enviamos el nombre, teléfono, correo, etiquetas y etapa del lead, y lo último que escribió. Solo direcciones públicas con https. Si la dirección falla, el flujo sigue igual.</p>
+          <p className="text-xs text-ink-faint">Solo direcciones https. Si falla, el flujo sigue.</p>
         </div>
       );
 
     case "round_robin":
       return (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-ink-muted">Reparte los leads por turnos entre estos embudos (elige al menos 2)</p>
+          <p className="text-xs font-semibold text-ink-muted">Reparte los leads por turnos entre (mínimo 2):</p>
           <ul className="space-y-1.5">
             {data.pipelines.map((p) => (
               <li key={p.id}>
@@ -550,7 +621,7 @@ export function StepForm({ step, flow, data, onChange }: { step: Step; flow: Flo
               </li>
             ))}
           </ul>
-          <p className="text-xs leading-relaxed text-ink-faint">Cada lead pasa a la primera etapa del embudo que le toca. Cada embudo es el tablero de una persona de tu equipo.</p>
+          
         </div>
       );
 

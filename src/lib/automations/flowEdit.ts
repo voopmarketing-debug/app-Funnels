@@ -96,7 +96,8 @@ export type EditContext = {
 export function defaultStep(type: StepType, id: string, flow: Flow, ctx: EditContext = {}): Step {
   switch (type) {
     case "message":
-      return { id, type, text: "Hola [nombre del lead], ¿en qué te puedo ayudar?" };
+      // A new message is a template to pick; the text is filled in when one is chosen.
+      return { id, type, asTemplate: true, text: "Elige una plantilla" };
     case "reaction":
       return { id, type, emoji: "👍" };
     case "comment":

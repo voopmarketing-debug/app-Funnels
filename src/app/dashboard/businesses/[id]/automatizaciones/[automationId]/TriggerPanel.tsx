@@ -10,11 +10,11 @@ import { inputClass, type EditorData } from "./StepForm";
 const TYPES = Object.keys(TRIGGER_LABELS) as Trigger["type"][];
 
 const HELP: Record<Trigger["type"], string> = {
-  new_conversation: "La primera vez que una persona te escribe por WhatsApp.",
-  message: "Cuando el mensaje del cliente trae alguna de estas palabras.",
-  stage_changed: "Cuando alguien de tu equipo (o tu agente de IA) mueve al lead a esa etapa.",
-  tag_added: "Cuando tu equipo le pone esa etiqueta al lead.",
-  appointment_booked: "Cuando el lead agenda una cita, por tu página o en el chat.",
+  new_conversation: "Una persona te escribe por primera vez.",
+  message: "El cliente escribe alguna de estas palabras.",
+  stage_changed: "Un lead llega a esa etapa.",
+  tag_added: "Un lead recibe esa etiqueta.",
+  appointment_booked: "Un lead agenda una cita.",
 };
 
 function TriggerCard({ index, trigger, data, onChange, onRemove }: { index: number; trigger: Trigger; data: EditorData; onChange: (t: Trigger) => void; onRemove: () => void }) {
@@ -46,10 +46,10 @@ function TriggerCard({ index, trigger, data, onChange, onRemove }: { index: numb
             El mensaje…
           </label>
           <select id={`${id}-match`} value={trigger.match ?? "contains"} onChange={(e) => onChange({ ...trigger, match: e.target.value as "contains" | "exact" })} className={inputClass}>
-            <option value="contains">Contiene la palabra (aunque tenga más texto)</option>
+            <option value="contains">Contiene la palabra</option>
             <option value="exact">Es exactamente la palabra</option>
           </select>
-          <p className="text-xs text-ink-faint">No importan las mayúsculas ni las tildes.</p>
+          
         </div>
       )}
       {trigger.type === "stage_changed" && (
@@ -87,7 +87,7 @@ export function TriggerPanel({ triggers, data, onChange, compact = false }: { tr
         <h2 id="triggers-title" className="text-base font-semibold text-ink">
           Disparadores
         </h2>
-        <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">Qué hace que el flujo empiece. Con que pase uno basta. Un chat solo puede estar en un flujo a la vez.</p>
+        <p className="mt-0.5 text-xs text-ink-muted">Con que pase uno, el flujo empieza.</p>
       </div>
       {triggers.length === 0 && <p className="rounded-lg border border-[#fab219]/50 bg-[#fab219]/10 px-3 py-2 text-xs text-ink">Sin disparador, el flujo nunca empieza. Agrega uno.</p>}
       <ul className={compact ? "grid grid-cols-1 gap-3" : "grid gap-3 md:grid-cols-2 xl:grid-cols-3"}>

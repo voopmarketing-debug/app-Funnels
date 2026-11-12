@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { checkTriggers, type Flow, type Trigger } from "@/lib/automations/flow";
 import { ensureLayout } from "@/lib/automations/flowLayout";
 import { canEditFlows } from "@/lib/flowAccess";
+import { bodyWithTags, readStoredTags } from "@/lib/templateTags";
 import { FlowEditor } from "./FlowEditor";
 import { FlowStudio } from "./studio/FlowStudio";
 
@@ -29,14 +30,27 @@ export default async function AutomationEditorPage({ params, searchParams }: { p
   const [stages, pipelines, templates, others, business] = await Promise.all([
     prisma.pipelineStage.findMany({ where: { businessId: id }, orderBy: [{ pipeline: { position: "asc" } }, { position: "asc" }], select: { id: true, name: true, pipeline: { select: { name: true } } } }),
     prisma.pipeline.findMany({ where: { businessId: id }, orderBy: { position: "asc" }, select: { id: true, name: true } }),
-    prisma.messageTemplate.findMany({ where: { businessId: id, status: "APPROVED" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.messageTemplate.findMany({ where: { businessId: id, status: "APPROVED" }, orderBy: { name: "asc" }, select: { id: true, name: true, bodyText: true, headerImageUrl: true, buttons: true, variableTags: true } }),
     prisma.automation.findMany({ where: { businessId: id, NOT: { id: automationId } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } }),
     prisma.business.findUnique({ where: { id }, select: { wabaAccessToken: true, wabaPhoneNumberId: true } }),
   ]);
 
   const parsedTriggers = checkTriggers(automation.triggers);
   const triggers: Trigger[] = parsedTriggers.ok ? parsedTriggers.triggers : [];
-  const editorData = { stages: stages.map((s) => ({ id: s.id, name: s.name, pipelineName: s.pipeline.name })), pipelines, templates, automations: others };
+  const editorData = {
+    stages: stages.map((s) => ({ id: s.id, name: s.name, pipelineName: s.pipeline.name })),
+    pipelines,
+    // Each template as the editor shows it: the body with its tags written out ([nombre del lead]), and its link buttons.
+    templates: templates.map((t) => ({
+      id: t.id,
+      name: t.name,
+      body: bodyWithTags(t.bodyText, readStoredTags(t.variableTags)),
+      imageUrl: t.headerImageUrl,
+      links: (Array.isArray(t.buttons) ? (t.buttons as { text?: unknown }[]) : []).map((b) => (typeof b?.text === "string" ? b.text : "")).filter(Boolean),
+    })),
+    templatesHref: `/dashboard/businesses/${id}/templates`,
+    automations: others,
+  };
   const canEdit = canEditFlows(membership.role, membership.canManageFlows);
   const whatsappConnected = !!business?.wabaAccessToken && !!business.wabaPhoneNumberId;
 

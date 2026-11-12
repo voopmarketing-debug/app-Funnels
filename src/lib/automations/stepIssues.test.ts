@@ -21,9 +21,17 @@ describe("stepIssues", () => {
 
   it("has nothing to say about a step that is ready", () => {
     const f = flow();
-    for (const type of ["message", "reaction", "comment", "internal", "list", "ai_condition", "pause", "actions", "condition", "validation", "stop"] as const) {
+    for (const type of ["reaction", "comment", "internal", "list", "ai_condition", "pause", "actions", "condition", "validation", "stop"] as const) {
       expect(stepIssues(defaultStep(type, "a", f), f), type).toEqual([]);
     }
+  });
+
+  it("asks a new message to pick its template, and is ready once it has one", () => {
+    const f = flow();
+    const fresh = defaultStep("message", "a", f);
+    expect(fresh).toMatchObject({ asTemplate: true });
+    expect(stepIssues(fresh, f)).toEqual(["Elige la plantilla."]);
+    expect(stepIssues({ id: "a", type: "message", asTemplate: true, templateId: "tpl1", text: "Hola" }, f)).toEqual([]);
   });
 
   it("agrees with the schema: a flow with no issues can be checked, one with issues cannot", () => {

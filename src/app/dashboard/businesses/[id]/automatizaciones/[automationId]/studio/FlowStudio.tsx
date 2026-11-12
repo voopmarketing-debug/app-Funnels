@@ -254,8 +254,7 @@ export function FlowStudio({ businessId, automationId, initialName, initialEnabl
                 <>
                   <StepIcon type={selectedStep.type} size={32} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-ink">{STEP_META[selectedStep.type].label}</p>
-                    <p className="truncate text-xs text-ink-muted">{STEP_META[selectedStep.type].hint}</p>
+                    <p className="truncate text-sm font-bold text-ink">{selectedStep.type === "message" && selectedStep.asTemplate ? "Plantilla" : STEP_META[selectedStep.type].label}</p>
                   </div>
                 </>
               ) : (
