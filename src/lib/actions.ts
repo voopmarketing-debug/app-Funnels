@@ -3039,6 +3039,24 @@ export async function removeTeamMember(businessId: string, userId: string): Prom
   revalidatePath("/dashboard/account");
 }
 
+/**
+ * The owner switches, per salesperson, whether they can create and edit the
+ * business's conversation flows ("Puede crear flujos" in Equipo de ventas).
+ */
+export async function setTeamMemberFlowAccess(businessId: string, userId: string, allowed: boolean): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Not authenticated");
+  await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+
+  const membership = await prisma.membership.findUnique({ where: { userId_businessId: { userId, businessId } } });
+  if (!membership) throw new Error("Esa persona no es parte de este equipo");
+  if (membership.role !== "MEMBER") throw new Error("El dueño y la agencia siempre pueden crear flujos");
+
+  await prisma.membership.update({ where: { userId_businessId: { userId, businessId } }, data: { canManageFlows: allowed } });
+  revalidatePath("/dashboard/account");
+  revalidatePath(`/dashboard/businesses/${businessId}/automatizaciones`);
+}
+
 /** Marks one notification read — e.g. when the user clicks it to open the conversation it's about. */
 export async function markNotificationRead(notificationId: string): Promise<void> {
   const session = await auth();

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { requireActiveAccount, requireBusinessOwnerOrAdmin } from "@/lib/authz";
+import { requireActiveAccount, requireFlowEditor } from "@/lib/authz";
 import { checkFlow, checkTriggers, MAX_STEPS, type Flow, type Trigger } from "./flow";
 import { referenceErrors, type KnownIds } from "./references";
 
@@ -24,7 +24,7 @@ async function guard(businessId: string, opts: { active?: boolean } = {}): Promi
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "Tu sesión venció. Vuelve a entrar." };
   try {
-    await requireBusinessOwnerOrAdmin(session.user.id, businessId);
+    await requireFlowEditor(session.user.id, businessId);
     // Turning a flow on spends WhatsApp messages: it needs an account in good standing.
     if (opts.active) await requireActiveAccount(session.user.id, businessId);
   } catch (err) {

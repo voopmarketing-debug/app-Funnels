@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checkTriggers } from "@/lib/automations/flow";
 import { triggerSummary } from "@/lib/automations/flowEdit";
+import { canEditFlows } from "@/lib/flowAccess";
 import { AutomationList, type AutomationRow } from "./AutomationList";
 
 export const metadata = { title: "Automatizaciones" };
@@ -50,7 +51,7 @@ export default async function AutomationsPage({ params }: { params: Promise<{ id
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">Conversaciones de WhatsApp que se arman solas: mensajes, botones, preguntas, etiquetas y cambios de etapa, según lo que haga cada cliente.</p>
         </div>
       </header>
-      <AutomationList businessId={id} rows={rows} canEdit={membership.role !== "MEMBER"} whatsappConnected={!!membership.business.wabaAccessToken && !!membership.business.wabaPhoneNumberId} />
+      <AutomationList businessId={id} rows={rows} canEdit={canEditFlows(membership.role, membership.canManageFlows)} whatsappConnected={!!membership.business.wabaAccessToken && !!membership.business.wabaPhoneNumberId} />
     </div>
   );
 }

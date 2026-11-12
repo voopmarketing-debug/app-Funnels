@@ -219,7 +219,7 @@ export function FlowStudio({ businessId, automationId, initialName, initialEnabl
 
       <div aria-live="polite" className="flex-none empty:hidden">
         {message && <p className={`border-b px-4 py-2 text-sm ${message.tone === "ok" ? "border-accent/40 bg-accent/10 text-ink" : "border-[#d03b3b]/40 bg-[#d03b3b]/10 text-ink"}`}>{message.text}</p>}
-        {!message && !canEdit && <p className="border-b border-border bg-surface px-4 py-2 text-sm text-ink-muted">Solo el dueño del negocio o la agencia pueden cambiar los flujos. Tú puedes verlo.</p>}
+        {!message && !canEdit && <p className="border-b border-border bg-surface px-4 py-2 text-sm text-ink-muted">No tienes permiso para cambiar flujos: puedes verlo, pero no modificarlo. Pídeselo al dueño del negocio.</p>}
         {!message && canEdit && !whatsappConnected && <p className="border-b border-[#fab219]/50 bg-[#fab219]/10 px-4 py-2 text-sm text-ink">Para encender un flujo primero conecta tu WhatsApp en la página del negocio.</p>}
         {!message && canEdit && whatsappConnected && problems.length > 0 && !enabled && (
           <p className="border-b border-border bg-surface px-4 py-2 text-sm text-ink-muted">

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checkTriggers, type Flow, type Trigger } from "@/lib/automations/flow";
 import { ensureLayout } from "@/lib/automations/flowLayout";
+import { canEditFlows } from "@/lib/flowAccess";
 import { FlowEditor } from "./FlowEditor";
 import { FlowStudio } from "./studio/FlowStudio";
 
@@ -20,7 +21,7 @@ export default async function AutomationEditorPage({ params, searchParams }: { p
   const { editor } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) return null;
-  const membership = await prisma.membership.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: id } }, select: { role: true } });
+  const membership = await prisma.membership.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: id } }, select: { role: true, canManageFlows: true } });
   if (!membership) notFound();
   const automation = await prisma.automation.findFirst({ where: { id: automationId, businessId: id } });
   if (!automation) notFound();
@@ -36,7 +37,7 @@ export default async function AutomationEditorPage({ params, searchParams }: { p
   const parsedTriggers = checkTriggers(automation.triggers);
   const triggers: Trigger[] = parsedTriggers.ok ? parsedTriggers.triggers : [];
   const editorData = { stages: stages.map((s) => ({ id: s.id, name: s.name, pipelineName: s.pipeline.name })), pipelines, templates, automations: others };
-  const canEdit = membership.role !== "MEMBER";
+  const canEdit = canEditFlows(membership.role, membership.canManageFlows);
   const whatsappConnected = !!business?.wabaAccessToken && !!business.wabaPhoneNumberId;
 
   // The canvas editor (full screen, left to right) is the editor for everyone;

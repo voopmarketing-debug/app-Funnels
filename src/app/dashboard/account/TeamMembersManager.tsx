@@ -2,10 +2,10 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { inviteTeamMember, removeTeamMember } from "@/lib/actions";
+import { inviteTeamMember, removeTeamMember, setTeamMemberFlowAccess } from "@/lib/actions";
 import { askConfirm } from "@/components/ConfirmHost";
 
-export type TeamMember = { userId: string; name: string | null; email: string };
+export type TeamMember = { userId: string; name: string | null; email: string; canManageFlows: boolean };
 
 export type TeamBusiness = {
   businessId: string;
@@ -47,6 +47,19 @@ export function TeamMembersManager({ businesses }: { businesses: TeamBusiness[] 
     });
   }
 
+  function handleFlowAccess(userId: string, allowed: boolean) {
+    setError(null);
+    setNotice(null);
+    startSubmitting(async () => {
+      try {
+        await setTeamMemberFlowAccess(selected.businessId, userId, allowed);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo cambiar el permiso");
+      }
+    });
+  }
+
   async function handleRemove(userId: string, label: string) {
     if (!(await askConfirm({ title: `¿Quitar a "${label}" del equipo?`, message: `Ya no podrá entrar a "${selected.businessName}".`, confirmLabel: "Sí, quitar", tone: "danger" })))
       return;
@@ -64,9 +77,9 @@ export function TeamMembersManager({ businesses }: { businesses: TeamBusiness[] 
         <h2 className="font-semibold text-ink">Equipo de ventas</h2>
         <p className="text-xs text-ink-muted">
           Crea un usuario y contraseña para cada vendedor, para que puedan estar conectados al mismo tiempo, cada
-          quien trabajando su propio embudo. Su acceso es limitado a propósito: pueden usar el CRM y las
-          conversaciones, pero no ven ni cambian las credenciales de WhatsApp, la configuración del agente de IA,
-          el plan, ni pueden borrar el negocio o el equipo.
+          quien trabajando su propio embudo. Su acceso es limitado a propósito: pueden usar el CRM, las
+          conversaciones y crear flujos de automatización (lo puedes apagar por persona), pero no ven ni cambian las
+          credenciales de WhatsApp, la configuración del agente de IA, el plan, ni pueden borrar el negocio o el equipo.
         </p>
       </div>
 
@@ -110,6 +123,18 @@ export function TeamMembersManager({ businesses }: { businesses: TeamBusiness[] 
                 <p className="truncate text-sm text-ink">{member.name ?? member.email}</p>
                 <p className="fl-mono truncate text-[13px] text-ink-faint">{member.email}</p>
               </div>
+              <label className="flex flex-none cursor-pointer items-center gap-2 text-xs text-ink-muted" title="Si lo apagas, esta persona puede ver los flujos pero no crearlos ni cambiarlos">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={member.canManageFlows}
+                  disabled={isSubmitting}
+                  onChange={(e) => handleFlowAccess(member.userId, e.target.checked)}
+                  aria-label={`Puede crear flujos: ${member.name ?? member.email}`}
+                  className="h-4 w-4 accent-[var(--accent)]"
+                />
+                Puede crear flujos
+              </label>
               <button
                 type="button"
                 disabled={removingId === member.userId}

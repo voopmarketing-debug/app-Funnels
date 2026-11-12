@@ -41,7 +41,7 @@ export default async function AccountPage() {
         businessId: m.business.id,
         businessName: m.business.name,
         limit: TEAM_MEMBER_LIMITS[m.business.planTier],
-        members: members.map((mm) => ({ userId: mm.user.id, name: mm.user.name, email: mm.user.email })),
+        members: members.map((mm) => ({ userId: mm.user.id, name: mm.user.name, email: mm.user.email, canManageFlows: mm.canManageFlows })),
       };
     }),
   );

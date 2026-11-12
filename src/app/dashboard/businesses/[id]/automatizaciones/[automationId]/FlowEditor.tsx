@@ -150,7 +150,7 @@ export function FlowEditor({ businessId, automationId, initialName, initialEnabl
             </div>
           )}
         </div>
-        {!canEdit && <p className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-ink-muted">Solo el dueño del negocio o la agencia pueden cambiar los flujos. Tú puedes verlo.</p>}
+        {!canEdit && <p className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-ink-muted">No tienes permiso para cambiar flujos: puedes verlo, pero no modificarlo. Pídeselo al dueño del negocio.</p>}
         {!whatsappConnected && canEdit && <p className="rounded-xl border border-[#fab219]/50 bg-[#fab219]/10 px-4 py-3 text-sm text-ink">Para encender un flujo primero conecta tu WhatsApp en la página del negocio.</p>}
         <div aria-live="polite">
           {message && <p className={`rounded-xl border px-4 py-3 text-sm ${message.tone === "ok" ? "border-accent/40 bg-accent/10 text-ink" : "border-[#d03b3b]/40 bg-[#d03b3b]/10 text-ink"}`}>{message.text}</p>}

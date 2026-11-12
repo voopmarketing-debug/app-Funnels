@@ -227,6 +227,11 @@ model Membership {
   userId     String
   businessId String
   createdAt  DateTime @default(now())
+  // Whether a MEMBER (salesperson) can create and edit the business's
+  // conversation flows (automations). The owner switches it per person from
+  // Mi perfil → Equipo de ventas. OWNER and ADMIN always can, so it only
+  // matters for MEMBER.
+  canManageFlows Boolean @default(true)
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { isSubscriptionActive } from "@/lib/subscription";
+import { FLOW_ACCESS_DENIED, canEditFlows } from "@/lib/flowAccess";
 
 /**
  * Multi-tenant guard: throws unless the given user belongs to the business.
@@ -32,6 +33,21 @@ export async function requireBusinessOwnerOrAdmin(userId: string, businessId: st
 
   if (!membership || membership.role === "MEMBER") {
     throw new Error("Solo el dueño del negocio o la agencia pueden hacer esto");
+  }
+}
+
+/**
+ * Guard for creating and editing conversation flows: the owner and the agency,
+ * and a salesperson (MEMBER) only while the owner leaves "Puede crear flujos"
+ * on for them (see canEditFlows in lib/flowAccess.ts).
+ */
+export async function requireFlowEditor(userId: string, businessId: string): Promise<void> {
+  const membership = await prisma.membership.findUnique({
+    where: { userId_businessId: { userId, businessId } },
+    select: { role: true, canManageFlows: true },
+  });
+  if (!membership || !canEditFlows(membership.role, membership.canManageFlows)) {
+    throw new Error(FLOW_ACCESS_DENIED);
   }
 }
 
