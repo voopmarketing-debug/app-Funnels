@@ -10,6 +10,8 @@ import { NotificationBell, type NotificationItem } from "./NotificationBell";
 import { PushBanner } from "./PushNotifications";
 import { NotificationSoundPoller } from "./NotificationSoundPoller";
 import { AssistantChat } from "@/components/assistant/AssistantChat";
+import { renewalNotice } from "@/lib/renewal";
+import { RenewalBanner } from "./RenewalBanner";
 
 // The Asistente Funnels runs a few Claude calls per message from these pages.
 export const maxDuration = 120;
@@ -118,6 +120,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
   }
 
+  // "Tu plan vence…" for accounts nobody renews for them (the agency has none).
+  const notice = isAgencyAdmin ? null : await renewalNotice(session.user.id).catch(() => null);
+
   async function handleSignOut() {
     "use server";
     await signOut({ redirectTo: "/login" });
@@ -150,6 +155,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </Link>
         </header>
         <main className="min-w-0 flex-1 p-4 md:p-6">
+          {notice && <RenewalBanner daysLeft={notice.daysLeft} expired={notice.expired} />}
           <PushBanner />
           {children}
         </main>

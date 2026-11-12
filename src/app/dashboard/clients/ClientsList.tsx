@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { SubscriptionDatesEditor } from "./SubscriptionDatesEditor";
 import { AddonGrantCell } from "./AddonGrantCell";
 import { ResetPasswordButton } from "./ResetPasswordButton";
+import { RenewalReminderButton } from "./RenewalReminderButton";
 import { PendingCardStrip } from "./PendingCardStrip";
 import type { ClientRow } from "@/lib/clientRows";
 
@@ -147,6 +148,8 @@ export function ClientsList({ rows, nowIso, supportHost }: { rows: ClientRow[]; 
                 : r.status === "unset"
                   ? "Sin fecha de vencimiento"
                   : `Vence ${fmtDate(r.endsAt!)} · ${r.days} d`;
+          // Who has to be chased: a plan nobody renews by itself, near its end or past it.
+          const manualCharge = !r.autoRenew && !r.pendingCard && (r.status === "expiring" || r.status === "expired");
           return (
             <article key={r.userId} className={isOpen ? "bg-surface-2/40" : ""}>
               <button
@@ -169,7 +172,10 @@ export function ClientsList({ rows, nowIso, supportHost }: { rows: ClientRow[]; 
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.dot }} />
                     {s.label}
                   </span>
-                  <span className="text-xs text-ink-muted md:mt-0.5 md:block">{statusDetail}</span>
+                  <span className="text-xs text-ink-muted md:mt-0.5 md:block">
+                    {statusDetail}
+                    {manualCharge && <span className="font-semibold text-[var(--status-warn)]"> · cobro manual</span>}
+                  </span>
                 </span>
                 <span className="hidden min-w-0 md:block">
                   <span className="block text-xs text-ink-muted">IA este mes</span>
@@ -275,7 +281,12 @@ export function ClientsList({ rows, nowIso, supportHost }: { rows: ClientRow[]; 
                   <div className="grid gap-4 lg:grid-cols-3">
                     <div className="space-y-2 rounded-xl border border-border p-3">
                       <p className="text-sm font-semibold text-ink">Membresía</p>
-                      <p className="text-xs text-ink-muted">Se renueva sola con cada pago. Cámbiala aquí solo en casos especiales.</p>
+                      <p className="text-xs text-ink-muted">
+                        {r.autoRenew
+                          ? "Cobro automático: se renueva sola con cada pago. Cámbiala aquí solo en casos especiales."
+                          : "Cobro manual: nadie lo cobra solo. Recibe avisos automáticos antes de vencer y renueva con un botón."}
+                      </p>
+                      {!r.autoRenew && !r.pendingCard && <RenewalReminderButton userId={r.userId} />}
                       {r.lines.map((l) => (
                         <div key={l.businessId} className="space-y-1">
                           {r.lines.length > 1 && <p className="text-xs font-medium text-ink">{l.name}</p>}

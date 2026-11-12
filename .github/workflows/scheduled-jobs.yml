@@ -1,5 +1,6 @@
 # Every 10 minutes: appointment reminders (~1 hour before), the retry of
-# unanswered chats and keyword auto-replies to comments Meta didn't notify. Vercel Hobby crons only run once a day, so GitHub calls
+# unanswered chats, keyword auto-replies to comments Meta didn't notify and the
+# emails asking owners to renew a plan that is about to end. Vercel Hobby crons only run once a day, so GitHub calls
 # the protected routes instead. Needs the repository secret CRON_SECRET
 # (same value as in Vercel).
 name: Scheduled jobs
@@ -32,3 +33,7 @@ jobs:
         if: always()
         run: |
           curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://agente.funnelslabs.app/api/cron/comment-replies
+      - name: Renewal reminders
+        if: always()
+        run: |
+          curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://agente.funnelslabs.app/api/cron/renewal-reminders

@@ -10,6 +10,8 @@ import { isSubscriptionActive } from "@/lib/subscription";
 // monthly subscription that renews itself, or one month paid once.
 
 const TIER_ORDER: PlanTier[] = ["STARTER", "PRO", "SCALE"];
+const DAY_MS = 86_400_000;
+export const NOTICE_DAYS = 5;
 const RENEWAL_PLAN_PREFIX = "mp_renewal_plan:";
 
 export type RenewalContext = {
@@ -19,6 +21,10 @@ export type RenewalContext = {
   priceCop: number;
   // Whether any line the account owns is still inside its paid period.
   active: boolean;
+  // When the paid period ends (the latest of its lines); null when never dated.
+  endsAt: Date | null;
+  // Over, or ending within NOTICE_DAYS: time to ask for the renewal.
+  ending: boolean;
 };
 
 /** What this signed-in account would pay to renew; null when it owns no business. */
@@ -34,13 +40,50 @@ export async function renewalContext(userId: string): Promise<RenewalContext | n
   if (!user || user.memberships.length === 0) return null;
   // One subscription covers every line the account owns: the highest plan among them.
   const planTier = user.memberships.map((m) => m.business.planTier).sort((a, b) => TIER_ORDER.indexOf(b) - TIER_ORDER.indexOf(a))[0];
+  const active = user.memberships.some((m) => isSubscriptionActive(m.business.subscriptionEndsAt));
+  const endsAt = user.memberships.reduce<Date | null>((max, m) => {
+    const end = m.business.subscriptionEndsAt;
+    return end && (!max || end > max) ? end : max;
+  }, null);
   return {
     userId,
     email: user.email,
     planTier,
     priceCop: monthlyPriceCop(planTier, user.monthlyPriceUsd),
-    active: user.memberships.some((m) => isSubscriptionActive(m.business.subscriptionEndsAt)),
+    active,
+    endsAt,
+    ending: !active || (!!endsAt && endsAt.getTime() - Date.now() <= NOTICE_DAYS * DAY_MS),
   };
+}
+
+/**
+ * The "your plan is about to end" notice at the top of the panel. Only for
+ * accounts nobody renews for them: not those with a Mercado Pago card
+ * subscription or a Hotmart one, which charge by themselves.
+ */
+export async function renewalNotice(userId: string, now = new Date()): Promise<{ daysLeft: number; expired: boolean } | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      mpPreapprovalId: true,
+      activationRequired: true,
+      memberships: { where: { role: "OWNER" }, select: { business: { select: { subscriptionEndsAt: true } } } },
+    },
+  });
+  if (!user || user.mpPreapprovalId || user.activationRequired) return null;
+  const ends = user.memberships.map((m) => m.business.subscriptionEndsAt).filter((d): d is Date => !!d);
+  if (ends.length === 0) return null;
+  const end = new Date(Math.max(...ends.map((d) => d.getTime())));
+  const ms = end.getTime() - now.getTime();
+  if (ms > NOTICE_DAYS * DAY_MS) return null;
+  const latest = await prisma.paymentEvent.findFirst({
+    where: { email: user.email.toLowerCase(), action: "grant" },
+    orderBy: { createdAt: "desc" },
+    select: { provider: true },
+  });
+  if (latest?.provider === "hotmart") return null;
+  return { daysLeft: Math.max(0, Math.ceil(ms / DAY_MS)), expired: ms <= 0 };
 }
 
 export function renewalTitle(planTier: PlanTier): string {

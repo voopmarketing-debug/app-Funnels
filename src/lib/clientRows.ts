@@ -28,6 +28,9 @@ export type ClientRow = {
   checkoutOpenedAt: string | null;
   // A Mercado Pago subscription is linked to the account.
   cardOnFile: boolean;
+  // Charged by itself every month (a card subscription or Hotmart): nobody
+  // has to renew it by hand.
+  autoRenew: boolean;
   planTier: PlanTier;
   planLabel: string;
   priceUsd: number;
@@ -152,6 +155,7 @@ export async function getClientRows(adminUserId: string, now = new Date()): Prom
         pendingCard: user.activationRequired,
         checkoutOpenedAt: user.trialCheckoutAt?.toISOString() ?? null,
         cardOnFile: !!user.mpPreapprovalId,
+        autoRenew: !!user.mpPreapprovalId,
         planTier: business.planTier,
         planLabel: PLAN_LABELS[business.planTier],
         priceUsd: user.monthlyPriceUsd ?? PLAN_PRICE_USD[business.planTier],
@@ -202,6 +206,7 @@ export async function getClientRows(adminUserId: string, now = new Date()): Prom
     // that sign-up and it only covered the trial's few days.
     const grants = grantsBy.get(row.email.toLowerCase()) ?? [];
     const latest = grants[0];
+    if (latest?.provider === "hotmart") row.autoRenew = true;
     // (A card linked with no recorded charge at all is the same trial.)
     const trialStart = latest ? (latest.transaction.startsWith("preapproval:") ? latest.createdAt : null) : row.cardOnFile && row.startedAt ? new Date(row.startedAt) : null;
     const onTrial = !!trialStart && !!row.endsAt && new Date(row.endsAt).getTime() - trialStart.getTime() <= TRIAL_SPAN_MS;

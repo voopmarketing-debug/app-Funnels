@@ -5,6 +5,7 @@ import { SignupShell } from "@/components/SignupShell";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { claimReturnedPayment, claimReturnedRenewal, renewalContext } from "@/lib/renewal";
 import { WaitForActivation } from "../activar/TrialForm";
+import { RenewButtons } from "../dashboard/businesses/[id]/RenewButtons";
 
 const ID = /^[\w-]{1,64}$/;
 
@@ -36,8 +37,39 @@ export default async function RenovarPage({
   }
 
   const ctx = await renewalContext(userId);
-  // Opened by hand, or not an owner: nothing to show here.
-  if (!ctx || (q.estado !== "listo" && ctx.active)) redirect("/dashboard");
+  // Not an owner: nothing to show here.
+  if (!ctx) redirect("/dashboard");
+  // Back from Mercado Pago ("listo"), the answer is below. Otherwise this is
+  // the renewal screen (the banner and the emails come here): only while the
+  // plan is ending or has ended, so nobody pays for days they already have.
+  if (q.estado !== "listo" && !ctx.ending) redirect("/dashboard");
+  if (q.estado !== "listo") {
+    const dateLabel = ctx.endsAt
+      ? new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", timeZone: "America/Bogota" }).format(ctx.endsAt)
+      : null;
+    return (
+      <SignupShell
+        aside={
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold text-ink">Que tu agente no se detenga</h2>
+            <p className="text-ink-muted">Renueva en un minuto. Tus datos y conversaciones siguen guardados.</p>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <div className="space-y-1 text-center">
+            <h1 className="text-2xl font-bold">
+              {ctx.active ? (dateLabel ? `Tu plan vence el ${dateLabel}` : "Tu plan está por vencer") : "Tu plan venció"}
+            </h1>
+            <p className="text-sm text-ink-muted">
+              {ctx.active ? "Renueva ahora y sigue atendiendo sin pausas." : "Renueva y tu agente vuelve a responder al instante."}
+            </p>
+          </div>
+          <RenewButtons priceLabel={`$${new Intl.NumberFormat("es-CO").format(ctx.priceCop)} COP/mes`} supportLink={SUPPORT_WHATSAPP_LINK} />
+        </div>
+      </SignupShell>
+    );
+  }
 
   return (
     <SignupShell
