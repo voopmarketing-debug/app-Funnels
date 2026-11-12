@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { FunnelsLogoBadge } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
@@ -160,6 +160,92 @@ function CloseIcon() {
   );
 }
 
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={`flex-none transition-transform ${open ? "" : "-rotate-90"}`}
+      aria-hidden="true"
+    >
+      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Which groups the person folded, remembered in this browser. Kept in a tiny
+// external store so the server render (everything open) and the first client
+// render agree, and the saved choice applies right after hydration.
+const COLLAPSED_KEY = "fl-nav-collapsed";
+const collapsedListeners = new Set<() => void>();
+let collapsedMemory = "";
+
+function readCollapsed(): string {
+  try {
+    return window.localStorage.getItem(COLLAPSED_KEY) ?? collapsedMemory;
+  } catch {
+    return collapsedMemory;
+  }
+}
+
+function subscribeCollapsed(cb: () => void) {
+  collapsedListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    collapsedListeners.delete(cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+
+function writeCollapsed(ids: string[]) {
+  collapsedMemory = ids.join(",");
+  try {
+    window.localStorage.setItem(COLLAPSED_KEY, collapsedMemory);
+  } catch {
+    // Private mode or blocked storage: the choice lasts until the page reloads.
+  }
+  collapsedListeners.forEach((cb) => cb());
+}
+
+type NavItem = { href: string; label: string; icon: React.ReactNode; active: boolean };
+type NavGroup = { id: string; title: string; items: NavItem[] };
+
+function NavGroupSection({ group, collapsed, onToggle }: { group: NavGroup; collapsed: boolean; onToggle: () => void }) {
+  // The group you are in stays open, so the highlighted page is never hidden.
+  const hasActive = group.items.some((item) => item.active);
+  const open = hasActive || !collapsed;
+  const listId = `fl-nav-group-${group.id}`;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={hasActive ? undefined : onToggle}
+        aria-expanded={open}
+        aria-controls={listId}
+        className={`flex w-full items-center justify-between rounded-md px-3 text-left pb-0.5 pt-2 text-[11px] font-semibold uppercase tracking-wider text-ink-muted/80 transition hover:text-ink ${
+          hasActive ? "cursor-default" : ""
+        }`}
+      >
+        {group.title}
+        <ChevronIcon open={open} />
+      </button>
+      {open && (
+        <div id={listId} className="flex flex-col gap-1">
+          {group.items.map((item) => (
+            <Link key={item.href} href={item.href} className="fl-nav-item" data-active={item.active}>
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // The link list, shared by the always-visible desktop <aside> and the
 // slide-in mobile drawer below — kept in one place so the two never drift
 // out of sync with each other.
@@ -175,100 +261,69 @@ function NavLinks({
   onSignOut: () => Promise<void>;
 }) {
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href));
+  const collapsedRaw = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => "");
+  const collapsedIds = collapsedRaw ? collapsedRaw.split(",") : [];
+
+  function toggleGroup(id: string) {
+    writeCollapsed(collapsedIds.includes(id) ? collapsedIds.filter((x) => x !== id) : [...collapsedIds, id]);
+  }
+
+  const biz = primaryBusinessId ? `/dashboard/businesses/${primaryBusinessId}` : null;
+  const item = (href: string, label: string, icon: React.ReactNode, active = isActive(href)): NavItem => ({ href, label, icon, active });
+
+  // Empty groups (a login without a business, or a non-agency login) drop out.
+  const groups: NavGroup[] = [
+    {
+      id: "ventas",
+      title: "Ventas",
+      items: [
+        biz && item(`${biz}/crm`, "CRM", <CrmIcon />),
+        isAgencyAdmin && item("/dashboard/clients", "Clientes", <UsersIcon />),
+        biz && item(`${biz}/templates`, "Plantillas", <TemplateIcon />),
+      ].filter((x): x is NavItem => !!x),
+    },
+    {
+      id: "ia",
+      title: "IA y flujos",
+      items: [
+        item("/dashboard/agentes", "Agentes de IA", <BotIcon />, isActive("/dashboard/agentes") || pathname === "/dashboard/businesses/new"),
+        biz && item(`${biz}/automatizaciones`, "Automatizaciones", <FlowIcon />),
+      ].filter((x): x is NavItem => !!x),
+    },
+    {
+      id: "marketing",
+      title: "Marketing",
+      items: [biz && item(`${biz}/redes`, "Redes sociales", <SocialIcon />), biz && item(`${biz}/website`, "Sitio web", <WebsiteIcon />)].filter(
+        (x): x is NavItem => !!x,
+      ),
+    },
+    {
+      id: "analisis",
+      title: "Análisis",
+      items: [biz && item(`${biz}/analytics`, "KPIs", <ChartIcon />), isAgencyAdmin && item("/dashboard/rentabilidad", "Rentabilidad", <CoinIcon />)].filter(
+        (x): x is NavItem => !!x,
+      ),
+    },
+    {
+      id: "integraciones",
+      title: "Integraciones",
+      items: [isAgencyAdmin && item("/dashboard/meta", "Conexión Meta", <WhatsAppIcon />)].filter((x): x is NavItem => !!x),
+    },
+  ].filter((g) => g.items.length > 0);
 
   return (
     <>
-      <nav className="flex flex-1 flex-col gap-1 px-3">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3">
         <Link href="/dashboard" className="fl-nav-item" data-active={isActive("/dashboard")}>
           <HomeIcon />
           Inicio
         </Link>
-        <Link
-          href="/dashboard/agentes"
-          className="fl-nav-item"
-          data-active={isActive("/dashboard/agentes") || pathname === "/dashboard/businesses/new"}
-        >
-          <BotIcon />
-          Agentes de IA
-        </Link>
-        {primaryBusinessId && (
-          <Link
-            href={`/dashboard/businesses/${primaryBusinessId}/analytics`}
-            className="fl-nav-item"
-            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/analytics`)}
-          >
-            <ChartIcon />
-            KPIs
-          </Link>
-        )}
-        {primaryBusinessId && (
-          <Link
-            href={`/dashboard/businesses/${primaryBusinessId}/crm`}
-            className="fl-nav-item"
-            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/crm`)}
-          >
-            <CrmIcon />
-            CRM
-          </Link>
-        )}
-        {primaryBusinessId && (
-          <Link
-            href={`/dashboard/businesses/${primaryBusinessId}/website`}
-            className="fl-nav-item"
-            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/website`)}
-          >
-            <WebsiteIcon />
-            Sitio web
-          </Link>
-        )}
-        {primaryBusinessId && (
-          <Link
-            href={`/dashboard/businesses/${primaryBusinessId}/redes`}
-            className="fl-nav-item"
-            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/redes`)}
-          >
-            <SocialIcon />
-            Redes sociales
-          </Link>
-        )}
-        {primaryBusinessId && (
-          <Link
-            href={`/dashboard/businesses/${primaryBusinessId}/templates`}
-            className="fl-nav-item"
-            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/templates`)}
-          >
-            <TemplateIcon />
-            Plantillas
-          </Link>
-        )}
-        {primaryBusinessId && (
-          <Link
-            href={`/dashboard/businesses/${primaryBusinessId}/automatizaciones`}
-            className="fl-nav-item"
-            data-active={isActive(`/dashboard/businesses/${primaryBusinessId}/automatizaciones`)}
-          >
-            <FlowIcon />
-            Automatizaciones
-          </Link>
-        )}
-        {isAgencyAdmin && (
-          <Link href="/dashboard/clients" className="fl-nav-item" data-active={isActive("/dashboard/clients")}>
-            <UsersIcon />
-            Clientes
-          </Link>
-        )}
-        {isAgencyAdmin && (
-          <Link href="/dashboard/rentabilidad" className="fl-nav-item" data-active={isActive("/dashboard/rentabilidad")}>
-            <CoinIcon />
-            Rentabilidad
-          </Link>
-        )}
-        {isAgencyAdmin && (
-          <Link href="/dashboard/meta" className="fl-nav-item" data-active={isActive("/dashboard/meta")}>
-            <WhatsAppIcon />
-            Conexión Meta
-          </Link>
-        )}
+        {groups.map((group) => (
+          <NavGroupSection key={group.id} group={group} collapsed={collapsedIds.includes(group.id)} onToggle={() => toggleGroup(group.id)} />
+        ))}
+      </nav>
+
+      <div className="flex flex-col gap-1 border-t border-border px-3 pt-3">
         {isAgencyAdmin && (
           <Link href="/dashboard/novedades" className="fl-nav-item" data-active={isActive("/dashboard/novedades")}>
             <MegaphoneIcon />
@@ -279,9 +334,6 @@ function NavLinks({
           <UserIcon />
           Mi perfil
         </Link>
-      </nav>
-
-      <div className="flex flex-col gap-1 border-t border-border px-3 pt-3">
         <ThemeToggle className="fl-nav-item" showLabel />
         <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="fl-nav-item">
           <WhatsAppIcon />
@@ -390,7 +442,7 @@ export function DashboardSidebar({
 
       {/* Desktop sidebar — identical to before, just now explicitly hidden
           below md so it doesn't fight the mobile top bar above for space. */}
-      <aside onClick={handleNavTap} className="hidden min-h-screen w-52 flex-none flex-col gap-2 border-r border-border bg-surface py-5 md:flex">
+      <aside onClick={handleNavTap} className="hidden h-screen w-52 flex-none flex-col gap-2 self-start border-r border-border bg-surface py-5 md:sticky md:top-0 md:flex">
         <Link href="/dashboard" className="mb-4 flex items-center gap-2.5 px-4">
           <FunnelsLogoBadge />
           <span className="text-[17px] font-extrabold tracking-tight text-ink">Funnels Labs</span>
