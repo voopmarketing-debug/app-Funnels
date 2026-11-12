@@ -46,6 +46,9 @@
   },
   "overrides": {
     "deepmerge-ts": "^8.0.0",
-    "mysql2": "^3.22.0"
+    "mysql2": "^3.22.0",
+    "@vercel/cli-config": {
+      "zod": "4.6.7"
+    }
   }
 }
