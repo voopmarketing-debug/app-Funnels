@@ -581,3 +581,33 @@ a:active {
     }
   }
 }
+
+/* The flow editor's canvas (React Flow) wears the platform's colours in
+ * both themes, instead of its own light/dark palette. */
+.fl-flow {
+  --xy-background-color: var(--background);
+  --xy-background-pattern-dots-color-default: var(--border-strong);
+  --xy-edge-stroke-selected: var(--accent);
+  --xy-connectionline-stroke: var(--accent);
+  --xy-connectionline-stroke-width: 2;
+  --xy-minimap-background-color: var(--surface);
+  --xy-attribution-background-color: transparent;
+}
+.fl-flow .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.fl-flow .react-flow__edge-path {
+  cursor: pointer;
+}
+.fl-flow .react-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.fl-flow .react-flow__attribution {
+  color: var(--ink-faint);
+}
+.fl-flow .react-flow__node {
+  cursor: grab;
+}

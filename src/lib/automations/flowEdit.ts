@@ -65,7 +65,7 @@ export function withSlot(step: Step, key: string, target: string | null): Step {
 }
 
 /** Where the rest of a chain goes when a step is put in front of it. */
-function continuationKey(step: Step): string | null {
+export function continuationKey(step: Step): string | null {
   switch (step.type) {
     case "condition":
       return "yes";
@@ -172,7 +172,9 @@ export function pruneUnreachable(flow: Flow): Flow {
     seen.add(id);
     queue.push(...nextIds(flow.steps[id]));
   }
-  return { start: flow.start, steps: Object.fromEntries(Object.entries(flow.steps).filter(([id]) => seen.has(id))) };
+  const steps = Object.fromEntries(Object.entries(flow.steps).filter(([id]) => seen.has(id)));
+  const layout = flow.layout ? Object.fromEntries(Object.entries(flow.layout).filter(([id]) => seen.has(id))) : undefined;
+  return { start: flow.start, steps, ...(layout ? { layout } : {}) };
 }
 
 export type EditResult = { ok: true; flow: Flow; id?: string } | { ok: false; error: string };
@@ -195,7 +197,7 @@ export function addStep(flow: Flow, parentId: string, key: string, type: StepTyp
   const carry = continuationKey(step);
   if (rest && carry) step = withSlot(step, carry, rest);
   const steps = { ...flow.steps, [id]: step, [parentId]: withSlot(parent, key, id) };
-  return { ok: true, flow: { start: flow.start, steps }, id };
+  return { ok: true, flow: { ...flow, steps }, id };
 }
 
 /**
@@ -203,7 +205,7 @@ export function addStep(flow: Flow, parentId: string, key: string, type: StepTyp
  * at what came after it. The branches it had of its own (buttons, conditions)
  * go away with it. The only step of a flow can't be removed.
  */
-export function removeStep(flow: Flow, id: string): EditResult {
+export function removeStep(flow: Flow, id: string, opts: { prune?: boolean } = {}): EditResult {
   const step = flow.steps[id];
   if (!step) return { ok: false, error: "Ese paso ya no existe." };
   if (Object.keys(flow.steps).length === 1) return { ok: false, error: "Un flujo necesita al menos un paso." };
@@ -225,13 +227,24 @@ export function removeStep(flow: Flow, id: string): EditResult {
     if (!after) return { ok: false, error: "No puedes quitar el primer paso si no hay otro después de él." };
     start = after;
   }
-  return { ok: true, flow: pruneUnreachable({ start, steps }) };
+  return { ok: true, flow: finish({ ...flow, start, steps }, opts.prune) };
+}
+
+/**
+ * The tree editor drops every step nothing leads to; the free canvas keeps
+ * them (a card can sit there unconnected while it is being placed), so it
+ * only forgets the positions of steps that are gone.
+ */
+function finish(flow: Flow, prune = true): Flow {
+  if (prune) return pruneUnreachable(flow);
+  if (!flow.layout) return flow;
+  return { ...flow, layout: Object.fromEntries(Object.entries(flow.layout).filter(([id]) => flow.steps[id])) };
 }
 
 /** Replaces a step with an edited copy of itself. Arrows that no longer exist (a deleted button) are cleaned up by the prune. */
-export function updateStep(flow: Flow, step: Step): EditResult {
+export function updateStep(flow: Flow, step: Step, opts: { prune?: boolean } = {}): EditResult {
   if (!flow.steps[step.id]) return { ok: false, error: "Ese paso ya no existe." };
-  return { ok: true, flow: pruneUnreachable({ start: flow.start, steps: { ...flow.steps, [step.id]: step } }) };
+  return { ok: true, flow: finish({ ...flow, steps: { ...flow.steps, [step.id]: step } }, opts.prune) };
 }
 
 // ---- Laying the flow out ----

@@ -2,7 +2,10 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checkTriggers, type Flow, type Trigger } from "@/lib/automations/flow";
+import { ensureLayout } from "@/lib/automations/flowLayout";
+import { isAgencyAdmin } from "@/lib/authz";
 import { FlowEditor } from "./FlowEditor";
+import { FlowStudio } from "./studio/FlowStudio";
 
 const DEFAULT_FLOW: Flow = { start: "message_1", steps: { message_1: { id: "message_1", type: "message", text: "Hola [nombre del lead], ¿en qué te puedo ayudar?" } } };
 
@@ -13,8 +16,9 @@ function readFlow(value: unknown): Flow {
   return DEFAULT_FLOW;
 }
 
-export default async function AutomationEditorPage({ params }: { params: Promise<{ id: string; automationId: string }> }) {
+export default async function AutomationEditorPage({ params, searchParams }: { params: Promise<{ id: string; automationId: string }>; searchParams: Promise<{ editor?: string }> }) {
   const { id, automationId } = await params;
+  const { editor } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) return null;
   const membership = await prisma.membership.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: id } }, select: { role: true } });
@@ -32,6 +36,28 @@ export default async function AutomationEditorPage({ params }: { params: Promise
 
   const parsedTriggers = checkTriggers(automation.triggers);
   const triggers: Trigger[] = parsedTriggers.ok ? parsedTriggers.triggers : [];
+  const editorData = { stages: stages.map((s) => ({ id: s.id, name: s.name, pipelineName: s.pipeline.name })), pipelines, templates, automations: others };
+  const canEdit = membership.role !== "MEMBER";
+  const whatsappConnected = !!business?.wabaAccessToken && !!business.wabaPhoneNumberId;
+
+  // The new canvas editor (full screen, left to right) is shown to the agency
+  // only for now; ?editor=anterior brings the previous one back for comparing.
+  if (editor !== "anterior" && (await isAgencyAdmin(session.user.id))) {
+    return (
+      <FlowStudio
+        businessId={id}
+        automationId={automationId}
+        initialName={automation.name}
+        initialEnabled={automation.enabled}
+        initialTriggers={triggers}
+        initialFlow={ensureLayout(readFlow(automation.definition))}
+        data={editorData}
+        canEdit={canEdit}
+        whatsappConnected={whatsappConnected}
+        backHref={`/dashboard/businesses/${id}/automatizaciones`}
+      />
+    );
+  }
 
   return (
     <FlowEditor
@@ -41,9 +67,9 @@ export default async function AutomationEditorPage({ params }: { params: Promise
       initialEnabled={automation.enabled}
       initialTriggers={triggers}
       initialFlow={readFlow(automation.definition)}
-      data={{ stages: stages.map((s) => ({ id: s.id, name: s.name, pipelineName: s.pipeline.name })), pipelines, templates, automations: others }}
-      canEdit={membership.role !== "MEMBER"}
-      whatsappConnected={!!business?.wabaAccessToken && !!business.wabaPhoneNumberId}
+      data={editorData}
+      canEdit={canEdit}
+      whatsappConnected={whatsappConnected}
     />
   );
 }

@@ -106,7 +106,11 @@ export const StepSchema = z.discriminatedUnion("type", [
 export type Step = z.infer<typeof StepSchema>;
 export type StepType = Step["type"];
 
-export const FlowSchema = z.object({ start: Id, steps: z.record(Id, StepSchema) });
+/** Where a step's card sits on the editor's canvas. The engine never reads it. */
+export const PositionSchema = z.object({ x: z.number().min(-100_000).max(100_000), y: z.number().min(-100_000).max(100_000) });
+export type Position = z.infer<typeof PositionSchema>;
+
+export const FlowSchema = z.object({ start: Id, steps: z.record(Id, StepSchema), layout: z.record(Id, PositionSchema).optional() });
 export type Flow = z.infer<typeof FlowSchema>;
 
 export const STEP_LABELS: Record<StepType, string> = {
