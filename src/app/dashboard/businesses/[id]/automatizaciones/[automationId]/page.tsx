@@ -3,7 +3,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checkTriggers, type Flow, type Trigger } from "@/lib/automations/flow";
 import { ensureLayout } from "@/lib/automations/flowLayout";
-import { isAgencyAdmin } from "@/lib/authz";
 import { FlowEditor } from "./FlowEditor";
 import { FlowStudio } from "./studio/FlowStudio";
 
@@ -40,9 +39,9 @@ export default async function AutomationEditorPage({ params, searchParams }: { p
   const canEdit = membership.role !== "MEMBER";
   const whatsappConnected = !!business?.wabaAccessToken && !!business.wabaPhoneNumberId;
 
-  // The new canvas editor (full screen, left to right) is shown to the agency
-  // only for now; ?editor=anterior brings the previous one back for comparing.
-  if (editor !== "anterior" && (await isAgencyAdmin(session.user.id))) {
+  // The canvas editor (full screen, left to right) is the editor for everyone;
+  // ?editor=anterior brings the previous one back.
+  if (editor !== "anterior") {
     return (
       <FlowStudio
         businessId={id}
