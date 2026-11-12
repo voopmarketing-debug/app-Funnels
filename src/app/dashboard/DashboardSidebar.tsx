@@ -230,23 +230,25 @@ type NavItem = { href: string; label: string; icon: React.ReactNode; active: boo
 type NavGroup = { id: string; title: string; items: NavItem[] };
 
 function NavGroupSection({ group, collapsed, onToggle }: { group: NavGroup; collapsed: boolean; onToggle: () => void }) {
-  // The group you are in stays open, so the highlighted page is never hidden.
+  // Every group folds whenever the person says so. If the page they are on
+  // lives inside a folded group, the title shows a dot so they still know where they are.
   const hasActive = group.items.some((item) => item.active);
-  const open = hasActive || !collapsed;
+  const open = !collapsed;
   const listId = `fl-nav-group-${group.id}`;
 
   return (
     <div className="flex flex-col gap-1">
       <button
         type="button"
-        onClick={hasActive ? undefined : onToggle}
+        onClick={onToggle}
         aria-expanded={open}
         aria-controls={listId}
-        className={`flex w-full items-center justify-between rounded-md px-3 text-left pb-0.5 pt-2 text-[11px] font-semibold uppercase tracking-wider text-ink-muted/80 transition hover:text-ink ${
-          hasActive ? "cursor-default" : ""
-        }`}
+        className="flex w-full items-center justify-between rounded-md px-3 pb-0.5 pt-2 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-muted/80 transition hover:text-ink"
       >
-        {group.title}
+        <span className="flex items-center gap-1.5">
+          {group.title}
+          {!open && hasActive && <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-label="Estás en esta sección" />}
+        </span>
         <ChevronIcon open={open} />
       </button>
       {open && (
