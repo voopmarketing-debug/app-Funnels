@@ -112,7 +112,7 @@ export function ConversationList({
           return (
             <Link
               key={c.id}
-              href={`?tab=chat&conv=${c.id}`}
+              href={`?conv=${c.id}`}
               aria-current={isActive ? "true" : undefined}
               className={`relative flex gap-3 border-b border-border/70 px-3 py-2.5 transition ${
                 isActive ? "bg-accent/10" : "hover:bg-surface-2"

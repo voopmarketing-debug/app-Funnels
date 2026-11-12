@@ -2,23 +2,21 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChatIcon, LayersIcon, ListIcon, BroadcastIcon } from "../analytics/StatIcons";
+import { LayersIcon, ListIcon } from "../analytics/StatIcons";
 
-// Conversaciones first — it's what an agency actually opens CRM for day to
-// day; Tablero and Lista are the less-frequent "manage the whole pipeline"
-// views. "chat" is also the default tab (see crm/page.tsx), so its link is
-// the bare pathname — the rest carry the ?tab= param instead.
+// Tablero and Lista are the two views of the CRM. Conversaciones and
+// Difusiones are pages of their own now (see the sidebar). "board" is the
+// default tab (see crm/page.tsx), so its link is the bare pathname — Lista
+// carries the ?tab= param.
 const TABS = [
-  { key: "chat", label: "Conversaciones", icon: ChatIcon, glowVar: "--glow-accent" },
   { key: "board", label: "Tablero", icon: LayersIcon, glowVar: "--glow-secondary" },
   { key: "list", label: "Lista", icon: ListIcon, glowVar: "--glow-blue" },
-  { key: "broadcasts", label: "Difusiones", icon: BroadcastIcon, glowVar: "--glow-amber" },
 ] as const;
 
 export function CrmTabs({ activeTab }: { activeTab: string }) {
   const pathname = usePathname();
   // Keeps the selected embudo (?pipeline=) intact when switching tabs — only
-  // ?tab and ?conv are tab-specific.
+  // ?tab is tab-specific.
   const pipelineParam = useSearchParams().get("pipeline");
   const suffix = pipelineParam ? `pipeline=${pipelineParam}` : "";
 
@@ -29,7 +27,7 @@ export function CrmTabs({ activeTab }: { activeTab: string }) {
       {TABS.map((tab) => {
         const active = activeTab === tab.key;
         const Icon = tab.icon;
-        const query = tab.key === "chat" ? suffix : [`tab=${tab.key}`, suffix].filter(Boolean).join("&");
+        const query = tab.key === "board" ? suffix : [`tab=${tab.key}`, suffix].filter(Boolean).join("&");
         return (
           <Link
             key={tab.key}

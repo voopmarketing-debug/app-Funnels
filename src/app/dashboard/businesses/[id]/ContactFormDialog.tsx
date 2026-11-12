@@ -72,7 +72,7 @@ function ContactForm(props: Props & { onClose: () => void }) {
             return;
           }
           props.onClose();
-          router.push(`/dashboard/businesses/${props.businessId}/crm?tab=chat&conv=${result.conversationId}`);
+          router.push(`/dashboard/businesses/${props.businessId}/conversaciones?conv=${result.conversationId}`);
         } else {
           await updateContactInfo(props.businessId, props.conversationId, { name, email });
           props.onClose();

@@ -130,7 +130,7 @@ export function CrmBoard({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline gap-2 pr-6">
                             <Link
-                              href={`/dashboard/businesses/${businessId}/crm?tab=chat&conv=${c.id}`}
+                              href={`/dashboard/businesses/${businessId}/conversaciones?conv=${c.id}`}
                               draggable={false}
                               className={`min-w-0 flex-1 truncate text-sm text-ink hover:text-accent ${isUnread ? "font-bold" : "font-semibold"}`}
                             >

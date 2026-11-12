@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 // Lets someone with more than one agent (a client on Starter/Pro running
 // several lines, or the agency) jump straight to another agent's KPIs/CRM
 // without going back through "Agentes de IA" first. `section` is whatever
-// sub-path follows the business id — "analytics" or "crm" — so switching
+// sub-path follows the business id ("analytics", "crm", "conversaciones"…) so switching
 // stays on the same kind of page.
 export function AgentSwitcher({
   businesses,
@@ -14,7 +14,8 @@ export function AgentSwitcher({
 }: {
   businesses: { id: string; name: string }[];
   currentId: string;
-  section: "analytics" | "crm";
+  // "" = the agent's own setup page (the business root).
+  section: "" | "analytics" | "crm" | "conversaciones" | "difusiones";
 }) {
   const router = useRouter();
 
@@ -31,7 +32,7 @@ export function AgentSwitcher({
       <span className="sr-only">Agente</span>
       <select
         value={currentId}
-        onChange={(e) => router.push(`/dashboard/businesses/${e.target.value}/${section}`)}
+        onChange={(e) => router.push(`/dashboard/businesses/${e.target.value}${section ? `/${section}` : ""}`)}
         className="min-w-0 flex-1 cursor-pointer appearance-none truncate bg-transparent text-sm font-semibold text-ink outline-none"
       >
         {businesses.map((b) => (

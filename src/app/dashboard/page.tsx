@@ -222,13 +222,13 @@ async function BusinessOverview({ businessId, role, now }: { businessId: string;
       {canSeePlan && <PlanLimitAlert businessId={businessId} ownerUserId={owner?.userId ?? null} planTier={business.planTier} />}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryTile
-          href={`${base}/crm?tab=chat`}
+          href={`${base}/conversaciones`}
           label="Sin responder"
           value={awaitingReply}
           hint={awaitingReply === 0 ? "Todo al día" : "Clientes esperando respuesta"}
           tone={awaitingReply > 0 ? "warn" : "ok"}
         />
-        <SummaryTile href={`${base}/crm?tab=chat`} label="Mensajes hoy" value={messagesToday} hint="Escritos por tus clientes" />
+        <SummaryTile href={`${base}/conversaciones`} label="Mensajes hoy" value={messagesToday} hint="Escritos por tus clientes" />
         <SummaryTile href={`${base}/crm?tab=list`} label="Contactos nuevos hoy" value={newContactsToday} hint={`${totalContacts.toLocaleString("es-CO")} en total`} />
         <Link href={base} className="fl-card fl-card-interactive flex flex-col justify-between gap-2 p-4">
           <span className="text-xs font-medium text-ink-muted">Tu agente</span>
@@ -303,7 +303,7 @@ async function BusinessOverview({ businessId, role, now }: { businessId: string;
               <ul className="space-y-2">
                 {upcoming.map((c) => (
                   <li key={c.id}>
-                    <Link href={`${base}/crm?tab=chat&conv=${c.id}`} className="flex items-center justify-between gap-2 text-sm hover:text-accent">
+                    <Link href={`${base}/conversaciones?conv=${c.id}`} className="flex items-center justify-between gap-2 text-sm hover:text-accent">
                       <span className="truncate text-ink">{contactLabel(c.customerName, c.customerPhone)}</span>
                       <span className="flex-none text-xs text-ink-muted">{formatShort(c.appointmentAt!)}</span>
                     </Link>

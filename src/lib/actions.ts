@@ -84,6 +84,16 @@ import { sendEmail } from "@/lib/email";
 import { maskEmail } from "@/lib/logPrivacy";
 import { Prisma, type PlanTier } from "@prisma/client";
 
+// The CRM data shows up on three pages (Conversaciones, CRM and Difusiones) —
+// anything that changes it has to refresh all of them, or a sent message or a
+// moved contact stays invisible on the page that wasn't revalidated.
+function revalidateCrmPages(businessId: string) {
+  for (const page of ["crm", "conversaciones", "difusiones"]) {
+    revalidatePath(`/dashboard/businesses/${businessId}/${page}`);
+  }
+}
+
+
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const RESET_REQUEST_MAX = 3;
 const RESET_REQUEST_WINDOW_MS = 15 * 60 * 1000;
@@ -992,7 +1002,7 @@ export async function updateConversationDetails(
     fireFlowEventInBackground({ businessId, conversationId, event: { type: "appointment_booked" } });
   }
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
 }
 
@@ -1018,7 +1028,7 @@ export async function updateContactInfo(
     },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
 }
 
@@ -1079,7 +1089,7 @@ export async function createContact(
     select: { id: true },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
   return { ok: true, conversationId: created.id, existed: false };
 }
 
@@ -1179,7 +1189,7 @@ export async function importContacts(
     await prisma.$transaction(updates.slice(i, i + 100));
   }
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
   return { created, updated: updates.length, skipped };
 }
 
@@ -1222,7 +1232,7 @@ export async function retryConversationReply(
   const conversation = await prisma.conversation.findFirst({ where: { id: conversationId, businessId }, select: { id: true } });
   if (!conversation) return { ok: false, error: "Conversación no encontrada" };
   const result = await retryConversationNow(conversationId);
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
   return result;
 }
@@ -1448,7 +1458,7 @@ export async function sendBroadcast(businessId: string, formData: FormData): Pro
     data: { sentCount, failedCount, resultLog, completedAt: new Date() },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 
   return { totalRecipients: conversations.length, sentCount, failedCount };
 }
@@ -1482,7 +1492,7 @@ export async function createPipeline(businessId: string, formData: FormData): Pr
     },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
   return { id: pipeline.id };
 }
 
@@ -1496,7 +1506,7 @@ export async function renamePipeline(businessId: string, pipelineId: string, nam
 
   await prisma.pipeline.update({ where: { id: pipelineId, businessId }, data: { name: trimmed } });
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 }
 
 export async function deletePipeline(businessId: string, pipelineId: string): Promise<void> {
@@ -1531,7 +1541,7 @@ export async function deletePipeline(businessId: string, pipelineId: string): Pr
     prisma.pipeline.delete({ where: { id: pipelineId } }),
   ]);
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 }
 
 export async function addPipelineStage(businessId: string, pipelineId: string, formData: FormData): Promise<void> {
@@ -1554,7 +1564,7 @@ export async function addPipelineStage(businessId: string, pipelineId: string, f
     data: { businessId, pipelineId, name, position: (last?.position ?? -1) + 1 },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 }
 
 export async function renamePipelineStage(
@@ -1574,7 +1584,7 @@ export async function renamePipelineStage(
     data: { name: trimmed },
   });
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 }
 
 export async function deletePipelineStage(businessId: string, pipelineId: string, stageId: string): Promise<void> {
@@ -1606,7 +1616,7 @@ export async function deletePipelineStage(businessId: string, pipelineId: string
     prisma.pipelineStage.delete({ where: { id: stageId, businessId } }),
   ]);
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 }
 
 export async function movePipelineStage(
@@ -1639,7 +1649,7 @@ export async function movePipelineStage(
     prisma.pipelineStage.update({ where: { id: a.id }, data: { position: b.position } }),
   ]);
 
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 }
 
 export async function toggleAgentEnabled(businessId: string, enabled: boolean): Promise<void> {
@@ -1677,7 +1687,7 @@ export async function dismissNeedsHuman(businessId: string, conversationId: stri
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
   await prisma.conversation.updateMany({ where: { id: conversationId, businessId }, data: { needsHumanAt: null } });
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
 }
 
@@ -1817,10 +1827,10 @@ export async function sendManualMessage(
 
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
   // This composer is also embedded in the CRM's WhatsApp-Web-style split
-  // view (?tab=chat&conv=...), a different route — without revalidating it
+  // view (/conversaciones?conv=...), a different route — without revalidating it
   // too, a message sent from there goes out fine but never appears on
   // screen until a manual reload, looking exactly like a silent failure.
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 }
 
 /**
@@ -1886,7 +1896,7 @@ export async function sendTemplateMessage(
   await prisma.conversation.updateMany({ where: { id: conversationId, needsHumanAt: { not: null } }, data: { needsHumanAt: null } });
 
   revalidatePath(`/dashboard/businesses/${businessId}/conversations/${conversationId}`);
-  revalidatePath(`/dashboard/businesses/${businessId}/crm`);
+  revalidateCrmPages(businessId);
 }
 
 export type SalesDiagnosisResult =

@@ -5,7 +5,7 @@ import type { CrmStage, CrmConversation } from "../CrmBoard";
 
 // WhatsApp-Web-style split inbox: every conversation on the left, the
 // selected one's full thread on the right. Selection is a URL param
-// (?tab=chat&conv=id) rather than client state, so the right pane can be
+// (?conv=id) rather than client state, so the right pane can be
 // server-rendered with real message data instead of fetching client-side.
 export function ConversationSplitView({
   businessId,
@@ -91,7 +91,7 @@ export function ConversationSplitView({
             messages={selectedConversation.messages}
             templates={templates}
             windowOpen={selectedConversation.windowOpen}
-            mobileBackHref="?tab=chat"
+            mobileBackHref={`/dashboard/businesses/${businessId}/conversaciones`}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-ink-muted">

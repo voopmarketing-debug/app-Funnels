@@ -8,6 +8,7 @@ import { getAccountAddonCapacity, getBusinessOwnerId } from "@/lib/addons";
 import { findPack } from "@/lib/addonPacks";
 import { PLAN_LIMITS, planUsageStatus } from "@/lib/plans";
 import { AgentForm } from "./AgentForm";
+import { AgentSwitcher } from "./AgentSwitcher";
 import { WabaCredentialsForm } from "./WabaCredentialsForm";
 import { isAgencyAdmin } from "@/lib/authz";
 import { AgentMediaManager } from "./AgentMediaManager";
@@ -97,6 +98,12 @@ export default async function BusinessPage({
 
   if (!membership) notFound();
   const { business } = membership;
+  // Every agent this login can open, for the switcher under the title.
+  const accessibleBusinesses = await prisma.membership.findMany({
+    where: { userId: session.user.id },
+    select: { business: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "asc" },
+  });
   const agencyViewer = await isAgencyAdmin(session.user.id);
   // A MEMBER is an invited teammate (e.g. a salesperson) — full CRM access,
   // but locked out of business-wide settings (see requireBusinessOwnerOrAdmin
@@ -210,7 +217,7 @@ export default async function BusinessPage({
               <AgentPowerButton businessId={id} enabled={business.agent?.enabled ?? true} />
             </div>
           )}
-          <Link href={`/dashboard/businesses/${id}/crm`} className={shortcutClass}>
+          <Link href={`/dashboard/businesses/${id}/conversaciones`} className={shortcutClass}>
             Conversaciones
           </Link>
           <Link href={`/dashboard/businesses/${id}/analytics`} className={shortcutClass}>
@@ -221,6 +228,13 @@ export default async function BusinessPage({
           </Link>
         </div>
       </header>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <AgentSwitcher businesses={accessibleBusinesses.map((m) => m.business)} currentId={id} section="" />
+        <Link href="/dashboard/agentes" className="text-sm text-ink-muted underline hover:text-ink">
+          Ver todos los agentes
+        </Link>
+      </div>
 
       {purchase && (
         <div

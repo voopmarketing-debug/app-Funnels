@@ -80,7 +80,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
   }
 
-  // KPIs and CRM are per-business pages, but the sidebar is global — link
+  // KPIs, CRM and Conversaciones are per-business pages, but the sidebar is global — link
   // those two nav items straight to a first business (any the user has
   // access to — their own if they're a client, or the first one they
   // administer if they're the agency) instead of making them dig through
@@ -94,6 +94,29 @@ export default async function DashboardLayout({ children }: { children: React.Re
         select: { businessId: true },
       })
     : null;
+
+  // Red badge on "Conversaciones": chats of that business with a customer
+  // message nobody has opened yet (same rule as the badge inside the inbox:
+  // customer messages newer than the chat's lastReadAt, last 60 days).
+  let unreadChats = 0;
+  if (primaryBusiness) {
+    const since = new Date();
+    since.setDate(since.getDate() - 60);
+    try {
+      const rows = await prisma.$queryRaw<{ n: number }[]>`
+        SELECT COUNT(*)::int AS n FROM "Conversation" c
+        WHERE c."businessId" = ${primaryBusiness.businessId}
+          AND EXISTS (
+            SELECT 1 FROM "Message" m
+            WHERE m."conversationId" = c.id AND m."role" = 'CUSTOMER' AND m."createdAt" >= ${since}
+              AND (c."lastReadAt" IS NULL OR m."createdAt" > c."lastReadAt")
+          )`;
+      unreadChats = rows[0]?.n ?? 0;
+    } catch (err) {
+      // A badge is never worth breaking the whole panel over.
+      console.error("Failed to count unread chats:", err);
+    }
+  }
 
   async function handleSignOut() {
     "use server";
@@ -113,6 +136,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <DashboardSidebar
         isAgencyAdmin={isAgencyAdmin}
         primaryBusinessId={primaryBusiness?.businessId ?? null}
+        unreadChats={unreadChats}
         onSignOut={handleSignOut}
         mobileActions={<NotificationBell notifications={notifications} unreadCount={unreadCount} />}
       />

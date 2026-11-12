@@ -26,6 +26,23 @@ function BotIcon() {
   );
 }
 
+function ChatBubbleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H11l-4.5 3.5V16.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M8 10h8M8 13h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <path d="M20.5 4 10 14.5M20.5 4l-6.5 16-3.5-5.5L5 11l15.5-7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function FlowIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="flex-none">
@@ -209,7 +226,7 @@ function writeCollapsed(ids: string[]) {
   collapsedListeners.forEach((cb) => cb());
 }
 
-type NavItem = { href: string; label: string; icon: React.ReactNode; active: boolean };
+type NavItem = { href: string; label: string; icon: React.ReactNode; active: boolean; badge?: number };
 type NavGroup = { id: string; title: string; items: NavItem[] };
 
 function NavGroupSection({ group, collapsed, onToggle }: { group: NavGroup; collapsed: boolean; onToggle: () => void }) {
@@ -238,6 +255,14 @@ function NavGroupSection({ group, collapsed, onToggle }: { group: NavGroup; coll
             <Link key={item.href} href={item.href} className="fl-nav-item" data-active={item.active}>
               {item.icon}
               {item.label}
+              {item.badge ? (
+                <span
+                  className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--status-bad,#d03b3b)] px-1.5 text-[11px] font-bold leading-none text-white"
+                  aria-label={`${item.badge} sin leer`}
+                >
+                  {item.badge > 99 ? "99+" : item.badge}
+                </span>
+              ) : null}
             </Link>
           ))}
         </div>
@@ -253,11 +278,13 @@ function NavLinks({
   isAgencyAdmin,
   primaryBusinessId,
   pathname,
+  unreadChats,
   onSignOut,
 }: {
   isAgencyAdmin: boolean;
   primaryBusinessId: string | null;
   pathname: string;
+  unreadChats: number;
   onSignOut: () => Promise<void>;
 }) {
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href));
@@ -269,24 +296,40 @@ function NavLinks({
   }
 
   const biz = primaryBusinessId ? `/dashboard/businesses/${primaryBusinessId}` : null;
-  const item = (href: string, label: string, icon: React.ReactNode, active = isActive(href)): NavItem => ({ href, label, icon, active });
+  const item = (href: string, label: string, icon: React.ReactNode, active = isActive(href), badge?: number): NavItem => ({ href, label, icon, active, badge });
 
   // Empty groups (a login without a business, or a non-agency login) drop out.
   const groups: NavGroup[] = [
     {
-      id: "ventas",
-      title: "Ventas",
+      id: "comunicaciones",
+      title: "Comunicaciones",
       items: [
-        biz && item(`${biz}/crm`, "CRM", <CrmIcon />),
-        isAgencyAdmin && item("/dashboard/clients", "Clientes", <UsersIcon />),
+        biz && item(`${biz}/conversaciones`, "Conversaciones", <ChatBubbleIcon />, undefined, unreadChats),
+        biz && item(`${biz}/difusiones`, "Difusiones", <SendIcon />),
         biz && item(`${biz}/templates`, "Plantillas", <TemplateIcon />),
       ].filter((x): x is NavItem => !!x),
+    },
+    {
+      id: "ventas",
+      title: "Ventas",
+      items: [biz && item(`${biz}/crm`, "CRM", <CrmIcon />), isAgencyAdmin && item("/dashboard/clients", "Clientes", <UsersIcon />)].filter(
+        (x): x is NavItem => !!x,
+      ),
     },
     {
       id: "ia",
       title: "IA y flujos",
       items: [
-        item("/dashboard/agentes", "Agentes de IA", <BotIcon />, isActive("/dashboard/agentes") || pathname === "/dashboard/businesses/new"),
+        // The agent's setup page (connections, instructions, catalog, team) for
+        // the current business; the list of every agent is one click away from there.
+        item(
+          biz ?? "/dashboard/agentes",
+          "Agente de IA",
+          <BotIcon />,
+          pathname.startsWith("/dashboard/agentes") ||
+            pathname === "/dashboard/businesses/new" ||
+            (!!biz && (pathname === biz || pathname.startsWith(`${biz}/productos`) || pathname.startsWith(`${biz}/inventario`))),
+        ),
         biz && item(`${biz}/automatizaciones`, "Automatizaciones", <FlowIcon />),
       ].filter((x): x is NavItem => !!x),
     },
@@ -353,11 +396,14 @@ function NavLinks({
 export function DashboardSidebar({
   isAgencyAdmin,
   primaryBusinessId,
+  unreadChats,
   onSignOut,
   mobileActions,
 }: {
   isAgencyAdmin: boolean;
   primaryBusinessId: string | null;
+  // Chats with customer messages nobody on the team has opened yet.
+  unreadChats: number;
   onSignOut: () => Promise<void>;
   // Rendered in the mobile top bar next to the menu button (e.g. the
   // notification bell), so mobile doesn't need a second header row.
@@ -435,7 +481,7 @@ export function DashboardSidebar({
                 <CloseIcon />
               </button>
             </div>
-            <NavLinks isAgencyAdmin={isAgencyAdmin} primaryBusinessId={primaryBusinessId} pathname={pathname} onSignOut={onSignOut} />
+            <NavLinks isAgencyAdmin={isAgencyAdmin} primaryBusinessId={primaryBusinessId} pathname={pathname} unreadChats={unreadChats} onSignOut={onSignOut} />
           </aside>
         </div>
       )}
@@ -447,7 +493,7 @@ export function DashboardSidebar({
           <FunnelsLogoBadge />
           <span className="text-[17px] font-extrabold tracking-tight text-ink">Funnels Labs</span>
         </Link>
-        <NavLinks isAgencyAdmin={isAgencyAdmin} primaryBusinessId={primaryBusinessId} pathname={pathname} onSignOut={onSignOut} />
+        <NavLinks isAgencyAdmin={isAgencyAdmin} primaryBusinessId={primaryBusinessId} pathname={pathname} unreadChats={unreadChats} onSignOut={onSignOut} />
       </aside>
     </>
   );
