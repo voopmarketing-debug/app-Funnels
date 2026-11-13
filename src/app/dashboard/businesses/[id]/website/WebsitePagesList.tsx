@@ -1,5 +1,6 @@
 "use client";
 
+import { fromPanelUrl } from "@/lib/panelBackLink";
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -309,7 +310,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
         </div>
 
         <a
-          href={publicUrl}
+          href={fromPanelUrl(publicUrl)}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}

@@ -1,5 +1,6 @@
 "use client";
 
+import { fromPanelUrl } from "@/lib/panelBackLink";
 import { TrackingSettings } from "./TrackingSettings";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
@@ -443,7 +444,7 @@ export function AgendaEditor({
           </p>
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
             <a
-              href={publicUrl}
+              href={fromPanelUrl(publicUrl)}
               target="_blank"
               rel="noopener noreferrer"
               className="fl-mono flex-1 truncate text-xs text-accent underline-offset-2 hover:underline"

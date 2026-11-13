@@ -13,6 +13,7 @@ import {
   getAvailableSlotsForAnyProfessional,
 } from "@/lib/agenda";
 import { siteSecurityHeaders } from "@/lib/securityHeaders";
+import { wantsPanelBack, withPanelBackLink } from "@/lib/panelBackLink";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import type { WebsiteContentV2 } from "@/lib/websiteContentV2";
 
@@ -86,6 +87,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     return new NextResponse("Sitio no encontrado", { status: 404, headers: siteSecurityHeaders() });
   }
 
+  // The owner opening the page from the dashboard (installed app, no browser bar) gets a way back.
+  const withBack = (html: string) => (!preview && wantsPanelBack(req.nextUrl.searchParams) ? withPanelBackLink(html, `/dashboard/businesses/${website.businessId}/website`) : html);
+
   if (!preview) {
     try {
       await prisma.websiteEvent.create({ data: { websiteId: website.id, type: "view" } });
@@ -156,7 +160,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     });
 
     const tracked = withSiteTracking(
-      html,
+      withBack(html),
       { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },
       { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
       { preview, events: { schedule: !!(confirmedDate && confirmedTime) } },
@@ -182,7 +186,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
 
   const tracked = withSiteTracking(
-    html,
+    withBack(html),
     { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...siteSecurityHeaders() },
     { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
     { preview: preview, events: { lead: leadSubmitted } },
