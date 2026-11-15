@@ -3,9 +3,11 @@ import { anthropic } from "@/lib/anthropicClient";
 import { prisma } from "@/lib/prisma";
 import { recordAnthropicUsage, withAiUsage } from "@/lib/aiUsage";
 import { ASSISTANT_SYSTEM_PROMPT } from "./prompt";
+import { withoutOldThinking } from "./history";
 import { AGENCY_MODE_TOOLS, BUSINESS_TOOLS, ToolInputError, buildProposal, isProposeTool, runReadTool, type AccessibleBusiness, type ToolScope } from "./tools";
 
-export const ASSISTANT_MODEL = "claude-opus-5-5";
+// Sonnet: half the price of Opus per question, and plenty for reading the account and proposing changes.
+export const ASSISTANT_MODEL = "claude-sonnet-5";
 // Tool calls per message the person sends: plenty for "read 3 things, propose 2".
 const MAX_ITERATIONS = 8;
 
@@ -45,6 +47,8 @@ export async function runAssistant(params: {
   messages: Message[];
 }): Promise<void> {
   const { threadId, userId, scope, messages } = params;
+  // Everything before this point is finished history; from here on is the turn being answered.
+  const keepFrom = messages.length;
   const agencyMode = !!scope.agencyUserId;
   const tools = agencyMode ? AGENCY_MODE_TOOLS : BUSINESS_TOOLS;
 
@@ -59,7 +63,7 @@ export async function runAssistant(params: {
         cache_control: { type: "ephemeral" },
         system: [{ type: "text", text: ASSISTANT_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
         tools,
-        messages,
+        messages: withoutOldThinking(messages, keepFrom),
       });
       await recordAnthropicUsage(ASSISTANT_MODEL, response.usage as Anthropic.Usage);
       messages.push({ role: "assistant", content: response.content });
@@ -120,7 +124,7 @@ export async function runAssistant(params: {
       output_config: { effort: "low" },
       system: [{ type: "text", text: ASSISTANT_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools,
-      messages,
+      messages: withoutOldThinking(messages, keepFrom),
     });
     await recordAnthropicUsage(ASSISTANT_MODEL, last.usage as Anthropic.Usage);
     messages.push({ role: "assistant", content: last.content });

@@ -27,6 +27,7 @@ import { withAiUsage } from "@/lib/aiUsage";
 import { getActiveContactsThisMonth, getAccountActiveContactsThisMonth } from "@/lib/analytics";
 import { getAccountAddonCapacity } from "@/lib/addons";
 import { ECONOMY_AGENT_MODEL, PLAN_LIMITS } from "@/lib/plans";
+import { resolveAgentModel } from "@/lib/agentModelRouting";
 import { checkReplyBudget, pausedOnlyByExpiredDailyCap } from "@/lib/aiReplyBudget";
 import { contactLabel } from "@/lib/contactDisplay";
 import { bookedStageAfter, resolveAutoStageMove, type FunnelStage } from "@/lib/autoStage";
@@ -516,6 +517,14 @@ export async function alertReplyGaveUp(ctx: ReplyContext, err: unknown): Promise
 
 async function generateAndSendReply(ctx: ReplyContext, modelOverride?: string): Promise<void> {
   const { business, conversation, accessToken } = ctx;
+  // The budget's economy override wins; otherwise the agent's model, which can be "auto" (picked per message, see agentModelRouting.ts).
+  const model =
+    modelOverride ??
+    resolveAgentModel(business.agent.model, {
+      text: ctx.userMessage,
+      hasImages: (ctx.userImages?.length ?? 0) > 0,
+      customerMessages: ctx.previousMessages.filter((m) => m.role === "CUSTOMER").length,
+    });
   // Internal error / plan-limit notices are stored as AGENT messages so they
   // show in the dashboard, but they were never sent to the customer — feeding
   // them back as the agent's own past replies would confuse the model (and
@@ -559,7 +568,7 @@ async function generateAndSendReply(ctx: ReplyContext, modelOverride?: string): 
       tone: business.agent.tone,
       replyLength: business.agent.replyLength,
       industry: business.industry,
-      model: modelOverride ?? business.agent.model,
+      model,
       history,
       // Never message.text directly: for a voice note that's always empty
       // (messageContent holds the transcript), and for a photo sent without
@@ -704,7 +713,7 @@ async function generateAndSendReply(ctx: ReplyContext, modelOverride?: string): 
         role: "AGENT",
         content: reply,
         whatsappMsgId: messageId,
-        model: modelOverride ?? business.agent.model,
+        model,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         cacheCreationInputTokens: usage.cacheCreationInputTokens,

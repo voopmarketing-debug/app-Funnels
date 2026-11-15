@@ -138,6 +138,8 @@ export function monthlyPriceCop(planTier: PlanTier, customPriceUsd: number | nul
 export const AGENT_MODELS = [
   { id: "claude-sonnet-5", label: "Sonnet 5 · calidad máxima" },
   { id: "claude-haiku-4-5", label: "Haiku 4.5 · económico" },
+  // Per message: Haiku for greetings and quick questions, Sonnet when there is money, a booking or a complaint (lib/agentModelRouting.ts).
+  { id: "auto", label: "Automático · económico y avanzado" },
 ] as const;
 
 // Free days a self-registered account gets after registering its card in
