@@ -137,7 +137,7 @@ function waLink(){var n=st.nombre||"un visitante",lines=["Hola, soy "+n+" 👋"]
  if(lead.diagnostico)lines.push('Hice el diagnóstico de madurez de funnel: resultado "'+lead.diagnostico.tier+'" ('+lead.diagnostico.score+"/"+lead.diagnostico.maxScore+").");
  if(st.step==="info"){lines.push("Me interesa conocer cómo funciona Funnels Labs. Tengo un negocio de "+label("negocio").toLowerCase()+" y recibo "+label("mensajes").toLowerCase()+" mensajes al mes.")}
  else if(lead.cita)lines.push("Ya elegí cita: "+lead.cita.fechaLabel+", "+lead.cita.hora+". Confírmenmela por favor.");
- else lines.push("Quiero agendar mi llamada. (ref: "+lead.id.slice(0,8)+")");
+ else lines.push("Quiero agendar mi videollamada de demostración. (ref: "+lead.id.slice(0,8)+")");
  return "https://wa.me/"+C.whatsapp+"?text="+encodeURIComponent(lines.join("\\n"))}
 function label(id){var q=Q.find(function(x){return x.id===id}),o=q&&q.options.find(function(x){return x.value===st.answers[id]});return o?o.label:""}
 function stepNo(){return typeof st.step==="number"?st.step+1:st.step==="calendario"?4:5}
@@ -146,25 +146,25 @@ function chrome(body,opts){opts=opts||{};var n=stepNo(),bars="";for(var i=1;i<=5
   '<div class="bar" aria-hidden="true">'+bars+"</div>"+(opts.back?'<button type="button" class="back" data-act="back">← Atrás</button>':"")+'<div class="screen">'+body+"</div>"}
 function render(){var h="";
  if(typeof st.step==="number"){var q=Q[st.step],intro=st.step===0;
-  h=chrome((intro?'<p class="eyebrow">Agenda tu llamada · 1 min</p><h1>Agenda una llamada con nosotros</h1><p class="lead">Revisamos tu caso y te mostramos cómo dejar de perder clientes por no responder a tiempo.</p><ul class="perks"><li>✓ Gratis y sin compromiso</li><li>✓ 3 preguntas rápidas</li><li>✓ Confirmación por WhatsApp</li></ul>':"")+
+  h=chrome((intro?'<p class="eyebrow">Agenda tu demostración · 1 min</p><h1>Agenda tu videollamada de demostración</h1><p class="lead">Revisamos tu caso y te mostramos en vivo cómo dejar de perder clientes por no responder a tiempo.</p><ul class="perks"><li>✓ Gratis y sin compromiso</li><li>✓ 3 preguntas rápidas</li><li>✓ Confirmación por WhatsApp</li></ul>':"")+
    '<h2 id="qt">'+esc(q.title)+'</h2><p class="hint">'+esc(q.hint)+'</p><div class="opts" role="radiogroup" aria-labelledby="qt">'+
    q.options.map(function(o){var sel=st.answers[q.id]===o.value;return '<button type="button" class="opt'+(sel?" sel":"")+'" role="radio" aria-checked="'+sel+'" data-answer="'+o.value+'"><span class="em" aria-hidden="true">'+o.emoji+'</span><span class="lb">'+esc(o.label)+'</span><span class="chev" aria-hidden="true">›</span></button>'}).join("")+"</div>",{back:st.step>0})}
- else if(st.step==="info"){h=chrome('<p class="eyebrow">Te ayudamos por WhatsApp</p><h1>Te enviamos la información por WhatsApp</h1><p class="lead">Como apenas estás explorando, lo más rápido es que te mandemos por WhatsApp cómo funciona, precios y ejemplos de negocios como el tuyo. Cuando quieras, agendamos la llamada.</p><a class="cta" href="'+esc(waLink())+'" target="_blank" rel="noopener" data-act="wa">Recibir la info por WhatsApp →</a><button type="button" class="ghost" data-act="force">Prefiero agendar una llamada de todas formas</button>',{back:true,full:true})}
+ else if(st.step==="info"){h=chrome('<p class="eyebrow">Te ayudamos por WhatsApp</p><h1>Te enviamos la información por WhatsApp</h1><p class="lead">Como apenas estás explorando, lo más rápido es que te mandemos por WhatsApp cómo funciona, precios y ejemplos de negocios como el tuyo. Cuando quieras, agendamos tu videollamada de demostración.</p><a class="cta" href="'+esc(waLink())+'" target="_blank" rel="noopener" data-act="wa">Recibir la info por WhatsApp →</a><button type="button" class="ghost" data-act="force">Prefiero agendar la videollamada de todas formas</button>',{back:true,full:true})}
  else if(st.step==="calendario"){var hs=st.fecha?hoursFor(st.fecha):[];
-  h=chrome('<p class="eyebrow">Elige tu horario</p><h2>¿Qué día y a qué hora te llamamos?</h2><p class="hint">Hora de Colombia (GMT-5). Te confirmamos por WhatsApp.</p>'+
+  h=chrome('<p class="eyebrow">Elige tu horario</p><h2>¿Qué día y a qué hora es tu videollamada?</h2><p class="hint">Demostración por videollamada. Hora de Colombia (GMT-5). Te llega la confirmación por WhatsApp.</p>'+
    '<div class="section-label">Día</div><div class="days" role="radiogroup" aria-label="Día">'+DAY_LIST.map(function(d){var sel=st.fecha===d.value;return '<button type="button" class="day'+(sel?" sel":"")+'" role="radio" aria-checked="'+sel+'" aria-label="'+esc(d.label)+'" data-day="'+d.value+'"><span class="dw">'+d.short+'</span><span class="dn">'+d.num+'</span><span class="dm">'+d.mon+"</span></button>"}).join("")+"</div>"+
    (st.fecha?'<div class="section-label">Hora <span>'+esc(dayLabel(st.fecha).replace(/^(Hoy|Mañana) · /,""))+"</span></div>"+(st.loading?'<div class="times">'+"<div class=skel></div>".repeat(6)+"</div>":hs.length===0?'<p class="note">Ya no quedan horarios hoy. Elige otro día.</p>':'<div class="times" role="radiogroup" aria-label="Hora">'+hs.map(function(t){var tk=(st.taken[st.fecha]||[]).indexOf(t)>=0,sel=st.hora===t;return '<button type="button" class="time'+(sel?" sel":"")+'" role="radio" aria-checked="'+sel+'" data-time="'+t+'"'+(tk?" disabled":"")+' aria-label="'+fmtHour(t)+(tk?", ocupado":"")+'">'+fmtHour(t)+"</button>"}).join("")+"</div>"+((st.taken[st.fecha]||[]).length?'<p class="note">Los horarios tachados ya están ocupados.</p>':"")):'<p class="note">Elige un día para ver los horarios disponibles.</p>')+
    (st.error?'<p class="err" role="alert">'+esc(st.error)+"</p>":"")+'<button type="button" class="cta" data-act="toData"'+(st.fecha&&st.hora?"":" disabled")+">Continuar →</button>",{back:true})}
  else if(st.step==="datos"){var ok=st.nombre.trim().length>1&&st.tel.replace(/\\D/g,"").length>=7&&/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(st.correo.trim());
-  h=chrome('<p class="eyebrow">Último paso</p><h2>¿A quién llamamos?</h2><p class="hint">Te enviamos la invitación a tu correo y te confirmamos por WhatsApp.</p>'+
+  h=chrome('<p class="eyebrow">Último paso</p><h2>¿A quién le enviamos la invitación?</h2><p class="hint">Te llega la invitación a tu correo y la confirmación por WhatsApp.</p>'+
    '<div class="slot"><span class="ic" aria-hidden="true">📅</span><span class="tx"><b>'+esc(dayLabel(st.fecha))+"</b><span>"+fmtHour(st.hora)+' · hora de Colombia</span></span><button type="button" data-act="back">Cambiar</button></div>'+
    '<form id="f" novalidate><label class="field"><span>Nombre</span><input class="input" id="nombre" name="nombre" autocomplete="name" placeholder="Tu nombre" value="'+esc(st.nombre)+'" maxlength="120"></label>'+
    '<label class="field"><span>WhatsApp</span><span class="phone"><select id="cc" aria-label="Indicativo del país">'+COUNTRIES.map(function(c){return '<option value="'+c[0]+'"'+(st.cc===c[0]?" selected":"")+">"+c[1]+"</option>"}).join("")+'</select><input class="input" id="tel" name="tel" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="300 123 4567" value="'+esc(st.tel)+'" maxlength="20"></span></label>'+
    '<label class="field"><span>Correo</span><input class="input" id="correo" name="correo" type="email" inputmode="email" autocomplete="email" placeholder="tucorreo@ejemplo.com" value="'+esc(st.correo)+'" maxlength="160"></label>'+
    '<div class="hp" aria-hidden="true"><label>Sitio web <input id="website_url" name="website_url" tabindex="-1" autocomplete="off"></label></div>'+
-   (st.error?'<p class="err" role="alert">'+esc(st.error)+"</p>":"")+'<button type="submit" class="cta" id="submit"'+(ok&&!st.busy?"":" disabled")+">"+(st.busy?"Agendando…":"Confirmar mi llamada")+"</button></form>",{back:!st.busy})}
+   (st.error?'<p class="err" role="alert">'+esc(st.error)+"</p>":"")+'<button type="submit" class="cta" id="submit"'+(ok&&!st.busy?"":" disabled")+">"+(st.busy?"Agendando…":"Confirmar mi videollamada")+"</button></form>",{back:!st.busy})}
  else if(st.step==="listo"){var c=lead.cita||{};
-  h=chrome('<div class="done"><div class="check" aria-hidden="true">✓</div><p class="eyebrow">¡Gracias'+(st.nombre?", "+esc(st.nombre.split(" ")[0]):"")+'!</p><h1>Tu llamada quedó agendada</h1><p class="lead">Te enviamos la invitación a <b>'+esc(st.correo)+'</b> para que quede en tu calendario.</p>'+
+  h=chrome('<div class="done"><div class="check" aria-hidden="true">✓</div><p class="eyebrow">¡Gracias'+(st.nombre?", "+esc(st.nombre.split(" ")[0]):"")+'!</p><h1>Tu videollamada quedó agendada</h1><p class="lead">Te enviamos la invitación a <b>'+esc(st.correo)+'</b> para que quede en tu calendario.</p>'+
    '<div class="slot"><span class="ic" aria-hidden="true">📅</span><span class="tx"><b>'+esc(c.fechaLabel||"")+"</b><span>"+(c.hora?fmtHour(c.hora):"")+' · hora de Colombia</span></span></div>'+
    '<a class="cta" href="'+esc(waLink())+'" target="_blank" rel="noopener">Confirmar por WhatsApp →</a><p class="small">Si necesitas cambiar la hora, escríbenos por WhatsApp.</p></div>',{full:true})}
  app.innerHTML=h;
@@ -236,8 +236,8 @@ export function renderAgencyAgendaPage(config: { crmUrl: string; sheetsUrl?: str
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Agenda tu llamada · Funnels Labs</title>
-<meta name="description" content="Agenda una llamada gratis con Funnels Labs: revisamos tu caso y te mostramos cómo dejar de perder clientes por no responder a tiempo.">
+<title>Agenda tu videollamada de demostración · Funnels Labs</title>
+<meta name="description" content="Agenda una videollamada de demostración gratis con Funnels Labs: revisamos tu caso y te mostramos cómo dejar de perder clientes por no responder a tiempo.">
 <meta name="theme-color" content="#0a0a0a">
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">

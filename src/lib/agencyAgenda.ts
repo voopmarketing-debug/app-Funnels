@@ -9,7 +9,7 @@ export const AGENDA_QUESTIONS: AgendaQuestion[] = [
   {
     id: "negocio",
     title: "¿Qué tipo de negocio tienes?",
-    hint: "Así preparamos ejemplos de tu sector para la llamada.",
+    hint: "Así preparamos ejemplos de tu sector para la demostración.",
     options: [
       { value: "clinica", label: "Clínica o estética", emoji: "🩺" },
       { value: "tienda", label: "Tienda o e-commerce", emoji: "🛍️" },

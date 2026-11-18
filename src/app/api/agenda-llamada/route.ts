@@ -106,7 +106,7 @@ export async function POST(req: Request) {
   // New leads start in the funnel's "Agendado"-type stage when it has one;
   // existing ones only ever move forward.
   const booked = bookedStageAfter(stages, existing?.stageId ?? stages[0].id);
-  const appointment = appointmentAt ? { appointmentAt, appointmentNote: "Llamada con Funnels Labs" } : {};
+  const appointment = appointmentAt ? { appointmentAt, appointmentNote: "Videollamada de demostración con Funnels Labs" } : {};
 
   const conversation = existing
     ? await prisma.conversation.update({
@@ -143,11 +143,11 @@ export async function POST(req: Request) {
       businessId,
       conversationId: conversation.id,
       type: "APPOINTMENT_SCHEDULED",
-      message: `📅 ${body.nombre} agendó una llamada para el ${when}${qualified ? "" : " (por calificar)"}`,
+      message: `📅 ${body.nombre} agendó una videollamada de demostración para el ${when}${qualified ? "" : " (por calificar)"}`,
     },
   });
   await sendPushToBusiness(businessId, {
-    title: `📅 Nueva llamada agendada · ${body.nombre}`,
+    title: `📅 Nueva demostración agendada · ${body.nombre}`,
     body: `${when} · ${answerLabel("negocio", body.respuestas.negocio)}`,
     url: `/dashboard/businesses/${businessId}/conversations/${conversation.id}`,
     tag: `agenda-${conversation.id}`,
