@@ -117,7 +117,7 @@ function loadLead(){var p=new URLSearchParams(location.search).get("lead"),s=sto
  if(s&&p&&p===s.id)l=s;else if(s&&!p){l=Object.assign({},s);delete l.cita}else l={id:p||uuid(),createdAt:now,updatedAt:now};
  store(LEAD_KEY,l);setLeadParam(l.id);return l}
 var lead=loadLead();
-var st={step:0,answers:{},fecha:"",hora:"",taken:{},busy:false,error:"",nombre:(lead.contacto&&lead.contacto.nombre)||"",cc:"+57",tel:"",correo:(lead.contacto&&lead.contacto.correo)||""};
+var st={step:0,answers:{},fecha:"",hora:"",taken:{},pending:{},busy:false,error:"",nombre:(lead.contacto&&lead.contacto.nombre)||"",cc:"+57",tel:"",correo:(lead.contacto&&lead.contacto.correo)||""};
 var app=document.getElementById("app");
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
@@ -153,7 +153,7 @@ function render(){var h="";
  else if(st.step==="calendario"){var hs=st.fecha?hoursFor(st.fecha):[];
   h=chrome('<p class="eyebrow">Elige tu horario</p><h2>¿Qué día y a qué hora es tu videollamada?</h2><p class="hint">Demostración por videollamada. Hora de Colombia (GMT-5). Te llega la confirmación por WhatsApp.</p>'+
    '<div class="section-label">Día</div><div class="days" role="radiogroup" aria-label="Día">'+DAY_LIST.map(function(d){var sel=st.fecha===d.value;return '<button type="button" class="day'+(sel?" sel":"")+'" role="radio" aria-checked="'+sel+'" aria-label="'+esc(d.label)+'" data-day="'+d.value+'"><span class="dw">'+d.short+'</span><span class="dn">'+d.num+'</span><span class="dm">'+d.mon+"</span></button>"}).join("")+"</div>"+
-   (st.fecha?'<div class="section-label">Hora <span>'+esc(dayLabel(st.fecha).replace(/^(Hoy|Mañana) · /,""))+"</span></div>"+(st.loading?'<div class="times">'+"<div class=skel></div>".repeat(6)+"</div>":hs.length===0?'<p class="note">Ya no quedan horarios hoy. Elige otro día.</p>':'<div class="times" role="radiogroup" aria-label="Hora">'+hs.map(function(t){var tk=(st.taken[st.fecha]||[]).indexOf(t)>=0,sel=st.hora===t;return '<button type="button" class="time'+(sel?" sel":"")+'" role="radio" aria-checked="'+sel+'" data-time="'+t+'"'+(tk?" disabled":"")+' aria-label="'+fmtHour(t)+(tk?", ocupado":"")+'">'+fmtHour(t)+"</button>"}).join("")+"</div>"+((st.taken[st.fecha]||[]).length?'<p class="note">Los horarios tachados ya están ocupados.</p>':"")):'<p class="note">Elige un día para ver los horarios disponibles.</p>')+
+   (st.fecha?'<div class="section-label">Hora <span>'+esc(dayLabel(st.fecha).replace(/^(Hoy|Mañana) · /,""))+"</span></div>"+(hs.length===0?'<p class="note">Ya no quedan horarios hoy. Elige otro día.</p>':'<div class="times" role="radiogroup" aria-label="Hora">'+hs.map(function(t){var tk=(st.taken[st.fecha]||[]).indexOf(t)>=0,sel=st.hora===t;return '<button type="button" class="time'+(sel?" sel":"")+'" role="radio" aria-checked="'+sel+'" data-time="'+t+'"'+(tk?" disabled":"")+' aria-label="'+fmtHour(t)+(tk?", ocupado":"")+'">'+fmtHour(t)+"</button>"}).join("")+"</div>"+(st.pending[st.fecha]?'<p class="note">Revisando disponibilidad…</p>':(st.taken[st.fecha]||[]).length?'<p class="note">Los horarios tachados ya están ocupados.</p>':"")):'<p class="note">Elige un día para ver los horarios disponibles.</p>')+
    (st.error?'<p class="err" role="alert">'+esc(st.error)+"</p>":"")+'<button type="button" class="cta" data-act="toData"'+(st.fecha&&st.hora?"":" disabled")+">Continuar →</button>",{back:true})}
  else if(st.step==="datos"){var ok=st.nombre.trim().length>1&&st.tel.replace(/\\D/g,"").length>=7&&/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(st.correo.trim());
   h=chrome('<p class="eyebrow">Último paso</p><h2>¿A quién le enviamos la invitación?</h2><p class="hint">Te llega la invitación a tu correo y la confirmación por WhatsApp.</p>'+
@@ -173,11 +173,20 @@ function bindForm(f){var btn=document.getElementById("submit");
  function sync(){st.nombre=f.nombre.value;st.tel=f.tel.value.replace(/[^0-9 ]/g,"");st.cc=document.getElementById("cc").value;st.correo=f.correo.value;if(f.tel.value!==st.tel)f.tel.value=st.tel;
   var ok=st.nombre.trim().length>1&&st.tel.replace(/\\D/g,"").length>=7&&/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(st.correo.trim());btn.disabled=!ok||st.busy}
  f.addEventListener("input",sync);f.addEventListener("change",sync);f.addEventListener("submit",function(e){e.preventDefault();submit(f)})}
-function go(step){st.step=step;st.error="";render();window.scrollTo({top:0});var t=app.querySelector("h1,h2");if(t){t.setAttribute("tabindex","-1");t.focus({preventScroll:true})}}
+function go(step){st.step=step;st.error="";
+ if(step==="calendario"&&!st.fecha){st.fecha=firstOpenDay();loadTaken(st.fecha)}
+ if(step==="calendario"||(typeof step==="number"&&step>=1))prefetch();
+ render();window.scrollTo({top:0});var t=app.querySelector("h1,h2");if(t){t.setAttribute("tabindex","-1");t.focus({preventScroll:true})}}
 function back(){if(st.step==="datos")return go("calendario");if(st.step==="calendario"||st.step==="info")return go(2);if(typeof st.step==="number"&&st.step>0)go(st.step-1)}
-function pickDay(f){st.fecha=f;st.hora="";st.error="";if(st.taken[f]){render();return}st.loading=true;render();
+// Which hours are taken comes from the calendar (slow: Google). The hours themselves show at once;
+// this fills in the taken ones as soon as the answer arrives, and the booking re-checks the slot anyway.
+function loadTaken(f){if(st.taken[f]||st.pending[f])return;st.pending[f]=true;
  fetch(C.sheetsUrl+"?fecha="+encodeURIComponent(f)+"&_="+Date.now(),{cache:"no-store",signal:timeout(6000)}).then(function(r){return r.json()}).catch(function(){return null}).then(function(j){
-  st.taken[f]=j&&Array.isArray(j.horasOcupadas)?j.horasOcupadas:[];if(st.fecha===f){st.loading=false;render()}})}
+  var t=j&&Array.isArray(j.horasOcupadas)?j.horasOcupadas:[];st.taken[f]=t;delete st.pending[f];
+  if(st.fecha===f){if(st.hora&&t.indexOf(st.hora)>=0){st.hora="";st.error="Esa hora acaba de ocuparse. Elige otra."}render()}})}
+function prefetch(){DAY_LIST.forEach(function(d){loadTaken(d.value)})}
+function firstOpenDay(){var d=DAY_LIST.find(function(x){return hoursFor(x.value).length>0});return d?d.value:DAY_LIST[0].value}
+function pickDay(f){st.fecha=f;st.hora="";st.error="";loadTaken(f);render()}
 function row(l){return{id:l.id,fecha_registro:l.createdAt,nombre:(l.contacto&&l.contacto.nombre)||"",telefono:(l.contacto&&l.contacto.telefono)||"",correo:(l.contacto&&l.contacto.correo)||"",
  diagnostico_tier:(l.diagnostico&&l.diagnostico.tier)||"",diagnostico_score:l.diagnostico?l.diagnostico.score+"/"+l.diagnostico.maxScore:"",
  calculadora_industria:(l.calculadora&&l.calculadora.industria)||"",calculadora_ciudad:(l.calculadora&&l.calculadora.ciudad)||"",calculadora_objetivo:(l.calculadora&&l.calculadora.objetivo)||"",
