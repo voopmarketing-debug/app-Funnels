@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
-import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { AGENDA_CALL_URL, SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { STARTER_FEATURES, TRIAL_DAYS } from "@/lib/plans";
 
 const SEGMENTS = [
@@ -31,7 +31,7 @@ const FAQ = [
   },
   {
     q: "¿Cómo funciona la prueba gratis?",
-    a: `El plan Starter tiene ${TRIAL_DAYS} días gratis. Creas tu cuenta, registras tu tarjeta en Mercado Pago y empiezas de inmediato; no se cobra nada hasta que termina la prueba y puedes cancelar antes cuando quieras. Los planes Pro y Consultoría se activan con nuestro equipo.`,
+    a: `El plan Starter tiene ${TRIAL_DAYS} días gratis. Creas tu cuenta, registras tu tarjeta en Mercado Pago y empiezas de inmediato; no se cobra nada hasta que termina la prueba y puedes cancelar antes cuando quieras. El plan Pro y el servicio «Lo hacemos por ti» se activan con nuestro equipo.`,
   },
   {
     q: "¿Cuántos mensajes masivos puedo enviar?",
@@ -90,20 +90,19 @@ const PLANS = [
     ctaHref: SUPPORT_WHATSAPP_LINK,
   },
   {
-    name: "Consultoría",
-    price: "$597+",
-    priceSuffix: "USD / mes",
-    billingNote: "Desde $597 USD al mes, más implementación. Agenda una llamada y nosotros lo hacemos todo por ti, de principio a fin.",
-    contacts: "Clientes atendidos por IA y líneas a la medida de tu volumen",
+    name: "Lo hacemos por ti",
+    price: null,
+    priceSuffix: "",
+    billingNote: "Nosotros implementamos y gestionamos tu asistente. Agenda una demostración y te contamos cómo.",
+    contacts: "Implementación y gestión por parte nuestra",
     features: [
-      "Todo lo del plan Pro, con cupo de IA y líneas a tu medida",
-      "Desarrollo a medida: lo que tu negocio necesite, hecho para ti",
-      "Lo implementamos nosotros, de punta a punta",
-      "Gerente de cuenta dedicado + soporte por WhatsApp",
+      "La plataforma incluida (plan Starter)",
+      "Lo implementamos nosotros y lo dejamos listo",
+      "Gestionamos la plataforma por ti: ajustamos las respuestas, creamos automatizaciones y la mantenemos al día",
     ],
     highlight: false,
-    ctaLabel: "Agenda una llamada",
-    ctaHref: SUPPORT_WHATSAPP_LINK,
+    ctaLabel: "Agenda una demostración",
+    ctaHref: AGENDA_CALL_URL,
   },
 ];
 
@@ -219,10 +218,12 @@ export default async function Home() {
                 </p>
               </div>
 
-              <div className="mt-2 flex flex-wrap items-baseline gap-2">
-                <p className="text-3xl font-bold">{plan.price}</p>
-                {plan.priceSuffix && <p className="text-base font-semibold text-ink-muted">{plan.priceSuffix}</p>}
-              </div>
+              {plan.price && (
+                <div className="mt-2 flex flex-wrap items-baseline gap-2">
+                  <p className="text-3xl font-bold">{plan.price}</p>
+                  {plan.priceSuffix && <p className="text-base font-semibold text-ink-muted">{plan.priceSuffix}</p>}
+                </div>
+              )}
               <p className="mt-1 text-sm text-ink-muted">{plan.billingNote}</p>
 
               <p className="mt-4 rounded-md bg-background px-3 py-2 text-sm font-medium text-ink">

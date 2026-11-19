@@ -384,21 +384,17 @@ export default function OfertaPage() {
             </div>
           </div>
           <div className="lp-card lp-rise flex flex-col p-7" style={{ "--i": 2 } as React.CSSProperties}>
-            <p className="lp-eyebrow !text-ink-muted">Consultoría</p>
-            <div className="mt-4 flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold tracking-tight text-white">$597+</p>
-              <p className="text-base font-semibold text-ink-muted">USD / mes</p>
-            </div>
-            <p className="mt-2 text-sm text-ink-muted">Nosotros lo hacemos todo por ti, de principio a fin.</p>
+            <p className="lp-eyebrow !text-ink-muted">Lo hacemos por ti</p>
+            <p className="mt-4 text-2xl font-extrabold tracking-tight text-white">Nosotros lo implementamos y lo gestionamos</p>
+            <p className="mt-2 text-sm text-ink-muted">Tú no armas nada: agenda una demostración y te contamos cómo.</p>
             <ul className="lp-dotlist mt-6 space-y-2.5 text-sm text-ink-muted">
-              <li>Todo lo del plan Pro, con cupo y líneas a tu medida</li>
-              <li>Desarrollo a tu medida: lo que tu negocio necesite</li>
-              <li>Lo implementamos nosotros de punta a punta</li>
-              <li>Un gerente de cuenta y soporte por WhatsApp</li>
+              <li>La plataforma incluida (plan Starter)</li>
+              <li>Lo implementamos nosotros y lo dejamos listo</li>
+              <li>Gestionamos la plataforma por ti: ajustamos las respuestas, creamos automatizaciones y la mantenemos al día</li>
             </ul>
             <div className="mt-auto pt-8">
               <a href={AGENDA_CALL_URL} target="_blank" rel="noopener noreferrer" data-cta="consultoria" className="lp-btn-ghost w-full">
-                Agendar una llamada
+                Agenda una demostración
               </a>
             </div>
           </div>
