@@ -6,6 +6,8 @@ import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { claimReturnedPayment, claimReturnedRenewal, renewalContext } from "@/lib/renewal";
 import { WaitForActivation } from "../activar/TrialForm";
 import { RenewButtons } from "../dashboard/businesses/[id]/RenewButtons";
+import { StoreAppNotice } from "@/components/StoreAppNotice";
+import { isStoreApp } from "@/lib/storeApp";
 
 const ID = /^[\w-]{1,64}$/;
 
@@ -27,6 +29,10 @@ export default async function RenovarPage({
     redirect(`/login?callbackUrl=${encodeURIComponent(back.size ? `/renovar?${back}` : "/renovar")}`);
   }
   const userId = session.user.id;
+  // Inside the store apps the web's renewal screen (prices, payment) is not shown.
+  if (await isStoreApp()) {
+    return <StoreAppNotice title="Tu plan está pausado" text="Escríbenos y te ayudamos a reactivarlo: tus datos siguen aquí." />;
+  }
 
   const paymentId = q.payment_id ?? q.collection_id;
   if (q.preapproval_id && ID.test(q.preapproval_id)) {

@@ -8,6 +8,7 @@ import { SignupShell, CheckList } from "@/components/SignupShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { safeCallbackPath } from "@/lib/safeRedirect";
+import { useIsStoreApp } from "@/lib/useStoreApp";
 
 function EyeIcon() {
   return (
@@ -47,6 +48,7 @@ export default function LoginPage() {
 
 function LoginForm() {
   const searchParams = useSearchParams();
+  const storeApp = useIsStoreApp();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -174,12 +176,14 @@ function LoginForm() {
           {loading ? "Entrando..." : "Entrar"}
         </button>
 
-        <p className="text-center text-sm text-ink-muted">
-          ¿Eres cliente nuevo?{" "}
-          <Link href="/register" className="text-accent hover:underline">
-            Crea tu cuenta
-          </Link>
-        </p>
+        {!storeApp && (
+          <p className="text-center text-sm text-ink-muted">
+            ¿Eres cliente nuevo?{" "}
+            <Link href="/register" className="text-accent hover:underline">
+              Crea tu cuenta
+            </Link>
+          </p>
+        )}
 
         <p className="text-center text-sm text-ink-muted">
           ¿Necesitas ayuda?{" "}

@@ -1,0 +1,51 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The app is a Trusted Web Activity: Chrome shows https://agente.funnelslabs.app full screen,
+// with no address bar, once the site vouches for this app (public/.well-known/assetlinks.json).
+// Nothing in the web platform is duplicated here: the Android app only opens it.
+
+def releaseKeystore = System.getenv('ANDROID_KEYSTORE_PATH')
+
+android {
+    namespace 'app.funnelslabs.agente'
+    compileSdk 36
+
+    defaultConfig {
+        // This id is permanent once the app is published: it cannot be changed afterwards.
+        applicationId 'app.funnelslabs.agente'
+        minSdk 23
+        targetSdk 36
+        // Play needs a bigger number on every upload: the CI run number does that.
+        versionCode((System.getenv('VERSION_CODE') ?: '1').toInteger())
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            if (releaseKeystore) {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (releaseKeystore) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

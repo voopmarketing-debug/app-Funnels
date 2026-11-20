@@ -4,24 +4,33 @@ import { useRef, useState, useTransition } from "react";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { ADDON_PACKS, ADDON_DURATION_DAYS, formatCop, type AddonKind } from "@/lib/addonPacks";
 import { startAddonCheckout } from "@/lib/addonActions";
+import { useIsStoreApp } from "@/lib/useStoreApp";
 
 /**
  * "Comprar más contactos / líneas": a button that opens the pack catalog.
  * Buying goes to Mercado Pago; the webhook activates the pack on the
  * account as soon as the payment is approved — no manual step.
  */
-export function AddonStore({
-  businessId,
-  kind,
-  label,
-  className,
-}: {
+export function AddonStore(props: AddonStoreProps) {
+  const storeApp = useIsStoreApp();
+  // Packs are a purchase: not inside the apps from the stores (see lib/storeApp.ts).
+  return storeApp ? null : <AddonStoreInner {...props} />;
+}
+
+type AddonStoreProps = {
   businessId: string;
   // Only show one kind of pack (e.g. lines from the "Nueva línea" limit).
   kind?: AddonKind;
   label: string;
   className?: string;
-}) {
+};
+
+function AddonStoreInner({
+  businessId,
+  kind,
+  label,
+  className,
+}: AddonStoreProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [isPending, startTransition] = useTransition();
   const [buyingKey, setBuyingKey] = useState<string | null>(null);

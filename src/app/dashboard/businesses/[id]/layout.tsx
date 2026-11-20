@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isSubscriptionActive } from "@/lib/subscription";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { renewalContext } from "@/lib/renewal";
+import { isStoreApp } from "@/lib/storeApp";
 import { RenewButtons } from "./RenewButtons";
 
 // Wraps every page scoped to one business (CRM, sitio web, analítica,
@@ -21,6 +22,7 @@ export default async function BusinessLayout({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const storeApp = await isStoreApp();
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -42,12 +44,14 @@ export default async function BusinessLayout({
         <div className="space-y-2">
           <h1 className="text-xl font-bold text-ink">Tu plan venció</h1>
           <p className="text-sm text-ink-muted">
-            {renewal
+            {renewal && !storeApp
               ? "Tu agente dejó de responder. Renueva y vuelve a atender al instante: tus datos siguen aquí."
-              : `El agente de ${membership.business.name} está pausado. Avísale al dueño de la cuenta para que renueve.`}
+              : renewal
+                ? `El agente de ${membership.business.name} está pausado. Escríbenos y te ayudamos a reactivarlo: tus datos siguen aquí.`
+                : `El agente de ${membership.business.name} está pausado. Avísale al dueño de la cuenta para que renueve.`}
           </p>
         </div>
-        {renewal ? (
+        {renewal && !storeApp ? (
           <RenewButtons
             priceLabel={`$${new Intl.NumberFormat("es-CO").format(renewal.priceCop)} COP/mes`}
             supportLink={SUPPORT_WHATSAPP_LINK}

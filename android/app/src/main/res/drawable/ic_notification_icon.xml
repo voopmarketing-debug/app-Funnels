@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small notification icon: the brand mark in solid white (Android paints it with the system's color). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10.5,6 L53.5,6 A4.5,4.5 0 0 1 53.5,15 L10.5,15 A4.5,4.5 0 0 1 10.5,6 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21.5,26 L42.5,26 A4.5,4.5 0 0 1 42.5,35 L21.5,35 A4.5,4.5 0 0 1 21.5,26 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,42.5 A7.5,7.5 0 1 1 32,57.5 A7.5,7.5 0 1 1 32,42.5 Z" />
+</vector>

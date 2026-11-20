@@ -7,6 +7,8 @@ import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 import { PLAN_PRICE_COP, STARTER_FEATURES, TRIAL_DAYS, TRIAL_PLAN, PLAN_LABELS } from "@/lib/plans";
 import { claimReturnedPreapproval } from "@/lib/trial";
 import { TrialForm, WaitForActivation } from "./TrialForm";
+import { StoreAppNotice } from "@/components/StoreAppNotice";
+import { isStoreApp } from "@/lib/storeApp";
 
 function trialEndLabel() {
   const end = new Date(Date.now() + TRIAL_DAYS * 86_400_000);
@@ -45,6 +47,11 @@ export default async function ActivarPage({ searchParams }: { searchParams: Prom
   async function logout() {
     "use server";
     await signOut({ redirectTo: "/login" });
+  }
+
+  // Inside the store apps the trial's card registration (a payment) is not shown.
+  if (await isStoreApp()) {
+    return <StoreAppNotice title="Tu cuenta todavía no está activa" text="Escríbenos y te ayudamos a activarla." logout={logout} />;
   }
 
   let body: React.ReactNode;

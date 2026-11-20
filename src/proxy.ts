@@ -16,6 +16,7 @@ import { submitAgendaBooking, previewAgendaBookingOutcome } from "@/lib/agendaBo
 import { captureWebsiteLead } from "@/lib/websiteLeads";
 import { blockedBookingOutcome, publicFormBlock } from "@/lib/abuseGuard";
 import { customDomainSecurityHeaders } from "@/lib/securityHeaders";
+import { STORE_APP_COOKIE, STORE_APP_COOKIE_MAX_AGE, STORE_APP_HIDDEN_PATHS, storeAppFromValue } from "@/lib/storeApp";
 
 // Hosts this app already answers for on purpose — everything else that
 // reaches this deployment has been manually connected in Vercel as a
@@ -34,7 +35,22 @@ export async function proxy(request: NextRequest) {
   const hostname = host.split(":")[0].toLowerCase();
 
   if (APP_HOSTS.has(host) || APP_HOSTS.has(hostname) || hostname.endsWith(".vercel.app")) {
-    return NextResponse.next();
+    // Inside the Android / iPhone app from the stores (it opens ?app=android|ios): no purchase
+    // screens. The cookie is set here so the very first page already knows (see lib/storeApp.ts).
+    const appParam = request.nextUrl.searchParams.get("app");
+    const launching = storeAppFromValue(appParam);
+    const inStoreApp = launching || storeAppFromValue(request.cookies.get(STORE_APP_COOKIE)?.value);
+    const remember = (response: NextResponse) => {
+      if (launching) response.cookies.set({ name: STORE_APP_COOKIE, value: appParam, path: "/", maxAge: STORE_APP_COOKIE_MAX_AGE, sameSite: "lax", secure: true });
+      return response;
+    };
+    if (inStoreApp && STORE_APP_HIDDEN_PATHS.has(request.nextUrl.pathname)) {
+      return remember(NextResponse.redirect(new URL("/login", request.url)));
+    }
+    if (!launching) return NextResponse.next();
+    const headers = new Headers(request.headers);
+    headers.set("cookie", `${request.headers.get("cookie") ?? ""}; ${STORE_APP_COOKIE}=${appParam}`);
+    return remember(NextResponse.next({ request: { headers } }));
   }
 
   const website = await prisma.website.findUnique({

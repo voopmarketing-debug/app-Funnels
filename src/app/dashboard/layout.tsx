@@ -12,6 +12,7 @@ import { NotificationSoundPoller } from "./NotificationSoundPoller";
 import { AssistantChat } from "@/components/assistant/AssistantChat";
 import { renewalNotice } from "@/lib/renewal";
 import { RenewalBanner } from "./RenewalBanner";
+import { isStoreApp } from "@/lib/storeApp";
 
 // The Asistente Funnels runs a few Claude calls per message from these pages.
 export const maxDuration = 120;
@@ -33,6 +34,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // straight to the login instead of an empty panel.
   if (!session?.user?.id) redirect("/login");
 
+  const storeApp = await isStoreApp();
   const isAgencyAdmin = session?.user?.id ? await isAgencyAccount(session.user.id) : false;
 
   // Self-registered accounts can't use the dashboard until they register a
@@ -155,7 +157,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </Link>
         </header>
         <main className="min-w-0 flex-1 p-4 md:p-6">
-          {notice && <RenewalBanner daysLeft={notice.daysLeft} expired={notice.expired} />}
+          {notice && !storeApp && <RenewalBanner daysLeft={notice.daysLeft} expired={notice.expired} />}
           <PushBanner />
           {children}
         </main>
