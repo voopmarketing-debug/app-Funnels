@@ -131,7 +131,11 @@ export default function PrivacyPolicyPage() {
 
           <Section title="9. Contacto">
             <p>
-              Para preguntas sobre esta política o el manejo de tus datos, escríbenos por WhatsApp:{" "}
+              Puedes eliminar tu cuenta y tus datos cuando quieras: mira cómo en{" "}
+              <Link href="/eliminar-cuenta" className="text-accent hover:underline">
+                Eliminar mi cuenta
+              </Link>
+              . Para preguntas sobre esta política o el manejo de tus datos, escríbenos por WhatsApp:{" "}
               <a
                 href={SUPPORT_WHATSAPP_LINK}
                 target="_blank"

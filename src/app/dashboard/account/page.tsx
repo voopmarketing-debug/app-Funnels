@@ -9,6 +9,8 @@ import { PushSettingsCard } from "../PushNotifications";
 import { AccountForm } from "./AccountForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { TeamMembersManager, type TeamBusiness } from "./TeamMembersManager";
+import { DeleteAccountCard } from "./DeleteAccountCard";
+import { isAgencyAdmin } from "@/lib/authz";
 
 // Still inside the free trial: no charge has happened yet.
 function isInTrial(createdAt: Date, trialDays: number): boolean {
@@ -126,6 +128,7 @@ export default async function AccountPage() {
           )}
           <PushSettingsCard />
           <ChangePasswordForm />
+          {!(await isAgencyAdmin(user.id)) && <DeleteAccountCard hasBusinesses={ownedMemberships.length > 0} hasSubscription={!!user.mpPreapprovalId} />}
         </aside>
       </div>
     </div>
