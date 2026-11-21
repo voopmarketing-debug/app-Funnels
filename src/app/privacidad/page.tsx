@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
-import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { COMPANY_LEGAL_NAME, COMPANY_NIT, SUPPORT_EMAIL, SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 const LAST_UPDATED = "22 de septiembre de 2026";
 
@@ -135,15 +135,23 @@ export default function PrivacyPolicyPage() {
               <Link href="/eliminar-cuenta" className="text-accent hover:underline">
                 Eliminar mi cuenta
               </Link>
-              . Para preguntas sobre esta política o el manejo de tus datos, escríbenos por WhatsApp:{" "}
+              . Para preguntas sobre esta política o el manejo de tus datos, escríbenos al correo{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent hover:underline">
+                {SUPPORT_EMAIL}
+              </a>{" "}
+              o por{" "}
               <a
                 href={SUPPORT_WHATSAPP_LINK}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-accent hover:underline"
               >
-                {SUPPORT_WHATSAPP_LINK}
+                WhatsApp
               </a>
+              .
+            </p>
+            <p className="text-sm text-ink-muted">
+              Responsable del tratamiento de los datos: {COMPANY_LEGAL_NAME}, NIT {COMPANY_NIT}, Bogotá, Colombia.
             </p>
           </Section>
         </div>

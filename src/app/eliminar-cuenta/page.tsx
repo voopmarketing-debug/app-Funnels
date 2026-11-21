@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FunnelsLogoMark } from "@/components/FunnelsLogoMark";
-import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
+import { SUPPORT_EMAIL, SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
 
 export const metadata = {
   title: "Eliminar mi cuenta — Funnels Labs",
@@ -36,11 +36,15 @@ export default function DeleteAccountPage() {
               <li>Baja hasta «Eliminar mi cuenta», escribe tu contraseña y confirma.</li>
             </ol>
             <p className="text-sm leading-relaxed text-ink-muted">
-              Si no puedes entrar a tu cuenta, escríbenos por{" "}
+              Si no puedes entrar a tu cuenta, escríbenos al correo{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent hover:underline">
+                {SUPPORT_EMAIL}
+              </a>{" "}
+              o por{" "}
               <a href={SUPPORT_WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 WhatsApp
-              </a>{" "}
-              desde el número o el correo con el que te registraste y la eliminamos por ti.
+              </a>
+              , desde el correo con el que te registraste, y la eliminamos por ti.
             </p>
           </section>
 

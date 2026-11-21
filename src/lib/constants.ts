@@ -9,6 +9,13 @@ export function supportWhatsAppLink(text: string): string {
 
 export const SUPPORT_WHATSAPP_LINK = supportWhatsAppLink("Hola, necesito soporte con Funnels Labs");
 
+/** Support / privacy contact shown in the legal pages and the store listings. */
+export const SUPPORT_EMAIL = "funnelslabs.col@gmail.com";
+
+/** The company behind the platform (RUT, DIAN). */
+export const COMPANY_LEGAL_NAME = "Funnels Labs S.A.S.";
+export const COMPANY_NIT = "902047298-2";
+
 /** Where a client books the guided call (about 30–45 minutes) to connect their WhatsApp. */
 export const AGENDA_CALL_URL = "https://agenda.funnelslabs.app/agenda";
 
