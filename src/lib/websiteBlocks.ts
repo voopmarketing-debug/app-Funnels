@@ -19,6 +19,10 @@ export const BLOCK_LIBRARY: BlockEntry[] = [
   { type: "productGrid", label: SECTION_LABELS.productGrid, help: "Tus productos con precio y botón de pedido.", group: "venta" },
   { type: "productSpotlight", label: SECTION_LABELS.productSpotlight, help: "Un producto protagonista con detalles.", group: "venta" },
   { type: "promo", label: SECTION_LABELS.promo, help: "Franja de color con un mensaje y un botón.", group: "venta" },
+  { type: "showroom", label: SECTION_LABELS.showroom, help: "Visor para girar el producto, con globos de características.", group: "venta" },
+  { type: "quoter", label: SECTION_LABELS.quoter, help: "El cliente mueve su presupuesto y ve qué le alcanza.", group: "venta" },
+  { type: "fan", label: SECTION_LABELS.fan, help: "Colección en abanico que gira sola y se arrastra.", group: "venta" },
+  { type: "marquee", label: SECTION_LABELS.marquee, help: "Frases gigantes que se desplazan al fondo.", group: "texto" },
   { type: "comparison", label: SECTION_LABELS.comparison, help: "Tabla: tú frente a las otras opciones.", group: "venta" },
   { type: "trustBar", label: SECTION_LABELS.trustBar, help: "Garantías cortas con ícono.", group: "confianza" },
   { type: "stats", label: SECTION_LABELS.stats, help: "Cifras grandes (solo si son reales).", group: "confianza" },
@@ -52,7 +56,15 @@ export function newSection(type: Exclude<SectionType, "hero">, ctx: { firstProdu
     case "productSpotlight":
       return ctx.firstProductId ? { type, productId: ctx.firstProductId, heading: "Por qué te va a encantar", bullets: [{ icon: icon("star"), ...item("Primer detalle", "Lo mejor de este producto.") }, { icon: icon("shield"), ...item("Segundo detalle", "Otra razón para elegirlo.") }], specs: [] } : null;
     case "promo":
-      return { type, tone: "accent", kicker: null, heading: "Tu mensaje destacado", body: "Cuéntale al cliente por qué debe escribirte hoy.", ctaLabel: "Escríbenos" };
+      return { type, tone: "accent", kicker: "Solo en {mes}", heading: "Tu mensaje destacado", body: "Cuéntale al cliente por qué debe escribirte hoy.", ctaLabel: "Escríbenos", countdown: true, seal: null };
+    case "showroom":
+      return ctx.firstProductId ? { type, kicker: "Míralo de cerca", heading: "Gíralo, compáralo, elígelo", productIds: [], bubbles: [item("Primera característica", "Lo que más destaca de tu producto."), item("Segunda característica", "Otro dato real que le importa al cliente.")], facts: [{ title: "Garantía", description: "Escribe el dato real" }, { title: "Entrega", description: "Escribe el dato real" }, { title: "Asesoría", description: "Por WhatsApp" }] } : null;
+    case "quoter":
+      return ctx.firstProductId ? { type, kicker: "Cotizador", heading: "Mira qué te alcanza", intro: "Mueve la barra con tu presupuesto.", productIds: [], months: 48, note: null } : null;
+    case "fan":
+      return ctx.firstProductId ? { type, kicker: "La colección", heading: "Elige tu favorito", intro: "Arrastra para ver todos.", productIds: [] } : null;
+    case "marquee":
+      return { type, lines: ["Escribe una frase corta", "Y otra distinta"] };
     case "comparison":
       return { type, heading: "Por qué elegirnos", usLabel: "Nosotros", othersLabel: "Lo típico", rows: [
         { label: "Atención", us: "Directa por WhatsApp", others: "Formularios y esperas" },

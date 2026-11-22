@@ -158,6 +158,27 @@ export function buildSampleContent(opts: { pageType: PageType; style: StyleKey; 
         { type: "leadForm", kicker: null, heading: "Hablemos hoy", body: "Sin compromiso. Te respondemos en minutos.", buttonLabel: "Enviar mis datos" },
       ];
       break;
+    case "showroom":
+      sections = [
+        { type: "hero", variant: "split", eyebrow: "Showroom", heading: `Tu próxima compra, sin vueltas`, highlight: "sin vueltas", subheading: `Conoce de cerca lo mejor de ${businessName} y encuentra lo que te alcanza.`, chips: [], showLeadForm: false, ctaLabel: "Agendar visita", secondaryCtaLabel: null, badge: null, productId: null },
+        { type: "showroom", kicker: "Míralo de cerca", heading: "Gíralo, compáralo, elígelo", productIds: ids.slice(0, 4), bubbles: [{ title: "Calidad que se nota", description: "Acabados revisados uno por uno." }, { title: "Garantía real", description: "Te acompañamos después de la compra." }], facts: [{ title: "Garantía", description: "Con respaldo directo" }, { title: "Entrega", description: "Coordinada contigo" }, { title: "Asesoría", description: "Por WhatsApp" }] },
+        { type: "promo", tone: "soft", kicker: "Solo en {mes}", heading: "Una oferta pensada para ti", body: "Escríbenos y te contamos las condiciones.", ctaLabel: "Quiero la oferta", countdown: true, seal: null },
+        { type: "quoter", kicker: "Cotizador", heading: "Mira qué te alcanza", intro: "Mueve la barra con tu presupuesto.", productIds: [], months: 48, note: null },
+        faq,
+        { type: "leadForm", kicker: null, heading: "Agenda tu visita", body: "Déjanos tus datos y te escribimos hoy.", buttonLabel: "Agendar" },
+      ];
+      break;
+    case "historia":
+      sections = [
+        { type: "hero", variant: "giant", eyebrow: businessName, heading: "Un ritual que se siente", highlight: "se siente", subheading: "Descubre la colección y elige la tuya.", chips: [], showLeadForm: false, ctaLabel: "Ver colección", secondaryCtaLabel: null, badge: null, productId: null },
+        benefits,
+        { type: "marquee", lines: ["Hecho con cuidado", "Elegido por ti"] },
+        { type: "fan", kicker: "La colección", heading: "Elige tu favorito", intro: "Arrastra para ver todos.", productIds: [] },
+        { type: "promo", tone: "accent", kicker: "Solo en {mes}", heading: "Pruébalo este mes", body: "Escríbenos y te ayudamos a elegir.", ctaLabel: "Quiero el mío", countdown: true, seal: null },
+        faq,
+        cta,
+      ];
+      break;
     default:
       sections = [
         { type: "hero", variant: "split", eyebrow: businessName, heading: "Resultados que se notan desde el primer día", highlight: "se notan", subheading: "Te acompañamos de principio a fin para que tomes la mejor decisión.", chips: [], showLeadForm: false, ctaLabel: "Escribir por WhatsApp", secondaryCtaLabel: "Ver servicios", badge: null, productId: null },

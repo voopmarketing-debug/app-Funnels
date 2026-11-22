@@ -8,7 +8,7 @@ import { LookSchema } from "@/lib/websiteLook";
 // rendering with lib/websiteTemplate.ts; anything with `version: 2` goes
 // through lib/websiteTemplateV2.ts.
 
-export const PAGE_TYPES = ["servicios", "producto", "tienda", "evento", "captacion"] as const;
+export const PAGE_TYPES = ["servicios", "producto", "tienda", "evento", "captacion", "showroom", "historia"] as const;
 export type PageType = (typeof PAGE_TYPES)[number];
 
 export const PAGE_TYPE_LABELS: Record<PageType, string> = {
@@ -17,6 +17,8 @@ export const PAGE_TYPE_LABELS: Record<PageType, string> = {
   tienda: "Tienda / catálogo",
   evento: "Evento o lanzamiento",
   captacion: "Conseguir clientes y citas",
+  showroom: "Showroom (productos para comparar)",
+  historia: "Historia de marca (scroll)",
 };
 
 export const STYLE_KEYS = [
@@ -172,10 +174,50 @@ const PromoSection = z.object({
   ...media,
   type: z.literal("promo"),
   tone: z.enum(["dark", "accent", "soft"]).catch("dark"),
-  kicker: nullableText("Etiqueta pequeña, ej. 'Oferta de temporada' (solo si es real)."),
+  kicker: nullableText("Etiqueta pequeña, ej. 'Solo en {mes}' (el token {mes} se cambia solo por el mes actual; solo si la oferta es real)."),
   heading: text(70, "Mensaje de la franja promocional"),
   body: text(160, "Detalle de la promoción o invitación"),
   ctaLabel: text(30, "Botón"),
+  countdown: z.boolean().optional().catch(undefined).describe("true para mostrar la cuenta regresiva en vivo hasta el último día del mes."),
+  seal: z.string().nullable().optional().catch(undefined).describe("Sello circular sobre la imagen, ej. '-15 %'. SOLO si es un dato real."),
+});
+
+const ShowroomSection = z.object({
+  ...media,
+  type: z.literal("showroom"),
+  kicker: nullableText("Etiqueta pequeña, ej. 'Conócelos de cerca'."),
+  heading: text(80, "Título del visor de productos"),
+  productIds: z.array(z.string()).describe("Ids de PRODUCTOS (con foto) que se pueden elegir y girar. Lista vacía = los primeros con foto."),
+  bubbles: z
+    .array(item)
+    .describe("2 a 4 características que se señalan con globos de chat sobre el producto. SOLO datos reales (materiales, garantía, tecnología)."),
+  facts: z.array(z.object({ title: z.string(), description: z.string() })).describe("Hasta 3 datos clave reales con ícono (garantía, entrega, financiación)."),
+});
+
+const QuoterSection = z.object({
+  ...media,
+  type: z.literal("quoter"),
+  kicker: nullableText("Etiqueta pequeña, ej. 'Cotizador'."),
+  heading: text(80, "Título del cotizador por presupuesto"),
+  intro: nullableText("Frase corta bajo el título."),
+  productIds: z.array(z.string()).describe("Ids de PRODUCTOS con precio a comparar contra el presupuesto. Lista vacía = todos los que tengan precio."),
+  months: z.number().int().min(1).max(120).catch(48).describe("Plazo en meses para el modo 'cuota mensual' (simulación sin intereses)."),
+  note: nullableText("Aviso bajo el cotizador. Por defecto: simulación de referencia."),
+});
+
+const FanSection = z.object({
+  ...media,
+  type: z.literal("fan"),
+  kicker: nullableText("Etiqueta pequeña, ej. 'La colección'."),
+  heading: text(80, "Título de la colección en abanico"),
+  intro: nullableText("Frase corta bajo el título."),
+  productIds: z.array(z.string()).describe("Ids de PRODUCTOS (con foto) de la colección, en orden. Lista vacía = todos."),
+});
+
+const MarqueeSection = z.object({
+  ...media,
+  type: z.literal("marquee"),
+  lines: z.array(z.string()).describe("1 o 2 frases cortas en mayúsculas que se desplazan gigantes, en direcciones opuestas."),
 });
 
 const ComparisonSection = z.object({
@@ -255,6 +297,10 @@ export const SectionSchema = z.discriminatedUnion("type", [
   ProductGridSection,
   SpotlightSection,
   PromoSection,
+  ShowroomSection,
+  QuoterSection,
+  FanSection,
+  MarqueeSection,
   ComparisonSection,
   AgendaSection,
   HostSection,
@@ -275,6 +321,10 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   productGrid: "Productos",
   productSpotlight: "Producto destacado",
   promo: "Franja promocional",
+  showroom: "Visor de productos",
+  quoter: "Cotizador",
+  fan: "Colección en abanico",
+  marquee: "Texto en movimiento",
   comparison: "Comparación",
   agenda: "Agenda",
   host: "Quién está detrás",
@@ -287,7 +337,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
 
 export const ThemeSchema = z.object({
   primaryColor: hexColor("#1f6feb").describe("Acento único (botones, enlaces). Contraste ≥4.5:1 con el fondo."),
-  backgroundColor: hexColor("#fafaf7").describe("Fondo. Nunca #ffffff ni #000000 puros."),
+  backgroundColor: hexColor("#fafaf7").describe("Fondo claro: blanco o blanco con un tinte muy suave. Nunca oscuro."),
   surfaceColor: hexColor("#f1f0eb").describe("Fondo de tarjetas y franjas alternas, un paso más claro u oscuro que el fondo."),
   textColor: hexColor("#141414").describe("Texto principal, contraste ≥7:1 con el fondo."),
   headingFont: z.enum(FONT_OPTIONS).catch("Inter"),

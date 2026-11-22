@@ -4,10 +4,12 @@
 // layer — the middleware returns its own NextResponse directly — so they
 // need to be attached by hand there too).
 
+import { SITE_SCRIPT_HASH } from "./siteScript";
+
 // Stricter CSP for the publicly-served, AI-generated business websites —
 // this surface renders raw HTML built from business-editable content (see
-// lib/websiteTemplate.ts) and has no inline <script> of its own, so
-// script-src can be fully locked down. This is the defense-in-depth layer
+// lib/websiteTemplate.ts). The only script it may run is the page's own fixed
+// interaction script (lib/siteScript.ts), allowed by its SHA-256 hash. This is the defense-in-depth layer
 // for the stored-XSS fix in lib/websiteContent.ts: even if a malicious
 // <script> ever slipped past schema validation again, the browser would
 // refuse to run it here.
@@ -20,7 +22,7 @@
 // page (the actual clickjacking risk this header defends against) — it only
 // allows same-origin embeds, which is this app's own dashboard.
 export const SITE_CSP =
-  "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.youtube.com https://player.vimeo.com; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
+  `default-src 'self'; script-src 'sha256-${SITE_SCRIPT_HASH}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.youtube.com https://player.vimeo.com; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`;
 
 export const SECURITY_HEADERS: { key: string; value: string }[] = [
   // SAMEORIGIN, not DENY — see the frame-ancestors comment on SITE_CSP above;

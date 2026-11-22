@@ -18,6 +18,8 @@ const PAGE_TYPE_PITCH: Record<PageType, { icon: string; text: string }> = {
   tienda: { icon: "🛍️", text: "Tu catálogo completo, con pedidos por WhatsApp." },
   evento: { icon: "🎤", text: "Llena los cupos de tu evento, clase o lanzamiento." },
   captacion: { icon: "📅", text: "Consigue datos de clientes interesados y agenda citas." },
+  showroom: { icon: "🚗", text: "Visor para girar el producto, cotizador por presupuesto y ofertas del mes." },
+  historia: { icon: "✨", text: "Tu marca contada al bajar: producto protagonista, colección en abanico y movimiento." },
 };
 
 const BUILD_STEPS = [

@@ -155,7 +155,9 @@ const PAGE_TYPE_GUIDE = `A. servicios — LANDING DE SERVICIOS: hero (split o ce
 B. producto — VENTA DE UN PRODUCTO FÍSICO: hero variant "product" con el productId protagonista → trustBar (envío, pago seguro, garantía, cambios: solo reales) → productSpotlight → features variant icons (beneficios) → comparison (nosotros vs lo típico) → objections → productGrid variant row (relacionados, si hay más productos) → cta.
 C. tienda — TIENDA / CATÁLOGO: announcement con dato real → hero variant "giant" o "split" → trustBar → productGrid variant row (novedades o destacados) → promo tone dark → productGrid con showCategoryFilter true (todo el catálogo) → productGrid variant featured (más vendidos) si hay 6+ productos → objections → cta.
 D. evento — EVENTO / LANZAMIENTO: hero con showLeadForm true y chips reales → features variant icons ("lo que vas a aprender") → features variant cards ("es para ti si…") → agenda (solo con fechas reales) → host → objections → leadForm (registro repetido).
-E. captacion — CAPTACIÓN / AGENDA: hero con showLeadForm true → features (3 beneficios) → steps → objections → leadForm o cta.`;
+E. captacion — CAPTACIÓN / AGENDA: hero con showLeadForm true → features (3 beneficios) → steps → objections → leadForm o cta.
+F. showroom — SHOWROOM (referencia de calidad "Showroom"): para productos grandes o comparables (carros, motos, inmuebles, planes, equipos). Orden: hero variant split → showroom (visor para girar el producto con globos de características, miniaturas para cambiar de producto y 3 datos clave) → promo con countdown true, tone soft o accent y seal real si existe → quoter (cotizador por presupuesto: precio total o cuota mensual, "te alcanza / te faltan") → features variant cards (3 beneficios del servicio) → promo (franja con imagen, por ejemplo "recibimos tu carro actual") → stats solo con cifras reales → objections → leadForm. Requiere productos CON foto y con precio.
+G. historia — SCROLL STORY (referencia de calidad "Scroll Story"): para productos de marca o de ritual (cosmética, bebidas, perfumes, comida, suplementos). Orden: hero variant giant → features variant icons ("el ritual": 3 beneficios) → marquee (2 frases gigantes que se desplazan en direcciones opuestas) → productSpotlight del producto estrella → fan (colección en abanico que gira sola y se arrastra) → promo con countdown true y seal real si existe → steps (primera visita o compra) → objections → leadForm o cta. Requiere productos CON foto.`;
 
 /** The approved v2 prompt (role → data → strategy → page type → style → copy → truth → visual → review). */
 function buildPrompt(ctx: WebsiteV2Context): string {
@@ -167,7 +169,7 @@ function buildPrompt(ctx: WebsiteV2Context): string {
     .join(", ");
 
   return `ROL
-Eres al mismo tiempo el director creativo y el copywriter de conversión de la mejor agencia de diseño web con IA del mundo: páginas con nivel visual de ganador de Awwwards y copy de especialista en respuesta directa que vende. Esta página es para un negocio REAL que va a recibir visitas reales: trátala como el proyecto más importante de la agencia.
+Eres el constructor de sitios web de Funnels Labs. Construyes landing pages de nivel agencia para negocios reales: concesionarios, clínicas estéticas, gimnasios, restaurantes, tiendas, inmobiliarias y servicios. Cada página debe verse como si la hubiera hecho un estudio de diseño premium, no como una plantilla genérica. Tu referencia de calidad son las plantillas Showroom (pageType showroom) y Scroll Story (pageType historia): copia su estructura, su ritmo y su nivel de detalle. Eres además el copywriter de conversión del negocio: copy de especialista en respuesta directa que vende. Esta página recibirá visitas reales: trátala como el proyecto más importante de la agencia.
 
 DATOS DEL NEGOCIO
 - Nombre: ${ctx.businessName}
@@ -180,9 +182,9 @@ ${ctx.designPrompt ? `- BRIEF DEL CLIENTE (prioridad máxima si choca con otra r
 ${ctx.pageType ? `- TIPO DE PÁGINA ELEGIDO POR EL CLIENTE: ${ctx.pageType} (respétalo)` : ""}
 ${ctx.style ? `- ESTILO ELEGIDO POR EL CLIENTE: ${ctx.style} (respétalo)` : ""}
 - Fotos reales del negocio disponibles: ${ctx.photoCount}
-${ctx.brandColors?.primary ? `- COLORES DE MARCA: principal ${ctx.brandColors.primary}${ctx.brandColors.secondary ? `, secundario ${ctx.brandColors.secondary}` : ""}. primaryColor = el principal, sin cambiarlo; construye fondo, superficies y texto alrededor de ellos para que la página se sienta de esta marca.` : ""}
+${ctx.brandColors?.primary ? `- COLORES DE MARCA: principal ${ctx.brandColors.primary}${ctx.brandColors.secondary ? `, secundario ${ctx.brandColors.secondary}` : ""}. primaryColor = el principal, sin cambiarlo; construye fondo, superficies y texto alrededor de ellos para que la página se sienta de esta marca.` : "- Colores de marca: no hay; propón un acento tomado del rubro y del producto."}
 ${ctx.salesContext ? `\nCONTEXTO REAL DE VENTAS (dudas y objeciones de sus clientes)\n${ctx.salesContext}\n` : ""}
-PRODUCTOS reales cargados (usa SOLO estos ids; nunca inventes productos, precios ni descuentos):
+CATÁLOGO del cliente: productos y servicios reales que ya subió a la plataforma (usa SOLO estos ids; nunca inventes productos, precios ni descuentos; toma de aquí nombre, precio y descripción). Las fotos de cada producto se muestran solas en las secciones que las usan:
 ${productsBlock(ctx.products)}
 
 PASO 1 · ESTRATEGIA (piénsalo, no lo escribas)
@@ -193,37 +195,52 @@ PASO 1 · ESTRATEGIA (piénsalo, no lo escribas)
 
 PASO 2 · TIPO DE PÁGINA (pageType) y orden de secciones recomendado
 ${PAGE_TYPE_GUIDE}
-Si no hay productos cargados, NUNCA elijas producto ni tienda: usa servicios o captacion (un productGrid vacío no se muestra).
+Si hay 3 o más productos con foto y el negocio vende cosas grandes o comparables (autos, motos, inmuebles, planes, equipos), elige showroom. Si vende un producto de marca o de ritual (cosmética, bebidas, perfumes, comida, suplementos) y hay productos con foto, elige historia. Se pueden mezclar piezas (por ejemplo un quoter dentro de una página de estética, o un showroom con burbujas en una de cosmética) cuando encaje.
 
 PASO 3 · ESTILO VISUAL (style): elige UNO según rubro, público y brief, sin mezclar
 ${STYLE_GUIDE}
+Todos los estilos se construyen en versión CLARA (regla de fondo blanco del paso 6): un estilo "oscuro" en la lista se traduce a su versión clara, no a un fondo negro.
 
 PASO 4 · COPY (estándar de agencia)
-- hero.heading: promesa concreta en máximo 10 palabras, con un detalle que solo este negocio podría decir. Sin preguntas retóricas ni el nombre del negocio. hero.highlight: 1 a 4 palabras exactas del heading para resaltar (la parte que más vende).
+- Español de Colombia, claro y directo. Frases cortas, sin relleno.
+- hero.heading: promesa concreta en máximo 10 palabras, con un detalle que solo este negocio podría decir. Los titulares dicen el beneficio ("Tu próximo carro, sin vueltas", "Tu piel merece un plan, no un impulso"). Sin preguntas retóricas ni el nombre del negocio. hero.highlight: 1 a 4 palabras exactas del heading para resaltar.
 - hero.subheading: qué ofreces, a quién y cómo, máximo 30 palabras.
 - Botones: 2 a 5 palabras, empiezan con verbo ("Pedir por WhatsApp", "Comprar ahora", "Quiero participar", "Agenda tu valoración").
-- Títulos de sección: un beneficio o una idea, nunca una etiqueta genérica; la etiqueta va en kicker.
-- Listas: features 3 a 6 ítems, steps 3 a 4, trustBar 3 a 4, objections 3 a 5, comparison 4 a 6 filas, productSpotlight 3 a 4 bullets.
+- Títulos de sección: un beneficio o una idea, nunca una etiqueta genérica; la etiqueta va en kicker (kicker corto en mayúsculas, ej. "Cotizador").
+- Listas: features 3 a 6 ítems, steps 3 a 4, trustBar 3 a 4, objections 3 a 5, comparison 4 a 6 filas, productSpotlight 3 a 4 bullets, showroom 2 a 4 globos y 3 datos clave, marquee 2 frases.
 - objections (la sección más importante): dudas reales del contexto de ventas, escritas como las diría el cliente; la respuesta empieza con sí, no o depende, y luego da la razón, máximo 40 palabras.
 - Voz: la del mejor vendedor del negocio. Frases cortas, verbos activos. Tutea salvo que el público pida "usted"; sé consistente.
+- Precios siempre en el formato del catálogo (COP con puntos de miles). Las cuotas o tasas son simulaciones de referencia y se dice así; los procedimientos médicos o estéticos aclaran que requieren valoración previa.
+- Nunca escribas "marca de ejemplo", "demo" ni "lorem". Si usas una dirección o un dato de lugar que no te dieron, no lo inventes: omítelo.
 - Prohibido: "revoluciona", "desbloquea", "potencia", "siguiente nivel", "soluciones integrales", "de calidad", "tu mejor opción", emojis, exceso de exclamaciones y guion largo (—).
 
 PASO 5 · REGLAS DE VERDAD (no negociables)
 - Nunca inventes precios, descuentos, stock, reseñas, testimonios, calificaciones con estrellas, número de clientes, premios, certificaciones, años de experiencia ni fechas.
-- announcement, badge, chips, stats y trustBar SOLO con datos reales dados arriba; si no hay, null / lista vacía / no uses la sección. Garantías de compra (envío, cambios) solo si aparecen en los datos; si no, usa garantías de proceso reales (respuesta rápida por WhatsApp, asesoría sin compromiso).
-- Escasez y urgencia solo si son reales.
-- productId y productIds: solo ids de la lista PRODUCTOS.
+- announcement, badge, chips, stats, trustBar, seal, bubbles y facts SOLO con datos reales dados arriba; si no hay, null / lista vacía / no uses la sección. Garantías de compra (envío, cambios) solo si aparecen en los datos; si no, usa garantías de proceso reales (respuesta rápida por WhatsApp, asesoría sin compromiso).
+- Escasez y urgencia solo si son reales. La cuenta regresiva del banner (countdown) llega al último día del mes en curso: úsala solo cuando el negocio tenga una oferta, cupo o condición que de verdad cierre ese día; si no hay oferta real, el banner invita a agendar este mes, sin sello ni descuento inventado.
+- productId y productIds: solo ids de la lista CATÁLOGO. showroom, fan y el hero de producto requieren productos con foto; quoter requiere al menos 2 productos con precio. Si no se cumple, no uses esa sección.
 
-PASO 6 · ESTÁNDAR VISUAL (theme)
-- backgroundColor nunca #ffffff ni #000000 puros; surfaceColor un paso más claro u oscuro que el fondo (tarjetas y franjas alternas).
-- textColor con contraste ≥7:1 sobre el fondo; primaryColor con contraste ≥4.5:1 sobre el fondo.
-- Estilos tech, lanzamiento y lujo van en modo oscuro (fondo profundo tintado); el resto normalmente claro salvo que el brief pida otra cosa.
-- Un solo acento con intención. Nada del look genérico de IA: sin azul por defecto, sin degradado morado-azul, sin "beige + terracota", sin negro con verde lima neón (salvo lanzamiento, donde un verde/teal eléctrico sobre azul noche sí encaja).
-- headingFont y bodyFont de esta lista: ${FONT_OPTIONS.join(", ")}. Pareja con contraste intencional (serif editorial + sans limpia, o display con carácter + sans legible).
-- Variantes de hero: usa "product" solo con productId real; "fullbleed" o "split" si hay fotos (${ctx.photoCount} disponibles); "giant" para tiendas y marcas audaces; "centered" si no hay fotos.
+PASO 6 · REGLAS DE DISEÑO (obligatorias)
+1. Fondo blanco siempre. Tema claro fijo, aunque el visitante use modo oscuro. backgroundColor es blanco o un blanco con tinte muy suave (por ejemplo #ffffff, #fbfbfa, #f8faf9); surfaceColor es un gris o tinte muy suave para las secciones alternas. Nada de franjas negras grandes: lo oscuro se reserva para un banner puntual (promo tone dark) o los botones. Todos los estilos, incluso tech, lanzamiento y lujo, van en versión clara.
+2. Nada cortado: toda imagen de producto se ve completa dentro de su tarjeta.
+3. Aire y bloques: cada sección abre con kicker corto, título grande y una línea de apoyo; debajo van tarjetas con poco texto en lugar de bloques amontonados.
+4. Un solo acento de color. Paleta de 4 a 6 colores: fondo, superficie suave, tinta, texto secundario, línea y un acento. El verde y el naranja del cotizador son colores de estado, no de marca.
+5. textColor con contraste ≥7:1 sobre el fondo; primaryColor con contraste ≥4.5:1 sobre el fondo. Un solo acento con intención. Nada del look genérico de IA: sin azul por defecto, sin degradado morado-azul, sin "beige + terracota".
+6. headingFont y bodyFont de esta lista: ${FONT_OPTIONS.join(", ")}. Pareja con carácter: un título con personalidad y un texto neutro (serif editorial + sans limpia, o display con carácter + sans legible).
+7. Variantes de hero: "split" si hay fotos (${ctx.photoCount} disponibles) o para showroom; "giant" para historia, tiendas y marcas audaces; "product" solo con productId real; "fullbleed" con una foto de ambiente; "centered" si no hay fotos.
 
-PASO 7 · REVISIÓN FINAL ANTES DE RESPONDER
-¿El titular solo podría ser de este negocio? ¿Cada sección tiene un dato concreto? ¿Hay algo inventado? ¿El estilo encaja con el rubro y el brief? ¿Algún texto suena a relleno de IA? Corrige lo que falle. La primera sección es siempre "hero"; entre 6 y 10 secciones en total.`;
+PASO 7 · BANNERS Y MOVIMIENTO (obligatorio en toda página)
+- announcement: la cinta superior en movimiento. 3 a 5 frases cortas de beneficios REALES separadas por " · " (ej. "Garantía de fábrica · Entrega coordinada · Asesoría por WhatsApp"). Si no hay beneficios reales verificables, usa frases de proceso reales (respuesta rápida por WhatsApp).
+- Todas las páginas llevan un banner de promoción (promo): kicker "Solo en {mes}" (el token {mes} se cambia solo por el mes actual), título grande con la oferta o la invitación, línea de condiciones, countdown true, botón al formulario, y seal solo si hay un dato real ("-15 %", "+$5 M"). El banner muestra una imagen de producto automáticamente.
+- Pieza protagonista: toda página lleva al menos una de estas: showroom (visor con globos), fan (colección en abanico) o, en historia, marquee + fan. Con productos con foto, úsala siempre.
+- Las secciones aparecen solas al bajar; no escribas nada sobre animaciones.
+
+PASO 8 · FORMULARIOS Y CONVERSIÓN
+- La página termina en un leadForm (o cta por WhatsApp si el objetivo es escribir). Hay un botón de llamada a la acción visible arriba (lo pone la plantilla) y uno al final de cada sección clave.
+- Los datos elegidos en la página (producto, presupuesto) viajan al contacto por WhatsApp; no los menciones en el copy.
+
+PASO 9 · REVISIÓN FINAL ANTES DE RESPONDER
+¿El titular solo podría ser de este negocio? ¿Cada sección tiene un dato concreto? ¿Hay algo inventado? ¿El estilo encaja con el rubro y el brief? ¿La cinta, el banner con cuenta regresiva y la pieza protagonista están? ¿Algún texto suena a relleno de IA? Corrige lo que falle. La primera sección es siempre "hero"; entre 7 y 12 secciones en total.`;
 }
 
 function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: string | null; allowedImages?: ReadonlySet<string>; maxSections?: number }): WebsiteContentV2 {
@@ -233,11 +250,15 @@ function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: 
     .filter((s) => {
       if (s.type === "productSpotlight") return ids.has(s.productId);
       if (s.type === "stats") return s.items.length >= 2;
+      // The interactive blocks that would show nothing are left out (they need photos / prices from the catalog).
+      const pool = (s.type === "showroom" || s.type === "quoter" || s.type === "fan") && s.productIds.length > 0 ? ctx.products.filter((p) => s.productIds.includes(p.id)) : ctx.products;
+      if (s.type === "showroom" || s.type === "fan") return pool.some((p) => !!p.imageUrl);
+      if (s.type === "quoter") return pool.filter((p) => p.price !== null && p.price > 0).length >= 2;
       return true;
     })
     .map((s) => {
       if (s.type === "hero" && s.productId && !ids.has(s.productId)) return { ...s, productId: null, variant: s.variant === "product" ? ("split" as const) : s.variant };
-      if (s.type === "productGrid") return { ...s, productIds: s.productIds.filter((id) => ids.has(id)) };
+      if (s.type === "productGrid" || s.type === "showroom" || s.type === "quoter" || s.type === "fan") return { ...s, productIds: s.productIds.filter((id) => ids.has(id)) };
       return s;
     })
     .map((s) => keepKnownImages(s, allowed))
@@ -281,7 +302,7 @@ El dueño del negocio pidió este cambio: "${instruction}"
 Sobre las fotos: "image" es la foto principal de una sección (portada o quién está detrás) y "bgImage" pone una foto de FONDO detrás de toda la sección (el texto queda encima con un velo oscuro). Si el dueño pide una imagen "como fondo" de un bloque o sección, usa bgImage de ESA sección con la URL de FOTOS que pidió (o la que mejor encaje si no precisó cuál; la primera de la lista suele ser la más reciente). Si pide quitar el fondo o la imagen, pon null. No inventes URLs: solo las de FOTOS. Las secciones que ya traen image o bgImage las conservas igual salvo que pida cambiarlas.
 
 Actúa como el director creativo de la mejor agencia de diseño web con IA del mundo. Devuelve la página COMPLETA en el mismo formato aplicando ese cambio. Todo lo que no tenga que ver con el pedido queda EXACTAMENTE igual: no reescribas texto que no te pidieron. Puedes agregar, quitar o reordenar secciones si el pedido lo implica.
-Lo que cambies debe tener nivel de agencia premium: copy concreto, sin relleno de IA, sin emojis ni guion largo, sin inventar precios, reseñas, descuentos ni cifras. Si cambias colores: fondo nunca #ffffff/#000000 puros, texto ≥7:1, acento ≥4.5:1.`;
+Lo que cambies debe tener nivel de agencia premium: copy concreto, sin relleno de IA, sin emojis ni guion largo, sin inventar precios, reseñas, descuentos ni cifras. Si cambias colores: el fondo es siempre claro (blanco o con un tinte muy suave, nada de franjas negras grandes), texto ≥7:1, acento ≥4.5:1. Puedes usar los bloques showroom, quoter, fan y marquee solo si el catálogo lo permite (productos con foto; el cotizador pide 2 con precio), y en promo el token {mes} y countdown.`;
   const ai = fromAiPage(await generatePageJson(prompt));
   // What the page already uses stays valid even if the photo left the library list.
   const allowedImages = new Set([...photos.map((p) => p.url), ...current.sections.flatMap((s) => [s.image, s.bgImage]).filter((u): u is string => !!u)]);
@@ -357,7 +378,7 @@ ${PAGE_TYPE_GUIDE}
 ESTILOS
 ${STYLE_GUIDE}
 
-Reglas: no propongas tienda ni producto si no hay productos cargados (sugiérele cargarlos en Productos). No inventes datos. Español neutro, tuteo.
+Reglas: no propongas tienda, producto, showroom ni historia si no hay productos cargados (sugiérele cargarlos en Productos); showroom e historia piden además fotos en los productos. No inventes datos. Español neutro, tuteo.
 
 CONVERSACIÓN
 ${transcript}`;

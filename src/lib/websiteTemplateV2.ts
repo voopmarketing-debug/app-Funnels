@@ -2,6 +2,7 @@ import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS } from "@/lib/websiteContent";
 import { readableTextColor, sanitizeHexColor } from "@/lib/websiteTemplate";
 import { LOOK_CSS, lookParts } from "@/lib/websiteLook";
+import { SITE_SCRIPT } from "@/lib/siteScript";
 import {
   formatMoney,
   type CatalogProduct,
@@ -14,6 +15,139 @@ import {
 // only — public pages ship with `script-src 'none'` (securityHeaders.ts),
 // so everything interactive here is CSS/HTML-native: <details> for FAQs,
 // anchors for category tabs, scroll-snap for product rows.
+
+
+// Motion and the interactive blocks (see siteScript.ts). Everything has a still,
+// readable state without the script, and no movement when the visitor asked for less.
+const FX_CSS = `
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rv{transition:opacity .7s ease,transform .7s cubic-bezier(.2,.8,.2,1)}
+.rv-hide{opacity:0;transform:translateY(26px)}
+.rv-in{opacity:1;transform:none}
+.feat-item.rv:nth-child(2),.pcard.rv:nth-child(2),.steps li.rv:nth-child(2){transition-delay:.07s}
+.feat-item.rv:nth-child(3),.pcard.rv:nth-child(3),.steps li.rv:nth-child(3){transition-delay:.14s}
+.feat-item.rv:nth-child(4),.pcard.rv:nth-child(4),.steps li.rv:nth-child(4){transition-delay:.21s}
+.annc-run{padding:0;overflow:hidden;white-space:nowrap}
+.annc-track{display:flex;width:max-content;animation:annc 38s linear infinite}
+.annc-run:hover .annc-track{animation-play-state:paused}
+.annc-set{display:flex;align-items:center;flex:none}
+.annc-set span{padding:9px 18px}
+.annc-set i{font-style:normal;opacity:.55;font-size:11px}
+@keyframes annc{to{transform:translateX(-50%)}}
+.promo-rich{padding:calc(var(--pad) * .7) 0;overflow:hidden}
+.promo-rich-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:48px;align-items:center}
+.promo-rich-grid.no-media{grid-template-columns:1fr}
+.promo-rich .kicker{display:inline-flex;align-items:center;gap:9px;background:color-mix(in srgb,currentColor 12%,transparent);padding:6px 14px;border-radius:999px;color:inherit;opacity:1;margin-bottom:18px}
+.promo-rich .kicker::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 60%,transparent);animation:pulse 1.8s infinite}
+.promo-accent.promo-rich .kicker::before{background:var(--btn-text)}
+@keyframes pulse{70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.promo-rich h2{font-size:clamp(30px,4.6vw,56px)}
+.promo-rich .promo-copy>p{margin:0 0 6px;opacity:.82;max-width:52ch}
+.cd{display:flex;gap:10px;margin:22px 0 26px}
+.cd div{min-width:64px;text-align:center;padding:10px 8px;border-radius:14px;background:color-mix(in srgb,currentColor 11%,transparent);border:1px solid color-mix(in srgb,currentColor 14%,transparent)}
+.cd b{display:block;font-family:var(--hf);font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.cd span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.7}
+.promo-media{position:relative;transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .25s ease;border-radius:var(--r);overflow:visible}
+.promo-media img{width:100%;height:auto;border-radius:var(--r);box-shadow:0 36px 70px -34px rgba(0,0,0,.55);animation:popIn .9s cubic-bezier(.2,.8,.2,1) both}
+.promo-media .glow{position:absolute;inset:0;border-radius:var(--r);pointer-events:none;background:radial-gradient(circle at var(--mx,50%) var(--my,30%),rgba(255,255,255,.34),transparent 55%);mix-blend-mode:soft-light;opacity:.9}
+.seal{position:absolute;top:-16px;right:-8px;width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;font-family:var(--hf);font-weight:800;font-size:19px;line-height:1.05;background:var(--primary);color:var(--btn-text);box-shadow:0 14px 30px -12px rgba(0,0,0,.5);animation:floaty 4.6s ease-in-out infinite}
+@keyframes floaty{50%{transform:translateY(-9px) rotate(4deg)}}
+@keyframes popIn{from{opacity:0;transform:translateY(30px) scale(.94)}}
+.shw{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:28px;margin-top:36px;align-items:start}
+.shw-stage{position:relative;aspect-ratio:16/11;border-radius:var(--r);background:radial-gradient(120% 90% at 50% 30%,color-mix(in srgb,var(--primary) 9%,var(--bg)),var(--surface));overflow:hidden;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.shw-stage.drag{cursor:grabbing}
+.shw-panel{margin:0;position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.shw-panel[hidden]{display:none}
+.shw-panel img{max-width:76%;max-height:84%;width:auto;height:auto;object-fit:contain;filter:drop-shadow(0 26px 24px rgba(0,0,0,.18));pointer-events:none}
+.shw-stage::after{content:"";position:absolute;left:18%;right:18%;bottom:7%;height:16px;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.2),transparent);filter:blur(4px)}
+.shw-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);margin:0;z-index:3;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted);background:color-mix(in srgb,var(--bg) 86%,transparent);padding:5px 12px;border-radius:999px}
+.shw-bubbles{list-style:none;margin:0;padding:0}
+.shw-bubbles li{position:absolute;left:var(--x);top:var(--y);z-index:2;max-width:210px;padding:10px 14px;border-radius:16px 16px 16px 4px;background:var(--bg);border:1px solid var(--line);box-shadow:0 14px 30px -18px rgba(0,0,0,.4);font-size:13px;line-height:1.35;opacity:0;transform:translateY(8px) scale(.96)}
+.shw-bubbles b{display:block;font-size:13.5px}
+.shw-bubbles span{color:var(--muted)}
+.shw.in .shw-bubbles li{animation:bubble .55s var(--d) cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes bubble{to{opacity:1;transform:none}}
+.shw-thumbs{display:flex;gap:10px;margin-top:14px;overflow-x:auto;padding-bottom:6px}
+.shw-thumb{flex:none;display:grid;grid-template-columns:48px auto;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:left;padding:8px 14px 8px 8px;border-radius:14px;border:1px solid var(--line);background:var(--bg);color:inherit;font:inherit;cursor:pointer;min-height:44px}
+.shw-thumb img{grid-row:1/3;width:48px;height:48px;object-fit:contain;border-radius:10px;background:var(--surface)}
+.shw-thumb span{font-weight:700;font-size:14px;line-height:1.2}
+.shw-thumb small{color:var(--muted);font-size:12.5px}
+.shw-thumb.on{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 25%,transparent)}
+.shw-chat{display:none;list-style:none;margin:14px 0 0;padding:0;gap:8px}
+.shw-chat li{max-width:88%;padding:10px 14px;border-radius:16px 16px 16px 4px;background:var(--surface);font-size:14px;line-height:1.35}
+.shw-chat li:nth-child(even){justify-self:end;border-radius:16px 16px 4px 16px;background:color-mix(in srgb,var(--primary) 12%,var(--bg))}
+.shw-chat b{display:block}.shw-chat span{color:var(--muted)}
+.shw-info[hidden]{display:none}
+.shw-info h3{font-size:26px;margin-bottom:8px}
+.shw-desc{color:var(--muted);margin:0 0 10px}
+.shw-facts{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:10px}
+.shw-facts li{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:14px;background:var(--surface)}
+.shw-facts .ico{width:24px;height:24px;color:var(--primary);flex:none}
+.shw-facts b{display:block;font-size:14px}
+.shw-facts span{font-size:13px;color:var(--muted)}
+.qt{margin-top:32px;padding:28px;border-radius:calc(var(--r) + 4px);background:var(--bg);border:1px solid var(--line)}
+.qt-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.qt-modes{display:inline-flex;padding:4px;border-radius:999px;background:var(--surface)}
+.qt-modes button{font:inherit;font-weight:700;font-size:14px;padding:9px 18px;border:0;border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;min-height:40px}
+.qt-modes button.on{background:var(--text);color:var(--bg)}
+.qt-count{margin:0;font-weight:700;color:var(--primary)}
+.qt-label{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:22px;font-weight:600;color:var(--muted)}
+.qt-label output{font-family:var(--hf);font-size:30px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.qt-range{width:100%;margin:12px 0 6px;accent-color:var(--primary);height:34px}
+.qt-list{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:12px}
+.qt-row{display:grid;grid-template-columns:64px 1fr auto;gap:16px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid var(--line);transition:border-color .2s,background .2s}
+.qt-row>img,.qt-ph{width:64px;height:64px;border-radius:12px;object-fit:contain;background:var(--surface);display:flex;align-items:center;justify-content:center;font-family:var(--hf);font-size:24px}
+.qt-info b{display:block;line-height:1.2}
+.qt-info>span{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+.qt-bar{height:8px;border-radius:999px;background:var(--surface);margin:8px 0 4px;overflow:hidden}
+.qt-bar i{display:block;height:100%;width:0;border-radius:999px;background:var(--primary);transition:width .25s ease,background .25s}
+.qt-info p{margin:0;font-size:13px;font-weight:700}
+.qt-row.fit .qt-bar i{background:#15803d}.qt-row.fit [data-qstate]{color:#15803d}
+.qt-row.nofit .qt-bar i{background:#c2410c}.qt-row.nofit [data-qstate]{color:#c2410c}
+.qt-row.nofit{opacity:.88}
+.qt-note{margin:18px 0 0;font-size:13px;color:var(--muted)}
+.fan{margin-top:34px}
+.fan-stage{display:flex;gap:16px;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x mandatory}
+.fan-card{flex:none;width:min(240px,70vw);scroll-snap-align:start;border-radius:var(--r);background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.fan-card img{width:100%;aspect-ratio:4/5;object-fit:contain;padding:12px;background:var(--surface);pointer-events:none}
+.fan-cap{padding:12px 14px}
+.fan-cap b{display:block;line-height:1.2}
+.fan-cap span{color:var(--muted);font-size:14px}
+.fan-on .fan-stage{display:block;position:relative;height:clamp(360px,54vw,480px);overflow:hidden;padding:0;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.fan-on .fan-card{position:absolute;left:50%;bottom:0;width:clamp(190px,26vw,250px);transform-origin:50% 330%;box-shadow:0 22px 40px -26px rgba(0,0,0,.45)}
+.fan-sheet{max-width:640px;margin:22px auto 0;text-align:center}
+.fan-info[hidden],[data-fpane][hidden]{display:none}
+.fan-tabs{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--bg);margin-bottom:16px}
+.fan-tabs button{font:inherit;font-weight:700;font-size:14px;padding:8px 18px;border:0;border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;min-height:40px}
+.fan-tabs button.on{background:var(--text);color:var(--bg)}
+.fan-info p{color:var(--muted)}
+.fan-info .prow{justify-content:center}
+.mq{padding:56px 0;overflow:hidden;border-block:1px solid var(--line)}
+.mq-row{overflow:hidden;white-space:nowrap}
+.mq-track{display:inline-flex;animation:mq 46s linear infinite}
+.mq-row.rev .mq-track{animation-direction:reverse}
+.mq-track span{font-family:var(--hf);font-size:clamp(54px,11vw,150px);line-height:1.05;text-transform:uppercase;letter-spacing:-.03em;padding-right:.5em;color:transparent;-webkit-text-stroke:1.5px color-mix(in srgb,var(--text) 38%,transparent)}
+.mq-row.rev .mq-track span{color:color-mix(in srgb,var(--primary) 16%,transparent);-webkit-text-stroke:0}
+@keyframes mq{to{transform:translateX(-50%)}}
+@media (max-width:860px){
+  .promo-rich-grid,.shw{grid-template-columns:minmax(0,1fr);gap:28px}
+  .shw-stage{aspect-ratio:4/3}
+  .shw-bubbles{display:none}
+  .shw-chat{display:grid}
+  .qt{padding:18px}
+  .qt-row{grid-template-columns:52px 1fr;gap:12px}
+  .qt-row>img,.qt-ph{width:52px;height:52px}
+  .qt-row>.btn,.qt-row>.btn-soldout{grid-column:1/-1;width:100%}
+  .cd div{min-width:58px}
+  .seal{right:6px;width:78px;height:78px;font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  .rv,.rv-hide{opacity:1!important;transform:none!important}
+  .annc-track,.mq-track,.seal,.promo-media img,.shw-bubbles li,.promo-rich .kicker::before{animation:none!important}
+  .shw-bubbles li{opacity:1;transform:none}
+  .promo-media{transform:none!important}
+}
+`;
 
 function esc(text: string | null | undefined): string {
   return (text ?? "")
@@ -183,7 +317,10 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       </div>
     </article>`;
 
-  const kickerHtml = (k: string | null | undefined, path?: string) => (k ? `<p class="kicker"${path ? ed(path) : ""}>${esc(k)}</p>` : "");
+  // "{mes}" becomes the current month (the page script keeps it right as the months go by); the editor sees the raw token.
+  const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const rich = (text: string) => (edit ? esc(text) : esc(text).replace(/\{mes\}/g, `<span data-month>${MONTHS[new Date().getMonth()]}</span>`));
+  const kickerHtml = (k: string | null | undefined, path?: string) => (k ? `<p class="kicker"${path ? ed(path) : ""}>${rich(k)}</p>` : "");
 
   // Paints the AI-chosen words of the headline in the accent color.
   const headline = (heading: string, highlight: string | null | undefined) => {
@@ -200,6 +337,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           <input type="text" name="name" placeholder="Tu nombre" maxlength="120" required>
           <input type="text" name="contact" placeholder="Tu WhatsApp o teléfono" maxlength="120" required>
           <textarea name="message" placeholder="Cuéntanos qué necesitas (opcional)" rows="2" maxlength="500"></textarea>
+          <label class="consent"><input type="checkbox" name="consent" value="1" required><span>Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012.</span></label>
           <button class="btn" type="submit">${esc(buttonLabel)}</button>
         </form>`;
 
@@ -347,11 +485,122 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         </div></section>`;
       }
 
-      case "promo":
-        return `<section class="promo promo-${s.tone}"><div class="wrap promo-inner">
-          <div>${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p${ed(fp("body"))}>${esc(s.body)}</p></div>
+      case "promo": {
+        const promoImg = safeUrl(s.image) ?? safeUrl(products.find((p) => p.imageUrl)?.imageUrl) ?? null;
+        if (!s.countdown && !promoImg && !s.seal) {
+          return `<section class="promo promo-${s.tone}"><div class="wrap promo-inner">
+          <div>${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${rich(s.heading)}</h2><p${ed(fp("body"))}>${esc(s.body)}</p></div>
           <a class="btn ${s.tone === "accent" ? "btn-invert" : ""}" href="${esc(href("promo"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a>
         </div></section>`;
+        }
+        const cd = s.countdown
+          ? `<div class="cd" data-countdown role="timer" aria-label="Tiempo que queda de la oferta">${[["d", "días"], ["h", "horas"], ["m", "min"], ["s", "seg"]].map(([k, l]) => `<div><b data-cd="${k}">00</b><span>${l}</span></div>`).join("")}</div>`
+          : "";
+        const media = promoImg
+          ? `<div class="promo-media rv" data-tilt><img src="${esc(promoImg)}" alt="" loading="lazy"${imgMark}>${s.seal ? `<span class="seal"${ed(fp("seal"))}>${esc(s.seal)}</span>` : ""}<i class="glow" aria-hidden="true"></i></div>`
+          : "";
+        return `<section class="promo promo-rich promo-${s.tone}" id="oferta"><div class="wrap promo-rich-grid${promoImg ? "" : " no-media"}">
+          <div class="promo-copy">${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${rich(s.heading)}</h2><p${ed(fp("body"))}>${esc(s.body)}</p>${cd}
+          <a class="btn ${s.tone === "accent" ? "btn-invert" : ""}" href="${esc(href("promo"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a></div>
+          ${media}
+        </div></section>`;
+      }
+
+      case "showroom": {
+        const pool = s.productIds.length > 0 ? s.productIds.map((id) => productById.get(id)).filter((p): p is CatalogProduct => !!p) : products;
+        const list = pool.filter((p) => safeUrl(p.imageUrl)).slice(0, 6);
+        if (list.length === 0) {
+          return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerá el visor. Agrega productos con foto en <strong>Productos</strong>.</div></div></section>` : "";
+        }
+        const spots = [["4%", "10%"], ["58%", "6%"], ["2%", "62%"], ["60%", "70%"]];
+        const bubbles = s.bubbles.slice(0, 4).map((b, bi) => `<li style="--x:${spots[bi][0]};--y:${spots[bi][1]};--d:${(0.5 + bi * 0.45).toFixed(2)}s"><b${ed(fp(`bubbles.${bi}.title`))}>${esc(b.title)}</b><span${ed(fp(`bubbles.${bi}.description`))}>${esc(b.description)}</span></li>`).join("");
+        const factIcons = ["shield", "truck", "chat"];
+        return `<section class="sec" id="visor"><div class="wrap">
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
+          <div class="shw rv" data-showroom>
+            <div class="shw-main">
+              <div class="shw-stage" data-viewer tabindex="0" role="group" aria-label="Visor del producto: arrastra para girarlo o usa las flechas del teclado">
+                ${list.map((p, i) => `<figure class="shw-panel" data-stage="${i}"${i > 0 ? " hidden" : ""}><img src="${esc(safeUrl(p.imageUrl) ?? "")}" alt="${esc(p.name)}" draggable="false"></figure>`).join("")}
+                ${bubbles ? `<ol class="shw-bubbles">${bubbles}</ol>` : ""}
+                <p class="shw-hint" aria-hidden="true">↔ Arrastra para girar</p>
+              </div>
+              ${s.bubbles.length ? `<ol class="shw-chat" aria-label="Características">${s.bubbles.slice(0, 4).map((b) => `<li><b>${esc(b.title)}</b><span>${esc(b.description)}</span></li>`).join("")}</ol>` : ""}
+              <div class="shw-thumbs">${list.map((p, i) => `<button type="button" class="shw-thumb" data-thumb="${i}" data-pid="${esc(p.id)}" aria-pressed="${i === 0 ? "true" : "false"}"><img src="${esc(safeUrl(p.imageUrl) ?? "")}" alt=""><span>${esc(p.name)}</span><small>${p.price !== null ? esc(formatMoney(p.price, p.currency)) : "Consultar"}</small></button>`).join("")}</div>
+            </div>
+            <div class="shw-side">
+              ${list.map((p, i) => `<div class="shw-info" data-info="${i}"${i > 0 ? " hidden" : ""}>${p.category ? `<p class="pcat">${esc(p.category)}</p>` : ""}<h3>${esc(p.name)}</h3>${p.description ? `<p class="shw-desc">${esc(p.description.slice(0, 220))}</p>` : ""}<div class="prow prow-lg">${priceHtml(p)}</div>${orderButton(p, "btn btn-block", p.isService ? "Agendar por WhatsApp" : "Pedir por WhatsApp")}</div>`).join("")}
+              ${s.facts.length ? `<ul class="shw-facts">${s.facts.slice(0, 3).map((f, fi) => `<li>${icon(factIcons[fi] ?? "check")}<div><b${ed(fp(`facts.${fi}.title`))}>${esc(f.title)}</b><span${ed(fp(`facts.${fi}.description`))}>${esc(f.description)}</span></div></li>`).join("")}</ul>` : ""}
+            </div>
+          </div>
+        </div></section>`;
+      }
+
+      case "quoter": {
+        const pool = (s.productIds.length > 0 ? s.productIds.map((id) => productById.get(id)).filter((p): p is CatalogProduct => !!p) : products).filter((p) => p.price !== null && p.price > 0).slice(0, 8);
+        if (pool.length < 2) {
+          return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerá el cotizador. Necesita al menos 2 productos con precio en <strong>Productos</strong>.</div></div></section>` : "";
+        }
+        const months = s.months || 48;
+        const cur = pool[0].currency;
+        const prices = pool.map((p) => p.price as number);
+        const nice = (v: number, up: boolean) => {
+          const step = Math.pow(10, Math.max(0, Math.floor(Math.log10(Math.max(v, 1))) - 1));
+          return (up ? Math.ceil(v / step) : Math.floor(v / step)) * step;
+        };
+        const tmin = nice(Math.min(...prices) * 0.6, false);
+        const tmax = nice(Math.max(...prices) * 1.15, true);
+        const cmin = nice(tmin / months, false);
+        const cmax = nice(tmax / months, true);
+        const hasShowroom = sections.some(({ s: x }) => x.type === "showroom");
+        return `<section class="sec alt" id="cotizador"><div class="wrap narrow-lg">
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>${s.intro ? `<p class="intro"${ed(fp("intro"))}>${esc(s.intro)}</p>` : ""}
+          <div class="qt rv" data-quoter data-cur="${esc(cur)}" data-months="${months}" data-tmin="${tmin}" data-tmax="${tmax}" data-cmin="${cmin}" data-cmax="${cmax}">
+            <div class="qt-head">
+              <div class="qt-modes" role="group" aria-label="Cómo quieres comparar"><button type="button" class="on" data-mode="total" aria-pressed="true">Precio total</button><button type="button" data-mode="cuota" aria-pressed="false">Cuota mensual</button></div>
+              <p class="qt-count" data-qcount aria-live="polite">${pool.length} productos</p>
+            </div>
+            <label class="qt-label" for="qt-range-${index}"><span data-qunit>Tu presupuesto total</span><output data-qbudget>${esc(formatMoney(Math.round((tmin + tmax) / 2), cur))}</output></label>
+            <input id="qt-range-${index}" class="qt-range" type="range" min="${tmin}" max="${tmax}" step="${Math.max(1, Math.round((tmax - tmin) / 200))}" value="${Math.round(tmin + (tmax - tmin) * 0.55)}" aria-label="Tu presupuesto">
+            <ul class="qt-list">${pool
+              .map(
+                (p) => `<li class="qt-row" data-qprice="${p.price}">${p.imageUrl && safeUrl(p.imageUrl) ? `<img src="${esc(safeUrl(p.imageUrl) ?? "")}" alt="" loading="lazy">` : `<span class="qt-ph" aria-hidden="true">${esc(p.name.slice(0, 1))}</span>`}
+                <div class="qt-info"><b>${esc(p.name)}</b><span data-qcost>${esc(formatMoney(p.price as number, p.currency))}</span><div class="qt-bar"><i data-qbar></i></div><p data-qstate></p></div>
+                ${hasShowroom ? `<a class="btn btn-ghost btn-sm" href="#visor" data-view="${esc(p.id)}">Verlo en el visor</a>` : orderButton(p, "btn btn-sm", p.isService ? "Agendar" : "Pedir")}</li>`,
+              )
+              .join("")}</ul>
+            <p class="qt-note">${esc(s.note || `Simulación de referencia${months ? `: la cuota divide el precio en ${months} meses, sin intereses` : ""}. Las condiciones reales las confirmamos contigo.`)}</p>
+          </div>
+        </div></section>`;
+      }
+
+      case "fan": {
+        const pool = (s.productIds.length > 0 ? s.productIds.map((id) => productById.get(id)).filter((p): p is CatalogProduct => !!p) : products).filter((p) => safeUrl(p.imageUrl)).slice(0, 10);
+        if (pool.length === 0) {
+          return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerá la colección. Agrega productos con foto en <strong>Productos</strong>.</div></div></section>` : "";
+        }
+        return `<section class="sec alt" id="coleccion"><div class="wrap">
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>${s.intro ? `<p class="intro"${ed(fp("intro"))}>${esc(s.intro)}</p>` : ""}
+          <div class="fan rv" data-fan>
+            <div class="fan-stage">${pool.map((p, i) => `<article class="fan-card" data-fcard="${i}"><img src="${esc(safeUrl(p.imageUrl) ?? "")}" alt="${esc(p.name)}" draggable="false" loading="lazy"><div class="fan-cap"><b>${esc(p.name)}</b><span>${p.price !== null ? esc(formatMoney(p.price, p.currency)) : "Consultar"}</span></div></article>`).join("")}</div>
+            <div class="fan-sheet">${pool
+              .map(
+                (p, i) => `<div class="fan-info" data-finfo="${i}"${i > 0 ? " hidden" : ""}>
+                  <div class="fan-tabs" role="tablist"><button type="button" role="tab" class="on" aria-selected="true" data-ftab="que">Qué es</button><button type="button" role="tab" aria-selected="false" data-ftab="inv">Inversión</button></div>
+                  <div data-fpane="que"><h3>${esc(p.name)}</h3><p>${esc(p.description ? p.description.slice(0, 260) : p.category ?? "")}</p></div>
+                  <div data-fpane="inv" hidden><div class="prow prow-lg">${priceHtml(p)}</div>${orderButton(p, "btn", p.isService ? "Agendar por WhatsApp" : "Pedir por WhatsApp")}</div>
+                </div>`,
+              )
+              .join("")}</div>
+          </div>
+        </div></section>`;
+      }
+
+      case "marquee": {
+        const lines = s.lines.filter(Boolean).slice(0, 2);
+        if (lines.length === 0) return "";
+        const row = (text: string, rev: boolean) => `<div class="mq-row${rev ? " rev" : ""}" aria-hidden="true"><div class="mq-track">${Array.from({ length: 8 }, () => `<span>${esc(text)}</span>`).join("")}</div></div>`;
+        return `<section class="mq"><p class="sr-only">${esc(lines.join(". "))}</p>${lines.map((l, li) => row(l, li % 2 === 1)).join("")}</section>`;
+      }
 
       case "comparison":
         return `<section class="sec"><div class="wrap narrow-lg">
@@ -434,7 +683,12 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       if (styles.length) a = /style="/.test(a) ? a.replace(/style="([^"]*)"/, (_x, css: string) => `style="${css};${styles.join(";")}"`) : `${a} style="${styles.join(";")}"`;
       return `${lead}<section${a}${edit ? ` data-sec="${index}" data-type="${s.type}"` : ""}>`;
     });
-  const body = sections.map(({ s, i }) => decorate(renderSection(s, i), s, i)).join("\n");
+  const body = sections
+    .map(({ s, i }) => decorate(renderSection(s, i), s, i))
+    .join("\n")
+    // Blocks that rise into view as the page scrolls (what is on screen at load never starts hidden: see siteScript).
+    .replace(/class="(feat-item|pcard[^"]*|ag-item|trust-item|stat-v|host-img)"/g, 'class="$1 rv"')
+    .replace(/<li><span class="step-n">/g, '<li class="rv"><span class="step-n">');
   const firstHero = content.sections.find((s) => s.type === "hero");
   const navLinks: { href: string; label: string }[] = [];
   if (sections.some(({ s }) => s.type === "productGrid") && products.length > 0) navLinks.push({ href: "#productos", label: "Productos" });
@@ -452,16 +706,25 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           ? `background: radial-gradient(40% 50% at 85% 30%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 70%), radial-gradient(30% 40% at 10% 90%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 70%);`
           : "display:none;";
 
+  // The top bar: phrases separated by "·" or "✦" scroll continuously (paused on hover); the editor sees it still so it can be edited.
+  const phrases = (content.announcement ?? "").split(/\s*[·✦|]\s*/).map((t) => t.trim()).filter(Boolean);
+  const announcementHtml = !content.announcement
+    ? ""
+    : edit || phrases.length === 0
+      ? `<div class="annc"${ed("announcement")}>${esc(content.announcement)}</div>`
+      : `<div class="annc annc-run" role="marquee" aria-label="${esc(phrases.join(". "))}"><div class="annc-track" aria-hidden="true">${Array.from({ length: 2 }, () => `<div class="annc-set">${Array.from({ length: Math.max(2, Math.ceil(6 / phrases.length)) }, () => phrases.map((t) => `<span>${esc(t)}</span><i>✦</i>`).join("")).join("")}</div>`).join("")}</div></div>`;
+
   return `<!doctype html>
-<html lang="es">
+<html lang="es"${edit ? ' data-fx="off"' : ""}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>${esc(ctx.businessName)}${firstHero && firstHero.type === "hero" ? ` · ${esc(firstHero.heading)}` : ""}</title>
 <meta name="description" content="${esc(firstHero && firstHero.type === "hero" ? firstHero.subheading : ctx.businessName)}">
 ${fontLink(fonts)}
 <style>
-:root{--primary:${primary};--primary-base:${primary};--btn-text:${readableTextColor(primary)};--bg:${bg};--surface:${surface};--text:${textColor};
+:root{color-scheme:light;--primary:${primary};--primary-base:${primary};--btn-text:${readableTextColor(primary)};--bg:${bg};--surface:${surface};--text:${textColor};
 --muted:color-mix(in srgb,var(--text) 64%,transparent);--line:color-mix(in srgb,var(--text) 12%,transparent);
 --hf:${fontStack(content.theme.headingFont)};--bf:${fontStack(content.theme.bodyFont)};
 --r:${style.radius};--br:${style.btnRadius};--pad:${style.sectionPad};--max:${style.maxWidth}}
@@ -634,6 +897,8 @@ section{position:relative}
 .gallery img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--r)}
 .lead-form{display:grid;gap:12px;margin-top:24px}
 .lead-form input,.lead-form textarea{font:inherit;padding:15px 16px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.4;color:var(--muted);cursor:pointer}
+.consent input{width:20px;height:20px;flex:none;margin:1px 0 0;accent-color:var(--primary)}
 .lead-ok{padding:18px;border-radius:12px;background:color-mix(in srgb,var(--primary) 14%,transparent);font-weight:600}
 .final-cta{padding:var(--pad) 0;background:var(--surface)}
 .empty-note{padding:28px;border:2px dashed var(--line);border-radius:var(--r);text-align:center;color:var(--muted)}
@@ -663,11 +928,12 @@ footer.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
   ${isShop ? ".mbar{display:block;position:sticky;bottom:0;z-index:30;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-top:1px solid var(--line)} .mbar .btn{width:100%}" : ""}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+${FX_CSS}
 ${LOOK_CSS}
 </style>
 </head>
 <body class="st-${content.style} pt-${content.pageType}">
-${content.announcement ? `<div class="annc"${ed("announcement")}>${esc(content.announcement)}</div>` : ""}
+${announcementHtml}
 <header class="top"><div class="wrap">
   <a class="brand" href="#inicio">${esc(ctx.businessName)}</a>
   <nav class="nav" aria-label="Secciones">${navLinks.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("")}</nav>
@@ -678,6 +944,7 @@ ${body}
 </main>
 <footer class="foot"><div class="wrap"><span>© ${esc(ctx.businessName)}</span><a href="${esc(href("footer"))}">Escríbenos por WhatsApp</a></div></footer>
 ${isShop ? `<div class="mbar"><a class="btn" href="${esc(href("barra-movil"))}">Pedir por WhatsApp</a></div>` : ""}
+<script>${SITE_SCRIPT}</script>
 </body>
 </html>`;
 }

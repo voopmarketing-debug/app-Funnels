@@ -35,6 +35,10 @@ export const AiSectionSchema = z.object({
     "productGrid",
     "productSpotlight",
     "promo",
+    "showroom",
+    "quoter",
+    "fan",
+    "marquee",
     "comparison",
     "agenda",
     "host",
@@ -64,8 +68,11 @@ export const AiSectionSchema = z.object({
   chips: z.array(z.string()).catch([]).describe("Solo hero: datos clave reales (fecha, hora, modalidad). Máx. 3."),
   showLeadForm: z.boolean().nullable().catch(null).describe("Solo hero: true para poner el formulario en la portada."),
   showCategoryFilter: z.boolean().nullable().catch(null).describe("Solo productGrid: true para pestañas de categorías."),
+  countdown: z.boolean().nullable().catch(null).describe("Solo promo: true para la cuenta regresiva en vivo hasta fin de mes."),
+  seal: z.string().nullable().catch(null).describe("Solo promo: sello circular sobre la imagen (ej. '-15 %'), SOLO si es un dato real."),
+  months: z.number().nullable().catch(null).describe("Solo quoter: plazo en meses para la cuota mensual (simulación sin intereses)."),
   productId: z.string().nullable().catch(null).describe("hero variant product y productSpotlight: id de PRODUCTOS."),
-  productIds: z.array(z.string()).catch([]).describe("Solo productGrid: ids en orden. Vacío = todos."),
+  productIds: z.array(z.string()).catch([]).describe("productGrid, showroom, quoter y fan: ids de PRODUCTOS en orden. Vacío = los que apliquen."),
   name: z.string().nullable().catch(null).describe("Solo host: nombre de la persona."),
   role: z.string().nullable().catch(null).describe("Solo host: cargo o especialidad."),
   usLabel: z.string().nullable().catch(null).describe("Solo comparison: columna propia."),
@@ -73,8 +80,8 @@ export const AiSectionSchema = z.object({
   items: z
     .array(AiItem)
     .catch([])
-    .describe("Ítems de trustBar, features, steps, comparison (filas), agenda, objections, stats y los bullets de productSpotlight."),
-  specs: z.array(z.object({ label: z.string(), value: z.string() })).catch([]).describe("Solo productSpotlight: especificaciones reales."),
+    .describe("Ítems de trustBar, features, steps, comparison (filas), agenda, objections, stats, los bullets de productSpotlight, los globos de showroom (title + text) y las líneas de marquee (solo title)."),
+  specs: z.array(z.object({ label: z.string(), value: z.string() })).catch([]).describe("productSpotlight: especificaciones reales. showroom: hasta 3 datos clave (label = título, value = descripción)."),
   image: z.string().nullable().catch(null).describe("Foto principal de la sección (portada, host): SOLO una URL de la lista FOTOS. null para dejar la automática."),
   bgImage: z.string().nullable().catch(null).describe("Foto de FONDO de toda la sección (con velo oscuro para leer el texto): SOLO una URL de la lista FOTOS. null si no lleva."),
 });
@@ -119,7 +126,22 @@ function toTypedBase(s: AiSection): unknown {
     case "productSpotlight":
       return { type: "productSpotlight", productId: s.productId ?? "", heading: s.heading, bullets: items(s), specs: s.specs };
     case "promo":
-      return { type: "promo", tone: s.tone, kicker: s.kicker, heading: s.heading, body: s.body ?? "", ctaLabel: s.ctaLabel ?? "Escríbenos" };
+      return { type: "promo", tone: s.tone, kicker: s.kicker, heading: s.heading, body: s.body ?? "", ctaLabel: s.ctaLabel ?? "Escríbenos", ...(s.countdown ? { countdown: true } : {}), ...(s.seal ? { seal: s.seal } : {}) };
+    case "showroom":
+      return {
+        type: "showroom",
+        kicker: s.kicker,
+        heading: s.heading,
+        productIds: s.productIds,
+        bubbles: s.items.slice(0, 4).map((i) => ({ title: i.title, description: i.text })),
+        facts: s.specs.slice(0, 3).map((f) => ({ title: f.label, description: f.value })),
+      };
+    case "quoter":
+      return { type: "quoter", kicker: s.kicker, heading: s.heading, intro: s.body, productIds: s.productIds, months: s.months ?? 48, note: null };
+    case "fan":
+      return { type: "fan", kicker: s.kicker, heading: s.heading, intro: s.body, productIds: s.productIds };
+    case "marquee":
+      return { type: "marquee", lines: s.items.map((i) => i.title).filter(Boolean).slice(0, 2) };
     case "comparison":
       return {
         type: "comparison",
@@ -176,6 +198,9 @@ const EMPTY: Omit<AiSection, "type" | "heading"> = {
   chips: [],
   showLeadForm: null,
   showCategoryFilter: null,
+  countdown: null,
+  seal: null,
+  months: null,
   productId: null,
   productIds: [],
   name: null,
@@ -206,7 +231,15 @@ function toAiSectionBase(s: Section): AiSection {
     case "productSpotlight":
       return { ...base, productId: s.productId, heading: s.heading, items: s.bullets.map((i) => it(i.title, i.description, i.icon)), specs: s.specs };
     case "promo":
-      return { ...base, tone: s.tone, kicker: s.kicker, heading: s.heading, body: s.body, ctaLabel: s.ctaLabel };
+      return { ...base, tone: s.tone, kicker: s.kicker, heading: s.heading, body: s.body, ctaLabel: s.ctaLabel, countdown: s.countdown ?? null, seal: s.seal ?? null };
+    case "showroom":
+      return { ...base, kicker: s.kicker, heading: s.heading, productIds: s.productIds, items: s.bubbles.map((b) => it(b.title, b.description)), specs: s.facts.map((f) => ({ label: f.title, value: f.description })) };
+    case "quoter":
+      return { ...base, kicker: s.kicker, heading: s.heading, body: s.intro, productIds: s.productIds, months: s.months };
+    case "fan":
+      return { ...base, kicker: s.kicker, heading: s.heading, body: s.intro, productIds: s.productIds };
+    case "marquee":
+      return { ...base, items: s.lines.map((l) => it(l, "")) };
     case "comparison":
       return { ...base, heading: s.heading, usLabel: s.usLabel, othersLabel: s.othersLabel, items: s.rows.map((r) => it(r.label, r.us, null, r.others)) };
     case "agenda":

@@ -233,5 +233,70 @@
   "type": "gallery",
   "kicker": "Así trabajamos",
   "heading": "Nuestro taller"
+ },
+ {
+  "type": "showroom",
+  "kicker": "Míralo de cerca",
+  "heading": "Gíralo y elígelo",
+  "productIds": [
+   "p1",
+   "p2"
+  ],
+  "bubbles": [
+   {
+    "title": "Garantía de 3 años",
+    "description": "Directa de fábrica."
+   },
+   {
+    "title": "Rines de 18",
+    "description": "De serie."
+   }
+  ],
+  "facts": [
+   {
+    "title": "Garantía",
+    "description": "3 años"
+   },
+   {
+    "title": "Entrega",
+    "description": "Inmediata"
+   }
+  ]
+ },
+ {
+  "type": "quoter",
+  "kicker": "Cotizador",
+  "heading": "Mira qué te alcanza",
+  "intro": "Mueve la barra.",
+  "productIds": [
+   "p1",
+   "p2"
+  ],
+  "months": 60,
+  "note": null
+ },
+ {
+  "type": "fan",
+  "kicker": "La colección",
+  "heading": "Elige tu favorito",
+  "intro": null,
+  "productIds": []
+ },
+ {
+  "type": "marquee",
+  "lines": [
+   "Hecho con cuidado",
+   "Elegido por ti"
+  ]
+ },
+ {
+  "type": "promo",
+  "tone": "accent",
+  "kicker": "Solo en {mes}",
+  "heading": "Oferta del mes",
+  "body": "Condiciones reales.",
+  "ctaLabel": "Quiero la oferta",
+  "countdown": true,
+  "seal": "-15 %"
  }
 ]

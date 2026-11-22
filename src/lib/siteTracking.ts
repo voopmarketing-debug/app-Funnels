@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { SITE_SCRIPT_HASH } from "./siteScript";
 
 // Meta Pixel + Google tag on a client's public pages, so they can measure
 // and optimize ad campaigns that point at them. Only validated ids are
@@ -23,7 +24,7 @@ export function cleanGoogleTagId(raw: unknown): string | null {
 export type SiteEvents = { lead?: boolean; schedule?: boolean };
 
 function csp(nonce: string, t: SiteTracking): string {
-  const scripts = [`'nonce-${nonce}'`];
+  const scripts = [`'nonce-${nonce}'`, `'sha256-${SITE_SCRIPT_HASH}'`];
   const connect = ["'self'"];
   const frames = ["https://www.youtube.com", "https://player.vimeo.com"];
   if (t.metaPixelId) {
