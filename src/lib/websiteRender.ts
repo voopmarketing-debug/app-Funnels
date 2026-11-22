@@ -4,6 +4,8 @@ import { renderWebsiteHtml } from "@/lib/websiteTemplate";
 import { renderWebsiteHtmlV2 } from "@/lib/websiteTemplateV2";
 import { WebsiteContentV2Schema, formatMoney, isV2Content, type CatalogProduct, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { getWebsiteHeroContext } from "@/lib/websiteHero";
+import { isTemplateContent } from "@/lib/templateSite/content";
+import { parseTemplateSite, renderTemplateSite } from "@/lib/templateSite/render";
 
 type StoredWebsite = {
   content: unknown;
@@ -54,6 +56,19 @@ export async function renderStoredWebsite(
     themeOverride?: Partial<WebsiteContentV2["theme"]>;
   },
 ): Promise<string | null> {
+  // Template pages (Showroom / Scroll Story): their own renderers, fed by the live catalog.
+  if (isTemplateContent(website.content)) {
+    const content = parseTemplateSite(website.content);
+    if (!content) return null;
+    return renderTemplateSite(content, {
+      businessName: website.business.name,
+      trackingBasePath: opts.trackingBasePath,
+      preview: opts.preview,
+      leadSubmitted: opts.leadSubmitted,
+      products: await getCatalogProducts(website.businessId),
+    });
+  }
+
   const { eyebrow, heroImageUrl } = await getWebsiteHeroContext(website.businessId, website.business.industry, website.aiImageUrl);
 
   if (isV2Content(website.content)) {

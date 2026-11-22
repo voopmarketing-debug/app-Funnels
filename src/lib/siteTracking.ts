@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { SITE_SCRIPT_HASH } from "./siteScript";
+import { addScriptHashes, inlineScriptHashes } from "./siteCsp";
 
 // Meta Pixel + Google tag on a client's public pages, so they can measure
 // and optimize ad campaigns that point at them. Only validated ids are
@@ -96,9 +97,15 @@ export function withSiteTracking(
   tracking: SiteTracking,
   opts: { preview?: boolean; events?: SiteEvents } = {},
 ): { html: string; headers: Record<string, string> } {
-  if (opts.preview || (!tracking.metaPixelId && !tracking.googleTagId)) return { html, headers };
+  // The page's own scripts (see siteCsp.ts), read before any tracking tag is added.
+  const own = inlineScriptHashes(html);
+  const base = (h: Record<string, string>): Record<string, string> => {
+    const policy = addScriptHashes(h["Content-Security-Policy"], own);
+    return policy ? { ...h, "Content-Security-Policy": policy } : h;
+  };
+  if (opts.preview || (!tracking.metaPixelId && !tracking.googleTagId)) return { html, headers: base(headers) };
   const nonce = crypto.randomBytes(16).toString("base64");
   const tag = snippet(nonce, tracking, opts.events ?? {});
   const withTag = html.includes("</head>") ? html.replace("</head>", `${tag}\n</head>`) : `${tag}\n${html}`;
-  return { html: withTag, headers: { ...headers, "Content-Security-Policy": csp(nonce, tracking) } };
+  return { html: withTag, headers: base({ ...headers, "Content-Security-Policy": csp(nonce, tracking) }) };
 }

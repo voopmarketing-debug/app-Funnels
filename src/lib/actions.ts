@@ -39,6 +39,9 @@ import { withAiUsage } from "@/lib/aiUsage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { isTemplateContent, templateForPageType } from "@/lib/templateSite/content";
+import { applyTemplateEdit, generateTemplateSite } from "@/lib/templateSite/generator";
+import { parseTemplateSite } from "@/lib/templateSite/render";
 import { z } from "zod";
 import { setSectionImage, setTextAtPath, type SectionImageField } from "@/lib/websiteEdit";
 import { applyBlockOp, BLOCK_LIBRARY, MAX_SECTIONS, type BlockOp } from "@/lib/websiteBlocks";
@@ -3261,6 +3264,35 @@ export async function createWebsitePageV2(
     const name = input.name?.trim().slice(0, 80) || (existingCount === 0 ? "Sitio principal" : `Página ${existingCount + 1}`);
     const ctaUrl = input.ctaUrl && /^https?:\/\//i.test(input.ctaUrl.trim()) ? input.ctaUrl.trim() : null;
 
+    // Showroom and Scroll Story pages are built on the hand-designed templates: the AI fills the
+    // texts, the catalog supplies the products, photos and prices.
+    const template = templateForPageType(input.pageType);
+    if (template) {
+      if (!ctx.products.some((p) => p.imageUrl)) {
+        return { ok: false, error: "Para este tipo de página primero carga tus productos con foto y precio en Productos." };
+      }
+      const templateContent = await withAiUsage(businessId, "WEBSITE", () =>
+        generateTemplateSite({ ...ctx, purpose: input.purpose?.trim() || null, designPrompt: input.brief?.trim() || null, template }),
+      );
+      await recordWebsiteGeneration(businessId);
+      const templateSlug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0);
+      const created = await prisma.website.create({
+        data: {
+          businessId,
+          name,
+          purpose: input.purpose?.trim() || null,
+          designPrompt: input.brief?.trim() || null,
+          slug: templateSlug,
+          content: templateContent,
+          aiImageUrl: null,
+          whatsappNumber: ctx.displayNumber,
+          model: "claude-sonnet-5",
+        },
+      });
+      revalidatePath(`/dashboard/businesses/${businessId}/website`);
+      return { ok: true, id: created.id };
+    }
+
     const [content, aiImageUrl] = await withAiUsage(businessId, "WEBSITE", () => Promise.all([
       generateWebsiteContentV2({
         ...ctx,
@@ -3311,6 +3343,16 @@ export async function applyWebsitePromptV2(
     await assertWebsiteGenerationAllowed(businessId);
 
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    if (isTemplateContent(website.content)) {
+      const currentTemplate = parseTemplateSite(website.content);
+      if (!currentTemplate) throw new Error("Esta página necesita regenerarse una vez para poder editarla");
+      const catalog = await getCatalogProducts(businessId);
+      const editedTemplate = await withAiUsage(businessId, "WEBSITE", () => applyTemplateEdit(currentTemplate, trimmed, { businessName: currentTemplate.brand.name, products: catalog }));
+      await recordWebsiteGeneration(businessId);
+      await prisma.website.update({ where: { id: websiteId }, data: { content: editedTemplate } });
+      revalidatePath(`/dashboard/businesses/${businessId}/website`);
+      return { ok: true, content: editedTemplate as unknown as WebsiteContentV2 };
+    }
     const current = WebsiteContentV2Schema.parse(website.content);
     const [products, library] = await Promise.all([
       getCatalogProducts(businessId),
@@ -3338,6 +3380,17 @@ export async function regenerateWebsitePageV2(businessId: string, websiteId: str
 
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
     const ctx = await buildWebsiteV2Context(businessId);
+    if (isTemplateContent(website.content)) {
+      const previousTemplate = parseTemplateSite(website.content);
+      const template = previousTemplate?.template ?? "showroom";
+      const regenerated = await withAiUsage(businessId, "WEBSITE", () =>
+        generateTemplateSite({ ...ctx, purpose: website.purpose, designPrompt: website.designPrompt, template }),
+      );
+      await recordWebsiteGeneration(businessId);
+      await prisma.website.update({ where: { id: websiteId }, data: { content: regenerated, whatsappNumber: ctx.displayNumber, generatedAt: new Date(), model: "claude-sonnet-5" } });
+      revalidatePath(`/dashboard/businesses/${businessId}/website`);
+      return { ok: true };
+    }
     const previous = isV2Content(website.content) ? WebsiteContentV2Schema.safeParse(website.content) : null;
     const content = await withAiUsage(businessId, "WEBSITE", () =>
       generateWebsiteContentV2({

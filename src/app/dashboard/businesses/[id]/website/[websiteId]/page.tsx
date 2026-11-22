@@ -10,6 +10,9 @@ import { UpgradeToBuilderBanner } from "./UpgradeToBuilderBanner";
 import { WebsiteContentV2Schema, isV2Content } from "@/lib/websiteContentV2";
 import { AgendaEditor } from "./AgendaEditor";
 import { RegenerateOldPageButton } from "./RegenerateOldPageButton";
+import { TemplateBuilder } from "./TemplateBuilder";
+import { isTemplateContent } from "@/lib/templateSite/content";
+import { parseTemplateSite } from "@/lib/templateSite/render";
 
 export default async function WebsiteEditorPage({
   params,
@@ -105,6 +108,30 @@ export default async function WebsiteEditorPage({
         />
       </div>
     );
+  }
+
+  // Showroom / Scroll Story pages: fixed hand-designed templates, edited by chat.
+  if (isTemplateContent(website.content)) {
+    const template = parseTemplateSite(website.content);
+    if (template) {
+      const [views, clicks, leadCount] = await Promise.all([
+        prisma.websiteEvent.count({ where: { websiteId, type: "view" } }),
+        prisma.websiteEvent.count({ where: { websiteId, type: "cta_click" } }),
+        prisma.websiteLead.count({ where: { websiteId } }),
+      ]);
+      return (
+        <TemplateBuilder
+          businessId={id}
+          websiteId={websiteId}
+          name={website.name}
+          slug={website.slug}
+          publicUrl={`https://${appHost}/sitio/${website.slug}`}
+          templateLabel={template.template === "showroom" ? "Showroom · productos para comparar" : "Scroll Story · historia de marca"}
+          stats={{ views, clicks, leads: leadCount }}
+          tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
+        />
+      );
+    }
   }
 
   // New builder (v2 content): full-screen chat + design + live preview.

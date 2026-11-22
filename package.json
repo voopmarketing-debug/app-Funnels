@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "build:site-scripts": "node scripts/build-site-scripts.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",
