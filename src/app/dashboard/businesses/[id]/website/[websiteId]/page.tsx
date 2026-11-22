@@ -14,6 +14,9 @@ import { TemplateBuilder } from "./TemplateBuilder";
 import { isTemplateContent } from "@/lib/templateSite/content";
 import { parseTemplateSite } from "@/lib/templateSite/render";
 
+// Remaking a page with AI can take a few minutes.
+export const maxDuration = 300;
+
 export default async function WebsiteEditorPage({
   params,
   searchParams,
@@ -129,6 +132,7 @@ export default async function WebsiteEditorPage({
           templateLabel={template.template === "showroom" ? "Showroom · productos para comparar" : "Scroll Story · historia de marca"}
           stats={{ views, clicks, leads: leadCount }}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
+          savedBrief={website.designPrompt ?? ""}
         />
       );
     }
@@ -154,6 +158,7 @@ export default async function WebsiteEditorPage({
           stats={{ views, clicks, leads: leadCount }}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
           initialTab={tabParam === "ajustes" ? "ajustes" : "chat"}
+          savedBrief={website.designPrompt ?? ""}
         />
       );
     }

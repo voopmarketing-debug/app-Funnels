@@ -25,11 +25,16 @@ import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { attachPreviewEditor, showSection, type EditorHandlers } from "./previewEditor";
-import { askConfirm } from "@/components/ConfirmHost";
+import { RegenerateBox } from "./RegenerateBox";
 
 type Tab = "chat" | "bloques" | "estilo" | "diseno" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
 type ChatEntry = { role: "user" | "assistant"; text: string; error?: boolean };
+
+const INTRO_CHAT: ChatEntry = {
+  role: "assistant",
+  text: "Pídeme cualquier cambio como se lo pedirías a tu diseñador: textos, colores, secciones, estilo. Lo aplico y lo ves al instante en la vista previa.",
+};
 
 const DEVICE_WIDTH: Record<Device, string> = { desktop: "100%", tablet: "820px", mobile: "390px" };
 const HINT_KEY = "fl-builder-edit-hint";
@@ -60,6 +65,7 @@ export function WebsiteBuilder({
   stats,
   tracking,
   initialTab = "chat",
+  savedBrief = "",
 }: {
   businessId: string;
   websiteId: string;
@@ -71,6 +77,8 @@ export function WebsiteBuilder({
   tracking: { metaPixelId: string | null; googleTagId: string | null };
   // ?tab=ajustes from the pages list's "Píxel" shortcut.
   initialTab?: Tab;
+  // The prompt this page was made from, offered again when remaking it.
+  savedBrief?: string;
 }) {
   const router = useRouter();
   const [content, setContent] = useState(initialContent);
@@ -94,9 +102,7 @@ export function WebsiteBuilder({
     const id = setTimeout(() => setPreviewTheme(draftTheme), 350);
     return () => clearTimeout(id);
   }, [draftTheme]);
-  const [chat, setChat] = useState<ChatEntry[]>([
-    { role: "assistant", text: "Pídeme cualquier cambio como se lo pedirías a tu diseñador: textos, colores, secciones, estilo. Lo aplico y lo ves al instante en la vista previa." },
-  ]);
+  const [chat, setChat] = useState<ChatEntry[]>([INTRO_CHAT]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -226,19 +232,24 @@ export function WebsiteBuilder({
     });
   }
 
-  async function regenerate() {
-    if (!(await askConfirm({ title: "¿Rehacer toda la página con IA?", message: "Se reemplazan los textos, el estilo y las secciones actuales.", confirmLabel: "Sí, rehacer" }))) return;
+  function regenerate(brief: string) {
     setBusy("Rehaciendo la página con IA…");
     startTransition(async () => {
       try {
-        const result = await regenerateWebsitePageV2(businessId, websiteId);
+        const result = await regenerateWebsitePageV2(businessId, websiteId, brief);
         if (!result.ok) {
           setChat((c) => [...c, { role: "assistant", text: result.error, error: true }]);
           setTab("chat");
           return;
         }
+        // A fresh page starts a fresh conversation.
+        setChat([INTRO_CHAT]);
+        setTab("chat");
         router.refresh();
         refreshPreview();
+      } catch (err) {
+        setChat((c) => [...c, { role: "assistant", text: err instanceof Error && err.message ? err.message : "No pude rehacer la página. Intenta de nuevo en un momento.", error: true }]);
+        setTab("chat");
       } finally {
         setBusy(null);
       }
@@ -654,9 +665,7 @@ export function WebsiteBuilder({
                 🛍️ <strong>Productos</strong>
                 <span className="block text-xs text-ink-muted">Agrega o edita los productos que aparecen en tu tienda.</span>
               </Link>
-              <button type="button" onClick={regenerate} disabled={!!busy} className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold hover:border-accent disabled:opacity-60">
-                Rehacer toda la página con IA
-              </button>
+              <RegenerateBox savedBrief={savedBrief} busy={!!busy} onRegenerate={regenerate} />
             </div>
           )}
         </aside>

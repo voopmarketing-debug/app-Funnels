@@ -3371,7 +3371,7 @@ export async function applyWebsitePromptV2(
 }
 
 /** Regenerates a page as v2 from its stored brief (also how a v1 page gets upgraded). */
-export async function regenerateWebsitePageV2(businessId: string, websiteId: string): Promise<BuilderResult<object>> {
+export async function regenerateWebsitePageV2(businessId: string, websiteId: string, newBrief?: string | null): Promise<BuilderResult<object>> {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
@@ -3379,7 +3379,10 @@ export async function regenerateWebsitePageV2(businessId: string, websiteId: str
     await requireActiveAccount(session.user.id, businessId);
     await assertWebsiteGenerationAllowed(businessId);
 
-    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const found = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    // A new prompt pasted when remaking the page replaces the saved brief.
+    const briefOverride = typeof newBrief === "string" && newBrief.trim() ? newBrief.trim().slice(0, 6000) : null;
+    const website = briefOverride ? { ...found, designPrompt: briefOverride } : found;
     const ctx = await buildWebsiteV2Context(businessId);
     // A page made as Showroom / Scroll Story stays on its template, including the ones saved
     // before the templates existed (they were v2 pages of the same type).
@@ -3394,7 +3397,7 @@ export async function regenerateWebsitePageV2(businessId: string, websiteId: str
         generateTemplateSite({ ...ctx, products: showcase, purpose: website.purpose, designPrompt: website.designPrompt, template: templateToKeep }),
       );
       await recordWebsiteGeneration(businessId);
-      await prisma.website.update({ where: { id: websiteId }, data: { content: regenerated, whatsappNumber: ctx.displayNumber, generatedAt: new Date(), model: "claude-sonnet-5" } });
+      await prisma.website.update({ where: { id: websiteId }, data: { content: regenerated, designPrompt: website.designPrompt, whatsappNumber: ctx.displayNumber, generatedAt: new Date(), model: "claude-sonnet-5" } });
       revalidatePath(`/dashboard/businesses/${businessId}/website`);
       return { ok: true };
     }
@@ -3412,7 +3415,7 @@ export async function regenerateWebsitePageV2(businessId: string, websiteId: str
     await recordWebsiteGeneration(businessId);
     await prisma.website.update({
       where: { id: websiteId },
-      data: { content, whatsappNumber: ctx.displayNumber, generatedAt: new Date(), model: "claude-sonnet-5" },
+      data: { content, designPrompt: website.designPrompt, whatsappNumber: ctx.displayNumber, generatedAt: new Date(), model: "claude-sonnet-5" },
     });
     revalidatePath(`/dashboard/businesses/${businessId}/website`);
     return { ok: true };

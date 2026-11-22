@@ -4,11 +4,17 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { applyWebsitePromptV2, regenerateWebsitePageV2 } from "@/lib/actions";
 import { TrackingSettings } from "./TrackingSettings";
+import { RegenerateBox } from "./RegenerateBox";
 
 type Device = "desktop" | "mobile";
 type ChatEntry = { role: "user" | "assistant"; text: string };
 
 const DEVICE_WIDTH: Record<Device, string> = { desktop: "100%", mobile: "390px" };
+
+const INTRO_CHAT: ChatEntry = {
+  role: "assistant",
+  text: "Pídeme cualquier cambio como se lo pedirías a tu diseñador: titulares, ofertas, textos, colores. Los productos, fotos y precios se cambian en Productos y se actualizan solos aquí.",
+};
 
 const IDEAS = [
   "Cambia el titular por uno más corto",
@@ -31,6 +37,7 @@ export function TemplateBuilder({
   templateLabel,
   stats,
   tracking,
+  savedBrief = "",
 }: {
   businessId: string;
   websiteId: string;
@@ -40,13 +47,12 @@ export function TemplateBuilder({
   templateLabel: string;
   stats: { views: number; clicks: number; leads: number };
   tracking: { metaPixelId: string | null; googleTagId: string | null };
+  savedBrief?: string;
 }) {
   const [device, setDevice] = useState<Device>("desktop");
   const [version, setVersion] = useState(0);
   const [tab, setTab] = useState<"chat" | "ajustes">("chat");
-  const [chat, setChat] = useState<ChatEntry[]>([
-    { role: "assistant", text: "Pídeme cualquier cambio como se lo pedirías a tu diseñador: titulares, ofertas, textos, colores. Los productos, fotos y precios se cambian en Productos y se actualizan solos aquí." },
-  ]);
+  const [chat, setChat] = useState<ChatEntry[]>([INTRO_CHAT]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -77,20 +83,28 @@ export function TemplateBuilder({
     });
   }
 
-  function regenerate() {
+  function regenerate(brief: string) {
     if (busy) return;
-    if (!window.confirm("Se rehace toda la página con IA desde cero. ¿Seguimos?")) return;
     setBusy("Rehaciendo tu página…");
     startTransition(async () => {
-      const result = await regenerateWebsitePageV2(businessId, websiteId);
-      setBusy(null);
-      if (!result.ok) {
-        setChat((c) => [...c, { role: "assistant", text: result.error }]);
-        return;
+      try {
+        const result = await regenerateWebsitePageV2(businessId, websiteId, brief);
+        if (!result.ok) {
+          setChat((c) => [...c, { role: "assistant", text: result.error }]);
+          setTab("chat");
+          return;
+        }
+        // A fresh page starts a fresh conversation.
+        setChat([INTRO_CHAT, { role: "assistant", text: "Listo, rehice la página con tu prompt, tus productos y tus fotos. Míralo en la vista previa." }]);
+        setTab("chat");
+        setVersion((v) => v + 1);
+        setMobilePanel("preview");
+      } catch (err) {
+        setChat((c) => [...c, { role: "assistant", text: err instanceof Error && err.message ? err.message : "No pude rehacer la página. Intenta de nuevo en un momento." }]);
+        setTab("chat");
+      } finally {
+        setBusy(null);
       }
-      setChat((c) => [...c, { role: "assistant", text: "Listo, rehice la página con tus productos y tu información más recientes." }]);
-      setVersion((v) => v + 1);
-      setMobilePanel("preview");
     });
   }
 
@@ -225,9 +239,7 @@ export function TemplateBuilder({
                 <span className="block text-xs text-ink-muted">Cambia productos, precios y fotos (incluidas las de otros ángulos para el giro 360°). Se actualizan solos en la página.</span>
               </Link>
               <TrackingSettings businessId={businessId} websiteId={websiteId} metaPixelId={tracking.metaPixelId} googleTagId={tracking.googleTagId} />
-              <button type="button" onClick={regenerate} disabled={!!busy} className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold hover:border-accent disabled:opacity-60">
-                Rehacer toda la página con IA
-              </button>
+              <RegenerateBox savedBrief={savedBrief} busy={!!busy} onRegenerate={regenerate} />
             </div>
           )}
         </aside>
