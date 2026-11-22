@@ -16,6 +16,7 @@ import {
 import { recordAnthropicUsage } from "@/lib/aiUsage";
 import { carryOver, MAX_SECTIONS } from "@/lib/websiteBlocks";
 import { ensureStructure } from "@/lib/websiteStructure";
+import { paletteHint } from "@/lib/designIntel";
 import { AiPageSchema, fromAiPage, keepKnownImages, toAiSection, type AiPage } from "@/lib/websiteAiFormat";
 
 // Same model the v1 generator has been running on in production — a page
@@ -183,7 +184,7 @@ ${ctx.designPrompt ? `- BRIEF DEL CLIENTE (prioridad máxima si choca con otra r
 ${ctx.pageType ? `- TIPO DE PÁGINA ELEGIDO POR EL CLIENTE: ${ctx.pageType} (respétalo)` : ""}
 ${ctx.style ? `- ESTILO ELEGIDO POR EL CLIENTE: ${ctx.style} (respétalo)` : ""}
 - Fotos reales del negocio disponibles: ${ctx.photoCount}
-${ctx.brandColors?.primary ? `- COLORES DE MARCA: principal ${ctx.brandColors.primary}${ctx.brandColors.secondary ? `, secundario ${ctx.brandColors.secondary}` : ""}. primaryColor = el principal, sin cambiarlo; construye fondo, superficies y texto alrededor de ellos para que la página se sienta de esta marca.` : "- Colores de marca: no hay; propón un acento tomado del rubro y del producto."}
+${ctx.brandColors?.primary ? `- COLORES DE MARCA: principal ${ctx.brandColors.primary}${ctx.brandColors.secondary ? `, secundario ${ctx.brandColors.secondary}` : ""}. primaryColor = el principal, sin cambiarlo; construye fondo, superficies y texto alrededor de ellos para que la página se sienta de esta marca.` : `- Colores de marca: no hay; propón un acento tomado del rubro y del producto.\n${paletteHint([ctx.businessName, ctx.description, ctx.purpose, ctx.designPrompt, ...ctx.products.map((p) => p.name)].filter(Boolean).join(". "))}`}
 ${ctx.salesContext ? `\nCONTEXTO REAL DE VENTAS (dudas y objeciones de sus clientes)\n${ctx.salesContext}\n` : ""}
 CATÁLOGO del cliente: productos y servicios reales que ya subió a la plataforma (usa SOLO estos ids; nunca inventes productos, precios ni descuentos; toma de aquí nombre, precio y descripción). Las fotos de cada producto se muestran solas en las secciones que las usan:
 ${productsBlock(ctx.products)}

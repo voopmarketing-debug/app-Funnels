@@ -1,3 +1,4 @@
+import { paletteHint } from "@/lib/designIntel";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { anthropic } from "@/lib/anthropicClient";
@@ -124,7 +125,7 @@ ${location ? `- Ubicación: ${location}` : ""}
 ${socials ? `- Redes: ${socials}` : ""}
 - Objetivo de la página: ${ctx.purpose || "que el visitante agende o escriba por WhatsApp"}
 ${ctx.designPrompt ? `- BRIEF DEL CLIENTE (prioridad máxima; de aquí salen también datos reales como ofertas, tasas, direcciones y horarios): "${ctx.designPrompt}"` : ""}
-${ctx.brandColors?.primary ? `- COLOR DE MARCA: ${ctx.brandColors.primary} (úsalo exactamente como brand.accent)` : "- Color de marca: no hay; elige un brand.accent (hex) que encaje con el rubro y los productos, sin el azul genérico."}
+${ctx.brandColors?.primary ? `- COLOR DE MARCA: ${ctx.brandColors.primary} (úsalo exactamente como brand.accent)` : `- Color de marca: no hay; elige un brand.accent (hex) que encaje con el rubro y los productos, sin el azul genérico.\n${paletteHint([ctx.businessName, ctx.description, ctx.purpose, ctx.designPrompt, ...ctx.products.map((p) => p.name)].filter(Boolean).join(". "))}`}
 ${ctx.salesContext ? `\nCONTEXTO REAL DE VENTAS (dudas de sus clientes)\n${ctx.salesContext}\n` : ""}
 CATÁLOGO (productos reales; la plantilla muestra sus fotos y precios sola):
 ${productsBlock(ctx.products)}`;
