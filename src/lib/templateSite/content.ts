@@ -11,7 +11,7 @@ export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export const TEMPLATE_FONTS: Record<TemplateKey, string[]> = {
   showroom: ["Manrope", "Inter Tight", "IBM Plex Mono"],
-  story: ["Instrument Serif", "Figtree", "DM Mono"],
+  story: ["Manrope", "Inter Tight", "IBM Plex Mono"],
 };
 
 export const ICON_NAMES = [

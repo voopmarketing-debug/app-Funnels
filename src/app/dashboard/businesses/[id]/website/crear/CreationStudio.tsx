@@ -41,12 +41,15 @@ export function CreationStudio({
   businessId,
   businessName,
   productCount,
+  showcaseCount,
   needsWhatsapp = false,
   initialBrand = { primary: null, secondary: null },
 }: {
   businessId: string;
   businessName: string;
   productCount: number;
+  // Products with a photo plus photos in the library: what Showroom and Scroll Story pages show.
+  showcaseCount?: number;
   needsWhatsapp?: boolean;
   initialBrand?: { primary: string | null; secondary: string | null };
 }) {
@@ -351,7 +354,7 @@ export function CreationStudio({
                   <legend className="text-sm font-semibold text-ink">¿Qué quieres lograr con tu página?</legend>
                   <div className="grid gap-1.5">
                     {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
-                      const needsProducts = (k === "tienda" || k === "producto" || k === "showroom" || k === "historia") && productCount === 0;
+                      const needsProducts = k === "tienda" || k === "producto" ? productCount === 0 : k === "showroom" || k === "historia" ? (showcaseCount ?? productCount) === 0 : false;
                       const active = plan.pageType === k;
                       return (
                         <button
@@ -368,7 +371,7 @@ export function CreationStudio({
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold text-ink">{PAGE_TYPE_LABELS[k]}</span>
                             <span className="block text-xs text-ink-muted">
-                              {needsProducts ? "Primero carga tus productos con foto y precio en Productos." : PAGE_TYPE_PITCH[k].text}
+                              {needsProducts ? (k === "showroom" || k === "historia" ? "Primero sube las fotos de tus productos en Productos (con precio) o a tu biblioteca de fotos." : "Primero carga tus productos en Productos.") : PAGE_TYPE_PITCH[k].text}
                             </span>
                           </span>
                         </button>

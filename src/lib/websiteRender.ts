@@ -39,6 +39,35 @@ export async function getCatalogProducts(businessId: string): Promise<CatalogPro
 }
 
 /**
+ * What a Showroom / Scroll Story page shows: the catalog and, when no product has a photo yet,
+ * the photos the owner uploaded to the platform's library (each one becomes a showcase item named
+ * after its label), so uploaded photos are never ignored.
+ */
+export async function getShowcaseProducts(businessId: string): Promise<CatalogProduct[]> {
+  const products = await getCatalogProducts(businessId);
+  if (products.some((p) => p.imageUrl)) return products;
+  const media = await prisma.agentMedia.findMany({
+    where: { businessId, mediaType: "image" },
+    orderBy: { createdAt: "asc" },
+    take: 12,
+    select: { id: true, url: true, label: true, filename: true },
+  });
+  const fromLibrary: CatalogProduct[] = media.map((m, i) => ({
+    id: `media:${m.id}`,
+    name: (m.label || m.filename || `Foto ${i + 1}`).replace(/\.(png|jpe?g|webp)$/i, "").slice(0, 80),
+    description: "",
+    price: null,
+    compareAtPrice: null,
+    currency: "COP",
+    category: null,
+    imageUrl: m.url,
+    galleryUrls: [],
+    badge: null,
+  }));
+  return [...products, ...fromLibrary];
+}
+
+/**
  * Renders a landing page (v1 or v2 content) to HTML — shared by
  * /sitio/[slug] and custom domains (proxy.ts). Null when the stored content
  * doesn't match either schema.
@@ -65,7 +94,7 @@ export async function renderStoredWebsite(
       trackingBasePath: opts.trackingBasePath,
       preview: opts.preview,
       leadSubmitted: opts.leadSubmitted,
-      products: await getCatalogProducts(website.businessId),
+      products: await getShowcaseProducts(website.businessId),
     });
   }
 
@@ -90,7 +119,8 @@ export async function renderStoredWebsite(
       preview: opts.preview,
       edit: opts.edit,
       leadSubmitted: opts.leadSubmitted,
-      heroImageUrl: website.aiImageUrl ?? heroImageUrl,
+      // The owner's own photos first; the generated one only when there is nothing real.
+      heroImageUrl,
       photos: photos.map((p) => p.url),
       products,
     });

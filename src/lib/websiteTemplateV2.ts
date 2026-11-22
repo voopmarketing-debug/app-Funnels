@@ -123,12 +123,12 @@ const FX_CSS = `
 .fan-tabs button.on{background:var(--text);color:var(--bg)}
 .fan-info p{color:var(--muted)}
 .fan-info .prow{justify-content:center}
-.mq{padding:56px 0;overflow:hidden;border-block:1px solid var(--line)}
+.mq{padding:28px 0;overflow:hidden;border-block:1px solid var(--line)}
 .mq-row{overflow:hidden;white-space:nowrap}
 .mq-track{display:inline-flex;animation:mq 46s linear infinite}
 .mq-row.rev .mq-track{animation-direction:reverse}
-.mq-track span{font-family:var(--hf);font-size:clamp(54px,11vw,150px);line-height:1.05;text-transform:uppercase;letter-spacing:-.03em;padding-right:.5em;color:transparent;-webkit-text-stroke:1.5px color-mix(in srgb,var(--text) 38%,transparent)}
-.mq-row.rev .mq-track span{color:color-mix(in srgb,var(--primary) 16%,transparent);-webkit-text-stroke:0}
+.mq-track span{font-family:var(--hf);font-weight:700;font-size:clamp(22px,3vw,40px);line-height:1.2;letter-spacing:-.01em;padding-right:1.2em;color:color-mix(in srgb,var(--text) 38%,transparent)}
+.mq-row.rev .mq-track span{color:color-mix(in srgb,var(--text) 22%,transparent)}
 @keyframes mq{to{transform:translateX(-50%)}}
 .tv{padding:var(--pad) 0 0}
 .tv-product{display:none}
@@ -266,7 +266,16 @@ export type RenderV2Context = {
 };
 
 export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Context): string {
-  const style = STYLES[content.style] ?? STYLES.editorial;
+  // Showroom / Scroll Story pages saved before the template builder: one standard look. Clean sans
+  // type for titles and text, black, white and gray, the accent only on buttons and small details.
+  const neutral = content.pageType === "showroom" || content.pageType === "historia";
+  const baseStyle = STYLES[content.style] ?? STYLES.editorial;
+  const style: StylePreset = neutral
+    ? { ...baseStyle, headingWeight: 700, headingTransform: "none", headingTracking: "-0.03em", h1: "clamp(32px, 4vw, 52px)", h2: "clamp(24px, 3vw, 36px)", sectionPad: "88px", cardBorder: true, cardShadow: false, heroDecor: "none" }
+    : baseStyle;
+  const theme: WebsiteContentV2["theme"] = neutral
+    ? { ...content.theme, textColor: "#111214", backgroundColor: "#ffffff", surfaceColor: "#f5f6f8", headingFont: "Inter", bodyFont: "Inter" }
+    : content.theme;
   const products = ctx.products ?? [];
   const productById = new Map(products.map((p) => [p.id, p]));
   const photos = (ctx.photos ?? []).map(safeUrl).filter((u): u is string => !!u);
@@ -285,14 +294,14 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(`pedido:${p.name}`.slice(0, 80))}&p=${encodeURIComponent(p.id)}${previewQ}`;
   const registroAction = `${ctx.trackingBasePath}/registro${ctx.preview ? "?preview=1" : ""}`;
 
-  const primary = sanitizeHexColor(content.theme.primaryColor, "#1f6feb");
-  const bg = sanitizeHexColor(content.theme.backgroundColor, "#fafaf7");
-  const surface = sanitizeHexColor(content.theme.surfaceColor, "#f1f0eb");
+  const primary = sanitizeHexColor(theme.primaryColor, "#1f6feb");
+  const bg = sanitizeHexColor(theme.backgroundColor, "#fafaf7");
+  const surface = sanitizeHexColor(theme.surfaceColor, "#f1f0eb");
   // The AI's own colors are corrected when they would not read: text on the background at 7:1, and the
   // accent used AS TEXT (kickers, highlights, prices) at 4.5:1. Buttons keep the exact brand color.
-  const textColor = ensureContrast(sanitizeHexColor(content.theme.textColor, "#141414"), bg, 7);
+  const textColor = ensureContrast(sanitizeHexColor(theme.textColor, "#141414"), bg, 7);
   const primaryInk = ensureContrast(primary, bg, 4.5);
-  const fonts = Array.from(new Set([content.theme.headingFont, content.theme.bodyFont]));
+  const fonts = Array.from(new Set([theme.headingFont, theme.bodyFont]));
   const fontStack = (f: string) => `"${f}", ${SERIF_FONTS.has(f) ? "Georgia, serif" : "system-ui, sans-serif"}`;
 
   const hidden = new Set(content.hidden ?? []);
@@ -784,7 +793,7 @@ ${fontLink(fonts)}
 <style>
 :root{color-scheme:light;--primary:${primary};--primary-base:${primary};--primary-ink:${primaryInk};--primary-on-dark:color-mix(in srgb,${primary} 50%,#fff);--btn-text:${readableTextColor(primary)};--bg:${bg};--surface:${surface};--text:${textColor};
 --muted:color-mix(in srgb,var(--text) 64%,transparent);--line:color-mix(in srgb,var(--text) 12%,transparent);
---hf:${fontStack(content.theme.headingFont)};--bf:${fontStack(content.theme.bodyFont)};
+--hf:${fontStack(theme.headingFont)};--bf:${fontStack(theme.bodyFont)};
 --r:${style.radius};--br:${style.btnRadius};--pad:${style.sectionPad};--max:${style.maxWidth}}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}

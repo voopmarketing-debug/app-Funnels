@@ -12,8 +12,10 @@ export default async function CreateWebsitePage({ params }: { params: Promise<{ 
     include: { business: { select: { name: true, wabaAccessToken: true, wabaPhoneNumberId: true, brandPrimaryColor: true, brandSecondaryColor: true } } },
   });
   if (!membership) notFound();
-  const [productCount, owner, latestPage] = await Promise.all([
+  const [productCount, showcaseProducts, libraryPhotos, owner, latestPage] = await Promise.all([
     prisma.product.count({ where: { businessId: id, active: true } }),
+    prisma.product.count({ where: { businessId: id, active: true, imageUrl: { not: null } } }),
+    prisma.agentMedia.count({ where: { businessId: id, mediaType: "image" } }),
     prisma.membership.findFirst({ where: { businessId: id, role: "OWNER" }, select: { user: { select: { phone: true } } } }),
     prisma.website.findFirst({ where: { businessId: id, pageType: "landing" }, orderBy: { generatedAt: "desc" }, select: { content: true } }),
   ]);
@@ -32,6 +34,7 @@ export default async function CreateWebsitePage({ params }: { params: Promise<{ 
       businessId={id}
       businessName={membership.business.name}
       productCount={productCount}
+      showcaseCount={showcaseProducts + libraryPhotos}
       needsWhatsapp={!hasWhatsapp}
       initialBrand={{ primary: brandPrimary, secondary: brandSecondary }}
     />

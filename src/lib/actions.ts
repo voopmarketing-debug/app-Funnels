@@ -52,7 +52,7 @@ import {
   type CreationTurn,
   type WebsiteV2Context,
 } from "@/lib/websiteGeneratorV2";
-import { getCatalogProducts } from "@/lib/websiteRender";
+import { getCatalogProducts, getShowcaseProducts } from "@/lib/websiteRender";
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import { isValidEmail, normalizePhone } from "@/lib/phone";
 import { exchangeSignupCode, isValidPin, registerPhoneNumber } from "@/lib/whatsappSignup";
@@ -3268,11 +3268,12 @@ export async function createWebsitePageV2(
     // texts, the catalog supplies the products, photos and prices.
     const template = templateForPageType(input.pageType);
     if (template) {
-      if (!ctx.products.some((p) => p.imageUrl)) {
-        return { ok: false, error: "Para este tipo de página primero carga tus productos con foto y precio en Productos." };
+      const showcase = await getShowcaseProducts(businessId);
+      if (!showcase.some((p) => p.imageUrl)) {
+        return { ok: false, error: "Para este tipo de página primero sube las fotos de tus productos (en Productos, con precio) o a tu biblioteca de fotos." };
       }
       const templateContent = await withAiUsage(businessId, "WEBSITE", () =>
-        generateTemplateSite({ ...ctx, purpose: input.purpose?.trim() || null, designPrompt: input.brief?.trim() || null, template }),
+        generateTemplateSite({ ...ctx, products: showcase, purpose: input.purpose?.trim() || null, designPrompt: input.brief?.trim() || null, template }),
       );
       await recordWebsiteGeneration(businessId);
       const templateSlug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0);
@@ -3346,7 +3347,7 @@ export async function applyWebsitePromptV2(
     if (isTemplateContent(website.content)) {
       const currentTemplate = parseTemplateSite(website.content);
       if (!currentTemplate) throw new Error("Esta página necesita regenerarse una vez para poder editarla");
-      const catalog = await getCatalogProducts(businessId);
+      const catalog = await getShowcaseProducts(businessId);
       const editedTemplate = await withAiUsage(businessId, "WEBSITE", () => applyTemplateEdit(currentTemplate, trimmed, { businessName: currentTemplate.brand.name, products: catalog }));
       await recordWebsiteGeneration(businessId);
       await prisma.website.update({ where: { id: websiteId }, data: { content: editedTemplate } });
@@ -3380,11 +3381,17 @@ export async function regenerateWebsitePageV2(businessId: string, websiteId: str
 
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
     const ctx = await buildWebsiteV2Context(businessId);
-    if (isTemplateContent(website.content)) {
-      const previousTemplate = parseTemplateSite(website.content);
-      const template = previousTemplate?.template ?? "showroom";
+    // A page made as Showroom / Scroll Story stays on its template, including the ones saved
+    // before the templates existed (they were v2 pages of the same type).
+    const previousV2 = isV2Content(website.content) ? WebsiteContentV2Schema.safeParse(website.content) : null;
+    const templateToKeep = isTemplateContent(website.content) ? (parseTemplateSite(website.content)?.template ?? "showroom") : previousV2?.success ? templateForPageType(previousV2.data.pageType) : null;
+    if (templateToKeep) {
+      const showcase = await getShowcaseProducts(businessId);
+      if (!showcase.some((p) => p.imageUrl)) {
+        return { ok: false, error: "Para esta página primero sube las fotos de tus productos (en Productos, con precio) o a tu biblioteca de fotos." };
+      }
       const regenerated = await withAiUsage(businessId, "WEBSITE", () =>
-        generateTemplateSite({ ...ctx, purpose: website.purpose, designPrompt: website.designPrompt, template }),
+        generateTemplateSite({ ...ctx, products: showcase, purpose: website.purpose, designPrompt: website.designPrompt, template: templateToKeep }),
       );
       await recordWebsiteGeneration(businessId);
       await prisma.website.update({ where: { id: websiteId }, data: { content: regenerated, whatsappNumber: ctx.displayNumber, generatedAt: new Date(), model: "claude-sonnet-5" } });
