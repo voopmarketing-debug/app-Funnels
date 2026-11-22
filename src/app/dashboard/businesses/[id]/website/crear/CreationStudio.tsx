@@ -351,7 +351,7 @@ export function CreationStudio({
                   <legend className="text-sm font-semibold text-ink">¿Qué quieres lograr con tu página?</legend>
                   <div className="grid gap-1.5">
                     {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
-                      const needsProducts = (k === "tienda" || k === "producto") && productCount === 0;
+                      const needsProducts = (k === "tienda" || k === "producto" || k === "showroom" || k === "historia") && productCount === 0;
                       const active = plan.pageType === k;
                       return (
                         <button
@@ -368,7 +368,7 @@ export function CreationStudio({
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold text-ink">{PAGE_TYPE_LABELS[k]}</span>
                             <span className="block text-xs text-ink-muted">
-                              {needsProducts ? "Primero carga tus productos en Productos." : PAGE_TYPE_PITCH[k].text}
+                              {needsProducts ? "Primero carga tus productos con foto y precio en Productos." : PAGE_TYPE_PITCH[k].text}
                             </span>
                           </span>
                         </button>

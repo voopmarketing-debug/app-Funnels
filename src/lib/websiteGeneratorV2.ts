@@ -15,6 +15,7 @@ import {
 } from "@/lib/websiteContentV2";
 import { recordAnthropicUsage } from "@/lib/aiUsage";
 import { carryOver, MAX_SECTIONS } from "@/lib/websiteBlocks";
+import { ensureStructure } from "@/lib/websiteStructure";
 import { AiPageSchema, fromAiPage, keepKnownImages, toAiSection, type AiPage } from "@/lib/websiteAiFormat";
 
 // Same model the v1 generator has been running on in production — a page
@@ -274,7 +275,7 @@ export async function generateWebsiteContentV2(ctx: WebsiteV2Context): Promise<W
   const ai = fromAiPage(await generatePageJson(buildPrompt(ctx)));
   if (ctx.pageType) ai.pageType = ctx.pageType;
   if (ctx.style) ai.style = ctx.style;
-  return applyBrand(normalize(ai, ctx), ctx.brandColors);
+  return ensureStructure(applyBrand(normalize(ai, ctx), ctx.brandColors), ctx.products);
 }
 
 /** Chat edits on an existing v2 page ("haz el titular más corto", "cámbialo a estilo lujo"). */
