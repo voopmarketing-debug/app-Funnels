@@ -298,5 +298,25 @@
   "ctaLabel": "Quiero la oferta",
   "countdown": true,
   "seal": "-15 %"
+ },
+ {
+  "type": "traveler",
+  "kicker": "El ritual",
+  "heading": "Así se vive",
+  "productId": "p1",
+  "scenes": [
+   {
+    "title": "Aplícalo",
+    "description": "Una gota en la mañana."
+   },
+   {
+    "title": "Siéntelo",
+    "description": "Se absorbe en segundos."
+   },
+   {
+    "title": "Repite",
+    "description": "Cada noche."
+   }
+  ]
  }
 ]

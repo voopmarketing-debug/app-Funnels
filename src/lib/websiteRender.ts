@@ -26,6 +26,7 @@ export async function getCatalogProducts(businessId: string): Promise<CatalogPro
       currency: true,
       category: true,
       imageUrl: true,
+      galleryUrls: true,
       badge: true,
       trackStock: true,
       stock: true,

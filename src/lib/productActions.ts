@@ -19,6 +19,8 @@ export type ProductInput = {
   category: string | null;
   badge: string | null;
   imageUrl: string | null;
+  /** Extra photos from other angles for the 360° viewer (up to 11). Left out = unchanged. */
+  galleryUrls?: string[];
   active: boolean;
   trackStock: boolean;
   stock: number | null;
@@ -70,6 +72,24 @@ async function resolveImage(businessId: string, url: string | null, current: str
   return uploaded.url;
 }
 
+const MAX_GALLERY_PHOTOS = 11; // keep in step with MAX_GALLERY in ProductManager (a "use server" file can only export functions)
+
+// Same re-check for the extra photos; the ones already saved are kept as they are.
+async function resolveGallery(businessId: string, urls: string[] | undefined, current: string[]): Promise<string[]> {
+  if (urls === undefined) return current;
+  const out: string[] = [];
+  for (const url of Array.from(new Set(urls)).slice(0, MAX_GALLERY_PHOTOS)) {
+    if (current.includes(url)) {
+      out.push(url);
+      continue;
+    }
+    const uploaded = await verifyChatUpload({ url, businessId, folder: "products" });
+    if (uploaded.mediaType !== "image") throw new Error("Las fotos del producto deben ser imágenes");
+    out.push(uploaded.url);
+  }
+  return out;
+}
+
 // Returns the error instead of throwing: Next.js hides a thrown error's
 // message in production, and these ("ponle un nombre…") are for the user.
 export async function saveProduct(
@@ -93,7 +113,8 @@ async function saveProductOrThrow(businessId: string, productId: string | null, 
   if (productId) {
     const existing = await prisma.product.findFirstOrThrow({ where: { id: productId, businessId } });
     const imageUrl = await resolveImage(businessId, input.imageUrl, existing.imageUrl);
-    await prisma.product.update({ where: { id: productId }, data: { ...data, imageUrl } });
+    const galleryUrls = await resolveGallery(businessId, input.galleryUrls, existing.galleryUrls);
+    await prisma.product.update({ where: { id: productId }, data: { ...data, imageUrl, galleryUrls } });
     if (data.trackStock) {
       await notifyStockLevel(businessId, { id: productId, name: data.name, lowStockAt: data.lowStockAt }, existing.trackStock ? existing.stock : Infinity, data.stock);
     }
@@ -103,7 +124,8 @@ async function saveProductOrThrow(businessId: string, productId: string | null, 
       throw new Error(`Tu catálogo llegó al máximo de ${MAX_PRODUCTS} productos y servicios. Elimina los que ya no vendes para agregar nuevos.`);
     }
     const imageUrl = await resolveImage(businessId, input.imageUrl, null);
-    await prisma.product.create({ data: { ...data, imageUrl, businessId, position: count } });
+    const galleryUrls = await resolveGallery(businessId, input.galleryUrls, []);
+    await prisma.product.create({ data: { ...data, imageUrl, galleryUrls, businessId, position: count } });
   }
   revalidatePath(`/dashboard/businesses/${businessId}/productos`);
   revalidatePath(`/dashboard/businesses/${businessId}/inventario`);

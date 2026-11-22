@@ -60,7 +60,7 @@ const FX_CSS = `
 .shw-panel[hidden]{display:none}
 .shw-panel img{max-width:76%;max-height:84%;width:auto;height:auto;object-fit:contain;filter:drop-shadow(0 26px 24px rgba(0,0,0,.18));pointer-events:none}
 .shw-stage::after{content:"";position:absolute;left:18%;right:18%;bottom:7%;height:16px;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.2),transparent);filter:blur(4px)}
-.shw-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);margin:0;z-index:3;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted);background:color-mix(in srgb,var(--bg) 86%,transparent);padding:5px 12px;border-radius:999px}
+.shw-hint{white-space:nowrap;position:absolute;left:50%;bottom:14px;transform:translateX(-50%);margin:0;z-index:3;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted);background:color-mix(in srgb,var(--bg) 86%,transparent);padding:5px 12px;border-radius:999px}
 .shw-bubbles{list-style:none;margin:0;padding:0}
 .shw-bubbles li{position:absolute;left:var(--x);top:var(--y);z-index:2;max-width:210px;padding:10px 14px;border-radius:16px 16px 16px 4px;background:var(--bg);border:1px solid var(--line);box-shadow:0 14px 30px -18px rgba(0,0,0,.4);font-size:13px;line-height:1.35;opacity:0;transform:translateY(8px) scale(.96)}
 .shw-bubbles b{display:block;font-size:13.5px}
@@ -129,6 +129,23 @@ const FX_CSS = `
 .mq-track span{font-family:var(--hf);font-size:clamp(54px,11vw,150px);line-height:1.05;text-transform:uppercase;letter-spacing:-.03em;padding-right:.5em;color:transparent;-webkit-text-stroke:1.5px color-mix(in srgb,var(--text) 38%,transparent)}
 .mq-row.rev .mq-track span{color:color-mix(in srgb,var(--primary) 16%,transparent);-webkit-text-stroke:0}
 @keyframes mq{to{transform:translateX(-50%)}}
+.tv{padding:var(--pad) 0 0}
+.tv-product{display:none}
+.tv-stage{display:grid;gap:18px;margin-top:28px;padding:0 24px;max-width:var(--max);margin-inline:auto}
+.tv-scene{display:grid;gap:14px;padding:20px;border-radius:var(--r);background:var(--surface)}
+.tv-own{width:100%;max-height:320px;object-fit:contain}
+.tv-n{font-family:var(--hf);font-size:34px;color:var(--primary);line-height:1}
+.tv-text h3{margin:6px 0 6px}
+.tv-text p{margin:0;color:var(--muted)}
+.tv-on{height:calc(var(--n) * 88vh)}
+.tv-on .tv-stage{position:sticky;top:68px;height:calc(100vh - 68px);margin:0;padding:0;max-width:none;display:block;overflow:hidden;background:radial-gradient(70% 70% at 50% 45%,color-mix(in srgb,var(--primary) 10%,var(--bg)),var(--bg))}
+.tv-on .tv-product{display:block;position:absolute;left:68%;top:50%;width:min(38vw,540px);height:auto;max-height:82%;object-fit:contain;transform:translate(-50%,-50%);filter:drop-shadow(0 34px 30px rgba(0,0,0,.2));will-change:transform,left,top;pointer-events:none}
+.tv-on .tv-own{display:none}
+.tv-on .tv-scene{position:absolute;inset:0;display:flex;align-items:center;padding:0;background:none;border-radius:0;opacity:var(--o,0);pointer-events:none}
+.tv-on .tv-text{width:min(430px,38vw);margin-left:max(24px,calc((100vw - var(--max)) / 2 + 24px))}
+.tv-on .tv-scene:nth-of-type(even) .tv-text{margin-left:auto;margin-right:max(24px,calc((100vw - var(--max)) / 2 + 24px))}
+.tv-on .tv-text h3{font-size:clamp(30px,3.6vw,50px)}
+.tv-on .tv-text p{font-size:18px}
 @media (max-width:860px){
   .promo-rich-grid,.shw{grid-template-columns:minmax(0,1fr);gap:28px}
   .shw-stage{aspect-ratio:4/3}
@@ -143,6 +160,7 @@ const FX_CSS = `
 }
 @media (prefers-reduced-motion:reduce){
   .rv,.rv-hide{opacity:1!important;transform:none!important}
+  .tv-product{transition:none!important}
   .annc-track,.mq-track,.seal,.promo-media img,.shw-bubbles li,.promo-rich .kicker::before{animation:none!important}
   .shw-bubbles li{opacity:1;transform:none}
   .promo-media{transform:none!important}
@@ -520,7 +538,13 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           <div class="shw rv" data-showroom>
             <div class="shw-main">
               <div class="shw-stage" data-viewer tabindex="0" role="group" aria-label="Visor del producto: arrastra para girarlo o usa las flechas del teclado">
-                ${list.map((p, i) => `<figure class="shw-panel" data-stage="${i}"${i > 0 ? " hidden" : ""}><img src="${esc(safeUrl(p.imageUrl) ?? "")}" alt="${esc(p.name)}" draggable="false"></figure>`).join("")}
+                ${list
+                  .map((p, i) => {
+                    // 3+ photos of the same product from other angles: the viewer turns through them all.
+                    const frames = [safeUrl(p.imageUrl), ...(p.galleryUrls ?? []).map(safeUrl)].filter((u): u is string => !!u).map((u) => u.replace(/\|/g, "%7C"));
+                    return `<figure class="shw-panel" data-stage="${i}"${i > 0 ? " hidden" : ""}><img src="${esc(safeUrl(p.imageUrl) ?? "")}" alt="${esc(p.name)}" draggable="false"${frames.length >= 3 ? ` data-frames="${esc(frames.join("|"))}"` : ""}></figure>`;
+                  })
+                  .join("")}
                 ${bubbles ? `<ol class="shw-bubbles">${bubbles}</ol>` : ""}
                 <p class="shw-hint" aria-hidden="true">↔ Arrastra para girar</p>
               </div>
@@ -593,6 +617,27 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
               .join("")}</div>
           </div>
         </div></section>`;
+      }
+
+      case "traveler": {
+        const p = productById.get(s.productId);
+        const img = p ? safeUrl(p.imageUrl) : null;
+        const scenes = s.scenes.slice(0, 4);
+        if (!p || !img || scenes.length < 2) {
+          return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerá el producto viajero. Elige un producto con foto en <strong>Productos</strong>.</div></div></section>` : "";
+        }
+        return `<section class="tv" id="historia"><div class="wrap">${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2></div>
+          <div class="tv-track" data-traveler style="--n:${scenes.length}">
+            <div class="tv-stage">
+              <img class="tv-product" src="${esc(img)}" alt="${esc(p.name)}" draggable="false">
+              ${scenes
+                .map(
+                  (c, ci) => `<article class="tv-scene" data-tvs="${ci}"><img class="tv-own" src="${esc(img)}" alt="${esc(p.name)}" loading="lazy"><div class="tv-text"><span class="tv-n">${String(ci + 1).padStart(2, "0")}</span><h3${ed(fp(`scenes.${ci}.title`))}>${esc(c.title)}</h3><p${ed(fp(`scenes.${ci}.description`))}>${esc(c.description)}</p></div></article>`,
+                )
+                .join("")}
+            </div>
+          </div>
+        </section>`;
       }
 
       case "marquee": {

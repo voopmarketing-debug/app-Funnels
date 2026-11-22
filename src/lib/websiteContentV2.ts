@@ -214,6 +214,15 @@ const FanSection = z.object({
   productIds: z.array(z.string()).describe("Ids de PRODUCTOS (con foto) de la colección, en orden. Lista vacía = todos."),
 });
 
+const TravelerSection = z.object({
+  ...media,
+  type: z.literal("traveler"),
+  kicker: nullableText("Etiqueta pequeña, ej. 'El ritual'."),
+  heading: text(80, "Título de la sección del producto viajero"),
+  productId: z.string().describe("Id del producto (con foto) que acompaña el scroll y cambia de lugar, tamaño y giro en cada escena."),
+  scenes: z.array(item).describe("2 a 4 escenas: cada una es un momento del ritual o de la historia del producto (título + texto corto, datos reales)."),
+});
+
 const MarqueeSection = z.object({
   ...media,
   type: z.literal("marquee"),
@@ -300,6 +309,7 @@ export const SectionSchema = z.discriminatedUnion("type", [
   ShowroomSection,
   QuoterSection,
   FanSection,
+  TravelerSection,
   MarqueeSection,
   ComparisonSection,
   AgendaSection,
@@ -324,6 +334,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   showroom: "Visor de productos",
   quoter: "Cotizador",
   fan: "Colección en abanico",
+  traveler: "Producto viajero",
   marquee: "Texto en movimiento",
   comparison: "Comparación",
   agenda: "Agenda",
@@ -377,6 +388,8 @@ export type CatalogProduct = {
   currency: string;
   category: string | null;
   imageUrl: string | null;
+  // Photos from other angles: with 3 or more, the viewer turns through all of them.
+  galleryUrls?: string[];
   badge: string | null;
   // Tracks inventory and has no units left: shown as "Agotado", no order button.
   soldOut?: boolean;

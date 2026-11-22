@@ -22,6 +22,7 @@ export const BLOCK_LIBRARY: BlockEntry[] = [
   { type: "showroom", label: SECTION_LABELS.showroom, help: "Visor para girar el producto, con globos de características.", group: "venta" },
   { type: "quoter", label: SECTION_LABELS.quoter, help: "El cliente mueve su presupuesto y ve qué le alcanza.", group: "venta" },
   { type: "fan", label: SECTION_LABELS.fan, help: "Colección en abanico que gira sola y se arrastra.", group: "venta" },
+  { type: "traveler", label: SECTION_LABELS.traveler, help: "Tu producto acompaña el scroll y cambia de lugar en cada escena.", group: "venta" },
   { type: "marquee", label: SECTION_LABELS.marquee, help: "Frases gigantes que se desplazan al fondo.", group: "texto" },
   { type: "comparison", label: SECTION_LABELS.comparison, help: "Tabla: tú frente a las otras opciones.", group: "venta" },
   { type: "trustBar", label: SECTION_LABELS.trustBar, help: "Garantías cortas con ícono.", group: "confianza" },
@@ -63,6 +64,8 @@ export function newSection(type: Exclude<SectionType, "hero">, ctx: { firstProdu
       return ctx.firstProductId ? { type, kicker: "Cotizador", heading: "Mira qué te alcanza", intro: "Mueve la barra con tu presupuesto.", productIds: [], months: 48, note: null } : null;
     case "fan":
       return ctx.firstProductId ? { type, kicker: "La colección", heading: "Elige tu favorito", intro: "Arrastra para ver todos.", productIds: [] } : null;
+    case "traveler":
+      return ctx.firstProductId ? { type, kicker: "El ritual", heading: "Así se vive", productId: ctx.firstProductId, scenes: [item("Primera escena", "Cuenta el primer momento de la experiencia."), item("Segunda escena", "Cuenta el segundo momento."), item("Tercera escena", "Cierra con el resultado.")] } : null;
     case "marquee":
       return { type, lines: ["Escribe una frase corta", "Y otra distinta"] };
     case "comparison":

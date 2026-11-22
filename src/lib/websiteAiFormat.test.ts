@@ -7,7 +7,7 @@ const sections = fixtures.map((f) => SectionSchema.parse(f));
 
 describe("websiteAiFormat", () => {
   it("covers every section type", () => {
-    expect(new Set(sections.map((s) => s.type)).size).toBe(19);
+    expect(new Set(sections.map((s) => s.type)).size).toBe(20);
   });
 
   it.each(sections.map((s) => [s.type, s] as const))("round-trips %s through the AI format unchanged", (_type, section) => {

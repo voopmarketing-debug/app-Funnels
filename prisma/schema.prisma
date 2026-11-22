@@ -137,6 +137,9 @@ model Product {
   currency       String      @default("COP")
   category       String?
   imageUrl       String?
+  // Extra photos from other angles (up to 11, in turning order after imageUrl):
+  // the website's product viewer turns through them when there are enough.
+  galleryUrls    String[]    @default([])
   // Short label shown on the card, e.g. "Nuevo", "Más vendido", "-20%".
   badge          String?
   active         Boolean     @default(true)

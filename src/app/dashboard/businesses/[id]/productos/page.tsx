@@ -31,6 +31,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ id: s
     category: p.category,
     badge: p.badge,
     imageUrl: p.imageUrl,
+    galleryUrls: p.galleryUrls,
     active: p.active,
     trackStock: p.trackStock,
     stock: p.stock,

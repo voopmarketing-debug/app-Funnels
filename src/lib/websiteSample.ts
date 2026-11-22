@@ -173,6 +173,7 @@ export function buildSampleContent(opts: { pageType: PageType; style: StyleKey; 
         { type: "hero", variant: "giant", eyebrow: businessName, heading: "Un ritual que se siente", highlight: "se siente", subheading: "Descubre la colección y elige la tuya.", chips: [], showLeadForm: false, ctaLabel: "Ver colección", secondaryCtaLabel: null, badge: null, productId: null },
         benefits,
         { type: "marquee", lines: ["Hecho con cuidado", "Elegido por ti"] },
+        ...(first ? [{ type: "traveler" as const, kicker: "El ritual", heading: "Así se vive", productId: first.id, scenes: [{ title: "Empieza tu día", description: "Un gesto simple que se vuelve costumbre." }, { title: "Se siente", description: "Textura ligera y resultado a tu ritmo." }, { title: "Se queda", description: "Constancia, no milagros." }] }] : []),
         { type: "fan", kicker: "La colección", heading: "Elige tu favorito", intro: "Arrastra para ver todos.", productIds: [] },
         { type: "promo", tone: "accent", kicker: "Solo en {mes}", heading: "Pruébalo este mes", body: "Escríbenos y te ayudamos a elegir.", ctaLabel: "Quiero el mío", countdown: true, seal: null },
         faq,

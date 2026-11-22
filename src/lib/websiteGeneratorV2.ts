@@ -157,7 +157,7 @@ C. tienda — TIENDA / CATÁLOGO: announcement con dato real → hero variant "g
 D. evento — EVENTO / LANZAMIENTO: hero con showLeadForm true y chips reales → features variant icons ("lo que vas a aprender") → features variant cards ("es para ti si…") → agenda (solo con fechas reales) → host → objections → leadForm (registro repetido).
 E. captacion — CAPTACIÓN / AGENDA: hero con showLeadForm true → features (3 beneficios) → steps → objections → leadForm o cta.
 F. showroom — SHOWROOM (referencia de calidad "Showroom"): para productos grandes o comparables (carros, motos, inmuebles, planes, equipos). Orden: hero variant split → showroom (visor para girar el producto con globos de características, miniaturas para cambiar de producto y 3 datos clave) → promo con countdown true, tone soft o accent y seal real si existe → quoter (cotizador por presupuesto: precio total o cuota mensual, "te alcanza / te faltan") → features variant cards (3 beneficios del servicio) → promo (franja con imagen, por ejemplo "recibimos tu carro actual") → stats solo con cifras reales → objections → leadForm. Requiere productos CON foto y con precio.
-G. historia — SCROLL STORY (referencia de calidad "Scroll Story"): para productos de marca o de ritual (cosmética, bebidas, perfumes, comida, suplementos). Orden: hero variant giant → features variant icons ("el ritual": 3 beneficios) → marquee (2 frases gigantes que se desplazan en direcciones opuestas) → productSpotlight del producto estrella → fan (colección en abanico que gira sola y se arrastra) → promo con countdown true y seal real si existe → steps (primera visita o compra) → objections → leadForm o cta. Requiere productos CON foto.`;
+G. historia — SCROLL STORY (referencia de calidad "Scroll Story"): para productos de marca o de ritual (cosmética, bebidas, perfumes, comida, suplementos). Orden: hero variant giant → features variant icons ("el ritual": 3 beneficios) → marquee (2 frases gigantes que se desplazan en direcciones opuestas) → traveler (el producto viajero: el producto estrella acompaña el scroll y cambia de lugar, tamaño y giro en 3 escenas del ritual, con datos reales) → productSpotlight del producto estrella → fan (colección en abanico que gira sola y se arrastra) → promo con countdown true y seal real si existe → steps (primera visita o compra) → objections → leadForm o cta. Requiere productos CON foto.`;
 
 /** The approved v2 prompt (role → data → strategy → page type → style → copy → truth → visual → review). */
 function buildPrompt(ctx: WebsiteV2Context): string {
@@ -232,7 +232,7 @@ PASO 6 · REGLAS DE DISEÑO (obligatorias)
 PASO 7 · BANNERS Y MOVIMIENTO (obligatorio en toda página)
 - announcement: la cinta superior en movimiento. 3 a 5 frases cortas de beneficios REALES separadas por " · " (ej. "Garantía de fábrica · Entrega coordinada · Asesoría por WhatsApp"). Si no hay beneficios reales verificables, usa frases de proceso reales (respuesta rápida por WhatsApp).
 - Todas las páginas llevan un banner de promoción (promo): kicker "Solo en {mes}" (el token {mes} se cambia solo por el mes actual), título grande con la oferta o la invitación, línea de condiciones, countdown true, botón al formulario, y seal solo si hay un dato real ("-15 %", "+$5 M"). El banner muestra una imagen de producto automáticamente.
-- Pieza protagonista: toda página lleva al menos una de estas: showroom (visor con globos), fan (colección en abanico) o, en historia, marquee + fan. Con productos con foto, úsala siempre.
+- Pieza protagonista: toda página lleva al menos una de estas: showroom (visor con globos), traveler (producto viajero), fan (colección en abanico). En historia usa traveler y fan; en showroom, el visor. Con productos con foto, úsala siempre.
 - Las secciones aparecen solas al bajar; no escribas nada sobre animaciones.
 
 PASO 8 · FORMULARIOS Y CONVERSIÓN
@@ -253,6 +253,7 @@ function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: 
       // The interactive blocks that would show nothing are left out (they need photos / prices from the catalog).
       const pool = (s.type === "showroom" || s.type === "quoter" || s.type === "fan") && s.productIds.length > 0 ? ctx.products.filter((p) => s.productIds.includes(p.id)) : ctx.products;
       if (s.type === "showroom" || s.type === "fan") return pool.some((p) => !!p.imageUrl);
+      if (s.type === "traveler") return s.scenes.length >= 2 && !!ctx.products.find((p) => p.id === s.productId)?.imageUrl;
       if (s.type === "quoter") return pool.filter((p) => p.price !== null && p.price > 0).length >= 2;
       return true;
     })

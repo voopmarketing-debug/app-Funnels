@@ -195,3 +195,39 @@ describe("renderWebsiteHtmlV2 interactive blocks", () => {
     expect(html).toContain('class="feat-item rv"');
   });
 });
+
+describe("renderWebsiteHtmlV2 360° viewer and traveling product", () => {
+  const showroom = { type: "showroom", kicker: null, heading: "Míralo", productIds: [], bubbles: [], facts: [] };
+
+  it("turns through the photos from other angles when there are enough", () => {
+    const rich = products.map((p, i) => (i === 0 ? { ...p, galleryUrls: ["https://img.example.com/a1.png", "https://img.example.com/a2.png", "https://img.example.com/a3.png"] } : p));
+    const html = renderWebsiteHtmlV2(withBlocks([showroom]), { ...ctx, products: rich });
+    expect(html).toContain('data-frames="https://img.example.com/p1.png|https://img.example.com/a1.png|https://img.example.com/a2.png|https://img.example.com/a3.png"');
+    expect(html.match(/data-frames=/g)).toHaveLength(1);
+  });
+
+  it("only tilts a product that has fewer than three photos in total", () => {
+    const few = products.map((p, i) => (i === 0 ? { ...p, galleryUrls: ["https://img.example.com/a1.png"] } : p));
+    expect(markup(renderWebsiteHtmlV2(withBlocks([showroom]), { ...ctx, products: few }))).not.toContain("data-frames");
+  });
+
+  it("ignores angle photos that are not https", () => {
+    const bad = products.map((p, i) => (i === 0 ? { ...p, galleryUrls: ["javascript:alert(1)", "http://x.test/a.png", "https://img.example.com/ok.png"] } : p));
+    const html = markup(renderWebsiteHtmlV2(withBlocks([showroom]), { ...ctx, products: bad }));
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain("data-frames");
+  });
+
+  it("renders the traveling product with its scenes", () => {
+    const html = renderWebsiteHtmlV2(withBlocks([{ type: "traveler", kicker: "El ritual", heading: "Así se vive", productId: "p1", scenes: [{ title: "Uno", description: "a" }, { title: "Dos", description: "b" }, { title: "Tres", description: "c" }] }]), { ...ctx, products });
+    expect(html).toContain("data-traveler");
+    expect(html.match(/data-tvs="/g)).toHaveLength(3);
+    expect(html).toContain('style="--n:3"');
+  });
+
+  it("renders no traveling product without a product photo or scenes", () => {
+    const section = { type: "traveler", kicker: null, heading: "Así", productId: "nope", scenes: [{ title: "Uno", description: "a" }, { title: "Dos", description: "b" }] };
+    expect(markup(renderWebsiteHtmlV2(withBlocks([section]), { ...ctx, products }))).not.toContain("data-traveler");
+  });
+});
+

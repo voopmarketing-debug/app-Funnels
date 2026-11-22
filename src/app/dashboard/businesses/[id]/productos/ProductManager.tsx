@@ -18,6 +18,7 @@ export type ManagedProduct = {
   category: string | null;
   badge: string | null;
   imageUrl: string | null;
+  galleryUrls: string[];
   active: boolean;
   trackStock: boolean;
   stock: number;
@@ -26,6 +27,7 @@ export type ManagedProduct = {
 
 const money = (v: number | null, currency: string) => (v === null ? "" : formatMoney(v, currency));
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_GALLERY = 11;
 
 function safeName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80) || "foto";
@@ -313,6 +315,9 @@ function ProductForm({
   const [stock, setStock] = useState(product?.trackStock ? String(product.stock) : "");
   const [lowStockAt, setLowStockAt] = useState(String(product?.lowStockAt ?? 5));
   const [imageUrl, setImageUrl] = useState<string | null>(product?.imageUrl ?? null);
+  const [galleryUrls, setGalleryUrls] = useState<string[]>(product?.galleryUrls ?? []);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -344,6 +349,35 @@ function ProductForm({
     }
   }
 
+  async function pickGallery(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setError(null);
+    const room = MAX_GALLERY - galleryUrls.length;
+    const chosen = Array.from(files).slice(0, Math.max(room, 0));
+    if (chosen.length === 0) return setError(`Ya tienes ${MAX_GALLERY} fotos de ángulos. Quita alguna para agregar otra.`);
+    setUploadingGallery(true);
+    try {
+      const added: string[] = [];
+      for (const file of chosen) {
+        if (!file.type.startsWith("image/")) throw new Error("Elige imágenes (JPG, PNG o WebP)");
+        if (file.size > MAX_IMAGE_BYTES) throw new Error(`"${file.name}" pesa más de 5 MB`);
+        const blob = await upload(`products/${businessId}/${safeName(file.name)}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/attachments/upload",
+          clientPayload: JSON.stringify({ businessId }),
+          contentType: file.type,
+        });
+        added.push(blob.url);
+      }
+      setGalleryUrls((cur) => [...cur, ...added]);
+    } catch (err) {
+      setError(`No se pudo subir la foto (${err instanceof Error ? err.message : "error"})`);
+    } finally {
+      setUploadingGallery(false);
+      if (galleryRef.current) galleryRef.current.value = "";
+    }
+  }
+
   const toNumber = (v: string) => (v ? Number(v) : null);
 
   function submit(e: React.FormEvent) {
@@ -361,6 +395,7 @@ function ProductForm({
           category: category || null,
           badge: badge || null,
           imageUrl,
+          galleryUrls,
           active,
           trackStock: !isService && trackStock,
           stock: toNumber(stock),
@@ -472,6 +507,44 @@ function ProductForm({
             <button type="button" onClick={() => setImageUrl(null)} className="text-xs text-ink-muted underline hover:text-error">
               Quitar foto
             </button>
+          )}
+          {!isService && imageUrl && (
+            <div className="space-y-2 rounded-xl border border-border p-3">
+              <p className="text-xs font-medium text-ink-muted">
+                Fotos desde otros ángulos <span className="text-ink-faint">(opcional)</span>
+              </p>
+              <p className="text-xs text-ink-faint">
+                Para que el visitante gire tu producto en la página web: sube de 8 a 12 fotos del mismo producto, de a unos 30° (frente, un poco de lado, perfil…), en orden.
+                Con menos de 3 fotos solo se inclina.
+              </p>
+              {galleryUrls.length > 0 && (
+                <ul className="flex flex-wrap gap-2">
+                  {galleryUrls.map((u, i) => (
+                    <li key={u} className="relative h-14 w-14 overflow-hidden rounded-lg border border-border">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- local preview of an uploaded photo */}
+                      <img src={u} alt={`Ángulo ${i + 2}`} className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        aria-label={`Quitar el ángulo ${i + 2}`}
+                        onClick={() => setGalleryUrls((cur) => cur.filter((x) => x !== u))}
+                        className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[10px] text-white"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                disabled={uploadingGallery || galleryUrls.length >= MAX_GALLERY}
+                onClick={() => galleryRef.current?.click()}
+                className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-ink hover:border-accent disabled:opacity-50"
+              >
+                {uploadingGallery ? "Subiendo…" : `Agregar fotos de ángulos (${galleryUrls.length}/${MAX_GALLERY})`}
+              </button>
+              <input ref={galleryRef} type="file" accept="image/*" multiple hidden onChange={(e) => pickGallery(e.target.files)} />
+            </div>
           )}
           <div className="space-y-1">
             <label htmlFor="product-description" className="text-xs font-medium text-ink-muted">
