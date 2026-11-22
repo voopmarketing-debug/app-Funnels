@@ -205,7 +205,7 @@ export function TemplateBuilder({
                     }
                   }}
                   rows={2}
-                  maxLength={2000}
+                  maxLength={6000}
                   placeholder="Ej.: pon la oferta de noviembre con 10 % de descuento"
                   className="min-w-0 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-base outline-none focus:border-accent md:text-sm"
                 />

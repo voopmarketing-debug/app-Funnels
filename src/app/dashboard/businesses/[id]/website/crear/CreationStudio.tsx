@@ -309,7 +309,7 @@ export function CreationStudio({
                 }}
                 rows={2}
                 placeholder="Cuéntale a la IA qué página quieres: para qué es, a quién le hablas, qué te gusta…"
-                className="max-h-40 min-h-[2.75rem] flex-1 resize-none bg-transparent px-2 py-1.5 text-base text-ink outline-none placeholder:text-ink-faint md:text-sm"
+                className="max-h-64 min-h-[2.75rem] flex-1 resize-none bg-transparent px-2 py-1.5 text-base text-ink outline-none placeholder:text-ink-faint md:text-sm"
               />
               <button type="submit" disabled={thinking || !input.trim()} className="h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50">
                 Enviar

@@ -3206,7 +3206,7 @@ export async function websiteCreationChat(
     await recordRateLimitEvent(key);
 
     const ctx = await buildWebsiteV2Context(businessId, { withNumber: false });
-    const trimmed = history.slice(-16).map((m) => ({ role: m.role, text: m.text.slice(0, 1500) }));
+    const trimmed = history.slice(-16).map((m) => ({ role: m.role, text: m.text.slice(0, 8000) }));
     return { ok: true, turn: await withAiUsage(businessId, "WEBSITE", () => websiteCreationTurn(ctx, trimmed)) };
   } catch (err) {
     return builderError(`websiteCreationChat(${businessId})`, err);
@@ -3339,7 +3339,7 @@ export async function applyWebsitePromptV2(
     const session = await auth();
     if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
     await requireBusinessMembership(session.user.id, businessId);
-    const trimmed = instruction.trim().slice(0, 2000);
+    const trimmed = instruction.trim().slice(0, 6000);
     if (!trimmed) throw new Error("Escribe qué cambio quieres");
     await assertWebsiteGenerationAllowed(businessId);
 

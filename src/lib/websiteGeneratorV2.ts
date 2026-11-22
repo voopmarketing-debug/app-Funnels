@@ -345,7 +345,7 @@ export const CreationTurnSchema = z.object({
       style: z.enum(STYLE_KEYS).catch("editorial"),
       name: z.string().describe("Nombre interno de la página, ej. 'Tienda principal'"),
       purpose: z.string().describe("Objetivo de la página en una frase"),
-      brief: z.string().describe("Brief final consolidado de todo lo conversado (máx. 120 palabras)"),
+      brief: z.string().describe("Brief final consolidado de todo lo conversado (máx. 120 palabras). EXCEPCIÓN: si el cliente pegó un texto largo y detallado, cópialo completo aquí, sin resumirlo."),
     })
     .nullable()
     .catch(null)
@@ -380,6 +380,8 @@ ${PAGE_TYPE_GUIDE}
 
 ESTILOS
 ${STYLE_GUIDE}
+
+Si el cliente pega un texto largo y detallado (más de 600 caracteres) que ya describe su página con datos (nombre, dirección, horario, beneficios, oferta, estructura), no le propongas ideas ni le preguntes nada: llena "ready" en ese mismo turno y copia ese texto COMPLETO, tal cual, en ready.brief (hasta 6000 caracteres; sin resumir, sin quitar ni cambiar ningún dato). Elige pageType showroom si pide showroom, visor 360° o cotizador, e historia si pide scroll story.
 
 Reglas: no propongas tienda, producto, showroom ni historia si no hay productos cargados (sugiérele cargarlos en Productos); showroom e historia piden además fotos en los productos. No inventes datos. Español neutro, tuteo.
 
