@@ -47,9 +47,11 @@ const nextConfig: NextConfig = {
         // page with a Meta Pixel / Google tag needs a per-response nonce in
         // its CSP (lib/siteTracking.ts) — and a header set here would
         // override the one the route returns.
+        // The creation studio's style previews (.../website/muestra) also send their own: they are
+        // example site pages whose own inline scripts need their hashes in the CSP.
         // /agenda-llamada (Funnels Labs' booking page) also sends its own,
         // since it talks to the booking Apps Script from the browser.
-        source: "/:path((?!sitio/|agenda-llamada$).*)",
+        source: "/:path((?!sitio/|agenda-llamada$|dashboard/businesses/[^/]+/website/muestra$).*)",
         headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: APP_CSP }],
       },
       {
@@ -57,13 +59,6 @@ const nextConfig: NextConfig = {
         // the strict site policy; the page route itself is excluded here.
         source: "/sitio/:slug/:rest+",
         headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: SITE_CSP }],
-      },
-      {
-        // The creation studio's style previews: an example site page shown
-        // in an iframe inside the dashboard, so it needs the site policy
-        // (frameable by our own origin, no scripts), not the app's.
-        source: "/dashboard/businesses/:id/website/muestra",
-        headers: [{ key: "Content-Security-Policy", value: SITE_CSP }],
       },
     ];
   },

@@ -62,7 +62,8 @@ export function CreationStudio({
   const [plan, setPlan] = useState<Ready | null>(null);
   const [building, setBuilding] = useState(false);
   const [step, setStep] = useState(0);
-  const [fullPreview, setFullPreview] = useState(false);
+  // The big preview: of the plan's page, or of an idea before it is chosen.
+  const [fullPreview, setFullPreview] = useState<{ style: StyleKey; pageType: PageType; title?: string; proposal?: Proposal } | null>(null);
   const [whatsapp, setWhatsapp] = useState("");
   const whatsappDigits = whatsapp.replace(/\D/g, "");
   const whatsappMissing = needsWhatsapp && (whatsappDigits.length < 8 || whatsappDigits.length > 15);
@@ -227,23 +228,40 @@ export function CreationStudio({
                     {m.proposals && m.proposals.length > 0 && (
                       <div className="grid gap-3 pl-11 sm:grid-cols-2 xl:grid-cols-3">
                         {m.proposals.map((p, j) => (
-                          <button
-                            key={j}
-                            type="button"
-                            onClick={() => pickProposal(p)}
-                            disabled={thinking}
-                            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-background text-left transition hover:border-accent disabled:opacity-60"
-                          >
-                            <ScaledPagePreview src={previewSrc(p.style, p.pageType)} aspect={0.5} title={`Idea: ${p.title}`} />
+                          <div key={j} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-background text-left transition hover:border-accent">
+                            <button
+                              type="button"
+                              onClick={() => setFullPreview({ style: p.style, pageType: p.pageType, title: p.title, proposal: p })}
+                              className="block text-left"
+                              aria-label={`Ver en grande: ${p.title}`}
+                            >
+                              <ScaledPagePreview src={previewSrc(p.style, p.pageType)} aspect={0.5} title={`Idea: ${p.title}`} />
+                            </button>
                             <div className="flex flex-1 flex-col gap-1 p-3">
                               <p className="text-sm font-semibold">{p.title}</p>
                               <p className="text-xs text-ink-muted">
                                 {PAGE_TYPE_LABELS[p.pageType]} · {STYLE_INFO[p.style].label}
                               </p>
                               <p className="line-clamp-3 text-xs text-ink-muted">{p.why}</p>
-                              <span className="mt-auto pt-2 text-xs font-semibold text-accent group-hover:underline">Usar esta idea →</span>
+                              <div className="mt-auto flex gap-2 pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setFullPreview({ style: p.style, pageType: p.pageType, title: p.title, proposal: p })}
+                                  className="flex-1 rounded-lg border border-border px-2 py-1.5 text-xs font-semibold hover:border-accent"
+                                >
+                                  Ver en grande
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => pickProposal(p)}
+                                  disabled={thinking}
+                                  className="flex-1 rounded-lg bg-accent px-2 py-1.5 text-xs font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-60"
+                                >
+                                  Usar esta idea
+                                </button>
+                              </div>
                             </div>
-                          </button>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -344,7 +362,7 @@ export function CreationStudio({
                       <span className="font-semibold text-ink">{STYLE_INFO[plan.style].label}</span>
                       <span className="text-ink-muted"> · {STYLE_INFO[plan.style].summary}</span>
                     </p>
-                    <button type="button" onClick={() => setFullPreview(true)} className="flex-none text-xs font-semibold text-accent hover:underline">
+                    <button type="button" onClick={() => setFullPreview({ style: plan.style, pageType: plan.pageType })} className="flex-none text-xs font-semibold text-accent hover:underline">
                       Ver en grande
                     </button>
                   </div>
@@ -521,9 +539,9 @@ export function CreationStudio({
         </aside>
       </div>
 
-      {fullPreview && plan && (
+      {fullPreview && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/70 p-3 backdrop-blur-sm md:p-6" role="dialog" aria-modal="true" aria-label="Vista previa">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 pb-3">
+          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 pb-3">
             <div className="inline-flex rounded-lg border border-white/20 bg-black/40 p-0.5">
               {(["desktop", "mobile"] as const).map((d) => (
                 <button
@@ -536,12 +554,29 @@ export function CreationStudio({
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => setFullPreview(false)} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-black">
-              Cerrar
-            </button>
+            {fullPreview.title && <p className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-white">{fullPreview.title}</p>}
+            <div className="flex gap-2">
+              {fullPreview.proposal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = fullPreview.proposal!;
+                    setFullPreview(null);
+                    pickProposal(p);
+                  }}
+                  disabled={thinking}
+                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-60"
+                >
+                  Usar esta idea
+                </button>
+              )}
+              <button type="button" onClick={() => setFullPreview(null)} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-black">
+                {fullPreview.proposal ? "Ver otras ideas" : "Cerrar"}
+              </button>
+            </div>
           </div>
           <div className={`mx-auto min-h-0 w-full flex-1 overflow-hidden rounded-xl bg-white ${device === "mobile" ? "max-w-[390px]" : "max-w-6xl"}`}>
-            <iframe src={previewSrc(plan.style, plan.pageType)} title="Vista previa completa" className="h-full w-full border-0" />
+            <iframe src={previewSrc(fullPreview.style, fullPreview.pageType)} title="Vista previa completa" className="h-full w-full border-0" />
           </div>
         </div>
       )}

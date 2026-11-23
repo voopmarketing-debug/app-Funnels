@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getCatalogProducts } from "@/lib/websiteRender";
+import { getCatalogProducts, getShowcaseProducts } from "@/lib/websiteRender";
+import { templateForPageType } from "@/lib/templateSite/content";
+import { renderTemplateSite } from "@/lib/templateSite/render";
+import { buildSampleTemplate } from "@/lib/templateSite/sample";
+import { withSiteTracking } from "@/lib/siteTracking";
 import { renderWebsiteHtmlV2 } from "@/lib/websiteTemplateV2";
 import { getWebsiteHeroContext } from "@/lib/websiteHero";
 import { buildSampleContent, sampleProducts } from "@/lib/websiteSample";
@@ -26,6 +30,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const typeParam = req.nextUrl.searchParams.get("type");
   const style: StyleKey = STYLE_KEYS.includes(styleParam as StyleKey) ? (styleParam as StyleKey) : "editorial";
   const pageType: PageType = PAGE_TYPES.includes(typeParam as PageType) ? (typeParam as PageType) : "servicios";
+
+  // Showroom and Scroll Story are fixed templates: the preview is the real template with
+  // this business's own products and photos (when it has none yet, the generic sample below).
+  const template = templateForPageType(pageType);
+  if (template) {
+    const showcase = await getShowcaseProducts(id);
+    if (showcase.some((p) => p.imageUrl)) {
+      const color = req.nextUrl.searchParams.get("color");
+      const content = buildSampleTemplate(template, membership.business.name, color);
+      const html = renderTemplateSite(content, { businessName: membership.business.name, trackingBasePath: "#", preview: true, products: showcase });
+      const tracked = withSiteTracking(
+        html,
+        { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, max-age=300", ...siteSecurityHeaders() },
+        { metaPixelId: null, googleTagId: null },
+        { preview: true },
+      );
+      return new NextResponse(tracked.html, { headers: tracked.headers });
+    }
+  }
 
   const [realProducts, photos, hero] = await Promise.all([
     getCatalogProducts(id),

@@ -177,3 +177,17 @@ describe("policy for the page's own scripts", () => {
     expect(addScriptHashes("default-src 'self'; script-src 'none'", [])).toBe("default-src 'self'; script-src 'none'");
   });
 });
+
+describe("buildSampleTemplate", () => {
+  it("builds valid previews for both templates, in the owner's accent", async () => {
+    const { buildSampleTemplate } = await import("./sample");
+    const a = buildSampleTemplate("showroom", "Vértice", "#d4572a");
+    const b = buildSampleTemplate("story", "Alba", "no-es-hex");
+    expect(TemplateSiteSchema.parse(a)).toEqual(a);
+    expect(TemplateSiteSchema.parse(b)).toEqual(b);
+    expect(a.brand.accent).toBe("#d4572a");
+    expect(b.brand.accent).toBe("#3457ff");
+    expect(renderShowroom(a as typeof showroom, ctx)).toContain("Vértice");
+    expect(renderStory(b as typeof story, ctx)).toContain("Alba");
+  });
+});
