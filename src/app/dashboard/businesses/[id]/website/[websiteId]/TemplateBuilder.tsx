@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { applyWebsitePromptV2, regenerateWebsitePageV2 } from "@/lib/actions";
+import { fromPanelUrl } from "@/lib/panelBackLink";
 import { TrackingSettings } from "./TrackingSettings";
 import { RegenerateBox } from "./RegenerateBox";
 
@@ -142,7 +143,7 @@ export function TemplateBuilder({
           <button type="button" onClick={copyLink} className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold hover:border-accent">
             {copied ? "¡Copiado!" : "Copiar link"}
           </button>
-          <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-hover">
+          <a href={fromPanelUrl(publicUrl)} target="_blank" rel="noopener noreferrer" className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-hover">
             Ver página
           </a>
         </div>

@@ -7,6 +7,7 @@ import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage,
 import { FONT_OPTIONS, type WebsiteContent } from "@/lib/websiteContent";
 import { DownloadCsvButton } from "@/components/DownloadCsvButton";
 import { ClientDate } from "@/components/ClientDate";
+import { fromPanelUrl } from "@/lib/panelBackLink";
 import { askConfirm } from "@/components/ConfirmHost";
 
 export function WebsiteEditor({
@@ -635,7 +636,7 @@ export function WebsiteEditor({
           </p>
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
             <a
-              href={publicUrl}
+              href={fromPanelUrl(publicUrl)}
               target="_blank"
               rel="noopener noreferrer"
               className="fl-mono flex-1 truncate text-xs text-accent underline-offset-2 hover:underline"
