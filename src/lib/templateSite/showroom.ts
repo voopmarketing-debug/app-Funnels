@@ -30,7 +30,7 @@ nav.links{display:flex;gap:24px;align-items:center}
 .logo-dot{width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--on-ink);display:grid;place-items:center;flex:none}
 nav.links a{text-decoration:none;font-size:14px;color:var(--muted)}
 nav.links a:hover{color:var(--ink)}
-.brand{font-family:var(--f-display);font-weight:600;letter-spacing:.42em;font-size:15px;text-decoration:none;text-align:center;text-transform:uppercase}
+.brand{font-family:var(--f-display);font-weight:600;letter-spacing:.42em;font-size:15px;text-decoration:none;text-align:center;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .pill{white-space:nowrap;display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:12px 20px;font-weight:600;font-size:14px;text-decoration:none;border:0;background:var(--ink);color:var(--on-ink);transition:transform .2s,opacity .2s}
 .pill:hover{opacity:.88}
 .pill:active{transform:scale(.97)}
@@ -50,7 +50,7 @@ h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(32px,4v
 .car-name small{display:block;font-family:var(--f-body);font-weight:400;font-size:13px;color:var(--muted);letter-spacing:0}
 .badge360{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap}
 .badge360 .ico{width:16px;height:16px}
-.stage{position:relative;height:clamp(340px,36vw,480px);touch-action:pan-y;cursor:grab;user-select:none;-webkit-user-select:none;perspective:1400px}
+.stage{position:relative;margin-top:56px;height:clamp(340px,36vw,480px);touch-action:pan-y;cursor:grab;user-select:none;-webkit-user-select:none;perspective:1400px}
 .stage.drag{cursor:grabbing}
 .car{position:absolute;left:50%;bottom:16%;width:min(84%,820px);max-height:70%;transform:translateX(-50%);aspect-ratio:var(--ar,16/7);transition:opacity .45s}
 .car .spin{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
@@ -164,7 +164,7 @@ footer .wrap{padding-block:32px;display:flex;flex-wrap:wrap;gap:8px 24px;justify
 @media (max-width:980px){
   header.top .wrap{grid-template-columns:auto 1fr auto}
   nav.links a{display:none}
-  .brand{text-align:left}
+  .brand{text-align:left;letter-spacing:.14em;font-size:12px;line-height:1.25;white-space:normal;text-overflow:clip}
   .hero .wrap{grid-template-columns:minmax(0,1fr)}
   .quote-grid,.book-grid{grid-template-columns:minmax(0,1fr)}
   .budget{position:static}
