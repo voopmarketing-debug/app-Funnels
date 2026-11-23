@@ -22,6 +22,55 @@ const PAGE_TYPE_PITCH: Record<PageType, { icon: string; text: string }> = {
   historia: { icon: "✨", text: "Tu marca contada al bajar: producto protagonista, colección en abanico y movimiento." },
 };
 
+// One-tap improvements offered once an idea is chosen, by page type. Each adds a sentence to the
+// brief the page is built from, so none of them can invent data: they only ask for a piece, and
+// the generator keeps its rule of using real data (offers, prices, hours) or leaving it out.
+const ENHANCERS: Record<PageType, { id: string; label: string; text: string }[]> = {
+  showroom: [
+    { id: "visor", label: "Visor para girar el producto", text: "Que el producto protagonista se pueda girar y comparar con otros." },
+    { id: "cotizador", label: "Cotizador por presupuesto", text: "Incluye el cotizador por presupuesto para que vea cuáles le alcanzan." },
+    { id: "oferta", label: "Oferta del mes con cuenta regresiva", text: "Incluye un banner de la oferta del mes con cuenta regresiva, solo si hay una oferta real; sin inventar descuentos." },
+    { id: "retoma", label: "Recibimos tu producto actual", text: "Incluye una franja destacada de recibimos tu producto actual como parte de pago, solo si el negocio lo ofrece." },
+    { id: "agendar", label: "Todo lleva a agendar visita", text: "Cada parte de la página debe llevar al formulario para agendar una visita." },
+  ],
+  historia: [
+    { id: "ingredientes", label: "Lo que hay adentro", text: "Incluye una sección de lo que hay adentro del producto, solo con datos reales." },
+    { id: "pasos", label: "Pasos de la primera visita", text: "Incluye los pasos de la primera visita o compra." },
+    { id: "oferta", label: "Oferta del mes", text: "Incluye un banner de la oferta del mes, solo si hay una oferta real; sin inventar descuentos." },
+    { id: "agendar", label: "Todo lleva a agendar", text: "Cada parte de la página debe llevar al formulario para agendar." },
+  ],
+  servicios: [
+    { id: "faq", label: "Preguntas frecuentes", text: "Incluye una sección de preguntas frecuentes con las dudas reales de sus clientes." },
+    { id: "pasos", label: "Cómo trabajamos, en pasos", text: "Explica en pasos cómo es trabajar con el negocio." },
+    { id: "oferta", label: "Oferta destacada", text: "Incluye una oferta destacada, solo si hay una real; sin inventar descuentos." },
+    { id: "formulario", label: "Formulario para agendar", text: "Termina con un formulario corto para que el cliente deje sus datos y agende." },
+  ],
+  producto: [
+    { id: "beneficios", label: "Beneficios clave", text: "Resalta los beneficios clave del producto, uno por uno." },
+    { id: "faq", label: "Preguntas frecuentes", text: "Incluye preguntas frecuentes sobre compra, envío y uso." },
+    { id: "oferta", label: "Oferta con cuenta regresiva", text: "Incluye una oferta con cuenta regresiva, solo si hay una real; sin inventar descuentos." },
+    { id: "whatsapp", label: "Comprar por WhatsApp", text: "Que el botón principal lleve a comprar por WhatsApp." },
+  ],
+  tienda: [
+    { id: "categorias", label: "Categorías destacadas", text: "Destaca las categorías principales del catálogo." },
+    { id: "oferta", label: "Oferta con cuenta regresiva", text: "Incluye una oferta con cuenta regresiva, solo si hay una real; sin inventar descuentos." },
+    { id: "whatsapp", label: "Pedidos por WhatsApp", text: "Que cada producto se pueda pedir por WhatsApp." },
+    { id: "faq", label: "Envíos y pagos", text: "Incluye preguntas frecuentes sobre envíos y formas de pago." },
+  ],
+  evento: [
+    { id: "cuenta", label: "Cuenta regresiva al evento", text: "Incluye una cuenta regresiva hacia la fecha del evento." },
+    { id: "programa", label: "Programa o agenda", text: "Incluye el programa o la agenda del evento, solo con datos reales." },
+    { id: "cupos", label: "Cupos limitados", text: "Resalta que los cupos son limitados, solo si es verdad." },
+    { id: "faq", label: "Preguntas frecuentes", text: "Incluye preguntas frecuentes sobre el evento." },
+  ],
+  captacion: [
+    { id: "pasos", label: "Cómo funciona, en pasos", text: "Explica en pasos cómo funciona el servicio." },
+    { id: "faq", label: "Preguntas frecuentes", text: "Incluye preguntas frecuentes con las dudas reales de sus clientes." },
+    { id: "oferta", label: "Oferta destacada", text: "Incluye una oferta destacada, solo si hay una real; sin inventar descuentos." },
+    { id: "formulario", label: "Formulario corto", text: "Que el formulario sea corto: nombre y WhatsApp." },
+  ],
+};
+
 const BUILD_STEPS = [
   "Analizando tu negocio y tus clientes…",
   "Definiendo la estrategia de la página…",
@@ -61,6 +110,8 @@ export function CreationStudio({
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<Ready | null>(null);
   const [building, setBuilding] = useState(false);
+  // Improvements ticked in the plan panel (ids from ENHANCERS).
+  const [extras, setExtras] = useState<string[]>([]);
   const [step, setStep] = useState(0);
   // The big preview: of the plan's page, or of an idea before it is chosen.
   const [fullPreview, setFullPreview] = useState<{ style: StyleKey; pageType: PageType; title?: string; proposal?: Proposal } | null>(null);
@@ -140,8 +191,23 @@ export function CreationStudio({
   }
 
   function pickProposal(p: Proposal) {
+    // The business is already known, so choosing an idea goes straight to the plan: no extra
+    // question. The improvements and the rest of the options are on the right.
     setPlan({ pageType: p.pageType, style: p.style, name: p.title, purpose: p.why, brief: p.brief });
-    send(`Me gusta la idea "${p.title}". ${p.brief}`);
+    setExtras([]);
+    setQuickReplies([]);
+    setMessages((m) => [
+      ...m,
+      { role: "user", text: `Me gusta la idea "${p.title}".` },
+      { role: "assistant", text: "Perfecto. Mírala a la derecha: puedes mejorarla con un toque o crearla ya mismo." },
+    ]);
+    window.setTimeout(() => document.getElementById("plan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
+  /** The brief the page is built from: the idea plus the improvements ticked. */
+  function finalBrief(current: Ready): string {
+    const picked = (ENHANCERS[current.pageType] ?? []).filter((e) => extras.includes(e.id)).map((e) => e.text);
+    return picked.length ? `${current.brief}\n\nAdemás: ${picked.join(" ")}` : current.brief;
   }
 
   function build() {
@@ -160,7 +226,7 @@ export function CreationStudio({
         const result = await createWebsitePageV2(businessId, {
           name: plan.name,
           purpose: plan.purpose,
-          brief: plan.brief,
+          brief: finalBrief(plan),
           pageType: plan.pageType,
           style: plan.style,
           whatsappNumber: needsWhatsapp ? whatsapp : undefined,
@@ -243,21 +309,21 @@ export function CreationStudio({
                                 {PAGE_TYPE_LABELS[p.pageType]} · {STYLE_INFO[p.style].label}
                               </p>
                               <p className="line-clamp-3 text-xs text-ink-muted">{p.why}</p>
-                              <div className="mt-auto flex gap-2 pt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setFullPreview({ style: p.style, pageType: p.pageType, title: p.title, proposal: p })}
-                                  className="flex-1 rounded-lg border border-border px-2 py-1.5 text-xs font-semibold hover:border-accent"
-                                >
-                                  Ver en grande
-                                </button>
+                              <div className="mt-auto flex flex-col gap-1.5 pt-2">
                                 <button
                                   type="button"
                                   onClick={() => pickProposal(p)}
                                   disabled={thinking}
-                                  className="flex-1 rounded-lg bg-accent px-2 py-1.5 text-xs font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-60"
+                                  className="rounded-lg bg-accent px-2 py-1.5 text-xs font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-60"
                                 >
                                   Usar esta idea
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setFullPreview({ style: p.style, pageType: p.pageType, title: p.title, proposal: p })}
+                                  className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold hover:border-accent"
+                                >
+                                  Ver en grande
                                 </button>
                               </div>
                             </div>
@@ -275,7 +341,7 @@ export function CreationStudio({
               <div className="ml-11 flex flex-wrap items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 p-3">
                 <p className="min-w-0 flex-1 text-sm text-ink">
                   <span className="font-semibold">Tu página está lista para crearse.</span>{" "}
-                  <span className="text-ink-muted">Mira cómo queda y elige el estilo antes de crearla.</span>
+                  <span className="text-ink-muted">Mejórala con un toque a la derecha o créala ya.</span>
                 </p>
                 <a href="#plan" className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold lg:hidden">
                   Ver cómo queda
@@ -369,6 +435,30 @@ export function CreationStudio({
                 </div>
 
                 <fieldset className="space-y-2">
+                  <legend className="text-sm font-semibold text-ink">Mejora tu idea con un toque</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {(ENHANCERS[plan.pageType] ?? []).map((e) => {
+                      const on = extras.includes(e.id);
+                      return (
+                        <button
+                          key={e.id}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setExtras((x) => (on ? x.filter((i) => i !== e.id) : [...x, e.id]))}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                        >
+                          {on ? "✓ " : "+ "}
+                          {e.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                <details className="group rounded-xl border border-border">
+                  <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-semibold text-ink">Más opciones: tipo de página, estilo, colores y texto</summary>
+                  <div className="space-y-5 border-t border-border p-3">
+                <fieldset className="space-y-2">
                   <legend className="text-sm font-semibold text-ink">¿Qué quieres lograr con tu página?</legend>
                   <div className="grid gap-1.5">
                     {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
@@ -398,6 +488,7 @@ export function CreationStudio({
                   </div>
                 </fieldset>
 
+                {plan.pageType !== "showroom" && plan.pageType !== "historia" && (
                 <fieldset className="space-y-2">
                   <legend className="text-sm font-semibold text-ink">Elige el estilo que va con tu marca</legend>
                   <div className="grid grid-cols-2 gap-2.5">
@@ -421,6 +512,8 @@ export function CreationStudio({
                     })}
                   </div>
                 </fieldset>
+
+                )}
 
                 <fieldset className="space-y-2">
                   <legend className="text-sm font-semibold text-ink">Los colores de tu marca</legend>
@@ -488,6 +581,8 @@ export function CreationStudio({
                     className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-2 text-sm text-ink outline-none focus:border-accent"
                   />
                 </label>
+                  </div>
+                </details>
               </div>
               <div className="border-t border-border bg-surface p-3">
                 {needsWhatsapp && (
