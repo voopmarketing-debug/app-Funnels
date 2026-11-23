@@ -7,6 +7,7 @@ import { createWebsitePageV2, websiteCreationChat } from "@/lib/actions";
 import { PAGE_TYPE_LABELS, STYLE_INFO, STYLE_KEYS, type PageType, type StyleKey } from "@/lib/websiteContentV2";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
+import { askConfirm } from "@/components/ConfirmHost";
 
 type Proposal = { title: string; pageType: PageType; style: StyleKey; why: string; brief: string };
 type Ready = { pageType: PageType; style: StyleKey; name: string; purpose: string; brief: string };
@@ -104,6 +105,55 @@ function DevicePreviewFrame({ src, device }: { src: string; device: "desktop" | 
   );
 }
 
+// The conversation is kept in this device's browser, per business, so coming back (or reloading)
+// continues where it was instead of asking the AI to read the business again, which costs.
+const DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+type Draft = { messages: ChatMessage[]; quickReplies: string[]; plan: Ready | null; extras: string[] };
+
+function draftKey(businessId: string) {
+  return `fl-website-creation:v1:${businessId}`;
+}
+
+function loadDraft(businessId: string): Draft | null {
+  try {
+    const raw = window.localStorage.getItem(draftKey(businessId));
+    if (!raw) return null;
+    const data = JSON.parse(raw) as { at?: number; messages?: unknown; quickReplies?: unknown; plan?: unknown; extras?: unknown };
+    if (typeof data.at !== "number" || Date.now() - data.at > DRAFT_TTL_MS) return null;
+    if (!Array.isArray(data.messages) || data.messages.length === 0) return null;
+    const messages = data.messages.filter(
+      (m): m is ChatMessage => !!m && typeof m === "object" && ((m as ChatMessage).role === "user" || (m as ChatMessage).role === "assistant") && typeof (m as ChatMessage).text === "string",
+    );
+    if (messages.length === 0) return null;
+    const plan = data.plan as Ready | null;
+    const planOk = !!plan && typeof plan === "object" && plan.pageType in PAGE_TYPE_LABELS && STYLE_KEYS.includes(plan.style) && typeof plan.brief === "string" && typeof plan.name === "string" && typeof plan.purpose === "string";
+    return {
+      messages,
+      quickReplies: Array.isArray(data.quickReplies) ? data.quickReplies.filter((q): q is string => typeof q === "string").slice(0, 4) : [],
+      plan: planOk ? plan : null,
+      extras: Array.isArray(data.extras) ? data.extras.filter((e): e is string => typeof e === "string") : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(businessId: string, draft: Draft) {
+  try {
+    window.localStorage.setItem(draftKey(businessId), JSON.stringify({ at: Date.now(), ...draft }));
+  } catch {
+    // Storage blocked or full: the conversation just isn't kept.
+  }
+}
+
+function clearDraft(businessId: string) {
+  try {
+    window.localStorage.removeItem(draftKey(businessId));
+  } catch {
+    // Nothing to clear.
+  }
+}
+
 const BUILD_STEPS = [
   "Analizando tu negocio y tus clientes…",
   "Definiendo la estrategia de la página…",
@@ -189,12 +239,43 @@ export function CreationStudio({
   }
 
   useEffect(() => {
+    // Continue the saved conversation, if any: no AI call, so nothing is spent.
+    // (Read after mount on purpose: the server cannot see localStorage, so reading it while
+    // rendering would not match the server's HTML.)
+    const draft = loadDraft(businessId);
+    if (draft) {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setMessages(draft.messages);
+      setQuickReplies(draft.quickReplies);
+      setPlan(draft.plan);
+      setExtras(draft.extras);
+      setThinking(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
+      return;
+    }
     // Deferred a tick: React rejects a Server Function call made while the
     // page is still hydrating ("cannot be called during initial render").
     const id = setTimeout(() => void ask([]), 0);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the conversation as it changes (not while the AI is answering).
+  useEffect(() => {
+    if (thinking || messages.length === 0) return;
+    saveDraft(businessId, { messages, quickReplies, plan, extras });
+  }, [businessId, thinking, messages, quickReplies, plan, extras]);
+
+  async function startOver() {
+    if (!(await askConfirm({ title: "¿Empezar de nuevo?", message: "Se borra esta conversación y la IA propone ideas desde cero.", confirmLabel: "Sí, empezar de nuevo" }))) return;
+    clearDraft(businessId);
+    setMessages([]);
+    setQuickReplies([]);
+    setPlan(null);
+    setExtras([]);
+    setInput("");
+    void ask([]);
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -267,6 +348,7 @@ export function CreationStudio({
           brandSecondaryColor: brandPrimary ? brandSecondary : null,
         });
         if (!result.ok) throw new Error(result.error);
+        clearDraft(businessId);
         router.push(`/dashboard/businesses/${businessId}/website/${result.id}`);
       } catch (err) {
         setBuilding(false);
@@ -305,6 +387,11 @@ export function CreationStudio({
           </Link>
           <h1 className="mt-1 text-xl font-bold">Crear página con IA</h1>
         </div>
+        {messages.length > 0 && !thinking && (
+          <button type="button" onClick={() => void startOver()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">
+            ↺ Empezar de nuevo
+          </button>
+        )}
         {productCount === 0 && (
           <Link href={`/dashboard/businesses/${businessId}/productos`} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:border-accent">
             🛍️ ¿Vendes productos? Cárgalos primero
