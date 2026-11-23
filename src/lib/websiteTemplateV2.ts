@@ -987,6 +987,7 @@ footer.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
   .nav{display:none}
   header.top .wrap{height:60px;gap:12px}
   .brand{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+  .giant{font-size:clamp(40px,11.5vw,72px)!important;line-height:1.04;letter-spacing:-.02em;overflow-wrap:anywhere}
   header.top .btn{padding:8px 14px;font-size:13px;white-space:nowrap;margin-left:auto}
   .hero-split-grid,.hero-product-grid,.giant-row,.spot,.host{grid-template-columns:1fr;gap:32px}
   .hero-media img{aspect-ratio:4/3}

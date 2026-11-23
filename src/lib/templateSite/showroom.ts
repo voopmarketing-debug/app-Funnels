@@ -174,6 +174,7 @@ footer .wrap{padding-block:32px;display:flex;flex-wrap:wrap;gap:8px 24px;justify
   .side{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:auto}
 }
 @media (max-width:640px){
+  .res-head{flex-direction:column;align-items:flex-start;gap:4px}
   .stage{height:300px}
   .car{width:94%;bottom:22%}
   .bubbles{display:none}
