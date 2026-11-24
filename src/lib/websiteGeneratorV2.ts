@@ -253,7 +253,7 @@ function normalize(ai: AiWebsiteV2, ctx: { products: CatalogProduct[]; ctaUrl?: 
       if (s.type === "productSpotlight") return ids.has(s.productId);
       if (s.type === "stats") return s.items.length >= 2;
       // The owner pastes the video link later; the AI never makes one up.
-      if (s.type === "video") return false;
+      if (s.type === "video" || s.type === "html") return false;
       // The interactive blocks that would show nothing are left out (they need photos / prices from the catalog).
       const pool = (s.type === "showroom" || s.type === "quoter" || s.type === "fan") && s.productIds.length > 0 ? ctx.products.filter((p) => s.productIds.includes(p.id)) : ctx.products;
       if (s.type === "showroom" || s.type === "fan") return pool.some((p) => !!p.imageUrl);

@@ -414,6 +414,11 @@ export function WebsiteBuilder({
       setTab("estilo");
       setMobilePanel("panel");
     },
+    code(index) {
+      setSelected(index);
+      setTab("bloques");
+      setMobilePanel("panel");
+    },
     add: (index) => setLibrary({ at: index + 1 }),
     duplicate: (index) => runBlock({ kind: "duplicate", index }, "Duplicando…"),
     remove: (index) => runBlock({ kind: "remove", index }, "Eliminando…"),
@@ -616,6 +621,17 @@ export function WebsiteBuilder({
               onStyle={(i) => {
                 setSelected(i);
                 setTab("estilo");
+              }}
+              onSaveHtml={async (index, code, height) => {
+                const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "html", index, code, height });
+                if (!res.ok) {
+                  showToast(res.error);
+                  return false;
+                }
+                adopt(res.content);
+                refreshPreview();
+                showToast("Código guardado.", true);
+                return true;
               }}
               onToggleHidden={(i) => runDesign("Actualizando…", { hidden: content.hidden.includes(i) ? content.hidden.filter((h) => h !== i) : [...content.hidden, i] })}
             />

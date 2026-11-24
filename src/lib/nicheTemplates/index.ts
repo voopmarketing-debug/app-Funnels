@@ -126,3 +126,21 @@ export function buildNicheContent(
     heroCtaUrl: null,
   };
 }
+
+/** A page with nothing on it: the owner builds it block by block (or pastes their own HTML). */
+export function buildBlankContent(opts: { businessName: string; brandColor?: string | null }): WebsiteContentV2 {
+  const style = "editorial" as const;
+  const accent = opts.brandColor && /^#[0-9a-fA-F]{6}$/.test(opts.brandColor) ? opts.brandColor : STYLE_THEME[style].primaryColor;
+  return {
+    version: 2,
+    pageType: "captacion",
+    style,
+    announcement: null,
+    theme: { ...STYLE_THEME[style], primaryColor: accent } as WebsiteContentV2["theme"],
+    sections: [
+      { type: "hero", variant: "blank", eyebrow: null, heading: opts.businessName.slice(0, 70) || "Mi página", highlight: null, subheading: "", chips: [], showLeadForm: false, ctaLabel: "Escríbenos", secondaryCtaLabel: null, badge: null, productId: null },
+    ],
+    hidden: [],
+    heroCtaUrl: null,
+  };
+}

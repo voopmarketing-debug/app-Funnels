@@ -45,6 +45,7 @@ export function BlocksPanel({
   onOp,
   onStyle,
   onToggleHidden,
+  onSaveHtml,
 }: {
   content: WebsiteContentV2;
   selected: number | null;
@@ -53,6 +54,7 @@ export function BlocksPanel({
   onOp: (op: BlockOp) => void;
   onStyle: (index: number) => void;
   onToggleHidden: (index: number) => void;
+  onSaveHtml: (index: number, code: string, height: number) => Promise<boolean>;
 }) {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [dropAt, setDropAt] = useState<number | null>(null);
@@ -104,6 +106,10 @@ export function BlocksPanel({
           </div>
         )}
       </div>
+
+      {selected !== null && content.sections[selected]?.type === "html" && (
+        <HtmlCodeEditor key={`${selected}`} section={content.sections[selected] as Extract<WebsiteContentV2["sections"][number], { type: "html" }>} busy={busy} onSave={(code, height) => onSaveHtml(selected, code, height)} />
+      )}
 
       <p className="text-[12px] text-ink-faint">Arrastra ⠿ para reordenar. Toca un bloque para verlo en la página y cambiar su estilo.</p>
 
@@ -191,6 +197,58 @@ export function BlocksPanel({
           onDrop={(e) => drop(e, count)}
         />
       </ol>
+    </div>
+  );
+}
+
+/** Where the owner pastes their own HTML (widget, embed, form from another service, script). */
+function HtmlCodeEditor({ section, busy, onSave }: { section: { code: string; height: number }; busy: boolean; onSave: (code: string, height: number) => Promise<boolean> }) {
+  const [code, setCode] = useState(section.code);
+  const [height, setHeight] = useState(section.height);
+  const [saving, setSaving] = useState(false);
+  const dirty = code !== section.code || height !== section.height;
+  return (
+    <div className="space-y-2 rounded-xl border border-accent/60 bg-accent/5 p-3">
+      <p className="text-sm font-bold">Código HTML</p>
+      <p className="text-[12px] text-ink-muted">Pega aquí tu código (HTML, CSS y JavaScript). Se muestra en un recuadro aislado de tu página: no puede cambiar el resto del sitio. Los formularios de este código no guardan contactos en tu CRM.</p>
+      <label htmlFor="html-code" className="sr-only">Código HTML</label>
+      <textarea
+        id="html-code"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        spellCheck={false}
+        rows={10}
+        maxLength={100000}
+        placeholder={'<div style="padding:24px">Hola</div>'}
+        className="w-full resize-y rounded-md border border-border bg-background p-2 font-mono text-[12px] leading-snug outline-none focus:border-accent"
+      />
+      <div className="flex flex-wrap items-center gap-2 text-[12px]">
+        <label htmlFor="html-height" className="text-ink-muted">Alto:</label>
+        <select id="html-height" value={height} onChange={(e) => setHeight(Number(e.target.value))} className="rounded-md border border-border bg-background px-2 py-1.5 text-xs">
+          <option value={0}>Automático</option>
+          {[200, 300, 400, 500, 600, 800, 1000, 1400].map((h) => (
+            <option key={h} value={h}>
+              {h} px
+            </option>
+          ))}
+        </select>
+        <span className="ml-auto text-ink-faint">{code.length.toLocaleString("es")} / 100.000</span>
+      </div>
+      <button
+        type="button"
+        disabled={busy || saving || !dirty}
+        onClick={async () => {
+          setSaving(true);
+          try {
+            await onSave(code, height);
+          } finally {
+            setSaving(false);
+          }
+        }}
+        className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink transition hover:bg-accent-hover disabled:opacity-40"
+      >
+        {saving ? "Guardando…" : dirty ? "Guardar código" : "Guardado"}
+      </button>
     </div>
   );
 }

@@ -17,6 +17,10 @@ function $(s,c){return Array.prototype.slice.call((c||d).querySelectorAll(s));}
 function pad(n){return n<10?'0'+n:''+n;}
 function money(v,cur){v=Math.round(v);return cur==='USD'?'US$'+v.toLocaleString('en-US'):cur==='EUR'?'\\u20ac'+v.toLocaleString('de-DE'):'$'+v.toLocaleString('es-CO');}
 root.className+=' js';
+window.addEventListener('message',function(e){
+  var m=e.data;if(!m||m.flHtmlH===undefined||typeof m.flHtmlH!=='number')return;
+  $('iframe[data-autoheight]').forEach(function(f){if(f.contentWindow===e.source)f.style.height=Math.min(4000,Math.max(40,Math.ceil(m.flHtmlH)))+'px';});
+});
 var MONTHS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 $('[data-month]').forEach(function(n){n.textContent=MONTHS[new Date().getMonth()];});
 d.addEventListener('click',function(e){

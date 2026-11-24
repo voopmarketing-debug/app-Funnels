@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { createWebsiteFromTemplate } from "@/lib/actions";
+import { createBlankWebsite, createWebsiteFromTemplate } from "@/lib/actions";
 import type { TemplateCard } from "@/lib/websiteNicheTemplates";
 import { DevicePreviewFrame } from "@/components/DevicePreviewFrame";
 import { TemplateThumb } from "./TemplateThumb";
@@ -40,6 +40,7 @@ export function TemplateLibrary({
   const [busy, setBusy] = useState<TemplateCard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [whatsapp, setWhatsapp] = useState("");
+  const [blankBusy, setBlankBusy] = useState(false);
   const [, startTransition] = useTransition();
 
   const niches = useMemo(() => {
@@ -103,6 +104,40 @@ export function TemplateLibrary({
         setError(err instanceof Error ? err.message : "No se pudo publicar la página");
       }
     });
+  }
+
+  function createBlank() {
+    if (busy || blankBusy) return;
+    if (whatsappMissing) {
+      setError("Escribe tu WhatsApp para que los botones de la página te lleven a él.");
+      document.getElementById("template-whatsapp")?.focus();
+      document.getElementById("template-whatsapp")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setError(null);
+    setBlankBusy(true);
+    startTransition(async () => {
+      try {
+        const result = await createBlankWebsite(businessId, { whatsappNumber: needsWhatsapp ? whatsapp : undefined });
+        if (!result.ok) throw new Error(result.error);
+        router.push(`/dashboard/businesses/${businessId}/website/${result.id}`);
+      } catch (err) {
+        setBlankBusy(false);
+        setError(err instanceof Error ? err.message : "No se pudo crear la página");
+      }
+    });
+  }
+
+  if (blankBusy) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+        <span className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-accent text-3xl text-accent-ink">▢</span>
+        <div>
+          <h2 className="text-xl font-bold">Creando tu página en blanco</h2>
+          <p className="mt-1 text-sm text-ink-muted">Un momento: la abrimos para que agregues bloques o pegues tu código.</p>
+        </div>
+      </div>
+    );
   }
 
   if (busy) {
@@ -277,6 +312,19 @@ export function TemplateLibrary({
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <article className="fl-card flex flex-col overflow-hidden border-dashed">
+                <button type="button" onClick={createBlank} className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-surface-2/50 text-ink-muted transition hover:text-ink" aria-label="Empezar con una página en blanco">
+                  <span aria-hidden="true" className="font-mono text-4xl">{"</>"}</span>
+                  <span className="text-xs">Sin nada: tú pones los bloques</span>
+                </button>
+                <div className="flex flex-1 flex-col gap-1.5 p-3.5">
+                  <p className="text-sm font-bold text-ink">Página en blanco</p>
+                  <p className="line-clamp-2 text-xs text-ink-muted">Arrastra bloques o pega tu propio código HTML, como en Elementor.</p>
+                  <button type="button" onClick={createBlank} className="mt-auto rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
+                    Empezar en blanco
+                  </button>
+                </div>
+              </article>
               {visible.map((card) => (
                 <article key={card.id} className="fl-card flex flex-col overflow-hidden">
                   <button type="button" onClick={() => setBig(card)} className="block overflow-hidden text-left" aria-label={`Ver página: ${card.nicheName}, ${label(card)}`}>

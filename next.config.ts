@@ -56,8 +56,10 @@ const nextConfig: NextConfig = {
       },
       {
         // The rest of /sitio (lead form, booking and click redirects) keeps
-        // the strict site policy; the page route itself is excluded here.
-        source: "/sitio/:slug/:rest+",
+        // the strict site policy; the page route itself is excluded here, and so are
+        // the frames of "Código HTML" blocks (/sitio/<slug>/bloque/<n>), which send
+        // their own sandbox policy.
+        source: "/sitio/:slug/:rest((?!bloque/).+)",
         headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: SITE_CSP }],
       },
     ];

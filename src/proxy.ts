@@ -16,6 +16,8 @@ import { submitAgendaBooking, previewAgendaBookingOutcome } from "@/lib/agendaBo
 import { captureWebsiteLead } from "@/lib/websiteLeads";
 import { blockedBookingOutcome, publicFormBlock } from "@/lib/abuseGuard";
 import { customDomainSecurityHeaders } from "@/lib/securityHeaders";
+import { notPublishedHtml } from "@/lib/sitePublish";
+import { HTML_BLOCK_HEADERS, htmlBlockFromContent } from "@/lib/htmlBlock";
 import { STORE_APP_COOKIE, STORE_APP_COOKIE_MAX_AGE, STORE_APP_HIDDEN_PATHS, storeAppFromValue } from "@/lib/storeApp";
 
 // Hosts this app already answers for on purpose — everything else that
@@ -57,6 +59,7 @@ export async function proxy(request: NextRequest) {
     where: { customDomain: hostname },
     select: {
       id: true,
+      published: true,
       pageType: true,
       metaPixelId: true,
       googleTagId: true,
@@ -89,6 +92,18 @@ export async function proxy(request: NextRequest) {
   }
 
   const preview = request.nextUrl.searchParams.get("preview") === "1";
+
+  // A page the owner unpublished is not shown on its own domain (the owner sees the draft from the dashboard).
+  if (!website.published) {
+    return new NextResponse(notPublishedHtml(), { status: 404, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", ...customDomainSecurityHeaders() } });
+  }
+
+  // The frame of a "Código HTML" block, reached as a root-relative "/bloque/<n>" on a custom domain.
+  const blockMatch = /^\/bloque\/(\d{1,2})$/.exec(request.nextUrl.pathname);
+  if (blockMatch) {
+    const doc = htmlBlockFromContent(website.content, Number(blockMatch[1]));
+    return doc ? new NextResponse(doc, { headers: HTML_BLOCK_HEADERS }) : new NextResponse("No encontrado", { status: 404 });
+  }
 
   if (website.pageType === "agenda") {
     if (!website.agendaConfig) {

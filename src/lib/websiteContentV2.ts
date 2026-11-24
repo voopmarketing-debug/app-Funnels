@@ -102,9 +102,9 @@ const HeroSection = z.object({
   ...media,
   type: z.literal("hero"),
   variant: z
-    .enum(["split", "centered", "fullbleed", "product", "giant"])
+    .enum(["split", "centered", "fullbleed", "product", "giant", "blank"])
     .catch("split")
-    .describe("split: texto + imagen; centered: solo texto centrado; fullbleed: imagen de fondo a sangre; product: producto protagonista con precio; giant: titular gigante tipo campaña."),
+    .describe("split: texto + imagen; centered: solo texto centrado; fullbleed: imagen de fondo a sangre; product: producto protagonista con precio; giant: titular gigante tipo campaña; blank: sin portada visible (solo para páginas en blanco, nunca lo uses)."),
   eyebrow: nullableText("Etiqueta corta sobre el titular, ej. 'Nueva colección' o 'Envíos a todo el país'."),
   heading: text(70, "Titular principal: la promesa concreta"),
   highlight: nullableText("1 a 4 palabras EXACTAS del heading que se pintan con el color de acento (ej. 'en 30 días'). null si no aplica."),
@@ -238,6 +238,15 @@ const VideoSection = z.object({
   url: z.string().catch("").describe("Enlace del video (YouTube, Vimeo, Wistia o Loom). Vacío si el dueño aún no lo ha pegado: NUNCA inventes un enlace."),
 });
 
+export const HTML_MAX_CHARS = 100_000;
+
+const HtmlSection = z.object({
+  ...media,
+  type: z.literal("html"),
+  code: z.string().max(HTML_MAX_CHARS).catch("").describe("Código HTML/CSS/JS que pegó el dueño. NUNCA lo escribas ni lo cambies tú."),
+  height: z.number().int().min(0).max(3000).catch(0).describe("Alto en píxeles; 0 = se ajusta solo al contenido."),
+});
+
 const ComparisonSection = z.object({
   ...media,
   type: z.literal("comparison"),
@@ -321,6 +330,7 @@ export const SectionSchema = z.discriminatedUnion("type", [
   TravelerSection,
   MarqueeSection,
   VideoSection,
+  HtmlSection,
   ComparisonSection,
   AgendaSection,
   HostSection,
@@ -347,6 +357,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   traveler: "Producto viajero",
   marquee: "Texto en movimiento",
   video: "Video",
+  html: "Código HTML",
   comparison: "Comparación",
   agenda: "Agenda",
   host: "Quién está detrás",

@@ -1,4 +1,4 @@
-import { SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { HTML_MAX_CHARS, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { mergeLook, type LookPatch } from "@/lib/websiteLook";
 
 // The builder's block operations: add a block from the library, duplicate,
@@ -24,6 +24,7 @@ export const BLOCK_LIBRARY: BlockEntry[] = [
   { type: "fan", label: SECTION_LABELS.fan, help: "Colección en abanico que gira sola y se arrastra.", group: "venta" },
   { type: "traveler", label: SECTION_LABELS.traveler, help: "Tu producto acompaña el scroll y cambia de lugar en cada escena.", group: "venta" },
   { type: "marquee", label: SECTION_LABELS.marquee, help: "Frases gigantes que se desplazan al fondo.", group: "texto" },
+  { type: "html", label: SECTION_LABELS.html, help: "Pega tu propio código HTML (widgets, formularios, scripts, embeds).", group: "texto" },
   { type: "video", label: SECTION_LABELS.video, help: "Tu video de YouTube, Vimeo, Wistia o Loom pegando el enlace.", group: "venta" },
   { type: "comparison", label: SECTION_LABELS.comparison, help: "Tabla: tú frente a las otras opciones.", group: "venta" },
   { type: "trustBar", label: SECTION_LABELS.trustBar, help: "Garantías cortas con ícono.", group: "confianza" },
@@ -69,6 +70,8 @@ export function newSection(type: Exclude<SectionType, "hero">, ctx: { firstProdu
       return ctx.firstProductId ? { type, kicker: "El ritual", heading: "Así se vive", productId: ctx.firstProductId, scenes: [item("Primera escena", "Cuenta el primer momento de la experiencia."), item("Segunda escena", "Cuenta el segundo momento."), item("Tercera escena", "Cierra con el resultado.")] } : null;
     case "marquee":
       return { type, lines: ["Escribe una frase corta", "Y otra distinta"] };
+    case "html":
+      return { type, code: "", height: 0 };
     case "video":
       return { type, kicker: "Míralo en un minuto", heading: "Mira cómo funciona", intro: null, url: "" };
     case "comparison":
@@ -101,7 +104,8 @@ export type BlockOp =
   | { kind: "duplicate"; index: number }
   | { kind: "remove"; index: number }
   | { kind: "move"; from: number; to: number }
-  | { kind: "look"; index: number; patch: LookPatch };
+  | { kind: "look"; index: number; patch: LookPatch }
+  | { kind: "html"; index: number; code: string; height: number };
 
 export type BlockResult = { ok: true; content: WebsiteContentV2; focus: number } | { ok: false; error: string };
 
@@ -171,6 +175,15 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       const look = mergeLook(section.look, op.patch);
       if (look) section.look = look;
       else delete section.look;
+      focus = op.index;
+      break;
+    }
+    case "html": {
+      const section = isInt(op.index) ? next.sections[op.index] : undefined;
+      if (!section || section.type !== "html" || typeof op.code !== "string" || !isInt(op.height)) return bad("No se pudo guardar el código.");
+      if (op.code.length > HTML_MAX_CHARS) return bad("El código es demasiado largo (máximo 100.000 caracteres).");
+      section.code = op.code;
+      section.height = Math.min(3000, Math.max(0, op.height));
       focus = op.index;
       break;
     }

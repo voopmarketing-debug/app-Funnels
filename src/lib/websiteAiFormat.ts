@@ -41,6 +41,7 @@ export const AiSectionSchema = z.object({
     "traveler",
     "marquee",
     "video",
+    "html",
     "comparison",
     "agenda",
     "host",
@@ -148,6 +149,8 @@ function toTypedBase(s: AiSection): unknown {
       return { type: "marquee", lines: s.items.map((i) => i.title).filter(Boolean).slice(0, 2) };
     case "video":
       return { type: "video", kicker: s.kicker, heading: s.heading, intro: s.body, url: "" };
+    case "html":
+      return { type: "html", code: "", height: 0 };
     case "comparison":
       return {
         type: "comparison",
@@ -250,6 +253,8 @@ function toAiSectionBase(s: Section): AiSection {
       return { ...base, items: s.lines.map((l) => it(l, "")) };
     case "video":
       return { ...base, kicker: s.kicker, heading: s.heading, body: s.intro };
+    case "html":
+      return { ...base, heading: "" };
     case "comparison":
       return { ...base, heading: s.heading, usLabel: s.usLabel, othersLabel: s.othersLabel, items: s.rows.map((r) => it(r.label, r.us, null, r.others)) };
     case "agenda":

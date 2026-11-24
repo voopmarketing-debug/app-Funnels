@@ -103,6 +103,12 @@ export function TemplateThumb({ card }: { card: TemplateCard }) {
             ))}
           </div>
         );
+      case "html":
+        return (
+          <div key={key} style={{ ...box, padding: "3cqw", fontFamily: "monospace", fontSize: "4cqw", color: muted }}>
+            {"</>"}
+          </div>
+        );
       case "video":
         return (
           <div key={key} style={{ ...box, padding: "3cqw" }}>

@@ -37,7 +37,7 @@ import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator
 import { generateHeroImage } from "@/lib/websiteHeroImage";
 import { withAiUsage } from "@/lib/aiUsage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
-import { buildNicheContent, getNicheTemplate } from "@/lib/websiteNicheTemplates";
+import { buildBlankContent, buildNicheContent, getNicheTemplate } from "@/lib/websiteNicheTemplates";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { isTemplateContent, templateForPageType } from "@/lib/templateSite/content";
@@ -3318,6 +3318,35 @@ export async function createWebsiteFromTemplate(
   }
 }
 
+/** A page with nothing on it, to build block by block or with the owner's own HTML. */
+export async function createBlankWebsite(businessId: string, input: { name?: string; whatsappNumber?: string } = {}): Promise<BuilderResult<{ id: string }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
+
+    const phoneError = await rememberWhatsappNumber(businessId, input.whatsappNumber);
+    if (phoneError) return { ok: false, error: phoneError };
+
+    const ctx = await buildWebsiteV2Context(businessId);
+    if (!ctx.displayNumber) {
+      return { ok: false, error: "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567: los botones de la página llevan a ese número." };
+    }
+    const existingCount = await prisma.website.count({ where: { businessId } });
+    const name = input.name?.trim().slice(0, 80) || (existingCount === 0 ? "Sitio principal" : "Página en blanco");
+    const content = buildBlankContent({ businessName: ctx.businessName, brandColor: ctx.brandColors?.primary });
+    const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0);
+    const created = await prisma.website.create({
+      data: { businessId, name, purpose: null, designPrompt: null, slug, content, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: "template:blank" },
+    });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, id: created.id };
+  } catch (err) {
+    return builderError(`createBlankWebsite(${businessId})`, err);
+  }
+}
+
 export async function createWebsitePageV2(
   businessId: string,
   input: {
@@ -3632,6 +3661,7 @@ const BlockOpSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("duplicate"), index: z.number().int() }),
   z.object({ kind: z.literal("remove"), index: z.number().int() }),
   z.object({ kind: z.literal("move"), from: z.number().int(), to: z.number().int() }),
+  z.object({ kind: z.literal("html"), index: z.number().int(), code: z.string().max(100_000), height: z.number().int().min(0).max(3000) }),
   z.object({ kind: z.literal("look"), index: z.number().int(), patch: z.record(z.string(), z.union([z.string().max(12), z.null()])) }),
 ]);
 

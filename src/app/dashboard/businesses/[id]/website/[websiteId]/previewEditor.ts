@@ -22,6 +22,8 @@ export type EditorHandlers = {
   add(index: number): void;
   duplicate(index: number): void;
   remove(index: number): void;
+  /** Opens the code editor of a "Código HTML" block. */
+  code(index: number): void;
   /** A block was touched in the page: the side panel follows it. */
   select(index: number): void;
   undo(): void;
@@ -267,6 +269,12 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     if (noted?.dataset.note) {
       e.preventDefault();
       getHandlers().notice(noted.dataset.note);
+      return;
+    }
+    const codeBtn = t.closest<HTMLElement>("[data-code-edit]");
+    if (codeBtn) {
+      e.preventDefault();
+      getHandlers().code(Number(codeBtn.dataset.codeEdit));
       return;
     }
     const img = t.closest<HTMLElement>("img[data-img]");

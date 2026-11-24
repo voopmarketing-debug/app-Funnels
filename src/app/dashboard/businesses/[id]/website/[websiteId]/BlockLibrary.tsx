@@ -17,6 +17,7 @@ const GLYPH: Record<BlockEntry["type"], string> = {
   traveler: "⇅",
   marquee: "≋",
   video: "▶",
+  html: "</>",
   comparison: "⇄",
   trustBar: "✓",
   stats: "#",
