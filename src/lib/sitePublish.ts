@@ -19,3 +19,23 @@ const RIBBON =
 export function withDraftRibbon(html: string): string {
   return html.includes("</body>") ? html.replace("</body>", `${RIBBON}</body>`) : `${html}${RIBBON}`;
 }
+
+/** Where the visitor goes after sending the form: the owner's thank-you link, if the page has a valid one. */
+export function thankYouTarget(content: unknown): string | null {
+  const url = typeof content === "object" && content !== null ? (content as { thankYouUrl?: unknown }).thankYouUrl : null;
+  if (typeof url !== "string" || !/^https?:\/\/\S+$/i.test(url) || url.length > 500) return null;
+  try {
+    return new URL(url).toString();
+  } catch {
+    return null;
+  }
+}
+
+/** The page's policy lets its form send the visitor on to the owner's thank-you page (browsers check redirects after a form against form-action). */
+export function allowThankYouRedirect(headers: Record<string, string>, content: unknown): Record<string, string> {
+  const target = thankYouTarget(content);
+  const policy = headers["Content-Security-Policy"];
+  if (!target || !policy) return headers;
+  const origin = new URL(target).origin;
+  return { ...headers, "Content-Security-Policy": policy.replace("form-action 'self'", `form-action 'self' ${origin}`) };
+}

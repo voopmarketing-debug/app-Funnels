@@ -14,7 +14,7 @@ import {
 } from "@/lib/agenda";
 import { siteSecurityHeaders } from "@/lib/securityHeaders";
 import { wantsPanelBack, withPanelBackLink } from "@/lib/panelBackLink";
-import { notPublishedHtml, withDraftRibbon } from "@/lib/sitePublish";
+import { allowThankYouRedirect, notPublishedHtml, withDraftRibbon } from "@/lib/sitePublish";
 import { auth } from "@/auth";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import type { WebsiteContentV2 } from "@/lib/websiteContentV2";
@@ -212,5 +212,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
     { preview: preview, events: { lead: leadSubmitted } },
   );
-  return new NextResponse(tracked.html, { headers: tracked.headers });
+  return new NextResponse(tracked.html, { headers: allowThankYouRedirect(tracked.headers, website.content) });
 }

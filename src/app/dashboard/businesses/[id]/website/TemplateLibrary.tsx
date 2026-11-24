@@ -69,6 +69,9 @@ export function TemplateLibrary({
   const whatsappMissing = needsWhatsapp && (digits.length < 8 || digits.length > 15);
   const previewSrc = (id: string) => `/dashboard/businesses/${businessId}/website/muestra?template=${id}`;
   const label = (c: TemplateCard) => `${c.number} · ${c.name}`;
+  // Funnels are created as drafts (they need the owner's own video, date or testimonials first).
+  const isFunnel = (c: TemplateCard) => c.nicheId === "embudos";
+  const actionLabel = (c: TemplateCard) => (isFunnel(c) ? "Crear embudo" : "Publicar");
 
   useEffect(() => {
     if (!big) return;
@@ -145,8 +148,8 @@ export function TemplateLibrary({
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
         <span className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-accent text-3xl text-accent-ink">{busy.emoji}</span>
         <div>
-          <h2 className="text-xl font-bold">Publicando tu página</h2>
-          <p className="mt-1 text-sm text-ink-muted">Un momento, ya casi: la abrimos para que la edites cuando quieras.</p>
+          <h2 className="text-xl font-bold">{busy.nicheId === "embudos" ? "Creando tu embudo" : "Publicando tu página"}</h2>
+          <p className="mt-1 text-sm text-ink-muted">{busy.nicheId === "embudos" ? "Un momento: queda como borrador para que agregues tu video, fecha o testimonios y luego lo publiques." : "Un momento, ya casi: la abrimos para que la edites cuando quieras."}</p>
         </div>
       </div>
     );
@@ -342,7 +345,7 @@ export function TemplateLibrary({
                         Ver página
                       </button>
                       <button type="button" onClick={() => publish(card)} className="rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                        Publicar
+                        {actionLabel(card)}
                       </button>
                     </div>
                   </div>
@@ -387,7 +390,7 @@ export function TemplateLibrary({
                 Cerrar
               </button>
               <button type="button" onClick={() => publish(big)} className="rounded-lg bg-accent px-4 py-1.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                Publicar
+                {actionLabel(big)}
               </button>
             </div>
           </div>

@@ -42,6 +42,10 @@ export const AiSectionSchema = z.object({
     "marquee",
     "video",
     "html",
+    "event",
+    "offer",
+    "guarantee",
+    "testimonials",
     "comparison",
     "agenda",
     "host",
@@ -151,6 +155,14 @@ function toTypedBase(s: AiSection): unknown {
       return { type: "video", kicker: s.kicker, heading: s.heading, intro: s.body, url: "" };
     case "html":
       return { type: "html", code: "", height: 0 };
+    case "event":
+      return { type: "event", kicker: s.kicker, heading: s.heading, when: "", where: "", date: "", ctaLabel: s.ctaLabel ?? "Reservar mi lugar" };
+    case "offer":
+      return { type: "offer", kicker: s.kicker, heading: s.heading, body: s.body ?? "", price: "", priceNote: null, includes: [], ctaLabel: s.ctaLabel ?? "Lo quiero" };
+    case "guarantee":
+      return { type: "guarantee", heading: s.heading, body: s.body ?? "" };
+    case "testimonials":
+      return { type: "testimonials", kicker: s.kicker, heading: s.heading, items: [] };
     case "comparison":
       return {
         type: "comparison",
@@ -255,6 +267,14 @@ function toAiSectionBase(s: Section): AiSection {
       return { ...base, kicker: s.kicker, heading: s.heading, body: s.intro };
     case "html":
       return { ...base, heading: "" };
+    case "event":
+      return { ...base, kicker: s.kicker, heading: s.heading, ctaLabel: s.ctaLabel };
+    case "offer":
+      return { ...base, kicker: s.kicker, heading: s.heading, body: s.body, ctaLabel: s.ctaLabel };
+    case "guarantee":
+      return { ...base, heading: s.heading, body: s.body };
+    case "testimonials":
+      return { ...base, kicker: s.kicker, heading: s.heading };
     case "comparison":
       return { ...base, heading: s.heading, usLabel: s.usLabel, othersLabel: s.othersLabel, items: s.rows.map((r) => it(r.label, r.us, null, r.others)) };
     case "agenda":

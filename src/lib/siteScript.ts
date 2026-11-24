@@ -41,7 +41,7 @@ $('[data-countdown]').forEach(function(box){
   var parts={};
   $('[data-cd]',box).forEach(function(n){parts[n.getAttribute('data-cd')]=n;});
   function tick(){
-    var n=new Date(),end=new Date(n.getFullYear(),n.getMonth()+1,1).getTime()-1;
+    var n=new Date(),u=box.getAttribute('data-until'),end=u?Date.parse(u):new Date(n.getFullYear(),n.getMonth()+1,1).getTime()-1;if(isNaN(end))end=n.getTime();
     var s=Math.floor(Math.max(0,end-n.getTime())/1000);
     var v={d:Math.floor(s/86400),h:Math.floor(s%86400/3600),m:Math.floor(s%3600/60),s:s%60};
     for(var k in v){if(parts[k])parts[k].textContent=pad(v[k]);}

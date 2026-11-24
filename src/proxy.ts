@@ -16,7 +16,7 @@ import { submitAgendaBooking, previewAgendaBookingOutcome } from "@/lib/agendaBo
 import { captureWebsiteLead } from "@/lib/websiteLeads";
 import { blockedBookingOutcome, publicFormBlock } from "@/lib/abuseGuard";
 import { customDomainSecurityHeaders } from "@/lib/securityHeaders";
-import { notPublishedHtml } from "@/lib/sitePublish";
+import { allowThankYouRedirect, notPublishedHtml, thankYouTarget } from "@/lib/sitePublish";
 import { HTML_BLOCK_HEADERS, htmlBlockFromContent } from "@/lib/htmlBlock";
 import { STORE_APP_COOKIE, STORE_APP_COOKIE_MAX_AGE, STORE_APP_HIDDEN_PATHS, storeAppFromValue } from "@/lib/storeApp";
 
@@ -223,6 +223,8 @@ export async function proxy(request: NextRequest) {
     const formData = await request.formData();
     const block = await publicFormBlock(formData, request.headers, website.id, "lead");
     const ok = block === "bot" ? true : block === "limited" ? false : await captureWebsiteLead(website.id, formData);
+    const thanks = ok ? thankYouTarget(website.content) : null;
+    if (thanks) return NextResponse.redirect(thanks, { status: 303 });
     const url = new URL("/", request.url);
     if (ok) url.searchParams.set("registrado", "1");
     return NextResponse.redirect(url, { status: 303 });
@@ -268,7 +270,7 @@ export async function proxy(request: NextRequest) {
     { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
     { preview: request.nextUrl.searchParams.get("preview") === "1", events: { lead: request.nextUrl.searchParams.get("registrado") === "1" } },
   );
-  return new NextResponse(tracked.html, { headers: tracked.headers });
+  return new NextResponse(tracked.html, { headers: allowThankYouRedirect(tracked.headers, website.content) });
 }
 
 export const config = {

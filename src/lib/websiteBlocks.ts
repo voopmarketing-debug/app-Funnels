@@ -8,6 +8,16 @@ import { mergeLook, type LookPatch } from "@/lib/websiteLook";
 
 export const MAX_SECTIONS = 30;
 
+/** The countdown date: "2026-12-12T19:00" (the business's own time, Colombia) or a full ISO date. */
+export function eventDateOk(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})?$/.test(value) && !Number.isNaN(Date.parse(toIsoWithZone(value)));
+}
+
+/** Dates typed without a zone are Colombian time (UTC-5, no daylight saving). */
+export function toIsoWithZone(value: string): string {
+  return /(Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value.length === 16 ? `${value}:00` : value}-05:00`;
+}
+
 export type BlockEntry = { type: Exclude<SectionType, "hero">; label: string; help: string; group: "texto" | "venta" | "confianza" | "captura" };
 
 /** What the "Agregar bloque" library offers, in the order it shows them. */
@@ -25,6 +35,10 @@ export const BLOCK_LIBRARY: BlockEntry[] = [
   { type: "traveler", label: SECTION_LABELS.traveler, help: "Tu producto acompaña el scroll y cambia de lugar en cada escena.", group: "venta" },
   { type: "marquee", label: SECTION_LABELS.marquee, help: "Frases gigantes que se desplazan al fondo.", group: "texto" },
   { type: "html", label: SECTION_LABELS.html, help: "Pega tu propio código HTML (widgets, formularios, scripts, embeds).", group: "texto" },
+  { type: "event", label: SECTION_LABELS.event, help: "Fecha, hora y lugar de tu evento, con cuenta regresiva.", group: "captura" },
+  { type: "offer", label: SECTION_LABELS.offer, help: "Caja con tu oferta: qué incluye, precio y botón.", group: "venta" },
+  { type: "guarantee", label: SECTION_LABELS.guarantee, help: "Tu garantía, con los términos reales.", group: "confianza" },
+  { type: "testimonials", label: SECTION_LABELS.testimonials, help: "Frases reales de clientes que te dieron permiso.", group: "confianza" },
   { type: "video", label: SECTION_LABELS.video, help: "Tu video de YouTube, Vimeo, Wistia o Loom pegando el enlace.", group: "venta" },
   { type: "comparison", label: SECTION_LABELS.comparison, help: "Tabla: tú frente a las otras opciones.", group: "venta" },
   { type: "trustBar", label: SECTION_LABELS.trustBar, help: "Garantías cortas con ícono.", group: "confianza" },
@@ -72,6 +86,14 @@ export function newSection(type: Exclude<SectionType, "hero">, ctx: { firstProdu
       return { type, lines: ["Escribe una frase corta", "Y otra distinta"] };
     case "html":
       return { type, code: "", height: 0 };
+    case "event":
+      return { type, kicker: "Próxima fecha", heading: "Reserva tu lugar", when: "", where: "", date: "", ctaLabel: "Reservar mi lugar" };
+    case "offer":
+      return { type, kicker: "Tu oferta", heading: "Escribe el nombre de tu oferta", body: "Cuenta en una frase qué recibe quien la toma.", price: "", priceNote: null, includes: ["Primera cosa que incluye", "Segunda cosa que incluye"], ctaLabel: "Lo quiero" };
+    case "guarantee":
+      return { type, heading: "Tu garantía", body: "Escribe aquí los términos reales de tu garantía." };
+    case "testimonials":
+      return { type, kicker: "Lo que dicen", heading: "Clientes que ya lo vivieron", items: [{ quote: "Escribe aquí el testimonio real de un cliente.", name: "Nombre del cliente", role: "" }] };
     case "video":
       return { type, kicker: "Míralo en un minuto", heading: "Mira cómo funciona", intro: null, url: "" };
     case "comparison":
@@ -105,7 +127,8 @@ export type BlockOp =
   | { kind: "remove"; index: number }
   | { kind: "move"; from: number; to: number }
   | { kind: "look"; index: number; patch: LookPatch }
-  | { kind: "html"; index: number; code: string; height: number };
+  | { kind: "html"; index: number; code: string; height: number }
+  | { kind: "eventDate"; index: number; date: string };
 
 export type BlockResult = { ok: true; content: WebsiteContentV2; focus: number } | { ok: false; error: string };
 
@@ -184,6 +207,15 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       if (op.code.length > HTML_MAX_CHARS) return bad("El código es demasiado largo (máximo 100.000 caracteres).");
       section.code = op.code;
       section.height = Math.min(3000, Math.max(0, op.height));
+      focus = op.index;
+      break;
+    }
+    case "eventDate": {
+      const section = isInt(op.index) ? next.sections[op.index] : undefined;
+      if (!section || section.type !== "event" || typeof op.date !== "string") return bad("No se pudo guardar la fecha.");
+      const date = op.date.trim();
+      if (date && !eventDateOk(date)) return bad("Esa fecha no es válida.");
+      section.date = date;
       focus = op.index;
       break;
     }

@@ -11,7 +11,7 @@ import { getWebsiteHeroContext } from "@/lib/websiteHero";
 import { buildSampleContent, sampleProducts } from "@/lib/websiteSample";
 import { PAGE_TYPES, STYLE_KEYS, type PageType, type StyleKey } from "@/lib/websiteContentV2";
 import { siteSecurityHeaders } from "@/lib/securityHeaders";
-import { buildNicheContent, getNicheTemplate } from "@/lib/websiteNicheTemplates";
+import { buildFunnelContent, buildNicheContent, getFunnelTemplate, getNicheTemplate } from "@/lib/websiteNicheTemplates";
 
 // The creation studio's style previews (thumbnails and the big preview):
 // an example page in the requested style and page type, with this
@@ -34,15 +34,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // A ready-made niche page (contadores, estéticas, odontólogos…): the real page, with this
   // business's name, brand color and photos.
-  const niche = getNicheTemplate(req.nextUrl.searchParams.get("template") ?? "");
-  if (niche) {
+  const templateId = req.nextUrl.searchParams.get("template") ?? "";
+  const funnel = getFunnelTemplate(templateId);
+  const niche = funnel ? null : getNicheTemplate(templateId);
+  if (funnel || niche) {
     const [photos, hero, brand] = await Promise.all([
       prisma.agentMedia.findMany({ where: { businessId: id, mediaType: "image" }, orderBy: { createdAt: "desc" }, take: 8, select: { url: true } }),
       getWebsiteHeroContext(id, membership.business.industry, null),
       prisma.business.findUnique({ where: { id }, select: { brandPrimaryColor: true } }),
     ]);
     const color = req.nextUrl.searchParams.get("color") ?? brand?.brandPrimaryColor;
-    const content = buildNicheContent(niche, { businessName: membership.business.name, brandColor: color });
+    const content = funnel ? buildFunnelContent(funnel, { businessName: membership.business.name, brandColor: color }) : buildNicheContent(niche!, { businessName: membership.business.name, brandColor: color });
     const html = renderWebsiteHtmlV2(content, {
       businessName: membership.business.name,
       trackingBasePath: "#",

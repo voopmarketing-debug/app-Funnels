@@ -49,6 +49,7 @@ export function BlocksPanel({
   onSaveHtml,
   onGenerateImages,
   onRemoveAiImages,
+  onSaveEventDate,
 }: {
   content: WebsiteContentV2;
   selected: number | null;
@@ -60,6 +61,7 @@ export function BlocksPanel({
   onSaveHtml: (index: number, code: string, height: number) => Promise<boolean>;
   onGenerateImages: () => Promise<void>;
   onRemoveAiImages: () => Promise<void>;
+  onSaveEventDate: (index: number, date: string) => Promise<boolean>;
 }) {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [dropAt, setDropAt] = useState<number | null>(null);
@@ -112,10 +114,20 @@ export function BlocksPanel({
         )}
       </div>
 
+      {selected !== null && content.sections[selected]?.type === "event" && (
+        <EventDateEditor key={`ev${selected}`} date={(content.sections[selected] as { date: string }).date} busy={busy} onSave={(date) => onSaveEventDate(selected, date)} />
+      )}
+
       <AiImagesCard content={content} busy={busy} onGenerate={onGenerateImages} onRemove={onRemoveAiImages} />
 
       {selected !== null && content.sections[selected]?.type === "html" && (
         <HtmlCodeEditor key={`${selected}`} section={content.sections[selected] as Extract<WebsiteContentV2["sections"][number], { type: "html" }>} busy={busy} onSave={(code, height) => onSaveHtml(selected, code, height)} />
+      )}
+
+      {hidden.size > 0 && (
+        <p className="rounded-lg border border-border bg-background p-2.5 text-[12px] text-ink-muted">
+          Hay {hidden.size} {hidden.size === 1 ? "bloque oculto" : "bloques ocultos"} (marcados «Oculto»): no se ven en tu página. Tócalo con 🚫 cuando tengas tus datos reales (testimonios, precio, garantía) y cambia el texto por el tuyo.
+        </p>
       )}
 
       <p className="text-[12px] text-ink-faint">Arrastra ⠿ para reordenar. Toca un bloque para verlo en la página y cambiar su estilo.</p>
@@ -294,6 +306,38 @@ function AiImagesCard({ content, busy, onGenerate, onRemove }: { content: Websit
             {working === "remove" ? "Quitando…" : `Quitar las ${used} de IA`}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** The exact date of an event, for the countdown. The text people read ("Jueves 12, 7 p. m.") is written on the page itself. */
+function EventDateEditor({ date, busy, onSave }: { date: string; busy: boolean; onSave: (date: string) => Promise<boolean> }) {
+  const [value, setValue] = useState(date.slice(0, 16));
+  const [saving, setSaving] = useState(false);
+  const dirty = value !== date.slice(0, 16);
+  return (
+    <div className="space-y-2 rounded-xl border border-accent/60 bg-accent/5 p-3">
+      <p className="text-sm font-bold">Fecha de la cuenta regresiva</p>
+      <p className="text-[12px] text-ink-muted">Elige el día y la hora (hora de Colombia). Vacío = sin cuenta regresiva. Mientras no escribas la fecha en la tarjeta, este bloque no se muestra al público.</p>
+      <div className="flex gap-2">
+        <label htmlFor="event-date" className="sr-only">Fecha y hora del evento</label>
+        <input id="event-date" type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 py-2 text-sm outline-none focus:border-accent" />
+        <button
+          type="button"
+          disabled={busy || saving || !dirty}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await onSave(value);
+            } finally {
+              setSaving(false);
+            }
+          }}
+          className="rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink transition hover:bg-accent-hover disabled:opacity-40"
+        >
+          {saving ? "Guardando…" : "Guardar"}
+        </button>
       </div>
     </div>
   );

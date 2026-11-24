@@ -10,12 +10,12 @@ import { toEmbedUrl } from "@/lib/websiteTemplate";
 /** Text fields a person can edit by clicking. Everything structural (type, variant, icon, ids…) is out. */
 const TEXT_KEYS = new Set([
   "heading", "subheading", "eyebrow", "kicker", "intro", "body", "name", "role", "title", "description", "question", "answer",
-  "value", "label", "ctaLabel", "secondaryCtaLabel", "buttonLabel", "badge", "when", "us", "others", "usLabel", "othersLabel",
+  "value", "label", "quote", "price", "priceNote", "where", "ctaLabel", "secondaryCtaLabel", "buttonLabel", "badge", "when", "us", "others", "usLabel", "othersLabel",
 ]);
 /** Lists of items inside a section that hold text. */
 const ARRAYS = new Set(["items", "bullets", "rows"]);
 /** Fields that may be emptied (the element just disappears from the page). */
-const OPTIONAL_KEYS = new Set(["eyebrow", "kicker", "intro", "badge", "secondaryCtaLabel", "role"]);
+const OPTIONAL_KEYS = new Set(["eyebrow", "kicker", "intro", "badge", "secondaryCtaLabel", "role", "when", "where", "price", "priceNote"]);
 /** Fields where a line break is part of the text. */
 const MULTILINE_KEYS = new Set(["body", "answer", "description", "intro", "subheading"]);
 
@@ -70,9 +70,9 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
     return finish(next);
   }
 
-  // sections.<i>.chips.<j>
-  if (parts.length === 4 && parts[2] === "chips" && isIndex(parts[3]) && Array.isArray(section.chips)) {
-    const chips = section.chips as unknown[];
+  // sections.<i>.chips.<j> (and the offer's list of what it includes)
+  if (parts.length === 4 && (parts[2] === "chips" || parts[2] === "includes") && isIndex(parts[3]) && Array.isArray(section[parts[2]])) {
+    const chips = section[parts[2]] as unknown[];
     const at = Number(parts[3]);
     if (typeof chips[at] !== "string") return bad();
     const text = clean("chip", rawValue);

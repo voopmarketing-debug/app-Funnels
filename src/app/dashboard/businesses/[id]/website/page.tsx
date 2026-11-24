@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { WebsiteHome } from "./WebsiteHome";
-import { listTemplateCards } from "@/lib/websiteNicheTemplates";
+import { listFunnelCards, listTemplateCards } from "@/lib/websiteNicheTemplates";
 
 export default async function WebsitePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
@@ -58,7 +58,8 @@ export default async function WebsitePage({ params, searchParams }: { params: Pr
     // What this person was deciding with the AI the last time, so a reload or another device continues it.
     prisma.websiteCreationDraft.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: id } }, select: { data: true } }),
   ]);
-  const cards = listTemplateCards();
+  // Funnels first, then the pages by kind of business.
+  const cards = [...listFunnelCards(), ...listTemplateCards()];
   const cardById = new Map(cards.map((c) => [c.id, c]));
   const pages = websites.map(({ model, ...w }) => ({
     ...w,

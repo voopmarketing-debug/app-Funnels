@@ -249,6 +249,44 @@ const HtmlSection = z.object({
   height: z.number().int().min(0).max(3000).catch(0).describe("Alto en píxeles; 0 = se ajusta solo al contenido."),
 });
 
+const EventSection = z.object({
+  ...media,
+  type: z.literal("event"),
+  kicker: nullableText("Etiqueta pequeña, ej. 'Próxima fecha'."),
+  heading: text(80, "Título de la tarjeta de fecha"),
+  when: z.string().catch("").describe("Fecha y hora tal como las escribe el dueño. NUNCA las inventes: vacío si no las dieron."),
+  where: z.string().catch("").describe("Lugar o modalidad (en línea, dirección). Vacío si no lo dieron."),
+  date: z.string().catch("").describe("Fecha exacta en formato ISO para la cuenta regresiva. Solo la pone el dueño; vacío si no."),
+  ctaLabel: text(30, "Botón, ej. 'Reservar mi lugar'"),
+});
+
+const OfferSection = z.object({
+  ...media,
+  type: z.literal("offer"),
+  kicker: nullableText("Etiqueta pequeña, ej. 'Tu oferta'."),
+  heading: text(80, "Nombre de la oferta"),
+  body: text(300, "Qué recibe quien la toma"),
+  price: z.string().catch("").describe("Precio tal como lo escribe el dueño. NUNCA lo inventes: vacío si no lo dieron."),
+  priceNote: nullableText("Aclaración del precio, ej. 'Pago único'. Solo si es real."),
+  includes: z.array(z.string()).catch([]).describe("Lo que incluye, una línea cada ítem. Solo cosas reales."),
+  ctaLabel: text(30, "Botón de la oferta"),
+});
+
+const GuaranteeSection = z.object({
+  ...media,
+  type: z.literal("guarantee"),
+  heading: text(80, "Título de la garantía"),
+  body: text(400, "Términos reales de la garantía. NUNCA inventes plazos ni condiciones."),
+});
+
+const TestimonialsSection = z.object({
+  ...media,
+  type: z.literal("testimonials"),
+  kicker: nullableText("Etiqueta pequeña."),
+  heading: text(80, "Título de los testimonios"),
+  items: z.array(z.object({ quote: z.string().catch(""), name: z.string().catch(""), role: z.string().catch("") })).describe("Solo testimonios REALES que dio el dueño, con permiso de quien los dijo. NUNCA los inventes."),
+});
+
 const ComparisonSection = z.object({
   ...media,
   type: z.literal("comparison"),
@@ -335,6 +373,10 @@ export const SectionSchema = z.discriminatedUnion("type", [
   MarqueeSection,
   VideoSection,
   HtmlSection,
+  EventSection,
+  OfferSection,
+  GuaranteeSection,
+  TestimonialsSection,
   ComparisonSection,
   AgendaSection,
   HostSection,
@@ -362,6 +404,10 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   marquee: "Texto en movimiento",
   video: "Video",
   html: "Código HTML",
+  event: "Fecha del evento",
+  offer: "Oferta",
+  guarantee: "Garantía",
+  testimonials: "Testimonios",
   comparison: "Comparación",
   agenda: "Agenda",
   host: "Quién está detrás",
@@ -399,6 +445,10 @@ export const WebsiteContentV2Schema = AiWebsiteV2Schema.extend({
   /** Small mono counters ("02 / 08") before each section's label. A look the template sets; the AI never decides it. */
   counters: z.boolean().optional().catch(undefined),
   /** Addresses of the pictures the platform created with AI on this page (so they can be counted, replaced or removed). */
+  /** A fixed button at the bottom of the screen on phones (landing and funnel pages). */
+  sticky: z.boolean().optional().catch(undefined),
+  /** Where the visitor goes after sending the form. Empty: the page itself, with a thank-you message. */
+  thankYouUrl: z.string().regex(/^https?:\/\/\S+$/).max(500).nullable().optional().catch(undefined),
   aiImages: z.array(z.string()).max(12).optional().catch(undefined),
   heroCtaUrl: z.string().regex(/^$|^https?:\/\/.+/).nullable().catch(null),
 });

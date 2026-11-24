@@ -1,6 +1,7 @@
 import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS } from "@/lib/websiteContent";
 import { readableTextColor, sanitizeHexColor, toEmbedUrl } from "@/lib/websiteTemplate";
+import { eventDateOk, toIsoWithZone } from "@/lib/websiteBlocks";
 import { LOOK_CSS, lookParts } from "@/lib/websiteLook";
 import { SITE_SCRIPT } from "@/lib/siteScript";
 import { ensureContrast } from "@/lib/colorContrast";
@@ -292,6 +293,9 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   const href = (label: string) => `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(label)}${previewQ}`;
   const orderHref = (p: CatalogProduct) =>
     `${ctx.trackingBasePath}/ir?label=${encodeURIComponent(`pedido:${p.name}`.slice(0, 80))}&p=${encodeURIComponent(p.id)}${previewQ}`;
+  // A page with a form sends its buttons to the form; otherwise they go through the tracked button link.
+  const formAnchor = content.sections.some((s) => s.type === "leadForm") ? "#registro" : content.sections[0]?.type === "hero" && content.sections[0].showLeadForm ? "#inicio" : null;
+  const ctaHref = (label: string) => formAnchor ?? href(label);
   const registroAction = `${ctx.trackingBasePath}/registro${ctx.preview ? "?preview=1" : ""}`;
 
   const primary = sanitizeHexColor(theme.primaryColor, "#1f6feb");
@@ -710,6 +714,43 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         return `<section class="mq"><p class="sr-only">${esc(lines.join(". "))}</p>${lines.map((l, li) => row(l, li % 2 === 1)).join("")}</section>`;
       }
 
+      case "event": {
+        const has = !!(s.when.trim() || s.date.trim());
+        if (!has && !edit) return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerá la fecha de tu evento. Elige este bloque en <strong>Bloques</strong> y escribe la fecha.</div></div></section>` : "";
+        const until = s.date.trim() && eventDateOk(s.date.trim()) ? toIsoWithZone(s.date.trim()) : "";
+        const cd = until
+          ? `<div class="cd" data-countdown data-until="${esc(until)}" role="timer" aria-label="Tiempo que falta">${[["d", "días"], ["h", "horas"], ["m", "min"], ["s", "seg"]].map(([k, l]) => `<div><b data-cd="${k}">00</b><span>${l}</span></div>`).join("")}</div>`
+          : "";
+        const whenHtml = s.when.trim() || edit ? `<p class="ev-when"${ed(fp("when"))}>${esc(s.when || "Escribe la fecha y la hora")}</p>` : "";
+        const whereHtml = s.where.trim() || edit ? `<p class="ev-where"${ed(fp("where"))}>${esc(s.where || "Escribe el lugar o la modalidad")}</p>` : "";
+        return `<section class="sec alt" id="fecha"><div class="wrap narrow-lg"><div class="ev-card">
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>${whenHtml}${whereHtml}${cd}
+          <a class="btn btn-lg" href="${esc(ctaHref("evento"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a>
+        </div></div></section>`;
+      }
+
+      case "offer": {
+        const incl = s.includes.filter((l) => l.trim());
+        const priceHtml2 = s.price.trim() || edit ? `<p class="of-price"${ed(fp("price"))}>${esc(s.price || "Escribe el precio")}</p>${s.priceNote || edit ? `<p class="of-note"${ed(fp("priceNote"))}>${esc(s.priceNote ?? "Aclaración del precio (opcional)")}</p>` : ""}` : "";
+        return `<section class="sec" id="oferta-caja"><div class="wrap narrow-lg"><div class="of-card">
+          ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p class="intro"${ed(fp("body"))}>${esc(s.body)}</p>
+          ${incl.length ? `<ul class="of-list">${s.includes.map((l, li) => (l.trim() ? `<li>${icon("check")}<span${ed(fp(`includes.${li}`))}>${esc(l)}</span></li>` : "")).join("")}</ul>` : ""}
+          ${priceHtml2}
+          <a class="btn btn-lg" href="${esc(ctaHref("oferta"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a>
+        </div></div></section>`;
+      }
+
+      case "guarantee":
+        return `<section class="sec alt" id="garantia"><div class="wrap narrow-lg"><div class="gu-card">${icon("shield")}<div><h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p${ed(fp("body"))}>${esc(s.body)}</p></div></div></div></section>`;
+
+      case "testimonials": {
+        const list = s.items.map((t, ti) => ({ t, ti })).filter(({ t }) => t.quote.trim());
+        if (list.length === 0 && !edit) return "";
+        return `<section class="sec" id="testimonios"><div class="wrap">${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
+          <div class="tm-grid">${list.map(({ t, ti }) => `<figure class="tm"><blockquote${ed(fp(`items.${ti}.quote`))}>${esc(t.quote)}</blockquote><figcaption>${t.name.trim() ? `<b${ed(fp(`items.${ti}.name`))}>${esc(t.name)}</b>` : ""}${t.role.trim() ? ` <span${ed(fp(`items.${ti}.role`))}>${esc(t.role)}</span>` : ""}</figcaption></figure>`).join("")}</div>
+        </div></section>`;
+      }
+
       case "video": {
         const embed = toEmbedUrl(s.url);
         if (!embed && !ctx.preview) return "";
@@ -1051,6 +1092,28 @@ section{position:relative}
   .faq-split .faq-head{position:static}
   .steps-timeline li{grid-template-columns:56px minmax(0,1fr);column-gap:16px}
 }
+.ev-card,.of-card{text-align:center;padding:clamp(28px,5vw,56px);border-radius:calc(var(--r) + 6px);background:var(--bg);border:1px solid var(--line)}
+.ev-when{font-family:var(--hf);font-size:clamp(26px,4.4vw,44px);line-height:1.1;font-weight:${style.headingWeight};margin:18px 0 6px}
+.ev-where{color:var(--muted);margin:0 0 6px;font-size:17px}
+.ev-card .cd{margin:22px auto;justify-content:center}.ev-card .btn{margin-top:14px}
+.of-card{text-align:left}
+.of-list{list-style:none;padding:0;margin:20px 0;display:grid;gap:10px}
+.of-list li{display:flex;gap:12px;align-items:flex-start}.of-list .ico{width:22px;height:22px;flex:none;color:var(--primary-ink);margin-top:2px}
+.of-price{font-family:var(--hf);font-size:clamp(34px,5.4vw,56px);line-height:1;font-weight:${style.headingWeight};margin:22px 0 4px}
+.of-note{color:var(--muted);margin:0 0 18px}
+.gu-card{display:flex;gap:22px;align-items:flex-start;padding:clamp(24px,4vw,40px);border-radius:calc(var(--r) + 4px);background:var(--bg);border:1px solid var(--line)}
+.gu-card .ico{width:44px;height:44px;flex:none;color:var(--primary-ink)}
+.gu-card h2{font-size:clamp(22px,3vw,30px);margin:0 0 8px}.gu-card p{margin:0;color:var(--muted)}
+.tm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:20px;margin-top:32px}
+.tm{margin:0;padding:26px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;gap:16px}
+.tm blockquote{margin:0;font-size:18px;line-height:1.5}.tm figcaption{color:var(--muted);font-size:14px}.tm figcaption b{color:var(--text)}
+.sticky-cta{display:none}
+@media (max-width:760px){
+  .sticky-cta{display:block;position:fixed;z-index:40;left:0;right:0;bottom:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-top:1px solid var(--line)}
+  .sticky-cta .btn{width:100%}
+  body.has-sticky{padding-bottom:76px}
+  .gu-card{flex-direction:column}
+}
 .htmlw{padding:0}
 .htmlw-frame{display:block;width:100%;border:0;background:transparent}
 .vid-frame{position:relative;aspect-ratio:16/9;width:100%;margin-top:28px;border-radius:var(--radius);overflow:hidden;background:#0b0b0f;box-shadow:0 24px 60px -24px rgba(0,0,0,.45)}
@@ -1139,7 +1202,7 @@ ${FX_CSS}
 ${LOOK_CSS}
 </style>
 </head>
-<body class="st-${content.style} pt-${content.pageType}">
+<body class="st-${content.style} pt-${content.pageType}${content.sticky ? " has-sticky" : ""}">
 ${announcementHtml}
 <header class="top"><div class="wrap">
   <a class="brand" href="#inicio">${esc(ctx.businessName)}</a>
@@ -1150,6 +1213,7 @@ ${announcementHtml}
 ${body}
 </main>
 <footer class="foot"><div class="wrap"><span>© ${esc(ctx.businessName)}</span><a href="${esc(href("footer"))}">Escríbenos por WhatsApp</a></div></footer>
+${content.sticky && firstHero && firstHero.type === "hero" ? `<div class="sticky-cta"><a class="btn" href="${esc(ctaHref("barra-fija"))}">${esc(firstHero.ctaLabel)}</a></div>` : ""}
 ${isShop ? `<div class="mbar"><a class="btn" href="${esc(href("barra-movil"))}">Pedir por WhatsApp</a></div>` : ""}
 <script>${SITE_SCRIPT}</script>
 </body>

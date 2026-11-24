@@ -642,6 +642,17 @@ export function WebsiteBuilder({
                 refreshPreview();
                 showToast("Imágenes de IA quitadas.", true);
               }}
+              onSaveEventDate={async (index, date) => {
+                const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "eventDate", index, date });
+                if (!res.ok) {
+                  showToast(res.error);
+                  return false;
+                }
+                adopt(res.content);
+                refreshPreview();
+                showToast("Fecha guardada.", true);
+                return true;
+              }}
               onSaveHtml={async (index, code, height) => {
                 const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "html", index, code, height });
                 if (!res.ok) {
@@ -698,6 +709,21 @@ export function WebsiteBuilder({
                 <p className="break-all rounded-md border border-border bg-background px-2.5 py-2 text-xs">{publicUrl}</p>
               </div>
               <CtaUrlEditor value={content.heroCtaUrl} disabled={!!busy} onSave={(url) => runDesign("Guardando…", { heroCtaUrl: url })} />
+              <CtaUrlEditor
+                key={`ty:${content.thankYouUrl ?? ""}`}
+                value={content.thankYouUrl ?? null}
+                disabled={!!busy}
+                title="Página de gracias"
+                help="Después de enviar el formulario, la persona va a este link (por ejemplo, tu página de gracias o el enlace de tu regalo). Vacío = ve un mensaje de gracias en esta misma página."
+                onSave={(url) => runDesign("Guardando…", { thankYouUrl: url })}
+              />
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-1" checked={!!content.sticky} disabled={!!busy} onChange={(e) => runDesign("Guardando…", { sticky: e.target.checked })} />
+                <span>
+                  <span className="font-semibold text-ink">Botón fijo en el celular</span>
+                  <span className="block text-[12px] text-ink-muted">Deja el botón principal siempre visible al final de la pantalla.</span>
+                </span>
+              </label>
               <TrackingSettings businessId={businessId} websiteId={websiteId} metaPixelId={tracking.metaPixelId} googleTagId={tracking.googleTagId} />
               <Link href={`/dashboard/businesses/${businessId}/productos`} className="block rounded-lg border border-border bg-background p-3 text-sm hover:border-accent">
                 🛍️ <strong>Productos</strong>
@@ -966,12 +992,12 @@ function ThemeEditor({
   );
 }
 
-function CtaUrlEditor({ value, disabled, onSave }: { value: string | null; disabled: boolean; onSave: (url: string | null) => void }) {
+function CtaUrlEditor({ value, disabled, onSave, title = "Botón principal", help = "Vacío = abre tu WhatsApp. O pon un link (agenda, checkout)." }: { value: string | null; disabled: boolean; onSave: (url: string | null) => void; title?: string; help?: string }) {
   const [url, setUrl] = useState(value ?? "");
   return (
     <div className="space-y-1">
-      <p className="text-xs font-bold uppercase tracking-wide text-ink-faint">Botón principal</p>
-      <p className="text-[12px] text-ink-muted">Vacío = abre tu WhatsApp. O pon un link (agenda, checkout).</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-ink-faint">{title}</p>
+      <p className="text-[12px] text-ink-muted">{help}</p>
       <div className="flex gap-1.5">
         <input
           value={url}

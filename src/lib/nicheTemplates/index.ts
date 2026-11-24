@@ -2,6 +2,7 @@ import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import type { Section, StyleKey, WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { BLUEPRINTS } from "./blueprints";
 import type { Niche } from "./types";
+import { FUNNELS, FUNNEL_NICHE, buildFunnelContent, getFunnelTemplate } from "./funnels";
 import { abogados } from "./niches/abogados";
 import { contadores } from "./niches/contadores";
 import { esteticas } from "./niches/esteticas";
@@ -146,3 +147,35 @@ export function buildBlankContent(opts: { businessName: string; brandColor?: str
     heroCtaUrl: null,
   };
 }
+
+/** The funnel templates as library cards (the first group of the library). */
+export function listFunnelCards(): TemplateCard[] {
+  return FUNNELS.map((f, i) => {
+    const sections = f.build("Tu negocio");
+    const hero = sections[0];
+    const theme = STYLE_THEME[f.style];
+    return {
+      id: f.id,
+      nicheId: FUNNEL_NICHE.id,
+      nicheName: FUNNEL_NICHE.name,
+      nicheShort: FUNNEL_NICHE.short,
+      emoji: FUNNEL_NICHE.emoji,
+      number: i + 1,
+      name: f.name,
+      strategy: f.strategy,
+      shape: sections.map((sec) => ({ type: sec.type, variant: "variant" in sec && typeof sec.variant === "string" ? sec.variant : undefined })),
+      style: f.style,
+      dark: isDark(theme.backgroundColor),
+      colors: { primary: theme.primaryColor, bg: theme.backgroundColor, surface: theme.surfaceColor, text: theme.textColor },
+      headingFont: theme.headingFont,
+      heroVariant: hero.type === "hero" && (hero.variant === "split" || hero.variant === "giant" || hero.variant === "wordmark") ? hero.variant : "centered",
+      heroForm: hero.type === "hero" ? hero.showLeadForm : false,
+      eyebrow: hero.type === "hero" ? (hero.eyebrow ?? "") : "",
+      heading: hero.type === "hero" ? hero.heading : "",
+      highlight: hero.type === "hero" ? (hero.highlight ?? "") : "",
+      cta: hero.type === "hero" ? hero.ctaLabel : "",
+    };
+  });
+}
+
+export { buildFunnelContent, getFunnelTemplate };

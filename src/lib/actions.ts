@@ -40,7 +40,7 @@ import { countRateLimitEvents } from "@/lib/rateLimit";
 import { INDUSTRY_LABELS } from "@/lib/websiteGenerator";
 import { withAiUsage } from "@/lib/aiUsage";
 import { assertWebsiteGenerationAllowed, monthWindow, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
-import { buildBlankContent, buildNicheContent, getNicheTemplate } from "@/lib/websiteNicheTemplates";
+import { buildBlankContent, buildFunnelContent, buildNicheContent, getFunnelTemplate, getNicheTemplate } from "@/lib/websiteNicheTemplates";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { isTemplateContent, templateForPageType } from "@/lib/templateSite/content";
@@ -3290,15 +3290,17 @@ async function rememberWhatsappNumber(businessId: string, raw: string | undefine
 export async function createWebsiteFromTemplate(
   businessId: string,
   input: { templateId: string; name?: string; whatsappNumber?: string },
-): Promise<BuilderResult<{ id: string }>> {
+): Promise<BuilderResult<{ id: string; draft: boolean }>> {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
     await requireBusinessMembership(session.user.id, businessId);
     await requireActiveAccount(session.user.id, businessId);
 
-    const template = getNicheTemplate(input.templateId);
-    if (!template) return { ok: false, error: "Esa plantilla ya no está disponible. Elige otra." };
+    // A funnel template, or a page for a kind of business.
+    const funnel = getFunnelTemplate(input.templateId);
+    const template = funnel ? null : getNicheTemplate(input.templateId);
+    if (!funnel && !template) return { ok: false, error: "Esa plantilla ya no está disponible. Elige otra." };
 
     const phoneError = await rememberWhatsappNumber(businessId, input.whatsappNumber);
     if (phoneError) return { ok: false, error: phoneError };
@@ -3308,14 +3310,19 @@ export async function createWebsiteFromTemplate(
       return { ok: false, error: "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567: todos los botones de la página llevan a ese número." };
     }
     const existingCount = await prisma.website.count({ where: { businessId } });
-    const name = input.name?.trim().slice(0, 80) || (existingCount === 0 ? "Sitio principal" : `${template.niche.name} · ${template.index + 1}`);
-    const content = buildNicheContent(template, { businessName: ctx.businessName, brandColor: ctx.brandColors?.primary });
-    const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0);
+    const defaultName = funnel ? `Embudo · ${funnel.name}`.slice(0, 80) : `${template!.niche.name} · ${template!.index + 1}`;
+    const name = input.name?.trim().slice(0, 80) || (existingCount === 0 && !funnel ? "Sitio principal" : defaultName);
+    const content = funnel
+      ? buildFunnelContent(funnel, { businessName: ctx.businessName, brandColor: ctx.brandColors?.primary })
+      : buildNicheContent(template!, { businessName: ctx.businessName, brandColor: ctx.brandColors?.primary });
+    const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0 && !funnel);
+    // A funnel needs the owner's own video, date or testimonials first: it starts as a draft.
+    const draft = !!funnel;
     const created = await prisma.website.create({
-      data: { businessId, name, purpose: null, designPrompt: null, slug, content, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: `template:${template.id}` },
+      data: { businessId, name, purpose: null, designPrompt: null, slug, content, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: `template:${input.templateId}`, published: !draft },
     });
     revalidatePath(`/dashboard/businesses/${businessId}/website`);
-    return { ok: true, id: created.id };
+    return { ok: true, id: created.id, draft };
   } catch (err) {
     return builderError(`createWebsiteFromTemplate(${businessId})`, err);
   }
@@ -3625,6 +3632,8 @@ export async function updateWebsiteDesignV2(
     move?: { from: number; to: number };
     theme?: Partial<WebsiteContentV2["theme"]>;
     heroCtaUrl?: string | null;
+    thankYouUrl?: string | null;
+    sticky?: boolean;
   },
 ): Promise<WebsiteContentV2> {
   const session = await auth();
@@ -3643,6 +3652,8 @@ export async function updateWebsiteDesignV2(
   if (patch.theme) next.theme = { ...next.theme, ...patch.theme };
   if (patch.hidden) next.hidden = patch.hidden.filter((i) => Number.isInteger(i) && i > 0 && i < next.sections.length);
   if (patch.heroCtaUrl !== undefined) next.heroCtaUrl = patch.heroCtaUrl && /^https?:\/\//i.test(patch.heroCtaUrl) ? patch.heroCtaUrl : null;
+  if (patch.thankYouUrl !== undefined) next.thankYouUrl = patch.thankYouUrl && /^https?:\/\/\S+$/i.test(patch.thankYouUrl.trim()) ? patch.thankYouUrl.trim().slice(0, 500) : null;
+  if (patch.sticky !== undefined) next.sticky = patch.sticky ? true : undefined;
   if (patch.move) {
     const { from, to } = patch.move;
     // The hero always stays first.
@@ -3728,6 +3739,7 @@ const BlockOpSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("duplicate"), index: z.number().int() }),
   z.object({ kind: z.literal("remove"), index: z.number().int() }),
   z.object({ kind: z.literal("move"), from: z.number().int(), to: z.number().int() }),
+  z.object({ kind: z.literal("eventDate"), index: z.number().int(), date: z.string().max(40) }),
   z.object({ kind: z.literal("html"), index: z.number().int(), code: z.string().max(100_000), height: z.number().int().min(0).max(3000) }),
   z.object({ kind: z.literal("look"), index: z.number().int(), patch: z.record(z.string(), z.union([z.string().max(12), z.null()])) }),
 ]);
