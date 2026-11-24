@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { listWebsiteImagesV2, uploadWebsiteImageV2 } from "@/lib/actions";
 
-type Photo = { url: string; label: string };
+type Photo = { url: string; label: string; source: "subida" | "catalogo" };
 
 /**
  * "Cambiar imagen" window of the builder: the business's own photos (the same
@@ -125,29 +125,37 @@ export function ImagePicker({
               ))}
             </div>
           )}
-          {photos && photos.length === 0 && <p className="py-6 text-center text-sm text-ink-muted">Todavía no tienes fotos. Sube la primera con el botón de arriba.</p>}
-          {photos && photos.length > 0 && (
-            <>
-              <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-faint">Tus fotos</p>
-              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {photos.map((p) => (
-                  <li key={p.url}>
-                    <button
-                      type="button"
-                      onClick={() => onPick(p.url)}
-                      title={p.label}
-                      aria-label={`Usar la foto ${p.label}`}
-                      className={`group relative block aspect-square w-full overflow-hidden rounded-lg border-2 bg-surface-2 transition hover:border-accent focus-visible:border-accent ${p.url === current ? "border-accent" : "border-transparent"}`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.url} alt="" loading="lazy" className="h-full w-full object-cover" />
-                      {p.url === current && <span className="absolute left-1.5 top-1.5 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-ink">En uso</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          {photos && photos.length === 0 && <p className="py-6 text-center text-sm text-ink-muted">Todavía no tienes fotos. Sube la primera con el botón de arriba, o agrega productos con foto a tu catálogo.</p>}
+          {photos && photos.length > 0 &&
+            ([
+              ["subida", "Tus fotos subidas"],
+              ["catalogo", "Fotos de tu catálogo (productos)"],
+            ] as const).map(([source, title]) => {
+              const group = photos.filter((p) => p.source === source);
+              if (group.length === 0) return null;
+              return (
+                <div key={source} className="space-y-2">
+                  <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-faint">{title}</p>
+                  <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {group.map((p) => (
+                      <li key={p.url}>
+                        <button
+                          type="button"
+                          onClick={() => onPick(p.url)}
+                          title={p.label}
+                          aria-label={`Usar la foto ${p.label}`}
+                          className={`group relative block aspect-square w-full overflow-hidden rounded-lg border-2 bg-surface-2 transition hover:border-accent focus-visible:border-accent ${p.url === current ? "border-accent" : "border-transparent"}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={p.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                          {p.url === current && <span className="absolute left-1.5 top-1.5 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-ink">En uso</span>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
         </div>
 
         {onRemove && (

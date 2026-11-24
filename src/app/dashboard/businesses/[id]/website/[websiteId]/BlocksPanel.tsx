@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { SECTION_LABELS, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import type { BlockOp } from "@/lib/websiteBlocks";
-import { AI_IMAGES_PER_PAGE, aiImagesInUse, planImageSlots } from "@/lib/websiteImages";
 import { BlockGrid, NEW_BLOCK_MIME } from "./BlockLibrary";
 
 const MOVE_MIME = "application/x-fl-move-block";
@@ -47,8 +46,7 @@ export function BlocksPanel({
   onStyle,
   onToggleHidden,
   onEditHtml,
-  onGenerateImages,
-  onRemoveAiImages,
+  onPickPhoto,
   onSaveEventDate,
   onHover,
 }: {
@@ -61,8 +59,8 @@ export function BlocksPanel({
   onToggleHidden: (index: number) => void;
   /** Opens the window where the code of an HTML block is pasted. */
   onEditHtml: (index: number) => void;
-  onGenerateImages: () => Promise<void>;
-  onRemoveAiImages: () => Promise<void>;
+  /** Opens the photo window (upload or pick from the catalog) for a picture slot of a block. */
+  onPickPhoto: (index: number, field: "image" | "bgImage") => void;
   onSaveEventDate: (index: number, date: string) => Promise<boolean>;
   /** The pointer is on the row of a block (null: left the list): the page outlines that block. */
   onHover: (index: number | null) => void;
@@ -136,14 +134,14 @@ export function BlocksPanel({
         </button>
       )}
 
-      <AiImagesCard content={content} busy={busy} onGenerate={onGenerateImages} onRemove={onRemoveAiImages} />
-
 
       {hidden.size > 0 && (
         <p className="rounded-lg border border-border bg-background p-2.5 text-[12px] text-ink-muted">
           Hay {hidden.size} {hidden.size === 1 ? "bloque oculto" : "bloques ocultos"} (marcados «Oculto»): no se ven en tu página. Tócalo con 🚫 cuando tengas tus datos reales (testimonios, precio, garantía) y cambia el texto por el tuyo.
         </p>
       )}
+
+      <PhotosCard content={content} selected={selected} busy={busy} onPick={onPickPhoto} />
 
       <p className="text-[12px] text-ink-faint">Capas de tu página: pasa el cursor por una para verla resaltada, tócala para ir a ella y arrastra ⠿ para reordenar.</p>
 
@@ -240,45 +238,6 @@ export function BlocksPanel({
   );
 }
 
-/** "Generar imágenes con IA": fills the empty picture slots; any of them can be swapped for the owner's own photo by tapping it. */
-function AiImagesCard({ content, busy, onGenerate, onRemove }: { content: WebsiteContentV2; busy: boolean; onGenerate: () => Promise<void>; onRemove: () => Promise<void> }) {
-  const [working, setWorking] = useState<"make" | "remove" | null>(null);
-  const used = aiImagesInUse(content);
-  const room = Math.max(0, AI_IMAGES_PER_PAGE - used);
-  const slots = planImageSlots(content, room).length;
-  async function run(kind: "make" | "remove") {
-    setWorking(kind);
-    try {
-      await (kind === "make" ? onGenerate() : onRemove());
-    } finally {
-      setWorking(null);
-    }
-  }
-  return (
-    <div className="space-y-2 rounded-xl border border-border bg-background p-3">
-      <p className="text-sm font-bold">🖼 Imágenes con IA</p>
-      <p className="text-[12px] text-ink-muted">
-        Llena con fotos de ambiente las imágenes vacías de tu página (máximo {AI_IMAGES_PER_PAGE}). Nunca crea personas: solo espacios y objetos de tu rubro. Toca cualquier imagen en la página para cambiarla por tu propia foto.
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={busy || working !== null || slots === 0}
-          onClick={() => run("make")}
-          className="rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink transition hover:bg-accent-hover disabled:opacity-40"
-        >
-          {working === "make" ? "Creando… (puede tardar un minuto)" : slots === 0 ? "No hay espacios vacíos" : `✦ Generar imágenes con IA (${slots})`}
-        </button>
-        {used > 0 && (
-          <button type="button" disabled={busy || working !== null} onClick={() => run("remove")} className="text-xs font-semibold text-ink-muted underline hover:text-ink disabled:opacity-40">
-            {working === "remove" ? "Quitando…" : `Quitar las ${used} de IA`}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /** The exact date of an event, for the countdown. The text people read ("Jueves 12, 7 p. m.") is written on the page itself. */
 function EventDateEditor({ date, busy, onSave }: { date: string; busy: boolean; onSave: (date: string) => Promise<boolean> }) {
   const [value, setValue] = useState(date.slice(0, 16));
@@ -307,6 +266,45 @@ function EventDateEditor({ date, busy, onSave }: { date: string; busy: boolean; 
           {saving ? "Guardando…" : "Guardar"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** The picture slots of the page in one place: upload a photo or pick one from the catalog or from the uploaded ones. */
+function PhotosCard({ content, selected, busy, onPick }: { content: WebsiteContentV2; selected: number | null; busy: boolean; onPick: (index: number, field: "image" | "bgImage") => void }) {
+  type Slot = { key: string; index: number; field: "image" | "bgImage"; label: string; url: string | null };
+  const slots: Slot[] = [];
+  content.sections.forEach((s, i) => {
+    if (i === 0 && s.type === "hero" && s.variant !== "blank" && s.variant !== "product") slots.push({ key: `${i}image`, index: i, field: "image", label: "Foto de la portada", url: s.image ?? null });
+    if (s.type === "host") slots.push({ key: `${i}image`, index: i, field: "image", label: "Foto de «Quién está detrás»", url: s.image ?? null });
+    if (s.type === "promo") slots.push({ key: `${i}image`, index: i, field: "image", label: "Foto de la franja promocional", url: s.image ?? null });
+  });
+  if (selected !== null && content.sections[selected]) {
+    const s = content.sections[selected];
+    slots.push({ key: `${selected}bg`, index: selected, field: "bgImage", label: `Foto de fondo de «${SECTION_LABELS[s.type]}»`, url: s.bgImage ?? null });
+  }
+  return (
+    <div className="space-y-2 rounded-xl border border-border bg-background p-3">
+      <p className="text-sm font-bold">🖼 Fotos de tu página</p>
+      <p className="text-[12px] text-ink-muted">Sube tus fotos o elige las de tu catálogo y las que ya subiste. También puedes tocar cualquier imagen en la página para cambiarla.</p>
+      <ul className="space-y-1.5">
+        {slots.map((slot) => (
+          <li key={slot.key}>
+            <button type="button" disabled={busy} onClick={() => onPick(slot.index, slot.field)} className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-2 text-left transition hover:border-accent disabled:opacity-50">
+              {slot.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={slot.url} alt="" className="h-12 w-12 flex-none rounded-md object-cover" />
+              ) : (
+                <span aria-hidden="true" className="flex h-12 w-12 flex-none items-center justify-center rounded-md border-2 border-dashed border-border-strong text-lg text-ink-muted">＋</span>
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-semibold text-ink">{slot.label}</span>
+                <span className="block text-[12px] text-accent">{slot.url ? "Cambiar foto" : "Subir o elegir una foto"}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
