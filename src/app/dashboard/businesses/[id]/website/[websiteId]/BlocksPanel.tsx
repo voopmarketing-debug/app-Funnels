@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SECTION_LABELS, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import type { BlockOp } from "@/lib/websiteBlocks";
+import { AI_IMAGES_PER_PAGE, aiImagesInUse, planImageSlots } from "@/lib/websiteImages";
 import { BlockGrid, NEW_BLOCK_MIME } from "./BlockLibrary";
 
 const MOVE_MIME = "application/x-fl-move-block";
@@ -46,6 +47,8 @@ export function BlocksPanel({
   onStyle,
   onToggleHidden,
   onSaveHtml,
+  onGenerateImages,
+  onRemoveAiImages,
 }: {
   content: WebsiteContentV2;
   selected: number | null;
@@ -55,6 +58,8 @@ export function BlocksPanel({
   onStyle: (index: number) => void;
   onToggleHidden: (index: number) => void;
   onSaveHtml: (index: number, code: string, height: number) => Promise<boolean>;
+  onGenerateImages: () => Promise<void>;
+  onRemoveAiImages: () => Promise<void>;
 }) {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [dropAt, setDropAt] = useState<number | null>(null);
@@ -106,6 +111,8 @@ export function BlocksPanel({
           </div>
         )}
       </div>
+
+      <AiImagesCard content={content} busy={busy} onGenerate={onGenerateImages} onRemove={onRemoveAiImages} />
 
       {selected !== null && content.sections[selected]?.type === "html" && (
         <HtmlCodeEditor key={`${selected}`} section={content.sections[selected] as Extract<WebsiteContentV2["sections"][number], { type: "html" }>} busy={busy} onSave={(code, height) => onSaveHtml(selected, code, height)} />
@@ -249,6 +256,45 @@ function HtmlCodeEditor({ section, busy, onSave }: { section: { code: string; he
       >
         {saving ? "Guardando…" : dirty ? "Guardar código" : "Guardado"}
       </button>
+    </div>
+  );
+}
+
+/** "Generar imágenes con IA": fills the empty picture slots; any of them can be swapped for the owner's own photo by tapping it. */
+function AiImagesCard({ content, busy, onGenerate, onRemove }: { content: WebsiteContentV2; busy: boolean; onGenerate: () => Promise<void>; onRemove: () => Promise<void> }) {
+  const [working, setWorking] = useState<"make" | "remove" | null>(null);
+  const used = aiImagesInUse(content);
+  const room = Math.max(0, AI_IMAGES_PER_PAGE - used);
+  const slots = planImageSlots(content, room).length;
+  async function run(kind: "make" | "remove") {
+    setWorking(kind);
+    try {
+      await (kind === "make" ? onGenerate() : onRemove());
+    } finally {
+      setWorking(null);
+    }
+  }
+  return (
+    <div className="space-y-2 rounded-xl border border-border bg-background p-3">
+      <p className="text-sm font-bold">🖼 Imágenes con IA</p>
+      <p className="text-[12px] text-ink-muted">
+        Llena con fotos de ambiente las imágenes vacías de tu página (máximo {AI_IMAGES_PER_PAGE}). Nunca crea personas: solo espacios y objetos de tu rubro. Toca cualquier imagen en la página para cambiarla por tu propia foto.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy || working !== null || slots === 0}
+          onClick={() => run("make")}
+          className="rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink transition hover:bg-accent-hover disabled:opacity-40"
+        >
+          {working === "make" ? "Creando… (puede tardar un minuto)" : slots === 0 ? "No hay espacios vacíos" : `✦ Generar imágenes con IA (${slots})`}
+        </button>
+        {used > 0 && (
+          <button type="button" disabled={busy || working !== null} onClick={() => run("remove")} className="text-xs font-semibold text-ink-muted underline hover:text-ink disabled:opacity-40">
+            {working === "remove" ? "Quitando…" : `Quitar las ${used} de IA`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -54,10 +54,23 @@ export function TemplateThumb({ card }: { card: TemplateCard }) {
     <span style={{ display: "inline-block", background: c.primary, color: card.dark ? "#0a0a0a" : "#fff", borderRadius: "99cqw", padding: "1.3cqw 3.4cqw", fontSize: "2.3cqw", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</span>
   );
 
-  const block = (type: TemplateCard["shape"][number], key: number) => {
+  const block = (item: TemplateCard["shape"][number], key: number) => {
     const box: CSSProperties = { background: c.surface, borderRadius: "2cqw" };
+    const { type, variant } = item;
     switch (type) {
       case "trustBar":
+        if (variant === "ticker") {
+          return (
+            <div key={key} style={{ display: "flex", gap: "3cqw", alignItems: "center", overflow: "hidden", borderBlock: `0.3cqw solid ${soft}`, padding: "1.6cqw 0" }}>
+              {[0, 1, 2, 3].map((n) => (
+                <span key={n} style={{ display: "flex", alignItems: "center", gap: "3cqw", flex: "none" }}>
+                  <i style={bar("14cqw", muted)} />
+                  <i style={{ width: "1.6cqw", height: "1.6cqw", borderRadius: "99cqw", background: c.primary }} />
+                </span>
+              ))}
+            </div>
+          );
+        }
         return (
           <div key={key} style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "2cqw" }}>
             {[0, 1, 2].map((n) => (
@@ -69,6 +82,35 @@ export function TemplateThumb({ card }: { card: TemplateCard }) {
           </div>
         );
       case "features":
+        if (variant === "bento") {
+          return (
+            <div key={key} style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gridTemplateRows: "repeat(2,7cqw)", gap: "2cqw" }}>
+              <div style={{ ...box, gridRow: "span 2", background: `color-mix(in srgb, ${c.primary} 16%, ${c.surface})`, padding: "2cqw", display: "grid", alignContent: "end", gap: "1cqw" }}>
+                <i style={bar("70%", muted)} />
+                <i style={bar("90%")} />
+              </div>
+              <div style={{ ...box, gridColumn: "span 2", padding: "2cqw", display: "grid", alignContent: "center", gap: "1cqw" }}>
+                <i style={bar("50%", muted)} />
+                <i style={bar("85%")} />
+              </div>
+              <div style={{ ...box, padding: "2cqw" }}><i style={bar("70%", muted)} /></div>
+              <div style={{ ...box, padding: "2cqw" }}><i style={bar("70%", muted)} /></div>
+            </div>
+          );
+        }
+        if (variant === "numbered") {
+          return (
+            <div key={key} style={{ display: "grid" }}>
+              {[1, 2, 3].map((n) => (
+                <div key={n} style={{ display: "grid", gridTemplateColumns: "6cqw 1fr 1.5fr", gap: "2cqw", alignItems: "center", borderTop: `0.3cqw solid ${soft}`, padding: "1.8cqw 0" }}>
+                  <i style={{ ...bar("4cqw", c.primary), height: "1.6cqw" }} />
+                  <i style={bar("80%", muted)} />
+                  <i style={bar("90%")} />
+                </div>
+              ))}
+            </div>
+          );
+        }
         return (
           <div key={key} style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "2cqw" }}>
             {[0, 1, 2].map((n) => (
@@ -81,6 +123,33 @@ export function TemplateThumb({ card }: { card: TemplateCard }) {
           </div>
         );
       case "steps":
+        if (variant === "timeline") {
+          return (
+            <div key={key} style={{ display: "grid" }}>
+              {[1, 2, 3].map((n) => (
+                <div key={n} style={{ display: "grid", gridTemplateColumns: "9cqw 1fr", gap: "2.4cqw", alignItems: "center", borderTop: `0.3cqw solid ${soft}`, padding: "1.6cqw 0" }}>
+                  <i style={{ ...bar("8cqw", c.primary), height: "3.4cqw", opacity: 0.85 }} />
+                  <div style={{ display: "grid", gap: "1cqw" }}>
+                    <i style={bar("55%", muted)} />
+                    <i style={bar("85%")} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        if (variant === "big") {
+          return (
+            <div key={key} style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "2cqw" }}>
+              {[1, 2].map((n) => (
+                <div key={n} style={{ border: `0.3cqw solid ${soft}`, borderRadius: "2cqw", padding: "2cqw", display: "grid", gap: "1cqw" }}>
+                  <span style={{ fontSize: "7cqw", lineHeight: 1, fontWeight: 700, color: "transparent", WebkitTextStroke: `0.35cqw ${c.primary}` }}>{`0${n}`}</span>
+                  <i style={bar("70%", muted)} />
+                </div>
+              ))}
+            </div>
+          );
+        }
         return (
           <div key={key} style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "2cqw" }}>
             {[1, 2, 3, 4].map((n) => (
@@ -93,6 +162,21 @@ export function TemplateThumb({ card }: { card: TemplateCard }) {
           </div>
         );
       case "objections":
+        if (variant === "split") {
+          return (
+            <div key={key} style={{ display: "grid", gridTemplateColumns: "1fr 1.7fr", gap: "3cqw" }}>
+              <div style={{ display: "grid", gap: "1.2cqw", alignContent: "start" }}>
+                <i style={bar("60%", c.primary)} />
+                <i style={bar("90%", muted)} />
+              </div>
+              <div style={{ display: "grid", gap: "1.2cqw" }}>
+                {[0, 1, 2].map((n) => (
+                  <div key={n} style={{ ...box, padding: "1.4cqw 2cqw" }}><i style={bar("65%", muted)} /></div>
+                ))}
+              </div>
+            </div>
+          );
+        }
         return (
           <div key={key} style={{ display: "grid", gap: "1.4cqw" }}>
             {[0, 1, 2].map((n) => (
@@ -169,6 +253,14 @@ export function TemplateThumb({ card }: { card: TemplateCard }) {
           </div>
         );
       case "cta":
+        if (variant === "giant") {
+          return (
+            <div key={key} style={{ display: "grid", gap: "1.4cqw", padding: "1cqw 0" }}>
+              <span style={{ fontSize: "8cqw", lineHeight: 0.95, fontWeight: 700, letterSpacing: "-0.04em", fontFamily: `"${card.headingFont}", ui-sans-serif, system-ui, sans-serif` }}>{card.cta}</span>
+              <i style={pill("22cqw")} />
+            </div>
+          );
+        }
         return (
           <div key={key} style={{ textAlign: "center", display: "grid", gap: "1.4cqw", justifyItems: "center", padding: "1cqw 0" }}>
             <i style={bar("55%", muted)} />
@@ -181,6 +273,7 @@ export function TemplateThumb({ card }: { card: TemplateCard }) {
   };
 
   const split = card.heroVariant === "split";
+  const wordmark = card.heroVariant === "wordmark";
   return (
     <div
       aria-hidden="true"
@@ -195,7 +288,17 @@ export function TemplateThumb({ card }: { card: TemplateCard }) {
       </div>
 
       <div style={{ padding: "5cqw", display: "grid", gap: "4cqw" }}>
-        {split ? (
+        {wordmark ? (
+          <div style={{ display: "grid", gap: "1.6cqw" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `0.3cqw solid ${soft}`, paddingBottom: "1.2cqw" }}>
+              <i style={bar("18cqw", muted)} />
+              <i style={bar("8cqw", muted)} />
+            </div>
+            <span style={{ fontSize: "15cqw", lineHeight: 0.85, fontWeight: 700, letterSpacing: "-0.05em", fontFamily: `"${card.headingFont}", ui-sans-serif, system-ui, sans-serif`, whiteSpace: "nowrap", overflow: "hidden" }}>Tu negocio</span>
+            {heading("3.6cqw")}
+            {button(card.cta)}
+          </div>
+        ) : split ? (
           <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr", gap: "4cqw", alignItems: "center" }}>
             <div style={{ display: "grid", gap: "1.8cqw", justifyItems: "start" }}>
               {eyebrow()}

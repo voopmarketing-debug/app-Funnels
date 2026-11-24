@@ -5,7 +5,7 @@ import { TrackingSettings } from "./TrackingSettings";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { applyWebsitePromptV2, editWebsiteBlocksV2, regenerateWebsitePageV2, restoreWebsiteContentV2, setWebsiteSectionImageV2, updateWebsiteDesignV2, updateWebsiteTextV2 } from "@/lib/actions";
+import { applyWebsitePromptV2, editWebsiteBlocksV2, generateWebsiteImagesV2, removeWebsiteAiImagesV2, regenerateWebsitePageV2, restoreWebsiteContentV2, setWebsiteSectionImageV2, updateWebsiteDesignV2, updateWebsiteTextV2 } from "@/lib/actions";
 import type { BlockOp } from "@/lib/websiteBlocks";
 import { lookParts, type Look } from "@/lib/websiteLook";
 import {
@@ -621,6 +621,26 @@ export function WebsiteBuilder({
               onStyle={(i) => {
                 setSelected(i);
                 setTab("estilo");
+              }}
+              onGenerateImages={async () => {
+                const res = await generateWebsiteImagesV2(businessId, websiteId);
+                if (!res.ok) {
+                  showToast(res.error);
+                  return;
+                }
+                adopt(res.content);
+                refreshPreview();
+                showToast(res.made === 1 ? "Listo: 1 imagen creada." : `Listo: ${res.made} imágenes creadas.`, true);
+              }}
+              onRemoveAiImages={async () => {
+                const res = await removeWebsiteAiImagesV2(businessId, websiteId);
+                if (!res.ok) {
+                  showToast(res.error);
+                  return;
+                }
+                adopt(res.content);
+                refreshPreview();
+                showToast("Imágenes de IA quitadas.", true);
               }}
               onSaveHtml={async (index, code, height) => {
                 const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "html", index, code, height });

@@ -642,6 +642,7 @@ export function CreationStudio({
 
                 <fieldset className="space-y-2">
                   <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Colores de tu marca (opcional)</legend>
+                  <p className="text-[12px] text-ink-muted">Toca el cuadro de color: se abre la paleta y ves cómo cambia al instante.</p>
                   <div className="flex flex-wrap items-center gap-3">
                     {(
                       [
@@ -655,6 +656,7 @@ export function CreationStudio({
                           label={`color ${label.toLowerCase()}`}
                           disabled={label === "Secundario" && !brandPrimary}
                           suggestions={suggestedColors}
+                          sizeClass="h-9 w-9"
                           onChange={(hex) => set(hex)}
                           onClear={() => set(null)}
                         />

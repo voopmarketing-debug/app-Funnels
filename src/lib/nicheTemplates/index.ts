@@ -35,12 +35,12 @@ export type TemplateCard = {
   number: number;
   name: string;
   strategy: string;
-  shape: Section["type"][];
+  shape: { type: Section["type"]; variant?: string }[];
   style: StyleKey;
   dark: boolean;
   colors: { primary: string; bg: string; surface: string; text: string };
   headingFont: string;
-  heroVariant: "split" | "centered" | "giant";
+  heroVariant: "split" | "centered" | "giant" | "wordmark";
   heroForm: boolean;
   eyebrow: string;
   heading: string;
@@ -66,7 +66,8 @@ export function listTemplateCards(): TemplateCard[] {
       const style = niche.styleOrder[i];
       const theme = STYLE_THEME[style];
       const angle = niche.angles[i];
-      const hero = bp.build(niche, angle, "Tu negocio")[0];
+      const built = bp.build(niche, angle, "Tu negocio");
+      const hero = built[0];
       cards.push({
         id: idOf(niche.id, i),
         nicheId: niche.id,
@@ -76,12 +77,12 @@ export function listTemplateCards(): TemplateCard[] {
         number: i + 1,
         name: bp.name,
         strategy: bp.strategy,
-        shape: bp.shape,
+        shape: built.map((sec) => ({ type: sec.type, variant: "variant" in sec && typeof sec.variant === "string" ? sec.variant : undefined })),
         style,
         dark: isDark(theme.backgroundColor),
         colors: { primary: theme.primaryColor, bg: theme.backgroundColor, surface: theme.surfaceColor, text: theme.textColor },
         headingFont: theme.headingFont,
-        heroVariant: hero.type === "hero" && (hero.variant === "centered" || hero.variant === "giant") ? hero.variant : "split",
+        heroVariant: hero.type === "hero" && (hero.variant === "centered" || hero.variant === "giant" || hero.variant === "wordmark") ? hero.variant : "split",
         heroForm: hero.type === "hero" ? hero.showLeadForm : false,
         eyebrow: angle.eyebrow.replaceAll("{negocio}", "Tu negocio"),
         heading: angle.heading,
@@ -123,6 +124,7 @@ export function buildNicheContent(
     theme: { ...STYLE_THEME[style], primaryColor: accent } as WebsiteContentV2["theme"],
     sections,
     hidden: [],
+    ...(BLUEPRINTS[index].counters ? { counters: true } : {}),
     heroCtaUrl: null,
   };
 }

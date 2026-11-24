@@ -212,5 +212,5 @@ export function carryOver(current: WebsiteContentV2, next: WebsiteContentV2): We
     const old = current.sections[source[i]];
     return old?.look && !s.look ? ({ ...s, look: old.look } as Section) : s;
   });
-  return { ...next, sections, hidden: remapHidden(current.hidden, source).filter((i) => i > 0) };
+  return { ...next, sections, hidden: remapHidden(current.hidden, source).filter((i) => i > 0), counters: current.counters, aiImages: current.aiImages };
 }

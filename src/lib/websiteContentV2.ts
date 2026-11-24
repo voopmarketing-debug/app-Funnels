@@ -102,9 +102,9 @@ const HeroSection = z.object({
   ...media,
   type: z.literal("hero"),
   variant: z
-    .enum(["split", "centered", "fullbleed", "product", "giant", "blank"])
+    .enum(["split", "centered", "fullbleed", "product", "giant", "blank", "wordmark"])
     .catch("split")
-    .describe("split: texto + imagen; centered: solo texto centrado; fullbleed: imagen de fondo a sangre; product: producto protagonista con precio; giant: titular gigante tipo campaña; blank: sin portada visible (solo para páginas en blanco, nunca lo uses)."),
+    .describe("split: texto + imagen; centered: solo texto centrado; fullbleed: imagen de fondo a sangre; product: producto protagonista con precio; giant: titular gigante tipo campaña; wordmark: el nombre del negocio gigante como logotipo y el titular debajo; blank: sin portada visible (solo para páginas en blanco, nunca lo uses)."),
   eyebrow: nullableText("Etiqueta corta sobre el titular, ej. 'Nueva colección' o 'Envíos a todo el país'."),
   heading: text(70, "Titular principal: la promesa concreta"),
   highlight: nullableText("1 a 4 palabras EXACTAS del heading que se pintan con el color de acento (ej. 'en 30 días'). null si no aplica."),
@@ -126,6 +126,7 @@ const HeroSection = z.object({
 const TrustBarSection = z.object({
   ...media,
   type: z.literal("trustBar"),
+  variant: z.enum(["row", "ticker"]).optional().catch(undefined),
   items: z
     .array(z.object({ icon: z.enum(ICON_KEYS).catch("check"), title: z.string(), description: z.string() }))
     .describe("Garantías de compra/servicio REALES (envío, pagos, cambios, soporte). Nada inventado."),
@@ -134,7 +135,7 @@ const TrustBarSection = z.object({
 const FeaturesSection = z.object({
   ...media,
   type: z.literal("features"),
-  variant: z.enum(["cards", "icons", "list"]).catch("cards"),
+  variant: z.enum(["cards", "icons", "list", "bento", "numbered"]).catch("cards"),
   kicker: nullableText("Etiqueta pequeña sobre el título, ej. 'Lo que ofrecemos'."),
   heading: text(80, "Título con beneficio, no una etiqueta"),
   intro: nullableText("Frase corta opcional bajo el título."),
@@ -144,6 +145,7 @@ const FeaturesSection = z.object({
 const StepsSection = z.object({
   ...media,
   type: z.literal("steps"),
+  variant: z.enum(["row", "timeline", "big"]).optional().catch(undefined),
   kicker: nullableText("Etiqueta pequeña, ej. 'Cómo funciona'."),
   heading: text(80, "Título con beneficio"),
   items: z.array(item),
@@ -279,6 +281,7 @@ const HostSection = z.object({
 const ObjectionsSection = z.object({
   ...media,
   type: z.literal("objections"),
+  variant: z.enum(["list", "split"]).optional().catch(undefined),
   kicker: nullableText("Etiqueta, ej. 'Preguntas frecuentes'."),
   heading: text(80, "Título que desactive la duda principal"),
   items: z.array(z.object({ question: z.string(), answer: z.string() })),
@@ -311,6 +314,7 @@ const LeadFormSection = z.object({
 const CtaSection = z.object({
   ...media,
   type: z.literal("cta"),
+  variant: z.enum(["band", "giant"]).optional().catch(undefined),
   heading: text(80, "Invitación final a dar el paso hoy"),
   body: text(180, "Frase que reduzca el riesgo de escribir"),
   ctaLabel: text(30, "Botón"),
@@ -392,6 +396,10 @@ export type AiWebsiteV2 = z.infer<typeof AiWebsiteV2Schema>;
 export const WebsiteContentV2Schema = AiWebsiteV2Schema.extend({
   version: z.literal(2),
   hidden: z.array(z.number().int()).catch([]),
+  /** Small mono counters ("02 / 08") before each section's label. A look the template sets; the AI never decides it. */
+  counters: z.boolean().optional().catch(undefined),
+  /** Addresses of the pictures the platform created with AI on this page (so they can be counted, replaced or removed). */
+  aiImages: z.array(z.string()).max(12).optional().catch(undefined),
   heroCtaUrl: z.string().regex(/^$|^https?:\/\/.+/).nullable().catch(null),
 });
 export type WebsiteContentV2 = z.infer<typeof WebsiteContentV2Schema>;

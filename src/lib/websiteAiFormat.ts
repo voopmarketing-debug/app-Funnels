@@ -55,7 +55,7 @@ export const AiSectionSchema = z.object({
     .string()
     .nullable()
     .catch(null)
-    .describe("hero: split | centered | fullbleed | product | giant. features: cards | icons | list. productGrid: grid | row | featured. Resto: null."),
+    .describe("hero: split | centered | fullbleed | product | giant | wordmark. features: cards | icons | list | bento | numbered. steps: row | timeline | big. objections: list | split. cta: band | giant. trustBar: row | ticker. productGrid: grid | row | featured. Resto: null."),
   tone: z.enum(["dark", "accent", "soft"]).nullable().catch(null).describe("Solo promo."),
   kicker: z.string().nullable().catch(null).describe("Etiqueta pequeña sobre el título (en hero es la etiqueta sobre el titular). null si no aplica."),
   heading: z.string().describe("Título de la sección. En stats y trustBar puede ir vacío."),
@@ -119,11 +119,11 @@ function toTypedBase(s: AiSection): unknown {
         productId: s.productId,
       };
     case "trustBar":
-      return { type: "trustBar", items: items(s) };
+      return { type: "trustBar", variant: s.variant, items: items(s) };
     case "features":
       return { type: "features", variant: s.variant, kicker: s.kicker, heading: s.heading, intro: s.body, items: items(s) };
     case "steps":
-      return { type: "steps", kicker: s.kicker, heading: s.heading, items: s.items.map((i) => ({ title: i.title, description: i.text })) };
+      return { type: "steps", variant: s.variant, kicker: s.kicker, heading: s.heading, items: s.items.map((i) => ({ title: i.title, description: i.text })) };
     case "productGrid":
       return { type: "productGrid", variant: s.variant, kicker: s.kicker, heading: s.heading, productIds: s.productIds, showCategoryFilter: s.showCategoryFilter ?? false };
     case "productSpotlight":
@@ -164,7 +164,7 @@ function toTypedBase(s: AiSection): unknown {
     case "host":
       return { type: "host", kicker: s.kicker, heading: s.heading, name: s.name ?? "", role: s.role, body: s.body ?? "" };
     case "objections":
-      return { type: "objections", kicker: s.kicker, heading: s.heading, items: s.items.map((i) => ({ question: i.title, answer: i.text })) };
+      return { type: "objections", variant: s.variant, kicker: s.kicker, heading: s.heading, items: s.items.map((i) => ({ question: i.title, answer: i.text })) };
     case "stats":
       return { type: "stats", items: s.items.map((i) => ({ value: i.title, label: i.text })) };
     case "gallery":
@@ -172,7 +172,7 @@ function toTypedBase(s: AiSection): unknown {
     case "leadForm":
       return { type: "leadForm", kicker: s.kicker, heading: s.heading, body: s.body ?? "", buttonLabel: s.ctaLabel ?? "Quiero que me contacten" };
     case "cta":
-      return { type: "cta", heading: s.heading, body: s.body ?? "", ctaLabel: s.ctaLabel ?? "Escríbenos" };
+      return { type: "cta", variant: s.variant, heading: s.heading, body: s.body ?? "", ctaLabel: s.ctaLabel ?? "Escríbenos" };
   }
 }
 
@@ -230,11 +230,11 @@ function toAiSectionBase(s: Section): AiSection {
     case "hero":
       return { ...base, variant: s.variant, kicker: s.eyebrow, heading: s.heading, highlight: s.highlight, body: s.subheading, chips: s.chips, showLeadForm: s.showLeadForm, ctaLabel: s.ctaLabel, secondaryCtaLabel: s.secondaryCtaLabel, badge: s.badge, productId: s.productId };
     case "trustBar":
-      return { ...base, items: s.items.map((i) => it(i.title, i.description, i.icon)) };
+      return { ...base, variant: s.variant ?? null, items: s.items.map((i) => it(i.title, i.description, i.icon)) };
     case "features":
       return { ...base, variant: s.variant, kicker: s.kicker, heading: s.heading, body: s.intro, items: s.items.map((i) => it(i.title, i.description, i.icon)) };
     case "steps":
-      return { ...base, kicker: s.kicker, heading: s.heading, items: s.items.map((i) => it(i.title, i.description)) };
+      return { ...base, variant: s.variant ?? null, kicker: s.kicker, heading: s.heading, items: s.items.map((i) => it(i.title, i.description)) };
     case "productGrid":
       return { ...base, variant: s.variant, kicker: s.kicker, heading: s.heading, productIds: s.productIds, showCategoryFilter: s.showCategoryFilter };
     case "productSpotlight":
@@ -262,7 +262,7 @@ function toAiSectionBase(s: Section): AiSection {
     case "host":
       return { ...base, kicker: s.kicker, heading: s.heading, name: s.name, role: s.role, body: s.body };
     case "objections":
-      return { ...base, kicker: s.kicker, heading: s.heading, items: s.items.map((i) => it(i.question, i.answer)) };
+      return { ...base, variant: s.variant ?? null, kicker: s.kicker, heading: s.heading, items: s.items.map((i) => it(i.question, i.answer)) };
     case "stats":
       return { ...base, items: s.items.map((i) => it(i.value, i.label)) };
     case "gallery":
@@ -270,7 +270,7 @@ function toAiSectionBase(s: Section): AiSection {
     case "leadForm":
       return { ...base, kicker: s.kicker, heading: s.heading, body: s.body, ctaLabel: s.buttonLabel };
     case "cta":
-      return { ...base, heading: s.heading, body: s.body, ctaLabel: s.ctaLabel };
+      return { ...base, variant: s.variant ?? null, heading: s.heading, body: s.body, ctaLabel: s.ctaLabel };
   }
 }
 

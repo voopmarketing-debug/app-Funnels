@@ -41,6 +41,13 @@ Dirección visual buscada: ${direction}
 
 Debe ser una FOTOGRAFÍA realista de alta calidad — nunca una ilustración, render 3D, clip art ni ícono. Composición horizontal amplia, con espacio de aire para poner texto encima a un lado, buena luz natural, look editorial/premium. Sin texto, sin logos, sin marcas de agua, sin caras ni manos reconocibles de personas específicas.`;
 
+  return generateImageFromPrompt(prompt, "hero.png");
+}
+
+/** One image from a ready prompt, stored in the platform's file storage. Null on any failure (no key, refusal, outage). */
+export async function generateImageFromPrompt(prompt: string, filename = "image.png"): Promise<string | null> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
   try {
     const response = await fetch(`${OPENAI_API_BASE}/images/generations`, {
       method: "POST",
@@ -69,12 +76,12 @@ Debe ser una FOTOGRAFÍA realista de alta calidad — nunca una ilustración, re
 
     const { url } = await uploadAttachment({
       bytes: Buffer.from(b64, "base64"),
-      filename: "hero.png",
+      filename,
       contentType: "image/png",
     });
     return url;
   } catch (err) {
-    console.error("generateHeroImage failed:", err);
+    console.error("generateImageFromPrompt failed:", err);
     return null;
   }
 }

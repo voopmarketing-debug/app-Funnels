@@ -351,7 +351,15 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   // "{mes}" becomes the current month (the page script keeps it right as the months go by); the editor sees the raw token.
   const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   const rich = (text: string) => (edit ? esc(text) : esc(text).replace(/\{mes\}/g, `<span data-month>${MONTHS[new Date().getMonth()]}</span>`));
-  const kickerHtml = (k: string | null | undefined, path?: string) => (k ? `<p class="kicker"${path ? ed(path) : ""}>${rich(k)}</p>` : "");
+  // "02 / 08": a small mono counter before the label of each section, when the template asks for it.
+  const visibleOrder = new Map(sections.map(({ i }, n) => [i, n + 1]));
+  let currentNo = 0;
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const kickerHtml = (k: string | null | undefined, path?: string) => {
+    if (!k) return "";
+    const p = `<p class="kicker"${path ? ed(path) : ""}>${rich(k)}</p>`;
+    return content.counters && currentNo > 0 ? `<div class="k-row"><span class="k-n" aria-hidden="true">${pad2(currentNo)} / ${pad2(sections.length)}</span>${p}</div>` : p;
+  };
 
   // Paints the AI-chosen words of the headline in the accent color.
   const headline = (heading: string, highlight: string | null | undefined) => {
@@ -373,6 +381,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         </form>`;
 
   const renderSection = (s: Section, index: number): string => {
+    currentNo = visibleOrder.get(index) ?? 0;
     // Path of a field of this section, and the marker of its main picture.
     const fp = (field: string) => `sections.${index}.${field}`;
     const imgMark = edit ? ` data-img="${index}"` : "";
@@ -424,6 +433,18 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
             </div>
           </div></section>`;
         }
+        if (s.variant === "wordmark") {
+          const name = ctx.businessName;
+          const size = name.length <= 8 ? "wm-xl" : name.length <= 14 ? "wm-lg" : "wm-md";
+          return `<section class="hero hero-wm" id="inicio"><div class="wrap">
+            <div class="wm-top">${s.eyebrow ? `<span${ed(fp("eyebrow"))}>${esc(s.eyebrow)}</span>` : "<span></span>"}<span aria-hidden="true">${esc(content.counters ? "01 / " + pad2(sections.length) : "Inicio")}</span></div>
+            <p class="wm ${size}" aria-hidden="true">${esc(name)}</p>
+            ${h1("wm-h1")}
+            <div class="wm-row"><div><p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}</div><div class="hero-actions">${primaryBtn}${secondaryBtn}</div></div>
+            ${heroBg ?? mainImage ? `<img class="wm-img" src="${esc((heroBg ?? mainImage) as string)}" alt=""${imgMark}>` : ""}
+            <p class="scroll-hint" aria-hidden="true">Desliza para explorar ↓</p>${badge}
+          </div></section>`;
+        }
         // A background photo chosen by the owner turns the portada into the full-photo one.
         const fullImage = heroBg ?? (s.variant === "fullbleed" ? mainImage : null);
         if (fullImage) {
@@ -462,24 +483,35 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       }
 
       case "trustBar":
+        if (s.variant === "ticker" && !edit) {
+          const titles = s.items.slice(0, 4).map((it) => it.title).filter(Boolean);
+          if (titles.length === 0) return "";
+          const run = Array.from({ length: 6 }, () => titles.map((t) => `<span>${esc(t)}</span>`).join("")).join("");
+          return `<section class="mq mq-trust"><ul class="sr-only">${titles.map((t) => `<li>${esc(t)}</li>`).join("")}</ul><div class="mq-row" aria-hidden="true"><div class="mq-track">${run}</div></div></section>`;
+        }
         return `<section class="trust"><div class="wrap trust-grid">${s.items
           .slice(0, 4)
           .map((it, ii) => `<div class="trust-item">${icon(it.icon)}<div><p class="t-title"${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</p><p class="t-desc"${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p></div></div>`)
           .join("")}</div></section>`;
 
-      case "features":
+      case "features": {
+        const list = s.items.slice(0, s.variant === "bento" ? 6 : 6);
+        const item = (it: (typeof list)[number], ii: number) => {
+          const t = `<h3${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</h3>`;
+          const d = `<p${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p>`;
+          if (s.variant === "numbered") return `<div class="feat-item"><span class="feat-num" aria-hidden="true">${pad2(ii + 1)}</span>${t}${d}</div>`;
+          return `<div class="feat-item">${s.variant !== "list" ? `<span class="feat-ico">${icon(it.icon)}</span>` : `<span class="feat-check">${icon("check")}</span>`}<div>${t}${d}</div></div>`;
+        };
         return `<section class="sec" id="${index === 1 ? "detalles" : `s${index}`}"><div class="wrap">
           ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>${s.intro ? `<p class="intro"${ed(fp("intro"))}>${esc(s.intro)}</p>` : ""}
-          <div class="feat feat-${s.variant}">${s.items
-            .slice(0, 6)
-            .map((it, ii) => `<div class="feat-item">${s.variant !== "list" ? `<span class="feat-ico">${icon(it.icon)}</span>` : `<span class="feat-check">${icon("check")}</span>`}<div><h3${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</h3><p${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p></div></div>`)
-            .join("")}</div>
+          <div class="feat feat-${s.variant}" data-n="${list.length}">${list.map(item).join("")}</div>
         </div></section>`;
+      }
 
       case "steps":
         return `<section class="sec alt" id="como-funciona"><div class="wrap">
           ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
-          <ol class="steps">${s.items
+          <ol class="steps steps-${s.variant ?? "row"}">${s.items
             .slice(0, 4)
             .map((it, i) => `<li><span class="step-n">${String(i + 1).padStart(2, "0")}</span><h3${ed(fp(`items.${i}.title`))}>${esc(it.title)}</h3><p${ed(fp(`items.${i}.description`))}>${esc(it.description)}</p></li>`)
             .join("")}</ol>
@@ -714,14 +746,19 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         </div></section>`;
       }
 
-      case "objections":
+      case "objections": {
+        const faqList = `<div class="faq">${s.items
+          .slice(0, 6)
+          .map((o, i) => `<details${i === 0 ? " open" : ""}><summary><span${ed(fp(`items.${i}.question`))}>${esc(o.question)}</span><span class="faq-plus" aria-hidden="true">+</span></summary><p${ed(fp(`items.${i}.answer`))}>${esc(o.answer)}</p></details>`)
+          .join("")}</div>`;
+        if (s.variant === "split") {
+          return `<section class="sec" id="preguntas"><div class="wrap faq-split"><div class="faq-head">${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2></div>${faqList}</div></section>`;
+        }
         return `<section class="sec" id="preguntas"><div class="wrap narrow-lg">
           ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
-          <div class="faq">${s.items
-            .slice(0, 6)
-            .map((o, i) => `<details${i === 0 ? " open" : ""}><summary><span${ed(fp(`items.${i}.question`))}>${esc(o.question)}</span><span class="faq-plus" aria-hidden="true">+</span></summary><p${ed(fp(`items.${i}.answer`))}>${esc(o.answer)}</p></details>`)
-            .join("")}</div>
+          ${faqList}
         </div></section>`;
+      }
 
       case "stats":
         return `<section class="stats"><div class="wrap stats-grid">${s.items
@@ -741,6 +778,12 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         </div></section>`;
 
       case "cta":
+        if (s.variant === "giant") {
+          return `<section class="final-cta final-giant"><div class="wrap">
+          <h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
+          <div class="final-row"><p class="intro"${ed(fp("body"))}>${esc(s.body)}</p><a class="btn btn-lg" href="${esc(href("cta-final"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a></div>
+        </div></section>`;
+        }
         return `<section class="final-cta"><div class="wrap narrow center">
           <h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p class="intro"${ed(fp("body"))}>${esc(s.body)}</p>
           <a class="btn btn-lg" href="${esc(href("cta-final"))}"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</a>
@@ -882,7 +925,7 @@ section{position:relative}
 .hero-full .lead{color:rgba(255,255,255,.85)}
 .hero-full-inner{max-width:640px}
 .hero-full .btn-ghost{color:#fff;border-color:rgba(255,255,255,.5)}
-.giant{font-size:clamp(64px,15vw,220px)!important;line-height:.88;margin-bottom:.25em}
+.giant{font-size:clamp(64px,15vw,220px)!important;line-height:.98;margin-bottom:.25em}
 .giant-row{display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:end}
 .giant-img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:var(--r)}
 .hero-product-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:56px;align-items:center}
@@ -956,6 +999,58 @@ section{position:relative}
 .promo-inner{display:flex;align-items:center;justify-content:space-between;gap:32px}
 .promo h2{margin-bottom:.25em}
 .promo p{margin:0;opacity:.8;max-width:56ch}
+.k-row{display:flex;align-items:baseline;gap:14px;margin:0 0 14px}
+.k-row .kicker{margin:0}
+.k-n{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;font-weight:600;letter-spacing:.14em;color:var(--muted)}
+.hero-wm{padding:calc(var(--pad) * .55) 0 var(--pad);overflow:hidden}
+.wm-top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.wm{font-family:var(--hf);font-weight:${style.headingWeight};line-height:.98;letter-spacing:-.045em;margin:.1em 0 .06em;color:var(--text);overflow-wrap:anywhere;text-wrap:balance}
+.wm-xl{font-size:clamp(72px,22vw,320px)}.wm-lg{font-size:clamp(56px,15vw,240px)}.wm-md{font-size:clamp(40px,10vw,170px)}
+.wm-h1{font-size:clamp(22px,3.2vw,40px)!important;max-width:26ch;margin:.25em 0 .6em!important;line-height:1.15!important;letter-spacing:-.01em!important}
+.wm-row{display:flex;gap:32px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+.wm-row .lead{max-width:46ch;margin-bottom:0}
+.wm-img{display:block;width:100%;aspect-ratio:21/9;object-fit:cover;border-radius:var(--r);margin-top:44px}
+.scroll-hint{margin:26px 0 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.mq-trust{padding:16px 0}
+.mq-trust .mq-track span{font-family:var(--bf);font-weight:700;font-size:clamp(14px,1.5vw,18px);letter-spacing:.04em;text-transform:uppercase;color:var(--text);padding-right:2.4em}
+.mq-trust .mq-track span::after{content:"✦";margin-left:2.4em;color:var(--primary-ink)}
+.feat-bento{grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:minmax(150px,auto)}
+.feat-bento .feat-item{grid-column:span 2;padding:26px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);justify-content:space-between}
+.feat-bento .feat-item:nth-child(1){grid-column:span 3;grid-row:span 2;background:color-mix(in srgb,var(--primary) 12%,var(--surface))}
+.feat-bento .feat-item:nth-child(2),.feat-bento .feat-item:nth-child(3){grid-column:span 3}
+.feat-bento[data-n="4"] .feat-item:nth-child(4){grid-column:span 6}
+.feat-bento[data-n="5"] .feat-item:nth-child(4),.feat-bento[data-n="5"] .feat-item:nth-child(5){grid-column:span 3}
+.feat-bento[data-n="3"] .feat-item:nth-child(n+2){grid-column:span 3}
+.feat-bento .feat-item:nth-child(1) h3{font-size:clamp(22px,2.6vw,30px)}
+.feat-numbered{grid-template-columns:1fr;gap:0}
+.feat-numbered .feat-item{display:grid;grid-template-columns:72px minmax(0,1fr) minmax(0,1.4fr);gap:20px;align-items:baseline;padding:26px 0;border-top:1px solid var(--line)}
+.feat-numbered .feat-item:last-child{border-bottom:1px solid var(--line)}
+.feat-num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;font-weight:600;letter-spacing:.1em;color:var(--primary-ink)}
+.feat-numbered h3{margin:0;font-size:clamp(20px,2.4vw,28px)}
+.steps-timeline{grid-template-columns:1fr;gap:0}
+.steps-timeline li{display:grid;grid-template-columns:minmax(72px,150px) minmax(0,1fr);column-gap:24px;padding:28px 0;border-top:1px solid var(--line)}
+.steps-timeline li:last-child{border-bottom:1px solid var(--line)}
+.steps-timeline .step-n{grid-row:span 2;font-size:clamp(40px,6vw,76px);margin:0}
+.steps-timeline h3{margin:0 0 6px}
+.steps-big{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px}
+.steps-big li{border:1px solid var(--line);border-radius:var(--r);padding:28px;background:var(--bg)}
+.steps-big .step-n{font-size:clamp(64px,9vw,112px);color:transparent;-webkit-text-stroke:1.5px var(--primary-ink);margin-bottom:8px}
+.faq-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr);gap:clamp(28px,5vw,72px);align-items:start}
+.faq-split .faq-head{position:sticky;top:96px}
+.faq-split .faq{margin-top:0}
+.final-giant{text-align:left}
+.final-giant h2{font-size:clamp(40px,8.5vw,132px);line-height:1;letter-spacing:-.04em;max-width:14ch;margin:0 0 .4em}
+.final-row{display:flex;gap:32px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.final-row .intro{margin:0;max-width:44ch}
+@media (max-width:760px){
+  .feat-bento{grid-template-columns:1fr}
+  .feat-bento .feat-item,.feat-bento .feat-item:nth-child(n){grid-column:1!important;grid-row:auto!important}
+  .feat-numbered .feat-item{grid-template-columns:44px minmax(0,1fr);row-gap:6px}
+  .feat-numbered .feat-item p{grid-column:2}
+  .faq-split{grid-template-columns:1fr}
+  .faq-split .faq-head{position:static}
+  .steps-timeline li{grid-template-columns:56px minmax(0,1fr);column-gap:16px}
+}
 .htmlw{padding:0}
 .htmlw-frame{display:block;width:100%;border:0;background:transparent}
 .vid-frame{position:relative;aspect-ratio:16/9;width:100%;margin-top:28px;border-radius:var(--radius);overflow:hidden;background:#0b0b0f;box-shadow:0 24px 60px -24px rgba(0,0,0,.45)}

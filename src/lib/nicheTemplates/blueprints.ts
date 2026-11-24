@@ -7,14 +7,14 @@ export type Blueprint = {
   name: string;
   /** The conversion idea behind the arrangement, in one line. */
   strategy: string;
-  /** Section types in order, for the card's mini preview. */
-  shape: Section["type"][];
+  /** Small mono counters ("02 / 08") before each section label. */
+  counters?: boolean;
   build: (n: Niche, a: Angle, business: string) => Section[];
 };
 
 const fill = (text: string, business: string) => text.replaceAll("{negocio}", business);
 
-const hero = (a: Angle, business: string, variant: "split" | "centered" | "giant", showLeadForm = false): Section => ({
+const hero = (a: Angle, business: string, variant: "split" | "centered" | "giant" | "wordmark", showLeadForm = false): Section => ({
   type: "hero",
   variant,
   eyebrow: fill(a.eyebrow, business),
@@ -29,8 +29,8 @@ const hero = (a: Angle, business: string, variant: "split" | "centered" | "giant
   productId: null,
 });
 
-const trust = (n: Niche, count = 3): Section => ({ type: "trustBar", items: n.trust.slice(0, count) });
-const features = (n: Niche, variant: "cards" | "icons" | "list", count = 6): Section => ({
+const trust = (n: Niche, count = 3, variant: "row" | "ticker" = "row"): Section => ({ type: "trustBar", variant, items: n.trust.slice(0, count) });
+const features = (n: Niche, variant: "cards" | "icons" | "list" | "bento" | "numbered", count = 6): Section => ({
   type: "features",
   variant,
   kicker: n.servicesKicker,
@@ -38,8 +38,8 @@ const features = (n: Niche, variant: "cards" | "icons" | "list", count = 6): Sec
   intro: null,
   items: n.services.slice(0, count),
 });
-const steps = (n: Niche): Section => ({ type: "steps", kicker: n.stepsKicker, heading: n.stepsHeading, items: n.steps });
-const faq = (n: Niche, count = 4): Section => ({ type: "objections", kicker: "Preguntas frecuentes", heading: n.faqHeading, items: n.faq.slice(0, count) });
+const steps = (n: Niche, variant: "row" | "timeline" | "big" = "row"): Section => ({ type: "steps", variant, kicker: n.stepsKicker, heading: n.stepsHeading, items: n.steps });
+const faq = (n: Niche, count = 4, variant: "list" | "split" = "list"): Section => ({ type: "objections", variant, kicker: "Preguntas frecuentes", heading: n.faqHeading, items: n.faq.slice(0, count) });
 const host = (n: Niche, business: string): Section => ({
   type: "host",
   kicker: n.host.kicker,
@@ -63,7 +63,7 @@ const promo = (n: Niche, tone: "dark" | "accent" | "soft"): Section => ({
   body: n.promo.body,
   ctaLabel: n.promo.cta,
 });
-const cta = (n: Niche): Section => ({ type: "cta", heading: n.cta.heading, body: n.cta.body, ctaLabel: n.cta.label });
+const cta = (n: Niche, variant: "band" | "giant" = "band"): Section => ({ type: "cta", variant, heading: n.cta.heading, body: n.cta.body, ctaLabel: n.cta.label });
 const form = (n: Niche): Section => ({ type: "leadForm", kicker: n.form.kicker, heading: n.form.heading, body: n.form.body, buttonLabel: n.form.button });
 const marquee = (n: Niche): Section => ({ type: "marquee", lines: n.marquee });
 
@@ -75,84 +75,77 @@ export const BLUEPRINTS: Blueprint[] = [
     key: "cita-directa",
     name: "Cita directa",
     strategy: "Promesa clara, servicios y formulario: para quien ya sabe lo que busca.",
-    shape: ["hero", "trustBar", "features", "steps", "host", "objections", "leadForm"],
     build: (n, a, b) => [hero(a, b, "split"), trust(n), features(n, "cards"), steps(n), host(n, b), faq(n), form(n)],
   },
   {
     key: "formulario-en-portada",
     name: "Formulario en portada",
     strategy: "El formulario está desde el primer vistazo: menos pasos para escribirte.",
-    shape: ["hero", "trustBar", "features", "steps", "objections", "cta"],
-    build: (n, a, b) => [hero(a, b, "split", true), trust(n), features(n, "icons"), steps(n), faq(n), cta(n)],
+    build: (n, a, b) => [hero(a, b, "split", true), trust(n, 4, "ticker"), features(n, "bento", 5), steps(n, "timeline"), faq(n, 4, "split"), cta(n)],
   },
   {
     key: "problema-y-solucion",
     name: "Problema y solución",
     strategy: "Empieza por lo que le duele al cliente y lo compara con hacerlo por su cuenta.",
-    shape: ["hero", "comparison", "features", "steps", "objections", "leadForm"],
-    build: (n, a, b) => [hero(a, b, "centered"), comparison(n, b), features(n, "list"), steps(n), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "centered"), comparison(n, b), features(n, "numbered", 5), steps(n, "big"), faq(n), form(n)],
   },
   {
     key: "confianza-primero",
     name: "Confianza primero",
     strategy: "Presenta a quien atiende y las garantías antes de pedir el contacto.",
-    shape: ["hero", "host", "trustBar", "features", "objections", "cta"],
-    build: (n, a, b) => [hero(a, b, "split"), host(n, b), trust(n, 4), features(n, "cards"), faq(n, 5), cta(n)],
+    build: (n, a, b) => [hero(a, b, "split"), host(n, b), trust(n, 4), features(n, "icons"), faq(n, 5, "split"), cta(n)],
   },
   {
     key: "titular-gigante",
     name: "Titular gigante",
     strategy: "Un mensaje que se lee de lejos y un solo camino: escribirte.",
-    shape: ["hero", "marquee", "features", "steps", "cta", "objections", "leadForm"],
-    build: (n, a, b) => [hero(a, b, "giant"), marquee(n), features(n, "list"), steps(n), cta(n), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "giant"), marquee(n), features(n, "list"), steps(n, "timeline"), cta(n, "giant"), faq(n), form(n)],
   },
   {
     key: "paso-a-paso",
+    counters: true,
     name: "Paso a paso",
     strategy: "Quita el miedo a empezar mostrando exactamente qué pasa después de escribir.",
-    shape: ["hero", "steps", "features", "comparison", "objections", "leadForm"],
-    build: (n, a, b) => [hero(a, b, "centered"), steps(n), features(n, "icons"), comparison(n, b), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "centered"), steps(n, "big"), features(n, "bento", 6), comparison(n, b), faq(n), form(n)],
   },
   {
     key: "primer-paso",
+    counters: true,
     name: "Primer paso sin compromiso",
     strategy: "Una franja que invita a una primera conversación, sin descuentos inventados.",
-    shape: ["hero", "trustBar", "promo", "features", "steps", "objections", "leadForm"],
-    build: (n, a, b) => [hero(a, b, "split"), trust(n), promo(n, "accent"), features(n, "cards"), steps(n), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "wordmark"), trust(n), promo(n, "accent"), features(n, "cards"), steps(n), faq(n), form(n)],
   },
   {
     key: "servicios-primero",
+    counters: true,
     name: "Servicios primero",
     strategy: "Muestra todo lo que haces enseguida: para quien compara opciones.",
-    shape: ["hero", "features", "promo", "steps", "host", "leadForm"],
-    build: (n, a, b) => [hero(a, b, "centered"), features(n, "cards", 8), promo(n, "dark"), steps(n), host(n, b), form(n)],
+    build: (n, a, b) => [hero(a, b, "centered"), features(n, "bento", 6), promo(n, "dark"), steps(n, "timeline"), host(n, b), form(n)],
   },
   {
     key: "preguntas-primero",
     name: "Preguntas primero",
     strategy: "Responde las dudas antes que nada: ideal cuando el cliente duda de contratar.",
-    shape: ["hero", "objections", "features", "steps", "trustBar", "cta"],
-    build: (n, a, b) => [hero(a, b, "split"), faq(n, 6), features(n, "icons"), steps(n), trust(n), cta(n)],
+    build: (n, a, b) => [hero(a, b, "split"), faq(n, 6, "split"), features(n, "numbered", 5), steps(n), trust(n, 3, "ticker"), cta(n, "giant")],
   },
   {
     key: "minimal",
+    counters: true,
     name: "Minimal y directo",
     strategy: "Pocas secciones y mucho aire: carga rápido y va al grano.",
-    shape: ["hero", "features", "steps", "leadForm"],
-    build: (n, a, b) => [hero(a, b, "centered"), features(n, "list", 4), steps(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "wordmark"), features(n, "list", 4), steps(n, "big"), form(n)],
   },
   {
     key: "doble-llamado",
     name: "Doble llamado a la acción",
     strategy: "Un botón a mitad de la página y otro al final: para quien se decide leyendo.",
-    shape: ["hero", "features", "promo", "comparison", "steps", "objections", "cta", "leadForm"],
-    build: (n, a, b) => [hero(a, b, "split"), features(n, "icons"), promo(n, "soft"), comparison(n, b), steps(n), faq(n), cta(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "split"), features(n, "icons"), promo(n, "soft"), comparison(n, b), steps(n, "big"), faq(n), cta(n), form(n)],
   },
   {
     key: "garantias-y-proceso",
+    counters: true,
     name: "Garantías y proceso",
     strategy: "Pone el proceso y las garantías al frente para bajar la sensación de riesgo.",
-    shape: ["hero", "trustBar", "steps", "features", "host", "objections", "cta", "leadForm"],
-    build: (n, a, b) => [hero(a, b, "split"), trust(n, 4), steps(n), features(n, "cards"), host(n, b), faq(n, 5), cta(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "centered"), trust(n, 4), steps(n, "timeline"), features(n, "numbered", 5), host(n, b), faq(n, 5, "split"), cta(n), form(n)],
   },
 ];

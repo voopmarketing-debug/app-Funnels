@@ -34,9 +34,12 @@ import {
   type WabaPhoneNumber,
 } from "@/lib/whatsapp";
 import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator";
-import { generateHeroImage } from "@/lib/websiteHeroImage";
+import { generateHeroImage, generateImageFromPrompt } from "@/lib/websiteHeroImage";
+import { AI_IMAGES_PER_PAGE, MONTHLY_WEBSITE_IMAGE_LIMIT, aiImagesInUse, applyGeneratedImages, imagePrompt, planImageSlots, removeAiImages } from "@/lib/websiteImages";
+import { countRateLimitEvents } from "@/lib/rateLimit";
+import { INDUSTRY_LABELS } from "@/lib/websiteGenerator";
 import { withAiUsage } from "@/lib/aiUsage";
-import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
+import { assertWebsiteGenerationAllowed, monthWindow, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
 import { buildBlankContent, buildNicheContent, getNicheTemplate } from "@/lib/websiteNicheTemplates";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
@@ -3318,6 +3321,70 @@ export async function createWebsiteFromTemplate(
   }
 }
 
+/**
+ * "Generar imágenes con IA": fills the page's empty picture slots (the cover and a few soft
+ * backgrounds, never people) with pictures made by the platform, at most five per page and a flat
+ * monthly amount per business. Anything that fails is simply left empty.
+ */
+export async function generateWebsiteImagesV2(businessId: string, websiteId: string): Promise<BuilderResult<{ content: WebsiteContentV2; made: number }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
+
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const current = WebsiteContentV2Schema.parse(website.content);
+    const remainingOnPage = AI_IMAGES_PER_PAGE - aiImagesInUse(current);
+    if (remainingOnPage <= 0) throw new Error(`Esta página ya tiene ${AI_IMAGES_PER_PAGE} imágenes de IA. Cambia alguna por tu foto o quita las de IA para generar otras.`);
+
+    const key = `website-img:${businessId}`;
+    const usedThisMonth = await countRateLimitEvents(key, monthWindow(new Date()).start);
+    const remainingThisMonth = MONTHLY_WEBSITE_IMAGE_LIMIT - usedThisMonth;
+    if (remainingThisMonth <= 0) throw new Error(`Ya usaste las ${MONTHLY_WEBSITE_IMAGE_LIMIT} imágenes con IA de este mes para este negocio. Mientras tanto puedes subir tus propias fotos.`);
+
+    const slots = planImageSlots(current, Math.min(remainingOnPage, remainingThisMonth));
+    if (slots.length === 0) throw new Error("No hay espacios vacíos para imágenes en esta página: todos ya tienen una foto.");
+
+    const ctx = await buildWebsiteV2Context(businessId);
+    const nicheId = website.model?.startsWith("template:") ? (getNicheTemplate(website.model.slice(9))?.niche.id ?? null) : null;
+    const base = { businessName: ctx.businessName, industryLabel: INDUSTRY_LABELS[ctx.industry] ?? INDUSTRY_LABELS.otro, nicheId };
+
+    const results = await Promise.all(
+      slots.map(async (slot, i) => {
+        const url = await generateImageFromPrompt(imagePrompt(slot.kind, base, i), `ai-${slot.kind}-${i}.png`);
+        if (url) await recordRateLimitEvent(key);
+        return url ? { slot, url } : null;
+      }),
+    );
+    const placed = results.filter((r): r is NonNullable<typeof r> => !!r);
+    if (placed.length === 0) throw new Error("No se pudieron crear las imágenes ahora. Inténtalo de nuevo en unos minutos.");
+
+    const next = applyGeneratedImages(current, placed);
+    await prisma.website.update({ where: { id: websiteId }, data: { content: next } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, content: next, made: placed.length };
+  } catch (err) {
+    return builderError(`generateWebsiteImagesV2(${websiteId})`, err);
+  }
+}
+
+/** Takes the AI pictures off a page (the owner's own photos stay). */
+export async function removeWebsiteAiImagesV2(businessId: string, websiteId: string): Promise<BuilderResult<{ content: WebsiteContentV2 }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const next = removeAiImages(WebsiteContentV2Schema.parse(website.content));
+    await prisma.website.update({ where: { id: websiteId }, data: { content: next } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, content: next };
+  } catch (err) {
+    return builderError(`removeWebsiteAiImagesV2(${websiteId})`, err);
+  }
+}
+
 /** A page with nothing on it, to build block by block or with the owner's own HTML. */
 export async function createBlankWebsite(businessId: string, input: { name?: string; whatsappNumber?: string } = {}): Promise<BuilderResult<{ id: string }>> {
   try {
@@ -3706,7 +3773,10 @@ export async function restoreWebsiteContentV2(businessId: string, websiteId: str
 
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
     const allowed = await ownImageUrls(businessId, website.aiImageUrl);
-    for (const s of WebsiteContentV2Schema.parse(website.content).sections) for (const u of [s.image, s.bgImage]) if (u) allowed.add(u);
+    const stored = WebsiteContentV2Schema.parse(website.content);
+    for (const s of stored.sections) for (const u of [s.image, s.bgImage]) if (u) allowed.add(u);
+    // Pictures the platform made for this page stay valid for undo/redo even after they were taken off.
+    for (const u of stored.aiImages ?? []) allowed.add(u);
     for (const s of parsed.data.sections) for (const u of [s.image, s.bgImage]) if (u && !allowed.has(u)) throw new Error("Una foto de esa versión ya no está en tu biblioteca.");
 
     const content = { ...parsed.data, hidden: parsed.data.hidden.filter((i) => i > 0 && i < parsed.data.sections.length) };

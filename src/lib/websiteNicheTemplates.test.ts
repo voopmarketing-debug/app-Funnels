@@ -25,7 +25,7 @@ describe("niche template library", () => {
     for (const niche of NICHES) {
       const mine = cards.filter((c) => c.nicheId === niche.id);
       expect(new Set(mine.map((c) => c.style)).size).toBe(12); // every style once
-      expect(new Set(mine.map((c) => c.shape.join(">"))).size).toBe(12); // every arrangement different
+      expect(new Set(mine.map((c) => c.shape.map((x) => `${x.type}:${x.variant ?? ""}`).join(">"))).size).toBe(12); // every arrangement different
       expect(new Set(mine.map((c) => c.heading)).size).toBe(12); // every opening different
       expect(niche.styleOrder.slice().sort()).toEqual([...STYLE_KEYS].sort());
     }
@@ -89,10 +89,26 @@ describe("every template", () => {
     expect(buildNicheContent(t, { businessName: "X", brandColor: "nope" }).theme.primaryColor).not.toBe("nope");
   });
 
-  it("the blueprints fit the card shape", () => {
-    for (const bp of BLUEPRINTS) {
-      const built = bp.build(NICHES[0], NICHES[0].angles[0], "X").map((s) => s.type);
-      expect(built).toEqual(bp.shape);
+  it("every template of a niche has its own structure (section order and layouts)", () => {
+    for (const niche of NICHES) {
+      const signatures = BLUEPRINTS.map((bp, i) =>
+        bp
+          .build(niche, niche.angles[i], "X")
+          .map((s) => `${s.type}:${"variant" in s ? String(s.variant) : ""}`)
+          .join(">"),
+      );
+      expect(new Set(signatures).size, niche.id).toBe(BLUEPRINTS.length);
     }
+  });
+
+  it("uses the 2026 layouts across the library, not just the classic ones", () => {
+    const used = new Set<string>();
+    for (const bp of BLUEPRINTS) {
+      for (const s of bp.build(NICHES[0], NICHES[0].angles[0], "X")) if ("variant" in s) used.add(`${s.type}:${String(s.variant)}`);
+    }
+    for (const want of ["hero:wordmark", "features:bento", "features:numbered", "steps:timeline", "steps:big", "objections:split", "cta:giant", "trustBar:ticker"]) {
+      expect(used.has(want), want).toBe(true);
+    }
+    expect(BLUEPRINTS.filter((bp) => bp.counters).length).toBeGreaterThanOrEqual(3);
   });
 });
