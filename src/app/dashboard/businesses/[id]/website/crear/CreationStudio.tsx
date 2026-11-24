@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createWebsitePageV2, websiteCreationChat } from "@/lib/actions";
+import { clearWebsiteCreationDraft, createWebsitePageV2, saveWebsiteCreationDraft, websiteCreationChat } from "@/lib/actions";
 import { PAGE_TYPE_LABELS, STYLE_INFO, STYLE_KEYS, type PageType, type StyleKey } from "@/lib/websiteContentV2";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
@@ -105,48 +105,75 @@ function DevicePreviewFrame({ src, device }: { src: string; device: "desktop" | 
   );
 }
 
-// The conversation is kept in this device's browser, per business, so coming back (or reloading)
-// continues where it was instead of asking the AI to read the business again, which costs.
+// The conversation is kept on the server (per person and business) and also in this browser, so a
+// reload, the phone unloading the page, another device or a cleared browser never loses what was
+// being decided, and coming back does not ask the AI to read the business again (that costs).
 const DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-type Draft = { messages: ChatMessage[]; quickReplies: string[]; plan: Ready | null; extras: string[] };
+type Draft = {
+  at: number;
+  messages: ChatMessage[];
+  quickReplies: string[];
+  plan: Ready | null;
+  extras: string[];
+  brandPrimary: string | null;
+  brandSecondary: string | null;
+  whatsapp: string;
+  input: string;
+};
+const HEX = /^#[0-9a-fA-F]{6}$/;
 
 function draftKey(businessId: string) {
-  return `fl-website-creation:v1:${businessId}`;
+  return `fl-website-creation:v2:${businessId}`;
 }
 
-function loadDraft(businessId: string): Draft | null {
+/** Saved data (from the server or the browser) → a draft, or null when it is old or damaged. */
+function parseDraft(raw: unknown): Draft | null {
   try {
-    const raw = window.localStorage.getItem(draftKey(businessId));
-    if (!raw) return null;
-    const data = JSON.parse(raw) as { at?: number; messages?: unknown; quickReplies?: unknown; plan?: unknown; extras?: unknown };
+    if (!raw || typeof raw !== "object") return null;
+    const data = raw as Record<string, unknown>;
     if (typeof data.at !== "number" || Date.now() - data.at > DRAFT_TTL_MS) return null;
-    if (!Array.isArray(data.messages) || data.messages.length === 0) return null;
+    if (!Array.isArray(data.messages)) return null;
     const messages = data.messages.filter(
       (m): m is ChatMessage => !!m && typeof m === "object" && ((m as ChatMessage).role === "user" || (m as ChatMessage).role === "assistant") && typeof (m as ChatMessage).text === "string",
     );
     if (messages.length === 0) return null;
     const plan = data.plan as Ready | null;
     const planOk = !!plan && typeof plan === "object" && plan.pageType in PAGE_TYPE_LABELS && STYLE_KEYS.includes(plan.style) && typeof plan.brief === "string" && typeof plan.name === "string" && typeof plan.purpose === "string";
+    const hex = (v: unknown) => (typeof v === "string" && HEX.test(v) ? v : null);
     return {
+      at: data.at,
       messages,
       quickReplies: Array.isArray(data.quickReplies) ? data.quickReplies.filter((q): q is string => typeof q === "string").slice(0, 4) : [],
       plan: planOk ? plan : null,
       extras: Array.isArray(data.extras) ? data.extras.filter((e): e is string => typeof e === "string") : [],
+      brandPrimary: hex(data.brandPrimary),
+      brandSecondary: hex(data.brandSecondary),
+      whatsapp: typeof data.whatsapp === "string" ? data.whatsapp.slice(0, 40) : "",
+      input: typeof data.input === "string" ? data.input.slice(0, 8000) : "",
     };
   } catch {
     return null;
   }
 }
 
-function saveDraft(businessId: string, draft: Draft) {
+function readLocalDraft(businessId: string): Draft | null {
   try {
-    window.localStorage.setItem(draftKey(businessId), JSON.stringify({ at: Date.now(), ...draft }));
+    const raw = window.localStorage.getItem(draftKey(businessId));
+    return raw ? parseDraft(JSON.parse(raw)) : null;
   } catch {
-    // Storage blocked or full: the conversation just isn't kept.
+    return null;
   }
 }
 
-function clearDraft(businessId: string) {
+function writeLocalDraft(businessId: string, draft: Draft) {
+  try {
+    window.localStorage.setItem(draftKey(businessId), JSON.stringify(draft));
+  } catch {
+    // Storage blocked or full: the server copy still keeps it.
+  }
+}
+
+function clearLocalDraft(businessId: string) {
   try {
     window.localStorage.removeItem(draftKey(businessId));
   } catch {
@@ -176,6 +203,7 @@ export function CreationStudio({
   showcaseCount,
   needsWhatsapp = false,
   initialBrand = { primary: null, secondary: null },
+  savedDraft = null,
 }: {
   businessId: string;
   businessName: string;
@@ -184,30 +212,33 @@ export function CreationStudio({
   showcaseCount?: number;
   needsWhatsapp?: boolean;
   initialBrand?: { primary: string | null; secondary: string | null };
+  // What this person was deciding last time (from the server), to continue it.
+  savedDraft?: unknown;
 }) {
   const router = useRouter();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [quickReplies, setQuickReplies] = useState<string[]>([]);
-  const [input, setInput] = useState("");
-  const [thinking, setThinking] = useState(true);
+  const [serverDraft] = useState(() => parseDraft(savedDraft));
+  const [messages, setMessages] = useState<ChatMessage[]>(serverDraft?.messages ?? []);
+  const [quickReplies, setQuickReplies] = useState<string[]>(serverDraft?.quickReplies ?? []);
+  const [input, setInput] = useState(serverDraft?.input ?? "");
+  const [thinking, setThinking] = useState(!serverDraft);
   const [error, setError] = useState<string | null>(null);
-  const [plan, setPlan] = useState<Ready | null>(null);
+  const [plan, setPlan] = useState<Ready | null>(serverDraft?.plan ?? null);
   const [building, setBuilding] = useState(false);
   // Improvements ticked in the plan panel (ids from ENHANCERS).
-  const [extras, setExtras] = useState<string[]>([]);
+  const [extras, setExtras] = useState<string[]>(serverDraft?.extras ?? []);
   const [step, setStep] = useState(0);
   // The big preview: of the plan's page, or of an idea before it is chosen.
   const [fullPreview, setFullPreview] = useState<{ style: StyleKey; pageType: PageType; title?: string; proposal?: Proposal } | null>(null);
-  const [whatsapp, setWhatsapp] = useState("");
+  const [whatsapp, setWhatsapp] = useState(serverDraft?.whatsapp ?? "");
   const whatsappDigits = whatsapp.replace(/\D/g, "");
   const whatsappMissing = needsWhatsapp && (whatsappDigits.length < 8 || whatsappDigits.length > 15);
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   // Brand colors: null = let the style decide.
-  const [brandPrimary, setBrandPrimary] = useState<string | null>(initialBrand.primary);
-  const [brandSecondary, setBrandSecondary] = useState<string | null>(initialBrand.secondary);
+  const [brandPrimary, setBrandPrimary] = useState<string | null>(serverDraft ? serverDraft.brandPrimary : initialBrand.primary);
+  const [brandSecondary, setBrandSecondary] = useState<string | null>(serverDraft ? serverDraft.brandSecondary : initialBrand.secondary);
   // The previews reload with the color only once the picker settles, not
   // on every drag step (each style card is a live page).
-  const [previewColor, setPreviewColor] = useState<string | null>(initialBrand.primary);
+  const [previewColor, setPreviewColor] = useState<string | null>(serverDraft ? serverDraft.brandPrimary : initialBrand.primary);
   useEffect(() => {
     const id = setTimeout(() => setPreviewColor(brandPrimary), 500);
     return () => clearTimeout(id);
@@ -216,6 +247,7 @@ export function CreationStudio({
     `/dashboard/businesses/${businessId}/website/muestra?style=${style}&type=${pageType}${previewColor ? `&color=${encodeURIComponent(previewColor)}` : ""}`;
   const [, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
 
   async function ask(history: ChatMessage[]) {
     setThinking(true);
@@ -238,21 +270,30 @@ export function CreationStudio({
     }
   }
 
+  const saveTimer = useRef<number | undefined>(undefined);
+  const lastDraft = useRef<Draft | null>(null);
+  const savingOff = useRef(false);
+
   useEffect(() => {
-    // Continue the saved conversation, if any: no AI call, so nothing is spent.
-    // (Read after mount on purpose: the server cannot see localStorage, so reading it while
-    // rendering would not match the server's HTML.)
-    const draft = loadDraft(businessId);
-    if (draft) {
+    // The server's copy is already on screen. If this browser has a newer one (the page was
+    // unloaded before the server got the last change), use that.
+    const local = readLocalDraft(businessId);
+    if (local && (!serverDraft || local.at > serverDraft.at)) {
       /* eslint-disable react-hooks/set-state-in-effect */
-      setMessages(draft.messages);
-      setQuickReplies(draft.quickReplies);
-      setPlan(draft.plan);
-      setExtras(draft.extras);
+      setMessages(local.messages);
+      setQuickReplies(local.quickReplies);
+      setPlan(local.plan);
+      setExtras(local.extras);
+      setBrandPrimary(local.brandPrimary);
+      setBrandSecondary(local.brandSecondary);
+      setPreviewColor(local.brandPrimary);
+      setWhatsapp(local.whatsapp);
+      setInput(local.input);
       setThinking(false);
       /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
+    if (serverDraft) return;
     // Deferred a tick: React rejects a Server Function call made while the
     // page is still hydrating ("cannot be called during initial render").
     const id = setTimeout(() => void ask([]), 0);
@@ -260,20 +301,47 @@ export function CreationStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep the conversation as it changes (not while the AI is answering).
+  // Keep everything as it changes: at once in this browser, and a moment later on the server.
   useEffect(() => {
-    if (thinking || messages.length === 0) return;
-    saveDraft(businessId, { messages, quickReplies, plan, extras });
-  }, [businessId, thinking, messages, quickReplies, plan, extras]);
+    if (messages.length === 0 || savingOff.current) return;
+    const draft: Draft = { at: Date.now(), messages, quickReplies, plan, extras, brandPrimary, brandSecondary, whatsapp, input };
+    lastDraft.current = draft;
+    writeLocalDraft(businessId, draft);
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => void saveWebsiteCreationDraft(businessId, draft), 1200);
+  }, [businessId, messages, quickReplies, plan, extras, brandPrimary, brandSecondary, whatsapp, input]);
+
+  // When the page goes to the background (the phone may unload it right after), send it now.
+  useEffect(() => {
+    const flush = () => {
+      const draft = lastDraft.current;
+      if (draft && !savingOff.current && document.visibilityState === "hidden") void saveWebsiteCreationDraft(businessId, draft);
+    };
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [businessId]);
+
+  function discardDraft() {
+    savingOff.current = true;
+    window.clearTimeout(saveTimer.current);
+    lastDraft.current = null;
+    clearLocalDraft(businessId);
+    void clearWebsiteCreationDraft(businessId);
+  }
 
   async function startOver() {
     if (!(await askConfirm({ title: "¿Empezar de nuevo?", message: "Se borra esta conversación y la IA propone ideas desde cero.", confirmLabel: "Sí, empezar de nuevo" }))) return;
-    clearDraft(businessId);
+    discardDraft();
     setMessages([]);
     setQuickReplies([]);
     setPlan(null);
     setExtras([]);
     setInput("");
+    savingOff.current = false;
     void ask([]);
   }
 
@@ -315,7 +383,7 @@ export function CreationStudio({
       { role: "user", text: `Me gusta la idea "${p.title}".` },
       { role: "assistant", text: "Perfecto. Mírala a la derecha: puedes mejorarla con un toque o crearla ya mismo." },
     ]);
-    window.setTimeout(() => document.getElementById("plan")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    window.setTimeout(() => optionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   }
 
   /** The brief the page is built from: the idea plus the improvements ticked. */
@@ -348,7 +416,7 @@ export function CreationStudio({
           brandSecondaryColor: brandPrimary ? brandSecondary : null,
         });
         if (!result.ok) throw new Error(result.error);
-        clearDraft(businessId);
+        discardDraft();
         router.push(`/dashboard/businesses/${businessId}/website/${result.id}`);
       } catch (err) {
         setBuilding(false);
@@ -458,17 +526,162 @@ export function CreationStudio({
               </div>
             ))}
             {plan && !thinking && messages[messages.length - 1]?.role === "assistant" && (
-              <div className="ml-11 flex flex-wrap items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 p-3">
-                <p className="min-w-0 flex-1 text-sm text-ink">
-                  <span className="font-semibold">Tu página está lista para crearse.</span>{" "}
-                  <span className="text-ink-muted">Mejórala con un toque a la derecha o créala ya.</span>
-                </p>
-                <a href="#plan" className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold lg:hidden">
-                  Ver cómo queda
-                </a>
-                <button type="button" onClick={build} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-accent-ink hover:bg-accent-hover">
-                  ✦ Crear mi página
-                </button>
+              <div ref={optionsRef} className="ml-0 scroll-mt-2 space-y-5 rounded-xl border border-accent/40 bg-accent/5 p-3 sm:ml-11 md:p-4">
+                <div>
+                  <p className="text-sm font-bold text-ink">Elige cómo quieres tu página</p>
+                  <p className="text-xs text-ink-muted">Todo se guarda solo: puedes salir y volver cuando quieras.</p>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm lg:hidden">
+                  <ScaledPagePreview key={`chat-${plan.style}-${plan.pageType}`} src={previewSrc(plan.style, plan.pageType)} aspect={0.7} title={`Vista previa en estilo ${STYLE_INFO[plan.style].label}`} />
+                  <div className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-2">
+                    <p className="min-w-0 truncate text-xs">
+                      <span className="font-semibold text-ink">{STYLE_INFO[plan.style].label}</span>
+                    </p>
+                    <button type="button" onClick={() => setFullPreview({ style: plan.style, pageType: plan.pageType })} className="flex-none text-xs font-semibold text-accent hover:underline">
+                      Ver en grande
+                    </button>
+                  </div>
+                </div>
+
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-semibold text-ink">Mejora tu idea con un toque</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {(ENHANCERS[plan.pageType] ?? []).map((e) => {
+                      const on = extras.includes(e.id);
+                      return (
+                        <button
+                          key={e.id}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setExtras((x) => (on ? x.filter((i) => i !== e.id) : [...x, e.id]))}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                        >
+                          {on ? "✓ " : "+ "}
+                          {e.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-semibold text-ink">¿Qué quieres lograr con tu página?</legend>
+                  <div className="grid gap-1.5">
+                    {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
+                      const needsProducts = k === "tienda" || k === "producto" ? productCount === 0 : k === "showroom" || k === "historia" ? (showcaseCount ?? productCount) === 0 : false;
+                      const active = plan.pageType === k;
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          disabled={needsProducts}
+                          onClick={() => setPlan({ ...plan, pageType: k })}
+                          aria-pressed={active}
+                          className={`fl-option flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left disabled:opacity-50 ${
+                            active ? "border-accent bg-accent/10" : "border-border hover:border-border-strong"
+                          }`}
+                        >
+                          <span className="text-lg leading-6" aria-hidden="true">{PAGE_TYPE_PITCH[k].icon}</span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold text-ink">{PAGE_TYPE_LABELS[k]}</span>
+                            <span className="block text-xs text-ink-muted">
+                              {needsProducts ? (k === "showroom" || k === "historia" ? "Primero sube las fotos de tus productos en Productos (con precio) o a tu biblioteca de fotos." : "Primero carga tus productos en Productos.") : PAGE_TYPE_PITCH[k].text}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                {plan.pageType !== "showroom" && plan.pageType !== "historia" && (
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-semibold text-ink">Estilo de la página</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {STYLE_KEYS.map((k) => {
+                      const active = plan.style === k;
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setPlan({ ...plan, style: k })}
+                          aria-pressed={active}
+                          title={STYLE_INFO[k].summary}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                        >
+                          {active ? "✓ " : ""}
+                          {STYLE_INFO[k].label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-ink-muted">{STYLE_INFO[plan.style].summary}</p>
+                </fieldset>
+                )}
+
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-semibold text-ink">Los colores de tu marca</legend>
+                  <p className="text-xs text-ink-muted">
+                    {brandPrimary
+                      ? "Tu página usará tu color en botones y detalles, con el estilo que elegiste."
+                      : "Opcional. Toca el cuadro o pega el código de tu color (#F3F3EF o rgb). Si no eliges, usamos los del estilo."}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {(
+                      [
+                        ["Principal", brandPrimary, setBrandPrimary],
+                        ["Secundario", brandSecondary, setBrandSecondary],
+                      ] as const
+                    ).map(([label, value, set]) => (
+                      <div key={label} className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5">
+                        <label className="relative h-8 w-8 flex-none cursor-pointer" title={`Elegir color ${label.toLowerCase()}`}>
+                          <span
+                            className={`block h-full w-full rounded-md border border-black/10 ${value ? "" : "bg-[repeating-linear-gradient(45deg,var(--surface-2)_0_4px,var(--border)_4px_8px)]"}`}
+                            style={value ? { background: value } : undefined}
+                          />
+                          <input
+                            type="color"
+                            value={value ?? "#1f6feb"}
+                            onChange={(e) => set(e.target.value)}
+                            disabled={label === "Secundario" && !brandPrimary}
+                            aria-label={`Color ${label.toLowerCase()} de tu marca`}
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                          />
+                        </label>
+                        <span className="text-xs font-semibold text-ink">{label}</span>
+                        <ColorCodeInput
+                          value={value}
+                          label={`color ${label.toLowerCase()}`}
+                          disabled={label === "Secundario" && !brandPrimary}
+                          onChange={(hex) => set(hex)}
+                        />
+                      </div>
+                    ))}
+                    {brandPrimary && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrandPrimary(null);
+                          setBrandSecondary(null);
+                        }}
+                        className="text-xs text-ink-muted underline hover:text-ink"
+                      >
+                        Usar los del estilo
+                      </button>
+                    )}
+                  </div>
+                </fieldset>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={build} className="rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
+                    ✦ Crear mi página
+                  </button>
+                  <a href="#plan" className="text-xs font-semibold text-accent hover:underline lg:hidden">
+                    Revisar el texto y crear
+                  </a>
+                </div>
               </div>
             )}
             {thinking && (
@@ -535,7 +748,7 @@ export function CreationStudio({
                   </p>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-border shadow-sm">
+                <div className="hidden overflow-hidden rounded-xl border border-border shadow-sm lg:block">
                   <ScaledPagePreview
                     key={`${plan.style}-${plan.pageType}`}
                     src={previewSrc(plan.style, plan.pageType)}
@@ -554,140 +767,6 @@ export function CreationStudio({
                   </div>
                 </div>
 
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-ink">Mejora tu idea con un toque</legend>
-                  <div className="flex flex-wrap gap-2">
-                    {(ENHANCERS[plan.pageType] ?? []).map((e) => {
-                      const on = extras.includes(e.id);
-                      return (
-                        <button
-                          key={e.id}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => setExtras((x) => (on ? x.filter((i) => i !== e.id) : [...x, e.id]))}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
-                        >
-                          {on ? "✓ " : "+ "}
-                          {e.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-
-                <details className="group rounded-xl border border-border">
-                  <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-semibold text-ink">Más opciones: tipo de página, estilo, colores y texto</summary>
-                  <div className="space-y-5 border-t border-border p-3">
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-ink">¿Qué quieres lograr con tu página?</legend>
-                  <div className="grid gap-1.5">
-                    {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
-                      const needsProducts = k === "tienda" || k === "producto" ? productCount === 0 : k === "showroom" || k === "historia" ? (showcaseCount ?? productCount) === 0 : false;
-                      const active = plan.pageType === k;
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          disabled={needsProducts}
-                          onClick={() => setPlan({ ...plan, pageType: k })}
-                          aria-pressed={active}
-                          className={`fl-option flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left disabled:opacity-50 ${
-                            active ? "border-accent bg-accent/10" : "border-border hover:border-border-strong"
-                          }`}
-                        >
-                          <span className="text-lg leading-6" aria-hidden="true">{PAGE_TYPE_PITCH[k].icon}</span>
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold text-ink">{PAGE_TYPE_LABELS[k]}</span>
-                            <span className="block text-xs text-ink-muted">
-                              {needsProducts ? (k === "showroom" || k === "historia" ? "Primero sube las fotos de tus productos en Productos (con precio) o a tu biblioteca de fotos." : "Primero carga tus productos en Productos.") : PAGE_TYPE_PITCH[k].text}
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-
-                {plan.pageType !== "showroom" && plan.pageType !== "historia" && (
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-ink">Elige el estilo que va con tu marca</legend>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {STYLE_KEYS.map((k) => {
-                      const active = plan.style === k;
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => setPlan({ ...plan, style: k })}
-                          aria-pressed={active}
-                          className={`fl-option overflow-hidden rounded-lg border-2 text-left ${active ? "border-accent" : "border-border hover:border-border-strong"}`}
-                        >
-                          <ScaledPagePreview src={previewSrc(k, plan.pageType)} aspect={0.62} title={`Estilo ${STYLE_INFO[k].label}`} />
-                          <span className="flex items-center justify-between gap-1 px-2 py-1.5">
-                            <span className="truncate text-xs font-semibold text-ink">{STYLE_INFO[k].label}</span>
-                            {active && <span className="text-xs text-accent">✓</span>}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-
-                )}
-
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-ink">Los colores de tu marca</legend>
-                  <p className="text-xs text-ink-muted">
-                    {brandPrimary
-                      ? "Tu página usará tu color en botones y detalles, con el estilo que elegiste."
-                      : "Opcional. Toca el cuadro o pega el código de tu color (#F3F3EF o rgb). Si no eliges, usamos los del estilo."}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {(
-                      [
-                        ["Principal", brandPrimary, setBrandPrimary],
-                        ["Secundario", brandSecondary, setBrandSecondary],
-                      ] as const
-                    ).map(([label, value, set]) => (
-                      <div key={label} className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5">
-                        <label className="relative h-8 w-8 flex-none cursor-pointer" title={`Elegir color ${label.toLowerCase()}`}>
-                          <span
-                            className={`block h-full w-full rounded-md border border-black/10 ${value ? "" : "bg-[repeating-linear-gradient(45deg,var(--surface-2)_0_4px,var(--border)_4px_8px)]"}`}
-                            style={value ? { background: value } : undefined}
-                          />
-                          <input
-                            type="color"
-                            value={value ?? "#1f6feb"}
-                            onChange={(e) => set(e.target.value)}
-                            disabled={label === "Secundario" && !brandPrimary}
-                            aria-label={`Color ${label.toLowerCase()} de tu marca`}
-                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                          />
-                        </label>
-                        <span className="text-xs font-semibold text-ink">{label}</span>
-                        <ColorCodeInput
-                          value={value}
-                          label={`color ${label.toLowerCase()}`}
-                          disabled={label === "Secundario" && !brandPrimary}
-                          onChange={(hex) => set(hex)}
-                        />
-                      </div>
-                    ))}
-                    {brandPrimary && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBrandPrimary(null);
-                          setBrandSecondary(null);
-                        }}
-                        className="text-xs text-ink-muted underline hover:text-ink"
-                      >
-                        Usar los del estilo
-                      </button>
-                    )}
-                  </div>
-                </fieldset>
-
                 <label className="block space-y-1.5">
                   <span className="block text-sm font-semibold text-ink">Lo que va a contar tu página</span>
                   <span className="block text-xs text-ink-muted">
@@ -701,8 +780,6 @@ export function CreationStudio({
                     className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-2 text-sm text-ink outline-none focus:border-accent"
                   />
                 </label>
-                  </div>
-                </details>
               </div>
               <div className="border-t border-border bg-surface p-3">
                 {needsWhatsapp && (

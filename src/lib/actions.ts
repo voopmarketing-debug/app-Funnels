@@ -3213,6 +3213,40 @@ export async function websiteCreationChat(
   }
 }
 
+/** The "Crear con IA" conversation, kept per person and business so a reload never loses it. */
+export async function saveWebsiteCreationDraft(businessId: string, data: unknown): Promise<{ ok: boolean }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { ok: false };
+    await requireBusinessMembership(session.user.id, businessId);
+    const json = JSON.stringify(data ?? null);
+    // A real conversation is a few KB; refuse anything absurd rather than store it.
+    if (!json || json === "null" || json.length > 200_000) return { ok: false };
+    await prisma.websiteCreationDraft.upsert({
+      where: { userId_businessId: { userId: session.user.id, businessId } },
+      create: { userId: session.user.id, businessId, data: JSON.parse(json) },
+      update: { data: JSON.parse(json) },
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error(`saveWebsiteCreationDraft(${businessId}) failed:`, err);
+    return { ok: false };
+  }
+}
+
+export async function clearWebsiteCreationDraft(businessId: string): Promise<{ ok: boolean }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { ok: false };
+    await requireBusinessMembership(session.user.id, businessId);
+    await prisma.websiteCreationDraft.deleteMany({ where: { userId: session.user.id, businessId } });
+    return { ok: true };
+  } catch (err) {
+    console.error(`clearWebsiteCreationDraft(${businessId}) failed:`, err);
+    return { ok: false };
+  }
+}
+
 export async function createWebsitePageV2(
   businessId: string,
   input: {

@@ -77,6 +77,7 @@ model Business {
   whatsappHealthCheckedAt DateTime?
 
   memberships            Membership[]
+  websiteCreationDrafts  WebsiteCreationDraft[]
   agent                  AIAgent?
   conversations          Conversation[]
   pipelineStages         PipelineStage[]
@@ -86,7 +87,7 @@ model Business {
   websites               Website[]
   // Off by default: the owner turns on the automatic booking-link follow-up
   // (lib/bookingLinkFollowUp.ts) from the Plantillas page.
-  autoBookingLinkEnabled Boolean            @default(false)
+  autoBookingLinkEnabled Boolean                @default(false)
   agentMedia             AgentMedia[]
   sales                  Sale[]
   automations            Automation[]
@@ -171,32 +172,33 @@ enum PlanTier {
 
 // Links a platform user to a business (a user can manage multiple businesses).
 model User {
-  id                String             @id @default(cuid())
-  email             String             @unique
+  id                    String                 @id @default(cuid())
+  email                 String                 @unique
   // Contact/WhatsApp number for the agency to reach this person directly —
   // separate from wabaPhoneNumberId on Business, which is the Meta WhatsApp
   // Business API config for their bot, not a way to contact them.
-  phone             String?
+  phone                 String?
   // Fed into the AI agent's system prompt as background context (see
   // buildSystemPrompt in src/lib/ai.ts) so the bot can answer "¿dónde
   // están?" or share a social media handle without the client having to
   // type it into their own editable prompt — set once here, used by every
   // business this account owns.
-  city              String?
-  country           String?
-  facebook          String?
-  instagram         String?
-  tiktok            String?
-  linkedin          String?
-  passwordHash      String
+  city                  String?
+  country               String?
+  facebook              String?
+  instagram             String?
+  tiktok                String?
+  linkedin              String?
+  passwordHash          String
   // Bumped on every password change/reset: sessions signed with an older
   // value stop working (see the jwt callback in src/auth.ts).
-  sessionVersion    Int                @default(0)
-  name              String?
-  createdAt         DateTime           @default(now())
-  memberships       Membership[]
-  addons            AccountAddon[]
-  pushSubscriptions PushSubscription[]
+  sessionVersion        Int                    @default(0)
+  name                  String?
+  createdAt             DateTime               @default(now())
+  memberships           Membership[]
+  websiteCreationDrafts WebsiteCreationDraft[]
+  addons                AccountAddon[]
+  pushSubscriptions     PushSubscription[]
 
   // Password reset flow: resetTokenHash stores a SHA-256 hash of the token
   // emailed to the user (never the raw token) so a DB read alone can't be
@@ -225,16 +227,33 @@ model User {
 }
 
 model Membership {
-  id         String   @id @default(cuid())
-  role       Role     @default(OWNER)
-  userId     String
-  businessId String
-  createdAt  DateTime @default(now())
+  id             String   @id @default(cuid())
+  role           Role     @default(OWNER)
+  userId         String
+  businessId     String
+  createdAt      DateTime @default(now())
   // Whether a MEMBER (salesperson) can create and edit the business's
   // conversation flows (automations). The owner switches it per person from
   // Mi perfil → Equipo de ventas. OWNER and ADMIN always can, so it only
   // matters for MEMBER.
-  canManageFlows Boolean @default(true)
+  canManageFlows Boolean  @default(true)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId])
+}
+
+// The "Crear con IA" conversation of one person for one business (ideas, the idea chosen, the
+// options ticked, colors, what was typed). Kept on the server so a reload, another device or a
+// cleared browser does not lose what was being decided.
+model WebsiteCreationDraft {
+  id         String   @id @default(cuid())
+  userId     String
+  businessId String
+  data       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)

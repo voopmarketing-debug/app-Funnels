@@ -12,12 +12,14 @@ export default async function CreateWebsitePage({ params }: { params: Promise<{ 
     include: { business: { select: { name: true, wabaAccessToken: true, wabaPhoneNumberId: true, brandPrimaryColor: true, brandSecondaryColor: true } } },
   });
   if (!membership) notFound();
-  const [productCount, showcaseProducts, libraryPhotos, owner, latestPage] = await Promise.all([
+  const [productCount, showcaseProducts, libraryPhotos, owner, latestPage, savedDraft] = await Promise.all([
     prisma.product.count({ where: { businessId: id, active: true } }),
     prisma.product.count({ where: { businessId: id, active: true, imageUrl: { not: null } } }),
     prisma.agentMedia.count({ where: { businessId: id, mediaType: "image" } }),
     prisma.membership.findFirst({ where: { businessId: id, role: "OWNER" }, select: { user: { select: { phone: true } } } }),
     prisma.website.findFirst({ where: { businessId: id, pageType: "landing" }, orderBy: { generatedAt: "desc" }, select: { content: true } }),
+    // What this person was deciding the last time, so a reload or another device continues it.
+    prisma.websiteCreationDraft.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: id } }, select: { data: true } }),
   ]);
   // Brand colors saved before, or the accent of the latest page.
   const pageContent = latestPage?.content as { theme?: { primaryColor?: unknown }; primaryColor?: unknown } | null;
@@ -37,6 +39,7 @@ export default async function CreateWebsitePage({ params }: { params: Promise<{ 
       showcaseCount={showcaseProducts + libraryPhotos}
       needsWhatsapp={!hasWhatsapp}
       initialBrand={{ primary: brandPrimary, secondary: brandSecondary }}
+      savedDraft={savedDraft?.data ?? null}
     />
   );
 }
