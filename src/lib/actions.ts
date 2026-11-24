@@ -3290,11 +3290,11 @@ export async function createWebsiteFromTemplate(
       return { ok: false, error: "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567: todos los botones de la página llevan a ese número." };
     }
     const existingCount = await prisma.website.count({ where: { businessId } });
-    const name = input.name?.trim().slice(0, 80) || (existingCount === 0 ? "Sitio principal" : template.niche);
+    const name = input.name?.trim().slice(0, 80) || (existingCount === 0 ? "Sitio principal" : `${template.niche.name} · ${template.index + 1}`);
     const content = buildNicheContent(template, { businessName: ctx.businessName, brandColor: ctx.brandColors?.primary });
     const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0);
     const created = await prisma.website.create({
-      data: { businessId, name, purpose: null, designPrompt: null, slug, content, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: "template" },
+      data: { businessId, name, purpose: null, designPrompt: null, slug, content, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: `template:${template.id}` },
     });
     revalidatePath(`/dashboard/businesses/${businessId}/website`);
     return { ok: true, id: created.id };

@@ -1,46 +1,7 @@
-import { notFound } from "next/navigation";
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { CreateHub } from "./CreateHub";
+import { redirect } from "next/navigation";
 
+// "Crear con IA" now lives in the "Sitio web" screen (the third tab); old links land there.
 export default async function CreateWebsitePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await auth();
-  if (!session?.user?.id) return null;
-  const membership = await prisma.membership.findUnique({
-    where: { userId_businessId: { userId: session.user.id, businessId: id } },
-    include: { business: { select: { name: true, wabaAccessToken: true, wabaPhoneNumberId: true, brandPrimaryColor: true, brandSecondaryColor: true } } },
-  });
-  if (!membership) notFound();
-  const [productCount, showcaseProducts, libraryPhotos, owner, latestPage, savedDraft] = await Promise.all([
-    prisma.product.count({ where: { businessId: id, active: true } }),
-    prisma.product.count({ where: { businessId: id, active: true, imageUrl: { not: null } } }),
-    prisma.agentMedia.count({ where: { businessId: id, mediaType: "image" } }),
-    prisma.membership.findFirst({ where: { businessId: id, role: "OWNER" }, select: { user: { select: { phone: true } } } }),
-    prisma.website.findFirst({ where: { businessId: id, pageType: "landing" }, orderBy: { generatedAt: "desc" }, select: { content: true } }),
-    // What this person was deciding the last time, so a reload or another device continues it.
-    prisma.websiteCreationDraft.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: id } }, select: { data: true } }),
-  ]);
-  // Brand colors saved before, or the accent of the latest page.
-  const pageContent = latestPage?.content as { theme?: { primaryColor?: unknown }; primaryColor?: unknown } | null;
-  const pagePrimary = pageContent?.theme?.primaryColor ?? pageContent?.primaryColor;
-  const isHex = (v: unknown): v is string => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v);
-  const brandPrimary = isHex(membership.business.brandPrimaryColor) ? membership.business.brandPrimaryColor : isHex(pagePrimary) ? pagePrimary : null;
-  const brandSecondary = isHex(membership.business.brandSecondaryColor) ? membership.business.brandSecondaryColor : null;
-  // Every button on the page leads to WhatsApp: without a connected line or
-  // a phone on the owner's profile, the studio asks for the number up front
-  // instead of failing at the very end.
-  const hasWhatsapp = !!(membership.business.wabaAccessToken && membership.business.wabaPhoneNumberId) || !!owner?.user.phone?.trim();
-  return (
-    <CreateHub
-      hasDraft={!!savedDraft?.data}
-      businessId={id}
-      businessName={membership.business.name}
-      productCount={productCount}
-      showcaseCount={showcaseProducts + libraryPhotos}
-      needsWhatsapp={!hasWhatsapp}
-      initialBrand={{ primary: brandPrimary, secondary: brandSecondary }}
-      savedDraft={savedDraft?.data ?? null}
-    />
-  );
+  redirect(`/dashboard/businesses/${id}/website?tab=ia`);
 }

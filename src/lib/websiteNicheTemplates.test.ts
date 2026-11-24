@@ -1,54 +1,98 @@
 import { describe, expect, it } from "vitest";
-import { NICHE_TEMPLATES, buildNicheContent, getNicheTemplate } from "./websiteNicheTemplates";
-import { WebsiteContentV2Schema } from "./websiteContentV2";
+import { NICHES, TEMPLATES_PER_NICHE, buildNicheContent, getNicheTemplate, listTemplateCards } from "./websiteNicheTemplates";
+import { BLUEPRINTS } from "./nicheTemplates/blueprints";
+import { STYLE_KEYS, WebsiteContentV2Schema } from "./websiteContentV2";
 import { renderWebsiteHtmlV2 } from "./websiteTemplateV2";
 
-describe("niche templates", () => {
-  it("has the three launch niches with unique ids", () => {
-    expect(NICHE_TEMPLATES.map((t) => t.id)).toEqual(["contadores", "esteticas", "odontologos"]);
-    expect(new Set(NICHE_TEMPLATES.map((t) => t.id)).size).toBe(NICHE_TEMPLATES.length);
-    expect(getNicheTemplate("nope")).toBeNull();
+const cards = listTemplateCards();
+
+describe("niche template library", () => {
+  it("has at least 12 templates per niche, 12 blueprints, and a unique id for each", () => {
+    expect(TEMPLATES_PER_NICHE).toBeGreaterThanOrEqual(12);
+    expect(NICHES.length).toBeGreaterThanOrEqual(8);
+    expect(cards).toHaveLength(NICHES.length * TEMPLATES_PER_NICHE);
+    expect(new Set(cards.map((c) => c.id)).size).toBe(cards.length);
+    for (const niche of NICHES) expect(cards.filter((c) => c.nicheId === niche.id)).toHaveLength(TEMPLATES_PER_NICHE);
   });
 
-  for (const t of NICHE_TEMPLATES) {
-    describe(t.id, () => {
-      const content = buildNicheContent(t, { businessName: "Vértice", brandColor: null });
+  it("resolves ids and rejects anything else", () => {
+    expect(getNicheTemplate("contadores-01")?.niche.id).toBe("contadores");
+    expect(getNicheTemplate("odontologos-12")?.index).toBe(11);
+    for (const bad of ["contadores", "contadores-13", "contadores-00", "nope-01", "contadores-1", "../x"]) expect(getNicheTemplate(bad)).toBeNull();
+  });
 
-      it("is valid stored content, and round-trips unchanged", () => {
-        expect(WebsiteContentV2Schema.parse(content)).toEqual(content);
-      });
+  it("makes the twelve templates of a niche different in structure and in look", () => {
+    for (const niche of NICHES) {
+      const mine = cards.filter((c) => c.nicheId === niche.id);
+      expect(new Set(mine.map((c) => c.style)).size).toBe(12); // every style once
+      expect(new Set(mine.map((c) => c.shape.join(">"))).size).toBe(12); // every arrangement different
+      expect(new Set(mine.map((c) => c.heading)).size).toBe(12); // every opening different
+      expect(niche.styleOrder.slice().sort()).toEqual([...STYLE_KEYS].sort());
+    }
+  });
+});
 
-      it("starts with a hero whose highlight is really in its heading", () => {
-        const hero = content.sections[0];
-        expect(hero.type).toBe("hero");
-        if (hero.type === "hero") expect(hero.highlight && hero.heading.includes(hero.highlight)).toBeTruthy();
-      });
+describe("every template", () => {
+  for (const niche of NICHES) {
+    for (let index = 0; index < TEMPLATES_PER_NICHE; index++) {
+      const id = `${niche.id}-${String(index + 1).padStart(2, "0")}`;
+      describe(id, () => {
+        const template = { niche, index };
+        const content = buildNicheContent(template, { businessName: "Vértice", brandColor: null });
+        const sections = content.sections;
 
-      it("ends with a form, so every page can capture a contact", () => {
-        expect(content.sections.at(-1)?.type).toBe("leadForm");
-      });
+        it("is valid stored content that round-trips unchanged", () => {
+          expect(WebsiteContentV2Schema.parse(content)).toEqual(content);
+        });
 
-      it("uses the business name and never leaves a placeholder", () => {
-        const json = JSON.stringify(content);
-        expect(json).toContain("Vértice");
-        expect(json).not.toMatch(/\{(nombre|negocio|ciudad)\}|[Ll]orem|TODO:/);
-      });
+        it("opens with a hero whose highlight is really in its heading, within the limits", () => {
+          const hero = sections[0];
+          expect(hero.type).toBe("hero");
+          if (hero.type !== "hero") return;
+          expect(hero.heading.length).toBeLessThanOrEqual(hero.variant === "giant" ? 45 : 72);
+          expect(hero.highlight && hero.heading.includes(hero.highlight)).toBeTruthy();
+          expect(hero.subheading.length).toBeLessThanOrEqual(180);
+          expect(hero.ctaLabel.length).toBeLessThanOrEqual(30);
+        });
 
-      it("makes no promises with numbers: no prices, percentages or years", () => {
-        const text = JSON.stringify(content.sections);
-        expect(text).not.toMatch(/\$\s?\d|\d\s?%|\d+\s+años|desde \d/i);
-      });
+        it("converts: a contact path (form, form in the hero or WhatsApp button), the main button repeated, and an answer to doubts", () => {
+          const hero = sections[0];
+          const hasContact = sections.some((s) => s.type === "leadForm" || s.type === "cta") || (hero.type === "hero" && hero.showLeadForm);
+          expect(hasContact).toBe(true);
+          expect(["leadForm", "cta"]).toContain(sections.at(-1)?.type); // the page ends on the action
+          const buttons = sections.filter((s) => s.type === "hero" || s.type === "cta" || s.type === "promo" || s.type === "leadForm").length;
+          expect(buttons).toBeGreaterThanOrEqual(2);
+          expect(sections.some((s) => s.type === "objections" || s.type === "steps")).toBe(true);
+          expect(sections.length).toBeGreaterThanOrEqual(4);
+          expect(sections.length).toBeLessThanOrEqual(12);
+        });
 
-      it("renders a full page with the business name", () => {
-        const html = renderWebsiteHtmlV2(content, { businessName: "Vértice", trackingBasePath: "#", preview: true, heroImageUrl: null, photos: [], products: [] });
-        expect(html).toContain("Vértice");
-        expect(html).toContain(t.id === "contadores" ? "Tu contabilidad al día" : t.id === "esteticas" ? "Luce y siéntete bien" : "Una sonrisa sana");
-      });
+        it("leaves no placeholder, and invents no numbers, prices or claims", () => {
+          const json = JSON.stringify(sections);
+          expect(json).not.toMatch(/\{[a-z]+\}|[Ll]orem|TODO:/);
+          expect(json).not.toMatch(/\d/); // no prices, percentages, years, counts
+          expect(json).not.toMatch(/garantizad|el mejor (precio|servicio|abogado|dentista|contador|gimnasio|centro|veterinari)|número uno|mejor precio/i);
+        });
 
-      it("takes the owner's brand color over its own", () => {
-        expect(buildNicheContent(t, { businessName: "X", brandColor: "#112233" }).theme.primaryColor).toBe("#112233");
-        expect(buildNicheContent(t, { businessName: "X", brandColor: "nope" }).theme.primaryColor).toBe(t.accent);
+        it("renders a full page", () => {
+          const html = renderWebsiteHtmlV2(content, { businessName: "Vértice", trackingBasePath: "#", preview: true, heroImageUrl: null, photos: [], products: [] });
+          expect(html).toContain("Vértice");
+          expect(html.length).toBeGreaterThan(5000);
+        });
       });
-    });
+    }
   }
+
+  it("takes the owner's brand color over the style's", () => {
+    const t = { niche: NICHES[0], index: 0 };
+    expect(buildNicheContent(t, { businessName: "X", brandColor: "#112233" }).theme.primaryColor).toBe("#112233");
+    expect(buildNicheContent(t, { businessName: "X", brandColor: "nope" }).theme.primaryColor).not.toBe("nope");
+  });
+
+  it("the blueprints fit the card shape", () => {
+    for (const bp of BLUEPRINTS) {
+      const built = bp.build(NICHES[0], NICHES[0].angles[0], "X").map((s) => s.type);
+      expect(built).toEqual(bp.shape);
+    }
+  });
 });

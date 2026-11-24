@@ -19,6 +19,8 @@ type Page = {
   viewCount: number;
   leadCount: number;
   hasTracking: boolean;
+  // Which library template it came from, so pages from different templates can be compared.
+  templateLabel?: string | null;
 };
 
 export function WebsitePagesList({
@@ -26,11 +28,14 @@ export function WebsitePagesList({
   pages,
   publicUrlBase,
   stats,
+  onNewPage,
 }: {
   businessId: string;
   pages: Page[];
   publicUrlBase: string;
   stats: { totalViews: number; totalClicksWhatsapp: number; totalClicksAgenda: number; totalLeads: number };
+  // Opens the template library (the first screen of "Sitio web").
+  onNewPage?: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [formKey, setFormKey] = useState(0);
@@ -84,12 +89,13 @@ export function WebsitePagesList({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/dashboard/businesses/${businessId}/website/crear`}
+            <button
+              type="button"
+              onClick={onNewPage}
               className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
             >
               + Nueva página
-            </Link>
+            </button>
             <button
               type="button"
               onClick={openNewPageDialog}
@@ -127,16 +133,16 @@ export function WebsitePagesList({
           <div>
             <p className="text-sm font-medium text-ink">Este negocio todavía no tiene sitio web</p>
             <p className="mx-auto mt-1 max-w-xs text-xs text-ink-muted">
-              Elige una plantilla lista para tu tipo de negocio (contadores, estéticas, odontólogos…) o pídele a la IA
-              que la arme con tus productos. Después la editas pidiéndole cambios por chat.
+              Elige una plantilla lista para tu tipo de negocio (contadores, estéticas, odontólogos…), mírala y publícala. Después la editas pidiéndole cambios por chat.
             </p>
           </div>
-          <Link
-            href={`/dashboard/businesses/${businessId}/website/crear`}
+          <button
+            type="button"
+            onClick={onNewPage}
             className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
           >
-            Elegir plantilla o crear con IA
-          </Link>
+            Elegir una plantilla
+          </button>
         </div>
       )}
     </div>
@@ -291,6 +297,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
             )}
             {renameError && <p className="mt-0.5 text-xs text-error">{renameError}</p>}
             {page.purpose && <p className="mt-0.5 truncate text-xs text-ink-muted">{page.purpose}</p>}
+            {page.templateLabel && <p className="mt-0.5 truncate text-xs text-ink-faint">📄 Plantilla: {page.templateLabel}</p>}
           </div>
           <button
             type="button"

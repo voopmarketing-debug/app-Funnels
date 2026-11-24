@@ -673,7 +673,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         return `<section class="sec"><div class="wrap narrow-lg">
           <h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
           <div class="cmp-wrap"><table class="cmp"><thead><tr><th></th><th class="us"${ed(fp("usLabel"))}>${esc(s.usLabel)}</th><th${ed(fp("othersLabel"))}>${esc(s.othersLabel)}</th></tr></thead>
-          <tbody>${s.rows.slice(0, 6).map((r, ri) => `<tr><th scope="row"${ed(fp(`rows.${ri}.label`))}>${esc(r.label)}</th><td class="us"${ed(fp(`rows.${ri}.us`))}>${esc(r.us)}</td><td${ed(fp(`rows.${ri}.others`))}>${esc(r.others)}</td></tr>`).join("")}</tbody></table></div>
+          <tbody>${s.rows.slice(0, 6).map((r, ri) => `<tr><th scope="row"${ed(fp(`rows.${ri}.label`))}>${esc(r.label)}</th><td class="us" data-label="${esc(s.usLabel)}"${ed(fp(`rows.${ri}.us`))}>${esc(r.us)}</td><td data-label="${esc(s.othersLabel)}"${ed(fp(`rows.${ri}.others`))}>${esc(r.others)}</td></tr>`).join("")}</tbody></table></div>
         </div></section>`;
 
       case "agenda":
@@ -879,17 +879,17 @@ section{position:relative}
 .trust-item .ico{width:30px;height:30px;flex:none;color:var(--primary-ink)}
 .t-title{font-weight:700;margin:0;font-size:15px}
 .t-desc{margin:0;color:var(--muted);font-size:14px}
-.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px;margin-top:40px}
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:22px;margin-top:40px}
 .feat-item{display:flex;flex-direction:column;gap:14px}
 .feat-cards .feat-item{padding:30px;border-radius:var(--r);background:var(--surface);${style.cardBorder ? "border:1px solid var(--line);" : ""}${style.cardShadow ? "box-shadow:0 16px 40px -28px color-mix(in srgb,var(--text) 40%,transparent);" : ""}}
-.feat-list{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.feat-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
 .feat-list .feat-item{flex-direction:row;padding:18px 0;border-bottom:1px solid var(--line)}
 .feat-ico{width:52px;height:52px;border-radius:calc(var(--r) * .7 + 6px);background:color-mix(in srgb,var(--primary) 13%,transparent);color:var(--primary-ink);display:flex;align-items:center;justify-content:center}
 .feat-ico .ico{width:26px;height:26px}
 .feat-check .ico{width:24px;height:24px;color:var(--primary-ink);flex:none}
 .feat-item h3{margin-bottom:6px}
 .feat-item p{margin:0;color:var(--muted);font-size:16px}
-.steps{list-style:none;padding:0;margin:44px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:32px;counter-reset:s}
+.steps{list-style:none;padding:0;margin:44px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:32px;counter-reset:s}
 .steps li{border-top:2px solid var(--text);padding-top:20px}
 .step-n{display:block;font-family:var(--hf);font-size:44px;font-weight:700;color:var(--primary-ink);line-height:1;margin-bottom:14px}
 .steps p{color:var(--muted);margin:0}
@@ -942,6 +942,17 @@ section{position:relative}
 .cmp thead th{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .cmp .us{background:color-mix(in srgb,var(--primary) 9%,transparent);font-weight:600}
 .cmp thead .us{color:var(--primary-ink)}
+@media (max-width:640px){
+  .cmp-wrap{overflow:visible}
+  .cmp thead{display:none}
+  .cmp,.cmp tbody,.cmp tr,.cmp th,.cmp td{display:block;width:100%}
+  .cmp tr{padding:14px 0;border-bottom:1px solid var(--line)}
+  .cmp tbody th,.cmp td{border:0;padding:4px 0}
+  .cmp tbody th{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-bottom:6px}
+  .cmp td::before{content:attr(data-label);display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+  .cmp td.us{padding:10px 12px;border-radius:10px;margin-bottom:6px}
+  .cmp td.us::before{color:var(--primary-ink)}
+}
 .agenda{display:grid;gap:18px;margin-top:36px}
 .ag-item{display:grid;grid-template-columns:auto 1fr;gap:24px;padding:26px;border-radius:var(--r);background:var(--bg);border:1px solid var(--line)}
 .ag-num{font-family:var(--hf);font-size:46px;font-weight:700;line-height:1;color:var(--primary-ink)}
@@ -989,9 +1000,11 @@ footer.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
   .brand{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
   .giant{font-size:clamp(40px,11.5vw,72px)!important;line-height:1.04;letter-spacing:-.02em;overflow-wrap:anywhere}
   header.top .btn{padding:8px 14px;font-size:13px;white-space:nowrap;margin-left:auto}
-  .hero-split-grid,.hero-product-grid,.giant-row,.spot,.host{grid-template-columns:1fr;gap:32px}
+  .hero-split-grid,.hero-product-grid,.giant-row,.spot,.host{grid-template-columns:minmax(0,1fr);gap:32px}
+  .hero-split-grid>*,.hero-product-grid>*,.giant-row>*,.spot>*,.host>*{min-width:0}
   .hero-media img{aspect-ratio:4/3}
-  .trust-grid{grid-template-columns:1fr 1fr}
+  .trust-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .trust-item>div{min-width:0;overflow-wrap:anywhere}
   .promo-inner{flex-direction:column;align-items:flex-start}
   .pgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .pcard-body{padding:12px}
