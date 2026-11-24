@@ -72,8 +72,8 @@ export function TemplateGallery({
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
         <span className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-accent text-3xl text-accent-ink">{card?.emoji ?? "✦"}</span>
         <div>
-          <h1 className="text-xl font-bold">Creando tu página</h1>
-          <p className="mt-1 text-sm text-ink-muted">Un momento, ya casi: la abrimos para que la edites.</p>
+          <h1 className="text-xl font-bold">Publicando tu página</h1>
+          <p className="mt-1 text-sm text-ink-muted">Un momento, ya casi: la abrimos para que la edites cuando quieras.</p>
         </div>
       </div>
     );
@@ -87,7 +87,7 @@ export function TemplateGallery({
         </Link>
         <h1 className="mt-1 text-xl font-bold">Elige una plantilla lista</h1>
         <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-          Ya vienen escritas para tu tipo de negocio y con tu nombre. Se crean al instante, sin esperar a la IA y sin costo; después cambias lo que quieras.
+          Ya vienen escritas para tu tipo de negocio y con tu nombre. Mira cómo queda con <strong>Ver página</strong> y, si te gusta, toca <strong>Publicar</strong>: sale al instante, sin esperar a la IA y sin costo. Después cambias lo que quieras.
         </p>
       </div>
 
@@ -113,7 +113,7 @@ export function TemplateGallery({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
           <article key={card.id} className="fl-card flex flex-col overflow-hidden">
-            <button type="button" onClick={() => setBig(card)} className="block text-left" aria-label={`Ver en grande: ${card.niche}`}>
+            <button type="button" onClick={() => setBig(card)} className="block text-left" aria-label={`Ver página: ${card.niche}`}>
               <ScaledPagePreview src={previewSrc(card.id)} aspect={0.7} title={`Plantilla para ${card.niche}`} />
             </button>
             <div className="flex flex-1 flex-col gap-2 p-4">
@@ -128,11 +128,11 @@ export function TemplateGallery({
                 ))}
               </ul>
               <div className="mt-auto flex flex-col gap-1.5 pt-3">
-                <button type="button" onClick={() => use(card)} className="rounded-lg bg-accent px-3 py-2.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                  Usar esta plantilla
+                <button type="button" onClick={() => setBig(card)} className="rounded-lg border border-border-strong px-3 py-2.5 text-sm font-semibold hover:border-accent">
+                  Ver página
                 </button>
-                <button type="button" onClick={() => setBig(card)} className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:border-accent">
-                  Ver en grande
+                <button type="button" onClick={() => use(card)} className="rounded-lg bg-accent px-3 py-2.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
+                  Publicar
                 </button>
               </div>
             </div>
@@ -160,11 +160,11 @@ export function TemplateGallery({
             </div>
             <p className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-white">{big.niche}</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => use(big)} className="rounded-lg bg-accent px-3 py-1.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                Usar esta plantilla
-              </button>
               <button type="button" onClick={() => setBig(null)} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-black">
-                Ver otras
+                Cerrar
+              </button>
+              <button type="button" onClick={() => use(big)} className="rounded-lg bg-accent px-4 py-1.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
+                Publicar
               </button>
             </div>
           </div>

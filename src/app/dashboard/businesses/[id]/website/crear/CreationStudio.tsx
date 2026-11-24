@@ -474,7 +474,7 @@ export function CreationStudio({
                               type="button"
                               onClick={() => setFullPreview({ style: p.style, pageType: p.pageType, title: p.title, proposal: p })}
                               className="block text-left"
-                              aria-label={`Ver en grande: ${p.title}`}
+                              aria-label={`Ver página: ${p.title}`}
                             >
                               <ScaledPagePreview src={previewSrc(p.style, p.pageType)} aspect={0.5} title={`Idea: ${p.title}`} />
                             </button>
@@ -498,7 +498,7 @@ export function CreationStudio({
                                   onClick={() => setFullPreview({ style: p.style, pageType: p.pageType, title: p.title, proposal: p })}
                                   className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold hover:border-accent"
                                 >
-                                  Ver en grande
+                                  Ver página
                                 </button>
                               </div>
                             </div>
@@ -529,7 +529,7 @@ export function CreationStudio({
                   <div className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-1.5">
                     <p className="min-w-0 truncate text-xs font-semibold text-ink">{STYLE_INFO[plan.style].label}</p>
                     <button type="button" onClick={() => setFullPreview({ style: plan.style, pageType: plan.pageType })} className="flex-none text-xs font-semibold text-accent hover:underline">
-                      Ver en grande
+                      Ver página
                     </button>
                   </div>
                 </div>
@@ -762,7 +762,7 @@ export function CreationStudio({
                       <span className="text-ink-muted"> · {STYLE_INFO[plan.style].summary}</span>
                     </p>
                     <button type="button" onClick={() => setFullPreview({ style: plan.style, pageType: plan.pageType })} className="flex-none text-xs font-semibold text-accent hover:underline">
-                      Ver en grande
+                      Ver página
                     </button>
                   </div>
                 </div>
