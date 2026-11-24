@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { Suspense, use, useState, useSyncExternalStore } from "react";
 import { FunnelsLogoBadge } from "@/components/FunnelsLogoMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORT_WHATSAPP_LINK } from "@/lib/constants";
@@ -226,7 +226,21 @@ function writeCollapsed(ids: string[]) {
   collapsedListeners.forEach((cb) => cb());
 }
 
-type NavItem = { href: string; label: string; icon: React.ReactNode; active: boolean; badge?: number };
+type NavItem = { href: string; label: string; icon: React.ReactNode; active: boolean; badge?: number | Promise<number> };
+
+function UnreadBadge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--status-bad,#d03b3b)] px-1.5 text-[11px] font-bold leading-none text-white" aria-label={`${count} sin leer`}>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+/** The count arrives later than the page: the badge shows up when it does. */
+function AsyncUnreadBadge({ promise }: { promise: Promise<number> }) {
+  return <UnreadBadge count={use(promise)} />;
+}
 type NavGroup = { id: string; title: string; items: NavItem[] };
 
 function NavGroupSection({ group, collapsed, onToggle }: { group: NavGroup; collapsed: boolean; onToggle: () => void }) {
@@ -257,13 +271,12 @@ function NavGroupSection({ group, collapsed, onToggle }: { group: NavGroup; coll
             <Link key={item.href} href={item.href} className="fl-nav-item" data-active={item.active}>
               {item.icon}
               {item.label}
-              {item.badge ? (
-                <span
-                  className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--status-bad,#d03b3b)] px-1.5 text-[11px] font-bold leading-none text-white"
-                  aria-label={`${item.badge} sin leer`}
-                >
-                  {item.badge > 99 ? "99+" : item.badge}
-                </span>
+              {typeof item.badge === "number" ? (
+                <UnreadBadge count={item.badge} />
+              ) : item.badge ? (
+                <Suspense fallback={null}>
+                  <AsyncUnreadBadge promise={item.badge} />
+                </Suspense>
               ) : null}
             </Link>
           ))}
@@ -286,7 +299,7 @@ function NavLinks({
   isAgencyAdmin: boolean;
   primaryBusinessId: string | null;
   pathname: string;
-  unreadChats: number;
+  unreadChats: number | Promise<number>;
   onSignOut: () => Promise<void>;
 }) {
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href));
@@ -298,7 +311,7 @@ function NavLinks({
   }
 
   const biz = primaryBusinessId ? `/dashboard/businesses/${primaryBusinessId}` : null;
-  const item = (href: string, label: string, icon: React.ReactNode, active = isActive(href), badge?: number): NavItem => ({ href, label, icon, active, badge });
+  const item = (href: string, label: string, icon: React.ReactNode, active = isActive(href), badge?: number | Promise<number>): NavItem => ({ href, label, icon, active, badge });
 
   // Empty groups (a login without a business, or a non-agency login) drop out.
   const groups: NavGroup[] = [
@@ -405,7 +418,7 @@ export function DashboardSidebar({
   isAgencyAdmin: boolean;
   primaryBusinessId: string | null;
   // Chats with customer messages nobody on the team has opened yet.
-  unreadChats: number;
+  unreadChats: number | Promise<number>;
   onSignOut: () => Promise<void>;
   // Rendered in the mobile top bar next to the menu button (e.g. the
   // notification bell), so mobile doesn't need a second header row.

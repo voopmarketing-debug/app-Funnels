@@ -6,27 +6,14 @@ import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isAgencyAdmin as isAgencyAccount } from "@/lib/authz";
 import { DashboardSidebar } from "./DashboardSidebar";
-import { NotificationBell, type NotificationItem } from "./NotificationBell";
+import { BellPlaceholder, NotificationBellLoader, RenewalLoader, countUnreadChats } from "./LayoutLoaders";
 import { PushBanner } from "./PushNotifications";
 import { NotificationSoundPoller } from "./NotificationSoundPoller";
 import { AssistantChat } from "@/components/assistant/AssistantChat";
-import { renewalNotice } from "@/lib/renewal";
-import { RenewalBanner } from "./RenewalBanner";
 import { isStoreApp } from "@/lib/storeApp";
 
 // The Asistente Funnels runs a few Claude calls per message from these pages.
 export const maxDuration = 120;
-
-function formatNotificationDate(date: Date): string {
-  return new Intl.DateTimeFormat("es-CO", {
-    timeZone: "America/Bogota",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-}
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -34,96 +21,25 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // straight to the login instead of an empty panel.
   if (!session?.user?.id) redirect("/login");
 
-  const storeApp = await isStoreApp();
-  const isAgencyAdmin = session?.user?.id ? await isAgencyAccount(session.user.id) : false;
+  // Everything the frame needs before it can draw, asked at the same time (one round trip, not five).
+  const userId = session.user.id;
+  const [storeApp, isAgencyAdmin, me, primaryBusiness] = await Promise.all([
+    isStoreApp(),
+    isAgencyAccount(userId),
+    prisma.user.findUnique({ where: { id: userId }, select: { activationRequired: true } }),
+    // KPIs, CRM and Conversaciones are per-business pages, but the sidebar is global: those nav items
+    // link straight to a first business the user has access to (their own, or the first one the
+    // agency administers). Hidden entirely if they have no business yet.
+    prisma.membership.findFirst({ where: { userId }, orderBy: { createdAt: "asc" }, select: { businessId: true } }),
+  ]);
 
   // Self-registered accounts can't use the dashboard until they register a
   // card in Mercado Pago (free trial) — see app/activar.
-  if (session?.user?.id && !isAgencyAdmin) {
-    const me = await prisma.user.findUnique({ where: { id: session.user.id }, select: { activationRequired: true } });
-    if (me?.activationRequired) redirect("/activar");
-  }
+  if (!isAgencyAdmin && me?.activationRequired) redirect("/activar");
 
-  // Every business this user has any access to (owner, agency, or invited
-  // teammate) — a MEMBER sees appointment notifications for their own leads
-  // just like the owner does, same as the rest of their CRM access.
-  let notifications: NotificationItem[] = [];
-  let unreadCount = 0;
-  if (session?.user?.id) {
-    const businessIds = (
-      await prisma.membership.findMany({ where: { userId: session.user.id }, select: { businessId: true } })
-    ).map((m) => m.businessId);
-
-    if (businessIds.length > 0) {
-      const [rows, count] = await Promise.all([
-        prisma.notification.findMany({
-          where: { businessId: { in: businessIds } },
-          orderBy: { createdAt: "desc" },
-          take: 20,
-          include: { business: { select: { name: true } } },
-        }),
-        prisma.notification.count({ where: { businessId: { in: businessIds }, readAt: null } }),
-      ]);
-      notifications = rows.map((n) => ({
-        id: n.id,
-        message: n.message,
-        createdAt: formatNotificationDate(n.createdAt),
-        read: n.readAt !== null,
-        // Appointment notifications point straight at the conversation;
-        // metric alerts (see lib/metricAlerts.ts) have no single
-        // conversation to point to, so they go to the KPIs page instead.
-        // Stock alerts go to Inventario.
-        href: n.conversationId
-          ? `/dashboard/businesses/${n.businessId}/conversations/${n.conversationId}`
-          : n.type === "LOW_STOCK" || n.type === "OUT_OF_STOCK"
-            ? `/dashboard/businesses/${n.businessId}/inventario`
-            : `/dashboard/businesses/${n.businessId}/analytics`,
-        businessName: n.business.name,
-      }));
-      unreadCount = count;
-    }
-  }
-
-  // KPIs, CRM and Conversaciones are per-business pages, but the sidebar is global — link
-  // those two nav items straight to a first business (any the user has
-  // access to — their own if they're a client, or the first one they
-  // administer if they're the agency) instead of making them dig through
-  // "Agentes de IA" first. Hidden entirely if they have no business yet.
-  // Once there, AgentSwitcher lets them pick a different one — the agency
-  // isn't stuck looking at just this one.
-  const primaryBusiness = session?.user?.id
-    ? await prisma.membership.findFirst({
-        where: { userId: session.user.id },
-        orderBy: { createdAt: "asc" },
-        select: { businessId: true },
-      })
-    : null;
-
-  // Red badge on "Conversaciones": chats of that business with a customer
-  // message nobody has opened yet (same rule as the badge inside the inbox:
-  // customer messages newer than the chat's lastReadAt, last 60 days).
-  let unreadChats = 0;
-  if (primaryBusiness) {
-    const since = new Date();
-    since.setDate(since.getDate() - 60);
-    try {
-      const rows = await prisma.$queryRaw<{ n: number }[]>`
-        SELECT COUNT(*)::int AS n FROM "Conversation" c
-        WHERE c."businessId" = ${primaryBusiness.businessId}
-          AND EXISTS (
-            SELECT 1 FROM "Message" m
-            WHERE m."conversationId" = c.id AND m."role" = 'CUSTOMER' AND m."createdAt" >= ${since}
-              AND (c."lastReadAt" IS NULL OR m."createdAt" > c."lastReadAt")
-          )`;
-      unreadChats = rows[0]?.n ?? 0;
-    } catch (err) {
-      // A badge is never worth breaking the whole panel over.
-      console.error("Failed to count unread chats:", err);
-    }
-  }
-
-  // "Tu plan vence…" for accounts nobody renews for them (the agency has none).
-  const notice = isAgencyAdmin ? null : await renewalNotice(session.user.id).catch(() => null);
+  // The red badge on "Conversaciones" is the slowest question of the frame: it is asked now, but
+  // the page does not wait for it (the badge appears when the answer arrives).
+  const unreadChats = primaryBusiness ? countUnreadChats(primaryBusiness.businessId) : Promise.resolve(0);
 
   async function handleSignOut() {
     "use server";
@@ -145,19 +61,29 @@ export default async function DashboardLayout({ children }: { children: React.Re
         primaryBusinessId={primaryBusiness?.businessId ?? null}
         unreadChats={unreadChats}
         onSignOut={handleSignOut}
-        mobileActions={<NotificationBell notifications={notifications} unreadCount={unreadCount} />}
+        mobileActions={
+          <Suspense fallback={<BellPlaceholder />}>
+            <NotificationBellLoader userId={userId} />
+          </Suspense>
+        }
       />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         {/* Desktop only — on mobile the bell lives in the sidebar's top bar
             and "Mi perfil" is in the menu, so this row would just duplicate them. */}
         <header className="hidden items-center justify-end gap-3 border-b border-border px-6 py-3 md:flex">
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} />
+          <Suspense fallback={<BellPlaceholder />}>
+            <NotificationBellLoader userId={userId} />
+          </Suspense>
           <Link href="/dashboard/account" className="fl-mono text-xs tracking-wide text-ink-muted transition hover:text-ink">
             Mi perfil
           </Link>
         </header>
         <main className="min-w-0 flex-1 p-4 md:p-6">
-          {notice && !storeApp && <RenewalBanner daysLeft={notice.daysLeft} expired={notice.expired} />}
+          {!isAgencyAdmin && !storeApp && (
+            <Suspense fallback={null}>
+              <RenewalLoader userId={userId} />
+            </Suspense>
+          )}
           <PushBanner />
           {children}
         </main>

@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Funnels Labs — Agentes de IA",
     short_name: "Funnels Labs",
     description: "Tu agente de IA para WhatsApp, tu CRM y tus KPIs.",
-    start_url: "/dashboard",
+    start_url: "/abrir",
     display: "standalone",
     background_color: "#0b0d08",
     theme_color: "#0b0d08",
