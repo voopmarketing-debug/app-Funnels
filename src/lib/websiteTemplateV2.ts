@@ -267,6 +267,23 @@ export type RenderV2Context = {
 };
 
 export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Context): string {
+  // "Subir mi HTML": the public page is only the owner's own page inside its isolated frame. (The
+  // builder's editing preview keeps the normal layout so the block can be selected and edited.)
+  if (content.fullHtml && !ctx.edit) {
+    const at = content.sections.findIndex((s, i) => s.type === "html" && s.code.trim() !== "" && !(content.hidden ?? []).includes(i));
+    if (at >= 0) {
+      const block = content.sections[at];
+      const height = block.type === "html" && block.height > 0 ? block.height : 0;
+      const src = `${ctx.trackingBasePath}/bloque/${at}${ctx.preview ? "?preview=1" : ""}`;
+      const first = content.sections[0];
+      const title = esc(first && first.type === "hero" && first.heading ? first.heading : ctx.businessName);
+      return `<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<style>html,body{margin:0;padding:0;background:#fff}iframe{display:block;width:100%;border:0;min-height:${height > 0 ? `${height}px` : "100dvh"}${height > 0 ? `;height:${height}px` : ""}}</style></head>
+<body><iframe title="${title}" src="${esc(src)}" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" referrerpolicy="no-referrer"${height > 0 ? "" : " data-autoheight"}></iframe>
+<script>${SITE_SCRIPT}</script></body></html>`;
+    }
+  }
   // Showroom / Scroll Story pages saved before the template builder: one standard look. Clean sans
   // type for titles and text, black, white and gray, the accent only on buttons and small details.
   const neutral = content.pageType === "showroom" || content.pageType === "historia";

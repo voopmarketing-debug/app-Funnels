@@ -445,6 +445,8 @@ export const WebsiteContentV2Schema = AiWebsiteV2Schema.extend({
   /** Small mono counters ("02 / 08") before each section's label. A look the template sets; the AI never decides it. */
   counters: z.boolean().optional().catch(undefined),
   /** Addresses of the pictures the platform created with AI on this page (so they can be counted, replaced or removed). */
+  /** The public page shows only the owner's HTML block, with no header, footer or sections of ours ("Subir mi HTML"). */
+  fullHtml: z.boolean().optional().catch(undefined),
   /** A fixed button at the bottom of the screen on phones (landing and funnel pages). */
   sticky: z.boolean().optional().catch(undefined),
   /** Where the visitor goes after sending the form. Empty: the page itself, with a thank-you message. */

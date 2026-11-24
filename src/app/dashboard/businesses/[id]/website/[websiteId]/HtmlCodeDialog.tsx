@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { SAMPLE_HTML } from "@/lib/htmlSample";
 
 /**
  * Where the owner pastes their own HTML: a big window that opens by itself when the "Código HTML"
@@ -21,6 +22,8 @@ export function HtmlCodeDialog({
   const [height, setHeight] = useState(initialHeight);
   const [saving, setSaving] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const dirty = code !== initialCode || height !== initialHeight;
 
   useEffect(() => {
@@ -56,6 +59,35 @@ export function HtmlCodeDialog({
           </button>
         </div>
 
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".html,.htm,text/html"
+          className="sr-only"
+          aria-label="Elegir un archivo HTML"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            setFileError(null);
+            if (f.size > 1_000_000) return setFileError("El archivo es muy pesado (máximo 100.000 caracteres de código).");
+            try {
+              setCode(await f.text());
+            } catch {
+              setFileError("No pudimos leer ese archivo. Prueba pegando el código.");
+            }
+          }}
+        />
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => fileRef.current?.click()} className="h-10 rounded-lg border border-border px-3 text-sm font-semibold hover:border-accent hover:text-accent">
+            ⬆ Elegir un archivo .html
+          </button>
+          <button type="button" onClick={() => setCode(SAMPLE_HTML)} className="h-10 rounded-lg border border-border px-3 text-sm font-semibold hover:border-accent hover:text-accent">
+            ✨ Probar con un ejemplo
+          </button>
+        </div>
+        {fileError && <p role="alert" className="text-sm text-error">{fileError}</p>}
+
         <label htmlFor="html-dialog-code" className="sr-only">Código HTML</label>
         <textarea
           id="html-dialog-code"
@@ -67,7 +99,7 @@ export function HtmlCodeDialog({
           autoCorrect="off"
           maxLength={100000}
           placeholder={'Pega aquí tu código. Por ejemplo:\n<div style="padding:24px">\n  <h2>Hola</h2>\n</div>'}
-          className="min-h-[46dvh] w-full flex-1 resize-none rounded-lg border border-border bg-background p-3 font-mono text-[13px] leading-snug outline-none focus:border-accent sm:min-h-[22rem]"
+          className="min-h-[34dvh] w-full flex-1 resize-none rounded-lg border border-border bg-background p-3 font-mono text-[13px] leading-snug outline-none focus:border-accent sm:min-h-[22rem]"
         />
 
         <div className="flex flex-wrap items-center gap-3 text-[12px]">

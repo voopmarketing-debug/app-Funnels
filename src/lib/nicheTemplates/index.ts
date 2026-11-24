@@ -179,3 +179,11 @@ export function listFunnelCards(): TemplateCard[] {
 }
 
 export { buildFunnelContent, getFunnelTemplate };
+
+/** A page that is only the owner's own HTML ("Subir mi HTML"): our header and sections are left out. */
+export function buildHtmlPageContent(opts: { businessName: string; brandColor?: string | null; html: string; title?: string }): WebsiteContentV2 {
+  const base = buildBlankContent(opts);
+  const first = base.sections[0];
+  if (first.type === "hero" && opts.title) first.heading = opts.title.slice(0, 70);
+  return { ...base, fullHtml: true, sections: [first, { type: "html", code: opts.html, height: 0 }] };
+}

@@ -733,6 +733,15 @@ export function WebsiteBuilder({
                 help="Después de enviar el formulario, la persona va a este link (por ejemplo, tu página de gracias o el enlace de tu regalo). Vacío = ve un mensaje de gracias en esta misma página."
                 onSave={(url) => runDesign("Guardando…", { thankYouUrl: url })}
               />
+              {content.sections.some((s) => s.type === "html") && (
+                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-1" checked={!!content.fullHtml} disabled={!!busy} onChange={(e) => runDesign("Guardando…", { fullHtml: e.target.checked })} />
+                  <span>
+                    <span className="font-semibold text-ink">Mostrar solo mi HTML</span>
+                    <span className="block text-[12px] text-ink-muted">La página pública es únicamente tu código, sin encabezado ni pie nuestros.</span>
+                  </span>
+                </label>
+              )}
               <label className="flex cursor-pointer items-start gap-2 text-sm">
                 <input type="checkbox" className="mt-1" checked={!!content.sticky} disabled={!!busy} onChange={(e) => runDesign("Guardando…", { sticky: e.target.checked })} />
                 <span>

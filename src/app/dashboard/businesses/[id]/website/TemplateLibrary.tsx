@@ -6,6 +6,7 @@ import { createBlankWebsite, createWebsiteFromTemplate } from "@/lib/actions";
 import type { TemplateCard } from "@/lib/websiteNicheTemplates";
 import { DevicePreviewFrame } from "@/components/DevicePreviewFrame";
 import { TemplateThumb } from "./TemplateThumb";
+import { HtmlUploadDialog } from "./HtmlUploadDialog";
 
 const PAGE = 24;
 const plain = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -41,6 +42,7 @@ export function TemplateLibrary({
   const [error, setError] = useState<string | null>(null);
   const [whatsapp, setWhatsapp] = useState("");
   const [blankBusy, setBlankBusy] = useState(false);
+  const [htmlOpen, setHtmlOpen] = useState(false);
   const [, startTransition] = useTransition();
 
   const niches = useMemo(() => {
@@ -328,6 +330,19 @@ export function TemplateLibrary({
                   </button>
                 </div>
               </article>
+              <article className="fl-card flex flex-col overflow-hidden border-dashed">
+                <button type="button" onClick={() => setHtmlOpen(true)} className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-surface-2/50 text-ink-muted transition hover:text-ink max-sm:hidden" aria-label="Subir mi propio HTML">
+                  <span aria-hidden="true" className="text-4xl">⬆</span>
+                  <span className="text-xs">Tu archivo .html o tu código</span>
+                </button>
+                <div className="flex flex-1 flex-col gap-1.5 p-3.5">
+                  <p className="text-sm font-bold text-ink"><span aria-hidden="true" className="mr-1.5 sm:hidden">⬆</span>Subir mi HTML</p>
+                  <p className="line-clamp-2 text-xs text-ink-muted">Elige un archivo .html desde tu celular o computador, o pega tu código: queda como una página tuya.</p>
+                  <button type="button" onClick={() => setHtmlOpen(true)} className="mt-auto rounded-lg border border-border-strong px-3 py-2 text-sm font-bold text-ink hover:border-accent">
+                    Subir mi HTML
+                  </button>
+                </div>
+              </article>
               {visible.map((card) => (
                 <article key={card.id} className="fl-card flex flex-col overflow-hidden">
                   <button type="button" onClick={() => setBig(card)} className="block overflow-hidden text-left" aria-label={`Ver página: ${card.nicheName}, ${label(card)}`}>
@@ -364,6 +379,7 @@ export function TemplateLibrary({
         </section>
       </div>
 
+      {htmlOpen && <HtmlUploadDialog businessId={businessId} needsWhatsapp={needsWhatsapp} onClose={() => setHtmlOpen(false)} />}
       {big && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/70 p-3 backdrop-blur-sm md:p-6" role="dialog" aria-modal="true" aria-label={`Vista previa: ${big.nicheName}, ${label(big)}`}>
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 pb-3">

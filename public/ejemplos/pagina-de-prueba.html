@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Página de prueba</title>
+<style>
+  :root { --brand: #5b3df5; --ink: #151522; --soft: #f4f2ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #fff; line-height: 1.5; }
+  header { padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; max-width: 960px; margin: 0 auto; }
+  header b { font-size: 18px; letter-spacing: -.01em; }
+  header span { font-size: 13px; color: #6b6b80; }
+  .hero { background: linear-gradient(135deg, #5b3df5, #9b5cff); color: #fff; padding: 56px 20px 64px; text-align: center; }
+  .hero h1 { margin: 0 auto 12px; max-width: 18ch; font-size: clamp(30px, 7vw, 52px); line-height: 1.05; letter-spacing: -.03em; }
+  .hero p { margin: 0 auto 26px; max-width: 42ch; opacity: .92; font-size: 17px; }
+  .btn { display: inline-block; border: 0; border-radius: 999px; padding: 14px 26px; font: 700 16px system-ui, sans-serif; cursor: pointer; background: #fff; color: var(--brand); }
+  .btn:active { transform: scale(.98); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 44px 20px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .card { background: var(--soft); border-radius: 18px; padding: 22px; }
+  .card h3 { margin: 6px 0 4px; font-size: 18px; }
+  .card p { margin: 0; color: #4a4a62; font-size: 15px; }
+  .ico { font-size: 26px; }
+  .box { background: #fff; border: 2px solid var(--soft); border-radius: 18px; padding: 22px; margin-top: 22px; text-align: center; }
+  .count { font-size: 44px; font-weight: 800; color: var(--brand); letter-spacing: -.03em; }
+  form { display: grid; gap: 10px; max-width: 420px; margin: 18px auto 0; text-align: left; }
+  input { width: 100%; padding: 13px 14px; border: 1.5px solid #d9d6f5; border-radius: 12px; font: 16px system-ui, sans-serif; }
+  form .btn { background: var(--brand); color: #fff; }
+  #ok { display: none; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #e8f9ee; color: #14703a; font-weight: 600; text-align: center; }
+  footer { text-align: center; color: #8a8aa0; font-size: 13px; padding: 28px 20px 40px; }
+</style>
+</head>
+<body>
+  <header><b>Mi Marca de Prueba</b><span>Página de ejemplo</span></header>
+
+  <section class="hero">
+    <h1>Esta página es tu propio HTML</h1>
+    <p>Si ves esto con colores, botones y un contador que funciona, tu código se subió bien.</p>
+    <button class="btn" id="hola">Tócame para probar</button>
+  </section>
+
+  <section class="wrap">
+    <div class="grid">
+      <div class="card"><div class="ico">🎨</div><h3>Tu diseño</h3><p>Los colores, las letras y el orden son los de tu archivo.</p></div>
+      <div class="card"><div class="ico">⚡</div><h3>Con JavaScript</h3><p>Los botones y los cálculos de tu código funcionan.</p></div>
+      <div class="card"><div class="ico">🔒</div><h3>Aislado y seguro</h3><p>Tu código no puede tocar el resto de la plataforma.</p></div>
+    </div>
+
+    <div class="box">
+      <p style="margin:0">Veces que tocaste el botón de arriba</p>
+      <div class="count" id="n">0</div>
+    </div>
+
+    <div class="box">
+      <h3 style="margin:0">Formulario de ejemplo</h3>
+      <p style="margin:6px 0 0;color:#4a4a62;font-size:14px">Solo es una prueba: no guarda nada.</p>
+      <form id="f">
+        <input id="nombre" placeholder="Tu nombre" autocomplete="name" required>
+        <button class="btn" type="submit">Enviar</button>
+      </form>
+      <div id="ok"></div>
+    </div>
+  </section>
+
+  <footer>Hecho con HTML, CSS y JavaScript · subido a Funnels Labs</footer>
+
+  <script>
+    var n = 0;
+    document.getElementById('hola').addEventListener('click', function () {
+      n += 1;
+      document.getElementById('n').textContent = n;
+      this.textContent = n < 3 ? '¡Funciona! Toca otra vez' : '¡Perfecto, tu JavaScript corre! ✅';
+    });
+    document.getElementById('f').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var ok = document.getElementById('ok');
+      ok.style.display = 'block';
+      ok.textContent = '¡Gracias, ' + document.getElementById('nombre').value + '! (esto es solo una prueba)';
+    });
+  </script>
+</body>
+</html>

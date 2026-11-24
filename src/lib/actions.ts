@@ -37,7 +37,8 @@ import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator
 import { generateHeroImage } from "@/lib/websiteHeroImage";
 import { withAiUsage } from "@/lib/aiUsage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
-import { buildBlankContent, buildFunnelContent, buildNicheContent, getFunnelTemplate, getNicheTemplate } from "@/lib/websiteNicheTemplates";
+import { checkUploadedHtml } from "@/lib/htmlBlock";
+import { buildBlankContent, buildFunnelContent, buildHtmlPageContent, buildNicheContent, getFunnelTemplate, getNicheTemplate } from "@/lib/websiteNicheTemplates";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { isTemplateContent, templateForPageType } from "@/lib/templateSite/content";
@@ -3326,6 +3327,38 @@ export async function createWebsiteFromTemplate(
   }
 }
 
+/** A page that is only the owner's own HTML (uploaded as a file or pasted): "Subir mi HTML". */
+export async function createHtmlWebsite(businessId: string, input: { name?: string; html: string; whatsappNumber?: string }): Promise<BuilderResult<{ id: string }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
+
+    const checked = checkUploadedHtml(input.html);
+    if (!checked.ok) return { ok: false, error: checked.error };
+
+    const phoneError = await rememberWhatsappNumber(businessId, input.whatsappNumber);
+    if (phoneError) return { ok: false, error: phoneError };
+
+    const ctx = await buildWebsiteV2Context(businessId);
+    if (!ctx.displayNumber) {
+      return { ok: false, error: "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567: lo usamos para tus avisos y tus enlaces." };
+    }
+    const existingCount = await prisma.website.count({ where: { businessId } });
+    const name = input.name?.trim().slice(0, 80) || "Mi página HTML";
+    const content = buildHtmlPageContent({ businessName: ctx.businessName, brandColor: ctx.brandColors?.primary, html: checked.html, title: name });
+    const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, false);
+    const created = await prisma.website.create({
+      data: { businessId, name, purpose: null, designPrompt: null, slug, content, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: "template:html" },
+    });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, id: created.id };
+  } catch (err) {
+    return builderError(`createHtmlWebsite(${businessId})`, err);
+  }
+}
+
 /** A page with nothing on it, to build block by block or with the owner's own HTML. */
 export async function createBlankWebsite(businessId: string, input: { name?: string; whatsappNumber?: string } = {}): Promise<BuilderResult<{ id: string }>> {
   try {
@@ -3568,6 +3601,7 @@ export async function updateWebsiteDesignV2(
     heroCtaUrl?: string | null;
     thankYouUrl?: string | null;
     sticky?: boolean;
+    fullHtml?: boolean;
   },
 ): Promise<WebsiteContentV2> {
   const session = await auth();
@@ -3588,6 +3622,7 @@ export async function updateWebsiteDesignV2(
   if (patch.heroCtaUrl !== undefined) next.heroCtaUrl = patch.heroCtaUrl && /^https?:\/\//i.test(patch.heroCtaUrl) ? patch.heroCtaUrl : null;
   if (patch.thankYouUrl !== undefined) next.thankYouUrl = patch.thankYouUrl && /^https?:\/\/\S+$/i.test(patch.thankYouUrl.trim()) ? patch.thankYouUrl.trim().slice(0, 500) : null;
   if (patch.sticky !== undefined) next.sticky = patch.sticky ? true : undefined;
+  if (patch.fullHtml !== undefined) next.fullHtml = patch.fullHtml ? true : undefined;
   if (patch.move) {
     const { from, to } = patch.move;
     // The hero always stays first.

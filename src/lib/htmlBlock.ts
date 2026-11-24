@@ -1,5 +1,6 @@
 import { WebsiteContentV2Schema } from "@/lib/websiteContentV2";
 import { SECURITY_HEADERS } from "@/lib/securityHeaders";
+import { HTML_MAX_CHARS } from "@/lib/websiteContentV2";
 
 // The "Código HTML" block: the owner pastes their own HTML (a widget, an embed, a form from another
 // service, a script). It is never put inside the page itself: it is served from its own address and
@@ -44,3 +45,13 @@ export const HTML_BLOCK_HEADERS: Record<string, string> = {
   // The owner edits this often; never serve an old copy.
   "Cache-Control": "no-store",
 };
+
+/** Checks the HTML an owner uploads or pastes for a whole page; an error in plain Spanish, or the cleaned text. */
+export function checkUploadedHtml(raw: unknown): { ok: true; html: string } | { ok: false; error: string } {
+  if (typeof raw !== "string") return { ok: false, error: "No se pudo leer el archivo." };
+  const html = raw.replace(/^\uFEFF/, "").trim();
+  if (!html) return { ok: false, error: "El archivo está vacío." };
+  if (html.length > HTML_MAX_CHARS) return { ok: false, error: `El HTML es muy largo (${html.length.toLocaleString("es")} caracteres): el máximo es ${HTML_MAX_CHARS.toLocaleString("es")}.` };
+  if (!/<[a-z!][^>]*>/i.test(html)) return { ok: false, error: "Eso no parece código HTML. Pega o sube un archivo .html." };
+  return { ok: true, html };
+}
