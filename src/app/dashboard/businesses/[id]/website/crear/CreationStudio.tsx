@@ -181,6 +181,17 @@ function clearLocalDraft(businessId: string) {
   }
 }
 
+// Short names for the compact options in the chat.
+const PAGE_TYPE_SHORT: Record<PageType, string> = {
+  servicios: "Servicios",
+  producto: "Un producto",
+  tienda: "Tienda",
+  evento: "Evento",
+  captacion: "Captar clientes",
+  showroom: "Showroom",
+  historia: "Historia de marca",
+};
+
 const BUILD_STEPS = [
   "Analizando tu negocio y tus clientes…",
   "Definiendo la estrategia de la página…",
@@ -469,7 +480,7 @@ export function CreationStudio({
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_27rem]">
         {/* Chat */}
-        <section className="fl-card flex h-[70dvh] min-h-0 flex-col overflow-hidden lg:h-auto">
+        <section className={`fl-card flex min-h-0 flex-col overflow-hidden lg:h-auto ${plan ? "h-[90dvh]" : "h-[70dvh]"}`}>
           <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 md:p-6">
             {messages.map((m, i) => (
               <div key={i} className={m.role === "user" ? "flex justify-end" : "space-y-3"}>
@@ -526,27 +537,81 @@ export function CreationStudio({
               </div>
             ))}
             {plan && !thinking && messages[messages.length - 1]?.role === "assistant" && (
-              <div ref={optionsRef} className="ml-0 scroll-mt-2 space-y-5 rounded-xl border border-accent/40 bg-accent/5 p-3 sm:ml-11 md:p-4">
-                <div>
-                  <p className="text-sm font-bold text-ink">Elige cómo quieres tu página</p>
-                  <p className="text-xs text-ink-muted">Todo se guarda solo: puedes salir y volver cuando quieras.</p>
+              <div ref={optionsRef} className="ml-0 scroll-mt-20 space-y-3.5 rounded-xl border border-accent/40 bg-accent/5 p-3 sm:ml-11">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-ink">Así queda tu página</p>
+                    <p className="text-xs text-ink-muted">Toca lo que quieras cambiar. Todo se guarda solo. <a href="#plan" className="font-semibold text-accent hover:underline">Revisar el texto</a></p>
+                  </div>
+                  <button type="button" onClick={build} className="flex-none rounded-lg bg-accent px-3 py-2 text-xs font-bold text-accent-ink hover:bg-accent-hover">
+                    ✦ Crear
+                  </button>
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm lg:hidden">
-                  <ScaledPagePreview key={`chat-${plan.style}-${plan.pageType}`} src={previewSrc(plan.style, plan.pageType)} aspect={0.7} title={`Vista previa en estilo ${STYLE_INFO[plan.style].label}`} />
-                  <div className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-2">
-                    <p className="min-w-0 truncate text-xs">
-                      <span className="font-semibold text-ink">{STYLE_INFO[plan.style].label}</span>
-                    </p>
+                  <ScaledPagePreview key={`chat-${plan.style}-${plan.pageType}`} src={previewSrc(plan.style, plan.pageType)} aspect={0.5} title={`Vista previa en estilo ${STYLE_INFO[plan.style].label}`} />
+                  <div className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-1.5">
+                    <p className="min-w-0 truncate text-xs font-semibold text-ink">{STYLE_INFO[plan.style].label}</p>
                     <button type="button" onClick={() => setFullPreview({ style: plan.style, pageType: plan.pageType })} className="flex-none text-xs font-semibold text-accent hover:underline">
                       Ver en grande
                     </button>
                   </div>
                 </div>
 
+                <fieldset className="space-y-1.5">
+                  <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Qué quieres lograr</legend>
+                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+                    {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
+                      const needsProducts = k === "tienda" || k === "producto" ? productCount === 0 : k === "showroom" || k === "historia" ? (showcaseCount ?? productCount) === 0 : false;
+                      const active = plan.pageType === k;
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          disabled={needsProducts}
+                          aria-pressed={active}
+                          title={needsProducts ? "Primero sube fotos de tus productos en Productos" : PAGE_TYPE_PITCH[k].text}
+                          onClick={() => {
+                            setPlan({ ...plan, pageType: k });
+                            setExtras([]);
+                          }}
+                          className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${active ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                        >
+                          <span aria-hidden="true">{PAGE_TYPE_PITCH[k].icon} </span>
+                          {PAGE_TYPE_SHORT[k]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                {plan.pageType !== "showroom" && plan.pageType !== "historia" && (
+                  <fieldset className="space-y-1.5">
+                    <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Estilo <span className="font-normal normal-case tracking-normal">· desliza para ver todos</span></legend>
+                    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+                      {STYLE_KEYS.map((k) => {
+                        const active = plan.style === k;
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => setPlan({ ...plan, style: k })}
+                            aria-pressed={active}
+                            title={STYLE_INFO[k].summary}
+                            className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition ${active ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                          >
+                            {active ? "✓ " : ""}
+                            {STYLE_INFO[k].label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
+
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-ink">Mejora tu idea con un toque</legend>
-                  <div className="flex flex-wrap gap-2">
+                  <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Mejora tu idea con un toque</legend>
+                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
                     {(ENHANCERS[plan.pageType] ?? []).map((e) => {
                       const on = extras.includes(e.id);
                       return (
@@ -555,7 +620,7 @@ export function CreationStudio({
                           type="button"
                           aria-pressed={on}
                           onClick={() => setExtras((x) => (on ? x.filter((i) => i !== e.id) : [...x, e.id]))}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                          className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
                         >
                           {on ? "✓ " : "+ "}
                           {e.label}
@@ -565,69 +630,8 @@ export function CreationStudio({
                   </div>
                 </fieldset>
 
-
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-ink">¿Qué quieres lograr con tu página?</legend>
-                  <div className="grid gap-1.5">
-                    {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
-                      const needsProducts = k === "tienda" || k === "producto" ? productCount === 0 : k === "showroom" || k === "historia" ? (showcaseCount ?? productCount) === 0 : false;
-                      const active = plan.pageType === k;
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          disabled={needsProducts}
-                          onClick={() => setPlan({ ...plan, pageType: k })}
-                          aria-pressed={active}
-                          className={`fl-option flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left disabled:opacity-50 ${
-                            active ? "border-accent bg-accent/10" : "border-border hover:border-border-strong"
-                          }`}
-                        >
-                          <span className="text-lg leading-6" aria-hidden="true">{PAGE_TYPE_PITCH[k].icon}</span>
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold text-ink">{PAGE_TYPE_LABELS[k]}</span>
-                            <span className="block text-xs text-ink-muted">
-                              {needsProducts ? (k === "showroom" || k === "historia" ? "Primero sube las fotos de tus productos en Productos (con precio) o a tu biblioteca de fotos." : "Primero carga tus productos en Productos.") : PAGE_TYPE_PITCH[k].text}
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-
-                {plan.pageType !== "showroom" && plan.pageType !== "historia" && (
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-ink">Estilo de la página</legend>
-                  <div className="flex flex-wrap gap-2">
-                    {STYLE_KEYS.map((k) => {
-                      const active = plan.style === k;
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => setPlan({ ...plan, style: k })}
-                          aria-pressed={active}
-                          title={STYLE_INFO[k].summary}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
-                        >
-                          {active ? "✓ " : ""}
-                          {STYLE_INFO[k].label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-ink-muted">{STYLE_INFO[plan.style].summary}</p>
-                </fieldset>
-                )}
-
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-ink">Los colores de tu marca</legend>
-                  <p className="text-xs text-ink-muted">
-                    {brandPrimary
-                      ? "Tu página usará tu color en botones y detalles, con el estilo que elegiste."
-                      : "Opcional. Toca el cuadro o pega el código de tu color (#F3F3EF o rgb). Si no eliges, usamos los del estilo."}
-                  </p>
+                  <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Colores de tu marca (opcional)</legend>
                   <div className="flex flex-wrap items-center gap-3">
                     {(
                       [
@@ -674,14 +678,6 @@ export function CreationStudio({
                   </div>
                 </fieldset>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <button type="button" onClick={build} className="rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                    ✦ Crear mi página
-                  </button>
-                  <a href="#plan" className="text-xs font-semibold text-accent hover:underline lg:hidden">
-                    Revisar el texto y crear
-                  </a>
-                </div>
               </div>
             )}
             {thinking && (
