@@ -7,6 +7,8 @@ import { clearWebsiteCreationDraft, createWebsitePageV2, saveWebsiteCreationDraf
 import { PAGE_TYPE_LABELS, STYLE_INFO, STYLE_KEYS, type PageType, type StyleKey } from "@/lib/websiteContentV2";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
+import { ColorSwatchButton } from "@/components/ColorSwatchButton";
+import { recommendPalette } from "@/lib/designIntel";
 import { askConfirm } from "@/components/ConfirmHost";
 
 type Proposal = { title: string; pageType: PageType; style: StyleKey; why: string; brief: string };
@@ -256,6 +258,12 @@ export function CreationStudio({
   }, [brandPrimary]);
   const previewSrc = (style: StyleKey, pageType: PageType) =>
     `/dashboard/businesses/${businessId}/website/muestra?style=${style}&type=${pageType}${previewColor ? `&color=${encodeURIComponent(previewColor)}` : ""}`;
+  // Colors recommended for this kind of business (from its name and what the page is about).
+  const suggestedColors = (() => {
+    if (!plan) return [] as string[];
+    const p = recommendPalette(`${businessName}. ${plan.name}. ${plan.purpose}. ${plan.brief}`);
+    return p ? [p.accent, p.primary, p.secondary, p.bg, p.fg] : [];
+  })();
   const [, startTransition] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
@@ -549,7 +557,7 @@ export function CreationStudio({
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm lg:hidden">
-                  <ScaledPagePreview key={`chat-${plan.style}-${plan.pageType}`} src={previewSrc(plan.style, plan.pageType)} aspect={0.5} title={`Vista previa en estilo ${STYLE_INFO[plan.style].label}`} />
+                  <ScaledPagePreview key={`chat-${plan.style}-${plan.pageType}`} src={previewSrc(plan.style, plan.pageType)} aspect={0.42} title={`Vista previa en estilo ${STYLE_INFO[plan.style].label}`} />
                   <div className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-1.5">
                     <p className="min-w-0 truncate text-xs font-semibold text-ink">{STYLE_INFO[plan.style].label}</p>
                     <button type="button" onClick={() => setFullPreview({ style: plan.style, pageType: plan.pageType })} className="flex-none text-xs font-semibold text-accent hover:underline">
@@ -560,7 +568,27 @@ export function CreationStudio({
 
                 <fieldset className="space-y-1.5">
                   <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Qué quieres lograr</legend>
-                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+                  {/* Phones: a dropdown (every option visible in the picker). Wider screens: all the chips. */}
+                  <select
+                    aria-label="Qué quieres lograr con tu página"
+                    value={plan.pageType}
+                    onChange={(e) => {
+                      setPlan({ ...plan, pageType: e.target.value as PageType });
+                      setExtras([]);
+                    }}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-ink outline-none focus:border-accent sm:hidden"
+                  >
+                    {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
+                      const needsProducts = k === "tienda" || k === "producto" ? productCount === 0 : k === "showroom" || k === "historia" ? (showcaseCount ?? productCount) === 0 : false;
+                      return (
+                        <option key={k} value={k} disabled={needsProducts}>
+                          {PAGE_TYPE_PITCH[k].icon} {PAGE_TYPE_SHORT[k]}
+                          {needsProducts ? " (primero sube fotos en Productos)" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="hidden flex-wrap gap-1.5 sm:flex">
                     {(Object.keys(PAGE_TYPE_LABELS) as PageType[]).map((k) => {
                       const needsProducts = k === "tienda" || k === "producto" ? productCount === 0 : k === "showroom" || k === "historia" ? (showcaseCount ?? productCount) === 0 : false;
                       const active = plan.pageType === k;
@@ -575,7 +603,7 @@ export function CreationStudio({
                             setPlan({ ...plan, pageType: k });
                             setExtras([]);
                           }}
-                          className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${active ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                          className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${active ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
                         >
                           <span aria-hidden="true">{PAGE_TYPE_PITCH[k].icon} </span>
                           {PAGE_TYPE_SHORT[k]}
@@ -583,12 +611,25 @@ export function CreationStudio({
                       );
                     })}
                   </div>
+                  <p className="hidden text-xs text-ink-muted sm:block">{PAGE_TYPE_PITCH[plan.pageType].text}</p>
                 </fieldset>
 
                 {plan.pageType !== "showroom" && plan.pageType !== "historia" && (
                   <fieldset className="space-y-1.5">
-                    <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Estilo <span className="font-normal normal-case tracking-normal">· desliza para ver todos</span></legend>
-                    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+                    <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Estilo</legend>
+                    <select
+                      aria-label="Estilo de la página"
+                      value={plan.style}
+                      onChange={(e) => setPlan({ ...plan, style: e.target.value as StyleKey })}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-ink outline-none focus:border-accent sm:hidden"
+                    >
+                      {STYLE_KEYS.map((k) => (
+                        <option key={k} value={k}>
+                          {STYLE_INFO[k].label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="hidden flex-wrap gap-1.5 sm:flex">
                       {STYLE_KEYS.map((k) => {
                         const active = plan.style === k;
                         return (
@@ -598,7 +639,7 @@ export function CreationStudio({
                             onClick={() => setPlan({ ...plan, style: k })}
                             aria-pressed={active}
                             title={STYLE_INFO[k].summary}
-                            className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition ${active ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                            className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition ${active ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
                           >
                             {active ? "✓ " : ""}
                             {STYLE_INFO[k].label}
@@ -606,12 +647,13 @@ export function CreationStudio({
                         );
                       })}
                     </div>
+                    <p className="hidden text-xs text-ink-muted sm:block">{STYLE_INFO[plan.style].summary}</p>
                   </fieldset>
                 )}
 
                 <fieldset className="space-y-2">
                   <legend className="text-xs font-bold uppercase tracking-wide text-ink-faint">Mejora tu idea con un toque</legend>
-                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+                  <div className="flex flex-wrap gap-1.5">
                     {(ENHANCERS[plan.pageType] ?? []).map((e) => {
                       const on = extras.includes(e.id);
                       return (
@@ -620,7 +662,7 @@ export function CreationStudio({
                           type="button"
                           aria-pressed={on}
                           onClick={() => setExtras((x) => (on ? x.filter((i) => i !== e.id) : [...x, e.id]))}
-                          className={`flex-none whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
+                          className={`rounded-full border px-2.5 py-1 text-left text-xs font-semibold transition ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}
                         >
                           {on ? "✓ " : "+ "}
                           {e.label}
@@ -640,20 +682,14 @@ export function CreationStudio({
                       ] as const
                     ).map(([label, value, set]) => (
                       <div key={label} className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5">
-                        <label className="relative h-8 w-8 flex-none cursor-pointer" title={`Elegir color ${label.toLowerCase()}`}>
-                          <span
-                            className={`block h-full w-full rounded-md border border-black/10 ${value ? "" : "bg-[repeating-linear-gradient(45deg,var(--surface-2)_0_4px,var(--border)_4px_8px)]"}`}
-                            style={value ? { background: value } : undefined}
-                          />
-                          <input
-                            type="color"
-                            value={value ?? "#1f6feb"}
-                            onChange={(e) => set(e.target.value)}
-                            disabled={label === "Secundario" && !brandPrimary}
-                            aria-label={`Color ${label.toLowerCase()} de tu marca`}
-                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                          />
-                        </label>
+                        <ColorSwatchButton
+                          value={value}
+                          label={`color ${label.toLowerCase()}`}
+                          disabled={label === "Secundario" && !brandPrimary}
+                          suggestions={suggestedColors}
+                          onChange={(hex) => set(hex)}
+                          onClear={() => set(null)}
+                        />
                         <span className="text-xs font-semibold text-ink">{label}</span>
                         <ColorCodeInput
                           value={value}

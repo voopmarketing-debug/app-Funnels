@@ -19,6 +19,7 @@ import {
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
+import { ColorSwatchButton } from "@/components/ColorSwatchButton";
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import { ImagePicker } from "./ImagePicker";
 import { BlocksPanel } from "./BlocksPanel";
@@ -832,20 +833,11 @@ function ThemeEditor({
           const value = /^#[0-9a-fA-F]{6}$/.test(theme[key]) ? theme[key] : "#000000";
           return (
             <div key={key} className="group flex items-center gap-3 rounded-xl border border-border bg-background p-2.5 transition hover:border-accent focus-within:border-accent">
-              <label className="relative h-11 w-11 flex-none cursor-pointer" title={`Cambiar ${label.toLowerCase()}`}>
-                <span className="block h-full w-full rounded-lg border border-black/10 shadow-inner" style={{ background: value }} />
+              <ColorSwatchButton value={value} label={label.toLowerCase()} disabled={disabled} sizeClass="h-11 w-11" roundedClass="rounded-lg" onChange={(hex) => update({ ...theme, [key]: hex })}>
                 <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-ink shadow">
                   <PencilIcon className="h-3 w-3" />
                 </span>
-                <input
-                  type="color"
-                  value={value}
-                  disabled={disabled}
-                  onChange={(e) => update({ ...theme, [key]: e.target.value })}
-                  aria-label={`Cambiar ${label.toLowerCase()}`}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                />
-              </label>
+              </ColorSwatchButton>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold leading-tight text-ink">{label}</p>
                 <p className="truncate text-[12px] text-ink-muted">{hint}</p>

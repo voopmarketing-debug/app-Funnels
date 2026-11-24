@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
+import { ColorSwatchButton } from "@/components/ColorSwatchButton";
 import { SECTION_LABELS, type Section, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { tidyLook, type Look } from "@/lib/websiteLook";
 
@@ -65,10 +66,15 @@ function ColorRow({
         <p className="text-[12px] text-ink-muted">{hint}</p>
       </div>
       <div className="flex items-center gap-2">
-        <label className="relative h-9 w-9 flex-none cursor-pointer" title={`Elegir ${label.toLowerCase()}`}>
-          <span className="block h-full w-full rounded-lg border border-black/10 shadow-inner" style={shown ? { background: shown } : { background: "repeating-linear-gradient(45deg,#ddd,#ddd 4px,#fff 4px,#fff 8px)" }} />
-          <input type="color" value={shown ?? "#ffffff"} onChange={(e) => onChange(e.target.value)} aria-label={`Elegir ${label.toLowerCase()}`} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-        </label>
+        <ColorSwatchButton
+          value={shown}
+          label={label.toLowerCase()}
+          sizeClass="h-9 w-9"
+          roundedClass="rounded-lg"
+          suggestions={swatches}
+          onChange={(hex) => onChange(hex)}
+          onClear={() => onChange(null)}
+        />
         <ColorCodeInput value={shown ?? ""} label={label.toLowerCase()} onChange={(hex) => onChange(hex)} />
         <button
           type="button"
