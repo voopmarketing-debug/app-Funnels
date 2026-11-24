@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { CreationStudio } from "./CreationStudio";
+import { CreateHub } from "./CreateHub";
 
 export default async function CreateWebsitePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,7 +32,8 @@ export default async function CreateWebsitePage({ params }: { params: Promise<{ 
   // instead of failing at the very end.
   const hasWhatsapp = !!(membership.business.wabaAccessToken && membership.business.wabaPhoneNumberId) || !!owner?.user.phone?.trim();
   return (
-    <CreationStudio
+    <CreateHub
+      hasDraft={!!savedDraft?.data}
       businessId={id}
       businessName={membership.business.name}
       productCount={productCount}

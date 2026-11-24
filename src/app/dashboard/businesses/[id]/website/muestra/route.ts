@@ -11,6 +11,7 @@ import { getWebsiteHeroContext } from "@/lib/websiteHero";
 import { buildSampleContent, sampleProducts } from "@/lib/websiteSample";
 import { PAGE_TYPES, STYLE_KEYS, type PageType, type StyleKey } from "@/lib/websiteContentV2";
 import { siteSecurityHeaders } from "@/lib/securityHeaders";
+import { buildNicheContent, getNicheTemplate } from "@/lib/websiteNicheTemplates";
 
 // The creation studio's style previews (thumbnails and the big preview):
 // an example page in the requested style and page type, with this
@@ -30,6 +31,28 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const typeParam = req.nextUrl.searchParams.get("type");
   const style: StyleKey = STYLE_KEYS.includes(styleParam as StyleKey) ? (styleParam as StyleKey) : "editorial";
   const pageType: PageType = PAGE_TYPES.includes(typeParam as PageType) ? (typeParam as PageType) : "servicios";
+
+  // A ready-made niche page (contadores, estéticas, odontólogos…): the real page, with this
+  // business's name, brand color and photos.
+  const niche = getNicheTemplate(req.nextUrl.searchParams.get("template") ?? "");
+  if (niche) {
+    const [photos, hero, brand] = await Promise.all([
+      prisma.agentMedia.findMany({ where: { businessId: id, mediaType: "image" }, orderBy: { createdAt: "desc" }, take: 8, select: { url: true } }),
+      getWebsiteHeroContext(id, membership.business.industry, null),
+      prisma.business.findUnique({ where: { id }, select: { brandPrimaryColor: true } }),
+    ]);
+    const color = req.nextUrl.searchParams.get("color") ?? brand?.brandPrimaryColor;
+    const content = buildNicheContent(niche, { businessName: membership.business.name, brandColor: color });
+    const html = renderWebsiteHtmlV2(content, {
+      businessName: membership.business.name,
+      trackingBasePath: "#",
+      preview: true,
+      heroImageUrl: hero.heroImageUrl,
+      photos: photos.map((p) => p.url),
+      products: [],
+    });
+    return new NextResponse(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, max-age=300", ...siteSecurityHeaders() } });
+  }
 
   // Showroom and Scroll Story are fixed templates: the preview is the real template with
   // this business's own products and photos (when it has none yet, the generic sample below).

@@ -88,7 +88,7 @@ export function WebsitePagesList({
               href={`/dashboard/businesses/${businessId}/website/crear`}
               className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
             >
-              ✦ Crear con IA
+              + Nueva página
             </Link>
             <button
               type="button"
@@ -127,15 +127,15 @@ export function WebsitePagesList({
           <div>
             <p className="text-sm font-medium text-ink">Este negocio todavía no tiene sitio web</p>
             <p className="mx-auto mt-1 max-w-xs text-xs text-ink-muted">
-              Conversa con la IA: te propone ideas según tu negocio (landing, tienda, producto, evento) y la
-              arma completa. Después la editas pidiéndole cambios por chat.
+              Elige una plantilla lista para tu tipo de negocio (contadores, estéticas, odontólogos…) o pídele a la IA
+              que la arme con tus productos. Después la editas pidiéndole cambios por chat.
             </p>
           </div>
           <Link
             href={`/dashboard/businesses/${businessId}/website/crear`}
             className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
           >
-            ✦ Crear con IA
+            Elegir plantilla o crear con IA
           </Link>
         </div>
       )}

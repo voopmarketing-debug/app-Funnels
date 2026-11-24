@@ -37,6 +37,7 @@ import { generateWebsiteContent, applyWebsiteEdit } from "@/lib/websiteGenerator
 import { generateHeroImage } from "@/lib/websiteHeroImage";
 import { withAiUsage } from "@/lib/aiUsage";
 import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/websiteGenerationLimit";
+import { buildNicheContent, getNicheTemplate } from "@/lib/websiteNicheTemplates";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
 import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { isTemplateContent, templateForPageType } from "@/lib/templateSite/content";
@@ -3247,6 +3248,61 @@ export async function clearWebsiteCreationDraft(businessId: string): Promise<{ o
   }
 }
 
+/**
+ * Saves the WhatsApp number a person typed while creating a page as the owner's phone (only when
+ * the owner has none), so this and future pages, and the rest of the platform, have it. Returns an
+ * error message for the person, or null when it is fine (or nothing was typed).
+ */
+async function rememberWhatsappNumber(businessId: string, raw: string | undefined): Promise<string | null> {
+  if (!raw?.trim()) return null;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 8 || digits.length > 15) return "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567";
+  const owner = await prisma.membership.findFirst({ where: { businessId, role: "OWNER" }, select: { user: { select: { id: true, phone: true } } } });
+  if (owner && !owner.user.phone?.trim()) {
+    await prisma.user.update({ where: { id: owner.user.id }, data: { phone: `+${digits}` } });
+  }
+  return null;
+}
+
+/**
+ * A page from a ready-made niche template (contadores, estéticas, odontólogos…): created at once,
+ * with no AI, so it costs nothing and does not count against the AI limit. The owner edits it in
+ * the builder afterwards.
+ */
+export async function createWebsiteFromTemplate(
+  businessId: string,
+  input: { templateId: string; name?: string; whatsappNumber?: string },
+): Promise<BuilderResult<{ id: string }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
+
+    const template = getNicheTemplate(input.templateId);
+    if (!template) return { ok: false, error: "Esa plantilla ya no está disponible. Elige otra." };
+
+    const phoneError = await rememberWhatsappNumber(businessId, input.whatsappNumber);
+    if (phoneError) return { ok: false, error: phoneError };
+
+    const ctx = await buildWebsiteV2Context(businessId);
+    if (!ctx.displayNumber) {
+      return { ok: false, error: "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567: todos los botones de la página llevan a ese número." };
+    }
+    const existingCount = await prisma.website.count({ where: { businessId } });
+    const name = input.name?.trim().slice(0, 80) || (existingCount === 0 ? "Sitio principal" : template.niche);
+    const content = buildNicheContent(template, { businessName: ctx.businessName, brandColor: ctx.brandColors?.primary });
+    const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0);
+    const created = await prisma.website.create({
+      data: { businessId, name, purpose: null, designPrompt: null, slug, content, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: "template" },
+    });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, id: created.id };
+  } catch (err) {
+    return builderError(`createWebsiteFromTemplate(${businessId})`, err);
+  }
+}
+
 export async function createWebsitePageV2(
   businessId: string,
   input: {
@@ -3272,18 +3328,8 @@ export async function createWebsitePageV2(
     await requireActiveAccount(session.user.id, businessId);
     await assertWebsiteGenerationAllowed(businessId);
 
-    if (input.whatsappNumber?.trim()) {
-      const digits = input.whatsappNumber.replace(/\D/g, "");
-      if (digits.length < 8 || digits.length > 15) {
-        return { ok: false, error: "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567" };
-      }
-      // Saved as the owner's phone (only when empty) so this and future
-      // pages, and the rest of the platform, have it.
-      const owner = await prisma.membership.findFirst({ where: { businessId, role: "OWNER" }, select: { user: { select: { id: true, phone: true } } } });
-      if (owner && !owner.user.phone?.trim()) {
-        await prisma.user.update({ where: { id: owner.user.id }, data: { phone: `+${digits}` } });
-      }
-    }
+    const phoneError = await rememberWhatsappNumber(businessId, input.whatsappNumber);
+    if (phoneError) return { ok: false, error: phoneError };
 
     if (input.brandPrimaryColor !== undefined || input.brandSecondaryColor !== undefined) {
       const clean = (v: string | null | undefined) => (v && HEX_COLOR.test(v) ? v.toLowerCase() : null);
