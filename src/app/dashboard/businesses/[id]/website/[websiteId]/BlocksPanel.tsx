@@ -46,7 +46,7 @@ export function BlocksPanel({
   onOp,
   onStyle,
   onToggleHidden,
-  onSaveHtml,
+  onEditHtml,
   onGenerateImages,
   onRemoveAiImages,
   onSaveEventDate,
@@ -59,7 +59,8 @@ export function BlocksPanel({
   onOp: (op: BlockOp) => void;
   onStyle: (index: number) => void;
   onToggleHidden: (index: number) => void;
-  onSaveHtml: (index: number, code: string, height: number) => Promise<boolean>;
+  /** Opens the window where the code of an HTML block is pasted. */
+  onEditHtml: (index: number) => void;
   onGenerateImages: () => Promise<void>;
   onRemoveAiImages: () => Promise<void>;
   onSaveEventDate: (index: number, date: string) => Promise<boolean>;
@@ -122,11 +123,21 @@ export function BlocksPanel({
         <EventDateEditor key={`ev${selected}`} date={(content.sections[selected] as { date: string }).date} busy={busy} onSave={(date) => onSaveEventDate(selected, date)} />
       )}
 
+      {selected !== null && content.sections[selected]?.type === "html" && (
+        <button
+          type="button"
+          onClick={() => onEditHtml(selected)}
+          className="flex w-full items-center justify-between gap-2 rounded-xl border-2 border-accent bg-accent/15 px-3 py-3 text-left text-sm font-bold text-ink transition hover:bg-accent/25"
+        >
+          <span>
+            <span className="font-mono">{"</>"}</span> {(content.sections[selected] as { code: string }).code.trim() ? "Editar el código HTML" : "Pegar el código HTML"}
+          </span>
+          <span aria-hidden="true">›</span>
+        </button>
+      )}
+
       <AiImagesCard content={content} busy={busy} onGenerate={onGenerateImages} onRemove={onRemoveAiImages} />
 
-      {selected !== null && content.sections[selected]?.type === "html" && (
-        <HtmlCodeEditor key={`${selected}`} section={content.sections[selected] as Extract<WebsiteContentV2["sections"][number], { type: "html" }>} busy={busy} onSave={(code, height) => onSaveHtml(selected, code, height)} />
-      )}
 
       {hidden.size > 0 && (
         <p className="rounded-lg border border-border bg-background p-2.5 text-[12px] text-ink-muted">
@@ -177,7 +188,12 @@ export function BlocksPanel({
                     {s.look && <span className="rounded bg-accent/15 px-1 text-[9px] font-bold uppercase tracking-wide text-accent">Estilo</span>}
                     {hidden.has(i) && <span className="rounded bg-surface-2 px-1 text-[9px] font-bold uppercase tracking-wide text-ink-muted">Oculto</span>}
                   </p>
-                  <p className="truncate text-[12px] text-ink-muted">{sectionTitle(s) || "—"}</p>
+                  <p className="truncate text-[12px] text-ink-muted">{s.type === "html" ? (s.code.trim() ? `${s.code.length.toLocaleString("es")} caracteres de código` : "Vacío: pega tu código") : sectionTitle(s) || "—"}</p>
+                  {s.type === "html" && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); onEditHtml(i); }} className="mt-1 rounded-md bg-accent px-2 py-1 text-[11px] font-bold text-accent-ink">
+                      {"</>"} {s.code.trim() ? "Editar código" : "Pegar código"}
+                    </button>
+                  )}
                 </div>
                 <div className={`flex flex-none items-center gap-1 ${on ? "" : "sm:hidden sm:group-hover:flex sm:group-focus-within:flex"}`}>
                   <IconButton label="Estilo del bloque" onClick={() => onStyle(i)}>
@@ -220,58 +236,6 @@ export function BlocksPanel({
           onDrop={(e) => drop(e, count)}
         />
       </ol>
-    </div>
-  );
-}
-
-/** Where the owner pastes their own HTML (widget, embed, form from another service, script). */
-function HtmlCodeEditor({ section, busy, onSave }: { section: { code: string; height: number }; busy: boolean; onSave: (code: string, height: number) => Promise<boolean> }) {
-  const [code, setCode] = useState(section.code);
-  const [height, setHeight] = useState(section.height);
-  const [saving, setSaving] = useState(false);
-  const dirty = code !== section.code || height !== section.height;
-  return (
-    <div className="space-y-2 rounded-xl border border-accent/60 bg-accent/5 p-3">
-      <p className="text-sm font-bold">Código HTML</p>
-      <p className="text-[12px] text-ink-muted">Pega aquí tu código (HTML, CSS y JavaScript). Se muestra en un recuadro aislado de tu página: no puede cambiar el resto del sitio. Los formularios de este código no guardan contactos en tu CRM.</p>
-      <label htmlFor="html-code" className="sr-only">Código HTML</label>
-      <textarea
-        id="html-code"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        spellCheck={false}
-        rows={10}
-        maxLength={100000}
-        placeholder={'<div style="padding:24px">Hola</div>'}
-        className="w-full resize-y rounded-md border border-border bg-background p-2 font-mono text-[12px] leading-snug outline-none focus:border-accent"
-      />
-      <div className="flex flex-wrap items-center gap-2 text-[12px]">
-        <label htmlFor="html-height" className="text-ink-muted">Alto:</label>
-        <select id="html-height" value={height} onChange={(e) => setHeight(Number(e.target.value))} className="rounded-md border border-border bg-background px-2 py-1.5 text-xs">
-          <option value={0}>Automático</option>
-          {[200, 300, 400, 500, 600, 800, 1000, 1400].map((h) => (
-            <option key={h} value={h}>
-              {h} px
-            </option>
-          ))}
-        </select>
-        <span className="ml-auto text-ink-faint">{code.length.toLocaleString("es")} / 100.000</span>
-      </div>
-      <button
-        type="button"
-        disabled={busy || saving || !dirty}
-        onClick={async () => {
-          setSaving(true);
-          try {
-            await onSave(code, height);
-          } finally {
-            setSaving(false);
-          }
-        }}
-        className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink transition hover:bg-accent-hover disabled:opacity-40"
-      >
-        {saving ? "Guardando…" : dirty ? "Guardar código" : "Guardado"}
-      </button>
     </div>
   );
 }

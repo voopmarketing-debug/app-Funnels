@@ -28,6 +28,7 @@ import { StylePanel } from "./StylePanel";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
 import { RegenerateBox } from "./RegenerateBox";
 import { PublishControl } from "./PublishControl";
+import { HtmlCodeDialog } from "./HtmlCodeDialog";
 
 type Tab = "chat" | "bloques" | "estilo" | "diseno" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
@@ -98,6 +99,8 @@ export function WebsiteBuilder({
   const focusAfterLoad = useRef<number | null>(null);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [phoneMenu, setPhoneMenu] = useState(false);
+  // The window where an HTML block's code is pasted (the block's number), or null.
+  const [htmlDialog, setHtmlDialog] = useState<number | null>(null);
   const [device, setDevice] = useState<Device>("desktop");
   const [previewVersion, setPreviewVersion] = useState(0);
   // Unsaved colors/fonts from the Diseño tab, shown live in the preview.
@@ -352,8 +355,10 @@ export function WebsiteBuilder({
         setSelected(op.kind === "remove" ? null : res.focus);
         focusAfterLoad.current = op.kind === "remove" ? null : res.focus;
         if (op.kind === "remove") showToast("Bloque eliminado.", true);
+        // A "Código HTML" block starts empty: open the window to paste the code right away.
+        if (op.kind === "add" && res.content.sections[res.focus]?.type === "html") setHtmlDialog(res.focus);
         // On a phone the panel and the page are not side by side: after adding a block, show it.
-        if (op.kind === "add" && typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+        else if (op.kind === "add" && typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
           setMobilePanel("preview");
           showToast("Bloque agregado", true);
         }
@@ -422,8 +427,7 @@ export function WebsiteBuilder({
     },
     code(index) {
       setSelected(index);
-      setTab("bloques");
-      setMobilePanel("panel");
+      setHtmlDialog(index);
     },
     dropBlock: (type, at) => runBlock({ kind: "add", type: type as never, at }, "Agregando el bloque…"),
     add: (index) => setLibrary({ at: index + 1 }),
@@ -691,16 +695,9 @@ export function WebsiteBuilder({
                 showToast("Fecha guardada.", true);
                 return true;
               }}
-              onSaveHtml={async (index, code, height) => {
-                const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "html", index, code, height });
-                if (!res.ok) {
-                  showToast(res.error);
-                  return false;
-                }
-                adopt(res.content);
-                refreshPreview();
-                showToast("Código guardado.", true);
-                return true;
+              onEditHtml={(index) => {
+                setSelected(index);
+                setHtmlDialog(index);
               }}
               onToggleHidden={(i) => runDesign("Actualizando…", { hidden: content.hidden.includes(i) ? content.hidden.filter((h) => h !== i) : [...content.hidden, i] })}
             />
@@ -835,6 +832,27 @@ export function WebsiteBuilder({
         </main>
         </div>
       </div>
+
+      {htmlDialog !== null && content.sections[htmlDialog]?.type === "html" && (
+        <HtmlCodeDialog
+          key={`html${htmlDialog}`}
+          code={(content.sections[htmlDialog] as { code: string }).code}
+          height={(content.sections[htmlDialog] as { height: number }).height}
+          onSave={async (code, height) => {
+            const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "html", index: htmlDialog, code, height });
+            if (!res.ok) {
+              showToast(res.error);
+              return false;
+            }
+            adopt(res.content);
+            refreshPreview();
+            setMobilePanel("preview");
+            showToast("Código guardado.", true);
+            return true;
+          }}
+          onClose={() => setHtmlDialog(null)}
+        />
+      )}
 
       {library && (
         <BlockLibraryDialog
