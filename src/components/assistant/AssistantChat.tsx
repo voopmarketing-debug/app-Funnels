@@ -392,7 +392,9 @@ export function AssistantChat() {
   }, [open]);
 
   // On a phone, an open WhatsApp/Messenger chat owns the bottom of the screen.
-  const chatOpenOnPhone = !!searchParams.get("conv") || (pathname.includes("/redes/mensajes") && !!searchParams.get("c"));
+  // Inside a page's editor (it has its own ✦ IA tab and a bottom bar) the phone has no floating button.
+  const inPageEditor = /\/website\/[^/]+$/.test(pathname) && !pathname.endsWith("/website/muestra");
+  const chatOpenOnPhone = inPageEditor || !!searchParams.get("conv") || (pathname.includes("/redes/mensajes") && !!searchParams.get("c"));
   const agencyScope = scope === AGENCY_SCOPE;
   const showPicker = !!ctx && (!scope || choosing);
 
@@ -413,14 +415,14 @@ export function AssistantChat() {
             setTimeout(() => inputRef.current?.focus(), 50);
           }}
           aria-label="Abrir el Asistente Funnels"
-          className={`fl-raised fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-4 z-40 items-center gap-2 rounded-full bg-surface px-4 py-3 text-sm font-semibold text-ink shadow-lg transition hover:-translate-y-0.5 md:bottom-6 md:right-6 ${
+          className={`fl-raised fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-4 z-40 items-center gap-2 rounded-full bg-surface p-2.5 text-sm font-semibold text-ink shadow-lg transition hover:-translate-y-0.5 md:bottom-6 md:right-6 md:px-4 md:py-3 ${
             chatOpenOnPhone ? "hidden md:flex" : "flex"
           }`}
         >
-          <span className="fl-ai-badge flex h-7 w-7 items-center justify-center rounded-full text-sm text-white" aria-hidden="true">
+          <span className="fl-ai-badge flex h-8 w-8 items-center justify-center rounded-full text-base text-white md:h-7 md:w-7 md:text-sm" aria-hidden="true">
             ✦
           </span>
-          Asistente
+          <span className="hidden md:inline">Asistente</span>
         </button>
       )}
 

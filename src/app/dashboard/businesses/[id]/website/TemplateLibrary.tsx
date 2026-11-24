@@ -228,7 +228,7 @@ export function TemplateLibrary({
               ))}
             </select>
             <select aria-label="Estilo de color" value={tone} onChange={(e) => setTone(e.target.value as Tone)} className="rounded-lg border border-border bg-background px-3 py-2.5 text-base text-ink outline-none focus:border-accent">
-              <option value="all">Todos los fondos</option>
+              <option value="all">Cualquier fondo</option>
               <option value="light">Fondo claro</option>
               <option value="dark">Fondo oscuro</option>
             </select>
@@ -316,12 +316,12 @@ export function TemplateLibrary({
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <article className="fl-card flex flex-col overflow-hidden border-dashed">
-                <button type="button" onClick={createBlank} className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-surface-2/50 text-ink-muted transition hover:text-ink" aria-label="Empezar con una página en blanco">
+                <button type="button" onClick={createBlank} className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-surface-2/50 text-ink-muted transition hover:text-ink max-sm:hidden" aria-label="Empezar con una página en blanco">
                   <span aria-hidden="true" className="font-mono text-4xl">{"</>"}</span>
                   <span className="text-xs">Sin nada: tú pones los bloques</span>
                 </button>
                 <div className="flex flex-1 flex-col gap-1.5 p-3.5">
-                  <p className="text-sm font-bold text-ink">Página en blanco</p>
+                  <p className="text-sm font-bold text-ink"><span aria-hidden="true" className="mr-1.5 font-mono sm:hidden">{"</>"}</span>Página en blanco</p>
                   <p className="line-clamp-2 text-xs text-ink-muted">Arrastra bloques o pega tu propio código HTML, como en Elementor.</p>
                   <button type="button" onClick={createBlank} className="mt-auto rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
                     Empezar en blanco

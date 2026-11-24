@@ -65,6 +65,7 @@ section[data-sec].fl-hover{box-shadow:inset 0 0 0 2px ${ACCENT};background-image
 .fl-bar button[disabled]{opacity:.3;cursor:default}
 .fl-bar button[disabled]:hover{background:none}
 @media (max-width:700px){.fl-label{display:none}}
+@media (pointer:coarse){.fl-bar button{min-height:44px;min-width:44px;padding:0 12px;font-size:14px;display:inline-flex;align-items:center;justify-content:center}.fl-bar button.fl-icon{padding:0 10px;font-size:17px}.fl-bar-wrap{right:6px}.fl-chip{display:none}}
 `;
 
 const MULTILINE = /\.(body|answer|description|intro|subheading)$/;

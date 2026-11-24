@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type PushState = "loading" | "unsupported" | "ios-install" | "denied" | "off" | "on";
 
@@ -151,6 +152,7 @@ export function PushToggleRow() {
 /** One-time invitation at the top of the dashboard until push is on (or dismissed). */
 export function PushBanner() {
   const { state, busy, enable } = usePush();
+  const pathname = usePathname();
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
@@ -171,30 +173,34 @@ export function PushBanner() {
     }
   }
 
+  // Not inside a page's editor: it fills the screen on a phone and has no room for banners.
+  if (/\/website\/[^/]+$/.test(pathname) && !pathname.endsWith("/website/muestra")) return null;
   if (dismissed || (state !== "off" && state !== "ios-install")) return null;
   return (
-    <div className="mb-4 flex flex-col gap-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm sm:flex-row sm:items-center">
-      <p className="flex-1 text-ink">
-        <strong>🔔 Entérate al instante cuando un cliente te escriba.</strong>{" "}
-        <span className="text-ink-muted">
+    <div className="mb-3 flex items-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-sm sm:mb-4 sm:gap-3 sm:px-4 sm:py-3">
+      <p className="min-w-0 flex-1 text-ink">
+        <strong className="sm:hidden">{state === "ios-install" ? "🔔 Activa los avisos: Compartir → Agregar a inicio" : "🔔 Avisos de chats nuevos"}</strong>
+        <strong className="hidden sm:inline">🔔 Entérate al instante cuando un cliente te escriba.</strong>{" "}
+        <span className="hidden text-ink-muted sm:inline">
           {state === "ios-install"
             ? "En iPhone: toca Compartir → Agregar a inicio, abre la app desde ahí y activa los avisos."
             : "Te avisamos en este dispositivo aunque no tengas el panel abierto."}
         </span>
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-none items-center gap-1 sm:gap-2">
         {state === "off" && (
           <button
             type="button"
             onClick={enable}
             disabled={busy}
-            className="rounded-lg bg-accent px-3 py-1.5 font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60"
+            className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-60 sm:py-1.5 sm:text-sm"
           >
-            {busy ? "Activando…" : "Activar avisos"}
+            {busy ? "Activando…" : "Activar"}
           </button>
         )}
-        <button type="button" onClick={hide} className="rounded-lg px-3 py-1.5 text-ink-muted hover:text-ink">
-          Ahora no
+        <button type="button" onClick={hide} aria-label="Ahora no" className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:text-ink sm:w-auto sm:px-3">
+          <span className="sm:hidden" aria-hidden="true">✕</span>
+          <span className="hidden sm:inline">Ahora no</span>
         </button>
       </div>
     </div>

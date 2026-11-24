@@ -97,6 +97,7 @@ export function WebsiteBuilder({
   const [library, setLibrary] = useState<{ at: number } | null>(null);
   const focusAfterLoad = useRef<number | null>(null);
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [phoneMenu, setPhoneMenu] = useState(false);
   const [device, setDevice] = useState<Device>("desktop");
   const [previewVersion, setPreviewVersion] = useState(0);
   // Unsaved colors/fonts from the Diseño tab, shown live in the preview.
@@ -351,6 +352,11 @@ export function WebsiteBuilder({
         setSelected(op.kind === "remove" ? null : res.focus);
         focusAfterLoad.current = op.kind === "remove" ? null : res.focus;
         if (op.kind === "remove") showToast("Bloque eliminado.", true);
+        // On a phone the panel and the page are not side by side: after adding a block, show it.
+        if (op.kind === "add" && typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+          setMobilePanel("preview");
+          showToast("Bloque agregado", true);
+        }
         refreshPreview();
       } finally {
         setBusy(null);
@@ -449,8 +455,48 @@ export function WebsiteBuilder({
 
   return (
     <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col md:-m-6">
-      {/* Top bar */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2 md:px-4">
+      {/* Phone top bar: one row. Back, name, publish chip, undo/redo and a menu. */}
+      <header className="flex items-center gap-1.5 border-b border-border bg-surface px-2 py-1.5 md:hidden">
+        <Link href={`/dashboard/businesses/${businessId}/website`} aria-label="Volver a mis sitios" className="flex h-11 w-11 flex-none items-center justify-center rounded-lg text-xl text-ink-muted active:bg-surface-2">
+          ←
+        </Link>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold leading-tight">{name}</p>
+          <p aria-live="polite" className={`truncate text-[11px] leading-tight ${saveState === "error" ? "text-error" : "text-ink-faint"}`}>
+            {saveState === "saving" ? "Guardando…" : saveState === "saved" ? "✓ Guardado" : saveState === "error" ? "No se guardó" : "Se guarda solo"}
+          </p>
+        </div>
+        <PublishControl businessId={businessId} websiteId={websiteId} published={published} variant="chip" />
+        <button type="button" onClick={() => travel("undo")} disabled={!!busy || history.undo === 0} aria-label="Deshacer" className="flex h-10 w-10 flex-none items-center justify-center rounded-lg border border-border text-lg disabled:opacity-30">
+          ↶
+        </button>
+        <button type="button" onClick={() => setPhoneMenu(true)} aria-label="Más opciones" aria-haspopup="dialog" className="flex h-10 w-10 flex-none items-center justify-center rounded-lg border border-border text-xl leading-none">
+          ⋯
+        </button>
+      </header>
+
+      {phoneMenu && (
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/50 md:hidden" onClick={() => setPhoneMenu(false)}>
+          <div role="dialog" aria-label="Más opciones" className="w-full space-y-2 rounded-t-2xl border-t border-border bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]" onClick={(e) => e.stopPropagation()}>
+            <p className="px-1 text-xs font-bold uppercase tracking-wide text-ink-faint">{name}</p>
+            <a href={fromPanelUrl(publicUrl)} target="_blank" rel="noopener noreferrer" className="flex h-12 items-center gap-3 rounded-xl bg-accent px-4 text-sm font-bold text-accent-ink">
+              <span aria-hidden="true">↗</span> Ver mi página
+            </a>
+            <button type="button" onClick={() => { void copyLink(); setPhoneMenu(false); }} className="flex h-12 w-full items-center gap-3 rounded-xl border border-border px-4 text-left text-sm font-semibold">
+              <span aria-hidden="true">🔗</span> {copied ? "¡Link copiado!" : "Copiar el link"}
+            </button>
+            <button type="button" onClick={() => { travel("redo"); setPhoneMenu(false); }} disabled={!!busy || history.redo === 0} className="flex h-12 w-full items-center gap-3 rounded-xl border border-border px-4 text-left text-sm font-semibold disabled:opacity-40">
+              <span aria-hidden="true">↷</span> Rehacer
+            </button>
+            <button type="button" onClick={() => setPhoneMenu(false)} className="h-12 w-full rounded-xl text-sm font-semibold text-ink-muted">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Top bar (tablet and desktop) */}
+      <header className="hidden flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2 md:flex md:px-4">
         <Link href={`/dashboard/businesses/${businessId}/website`} className="rounded-md px-2 py-1 text-sm text-ink-muted hover:bg-surface-2 hover:text-ink">
           ← Sitios
         </Link>
@@ -495,20 +541,6 @@ export function WebsiteBuilder({
           </a>
         </div>
       </header>
-
-      {/* Phone: switch between panel and preview */}
-      <div className="flex gap-1 border-b border-border bg-surface p-1.5 md:hidden">
-        {(["panel", "preview"] as const).map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setMobilePanel(p)}
-            className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${mobilePanel === p ? "bg-accent text-accent-ink" : "text-ink-muted"}`}
-          >
-            {p === "panel" ? "Editar" : "Vista previa"}
-          </button>
-        ))}
-      </div>
 
       <div className="flex min-h-0 flex-1">
         {/* Side panel */}
@@ -745,7 +777,8 @@ export function WebsiteBuilder({
         {!hintDismissed && (
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
             <p className="min-w-0 flex-1">
-              <strong>✏️ Edita directo en la página:</strong> toca un texto para escribir sobre él o una imagen para cambiarla. Arrastra elementos desde la izquierda y suéltalos donde quieras. La barra sobre cada bloque te deja cambiar su estilo, moverlo, duplicarlo, agregar otro o eliminarlo. Si te equivocas, usa ↶ Deshacer.
+              <span className="md:hidden"><strong>✏️ Toca un texto</strong> para escribir sobre él, o una imagen para cambiarla. Los botones sobre cada bloque lo mueven, lo duplican o lo borran.</span>
+              <span className="hidden md:inline"><strong>✏️ Edita directo en la página:</strong> toca un texto para escribir sobre él o una imagen para cambiarla. Arrastra elementos desde la izquierda y suéltalos donde quieras. La barra sobre cada bloque te deja cambiar su estilo, moverlo, duplicarlo, agregar otro o eliminarlo. Si te equivocas, usa ↶ Deshacer.</span>
             </p>
             <button
               type="button"
@@ -832,6 +865,21 @@ export function WebsiteBuilder({
           />
         );
       })()}
+      {/* Phone: the two things you do, at thumb reach. */}
+      <nav aria-label="Modo" className="flex flex-none gap-2 border-t border-border bg-surface p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:hidden">
+        {(["panel", "preview"] as const).map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => setMobilePanel(p)}
+            aria-pressed={mobilePanel === p}
+            className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-bold transition ${mobilePanel === p ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-muted"}`}
+          >
+            <span aria-hidden="true">{p === "panel" ? "＋" : "👁"}</span>
+            {p === "panel" ? "Elementos y ajustes" : "Mi página"}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

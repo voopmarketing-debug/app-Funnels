@@ -67,7 +67,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </Suspense>
         }
       />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col md:min-h-screen">
         {/* Desktop only — on mobile the bell lives in the sidebar's top bar
             and "Mi perfil" is in the menu, so this row would just duplicate them. */}
         <header className="hidden items-center justify-end gap-3 border-b border-border px-6 py-3 md:flex">
