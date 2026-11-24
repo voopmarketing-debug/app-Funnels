@@ -50,6 +50,7 @@ export function BlocksPanel({
   onGenerateImages,
   onRemoveAiImages,
   onSaveEventDate,
+  onHover,
 }: {
   content: WebsiteContentV2;
   selected: number | null;
@@ -62,8 +63,11 @@ export function BlocksPanel({
   onGenerateImages: () => Promise<void>;
   onRemoveAiImages: () => Promise<void>;
   onSaveEventDate: (index: number, date: string) => Promise<boolean>;
+  /** The pointer is on the row of a block (null: left the list): the page outlines that block. */
+  onHover: (index: number | null) => void;
 }) {
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  // Open from the start: the elements are right there to drag onto the page.
+  const [libraryOpen, setLibraryOpen] = useState(true);
   const [dropAt, setDropAt] = useState<number | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const hidden = new Set(content.hidden);
@@ -99,12 +103,12 @@ export function BlocksPanel({
           aria-expanded={libraryOpen}
           className="flex w-full items-center justify-between gap-2 rounded-xl border border-accent/60 bg-accent/10 px-3 py-2.5 text-sm font-semibold text-ink transition hover:bg-accent/20"
         >
-          <span>＋ Agregar un bloque</span>
-          <span className="text-xs font-normal text-ink-muted">{libraryOpen ? "Cerrar" : "Elige uno"}</span>
+          <span>＋ Elementos</span>
+          <span className="text-xs font-normal text-ink-muted">{libraryOpen ? "Cerrar" : "Abrir"}</span>
         </button>
         {libraryOpen && (
           <div className="max-h-[17rem] overflow-y-auto rounded-xl border border-border bg-background p-2.5">
-            <p className="mb-2 text-[12px] text-ink-muted">Toca uno para agregarlo{selected !== null && selected > 0 ? " debajo del bloque elegido" : " al final"}, o arrástralo al lugar que quieras.</p>
+            <p className="mb-2 text-[12px] text-ink-muted"><strong>Arrástralo a la página</strong> y suéltalo donde quieras, o tócalo para agregarlo{selected !== null && selected > 0 ? " debajo del bloque elegido" : " al final"}.</p>
             <BlockGrid compact disabled={busy} onPick={(type) => {
                 setLibraryOpen(false);
                 onOp({ kind: "add", type, at: selected !== null && selected > 0 ? selected + 1 : undefined });
@@ -130,7 +134,7 @@ export function BlocksPanel({
         </p>
       )}
 
-      <p className="text-[12px] text-ink-faint">Arrastra ⠿ para reordenar. Toca un bloque para verlo en la página y cambiar su estilo.</p>
+      <p className="text-[12px] text-ink-faint">Capas de tu página: pasa el cursor por una para verla resaltada, tócala para ir a ella y arrastra ⠿ para reordenar.</p>
 
       <ol
         className="space-y-1.5"
@@ -141,7 +145,7 @@ export function BlocksPanel({
           const on = selected === i;
           const fixed = i === 0;
           return (
-            <li key={i} className="relative">
+            <li key={i} className="relative" onMouseEnter={() => onHover(i)} onMouseLeave={() => onHover(null)}>
               {dropAt === i && <span aria-hidden="true" className="absolute -top-1 left-0 right-0 z-10 h-0.5 rounded bg-accent" />}
               <div
                 draggable={!fixed && !busy}

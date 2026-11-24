@@ -24,6 +24,8 @@ export type EditorHandlers = {
   remove(index: number): void;
   /** Opens the code editor of a "Código HTML" block. */
   code(index: number): void;
+  /** A block taken from the library was dropped on the page: add it so it ends up at `at`. */
+  dropBlock(type: string, at: number): void;
   /** A block was touched in the page: the side panel follows it. */
   select(index: number): void;
   undo(): void;
@@ -33,6 +35,8 @@ export type EditorHandlers = {
 };
 
 const ACCENT = "#5b6cf0";
+/** Drag payload of a library block (the same one the block list accepts). */
+const NEW_BLOCK_TYPE = "application/x-fl-new-block";
 
 const CSS = `
 [data-edit]{cursor:text;border-radius:4px;transition:outline-color .12s,background-color .12s}
@@ -43,6 +47,13 @@ img[data-img]{cursor:pointer;transition:filter .12s}
 img[data-img]:hover{outline:3px solid ${ACCENT};outline-offset:-3px;filter:brightness(.9)}
 section[data-sec].fl-active{box-shadow:inset 0 0 0 2px rgba(91,108,240,.55)}
 section[data-sec].fl-picked{box-shadow:inset 0 0 0 3px ${ACCENT}}
+section[data-sec].fl-hover{box-shadow:inset 0 0 0 2px ${ACCENT};background-image:linear-gradient(rgba(91,108,240,.06),rgba(91,108,240,.06))}
+.fl-chip{position:absolute;z-index:2147483100;pointer-events:none;padding:5px 9px;border-radius:8px;background:${ACCENT};color:#fff;font:600 11px/1 system-ui,sans-serif;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.fl-drop{position:absolute;left:0;right:0;z-index:2147483200;height:0;pointer-events:none}
+.fl-drop::before{content:"";position:absolute;left:12px;right:12px;top:-2px;height:4px;border-radius:4px;background:${ACCENT};box-shadow:0 0 0 3px rgba(91,108,240,.25)}
+.fl-drop::after{content:"Suelta aquí";position:absolute;left:50%;top:-14px;transform:translateX(-50%);padding:4px 10px;border-radius:99px;background:${ACCENT};color:#fff;font:700 11px/1 system-ui,sans-serif}
+@keyframes fl-pulse{0%,100%{outline-color:transparent}50%{outline-color:${ACCENT}}}
+[data-edit].fl-pulse{outline:2px dashed transparent;outline-offset:4px;animation:fl-pulse 1.2s ease-in-out 3}
 .fl-bar-wrap{position:absolute;right:12px;top:8px;max-width:calc(100% - 24px);z-index:2147483000;font:600 12px/1 system-ui,sans-serif;text-transform:none;letter-spacing:0;text-align:left}
 .fl-bar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:2px;padding:4px;background:#111827;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .fl-label{color:#9ca3af;padding:0 8px 0 6px;font-weight:600;white-space:nowrap}
@@ -338,6 +349,89 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   const onSubmit = (e: Event) => e.preventDefault();
   const onScroll = () => placeBar();
 
+  // A small label over the text under the pointer, so it is clear that it can be written on.
+  const chip = doc.createElement("div");
+  chip.className = "fl-chip";
+  chip.setAttribute("contenteditable", "false");
+  let chipFor: HTMLElement | null = null;
+  const hideChip = () => {
+    chipFor = null;
+    chip.remove();
+  };
+  const onChipOver = (e: MouseEvent) => {
+    const el = asElement(e.target)?.closest<HTMLElement>("[data-edit]") ?? null;
+    if (!el || el === editing || el.classList.contains("fl-editing")) return hideChip();
+    if (el === chipFor) return;
+    chipFor = el;
+    const r = el.getBoundingClientRect();
+    chip.textContent = "✎ Toca para escribir aquí";
+    doc.body.appendChild(chip);
+    const top = r.top + win.scrollY - 28;
+    chip.style.top = `${Math.max(win.scrollY + 4, top)}px`;
+    chip.style.left = `${Math.min(Math.max(4, r.left + win.scrollX), Math.max(4, doc.documentElement.clientWidth - 190))}px`;
+  };
+  const onChipOut = (e: MouseEvent) => {
+    if (!e.relatedTarget || !asElement(e.relatedTarget)?.closest("[data-edit]")) hideChip();
+  };
+
+  // Dragging a block from the library over the page: a line shows where it will land.
+  const marker = doc.createElement("div");
+  marker.className = "fl-drop";
+  marker.setAttribute("contenteditable", "false");
+  let dropAt: number | null = null;
+  const hasNewBlock = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes(NEW_BLOCK_TYPE);
+  const sections = () => Array.from(doc.querySelectorAll<HTMLElement>("section[data-sec]"));
+  const onDragOver = (e: DragEvent) => {
+    if (!hasNewBlock(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    const list = sections();
+    if (list.length === 0) return;
+    // Between the two blocks the pointer is closest to; never above the portada.
+    let at = Number(list[list.length - 1].dataset.sec) + 1;
+    let y = list[list.length - 1].getBoundingClientRect().bottom + win.scrollY;
+    for (const s of list) {
+      const r = s.getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) {
+        at = Number(s.dataset.sec);
+        y = r.top + win.scrollY;
+        break;
+      }
+    }
+    if (at < 1) {
+      at = 1;
+      const second = list.find((s) => Number(s.dataset.sec) === 1);
+      y = second ? second.getBoundingClientRect().top + win.scrollY : y;
+    }
+    dropAt = at;
+    marker.style.top = `${y}px`;
+    doc.body.appendChild(marker);
+  };
+  const clearDrop = () => {
+    dropAt = null;
+    marker.remove();
+  };
+  const onDragLeave = (e: DragEvent) => {
+    if (!e.relatedTarget) clearDrop();
+  };
+  const onDrop = (e: DragEvent) => {
+    const type = e.dataTransfer?.getData(NEW_BLOCK_TYPE);
+    if (!type) return clearDrop();
+    e.preventDefault();
+    const at = dropAt;
+    clearDrop();
+    if (at !== null) getHandlers().dropBlock(type, at);
+  };
+
+  // The first time, the first text on the page pulses a few times: "this one you can write on".
+  doc.querySelector<HTMLElement>("[data-edit]")?.classList.add("fl-pulse");
+
+  doc.addEventListener("mouseover", onChipOver, true);
+  doc.addEventListener("mouseout", onChipOut, true);
+  doc.addEventListener("dragover", onDragOver, true);
+  doc.addEventListener("dragleave", onDragLeave, true);
+  doc.addEventListener("drop", onDrop, true);
+  doc.addEventListener("dragend", clearDrop, true);
   doc.addEventListener("mouseover", onMouseOver, true);
   doc.addEventListener("mousedown", onMouseDown, true);
   doc.addEventListener("click", onClick, true);
@@ -350,6 +444,14 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   win.addEventListener("resize", onScroll, { passive: true });
 
   return () => {
+    doc.removeEventListener("mouseover", onChipOver, true);
+    doc.removeEventListener("mouseout", onChipOut, true);
+    doc.removeEventListener("dragover", onDragOver, true);
+    doc.removeEventListener("dragleave", onDragLeave, true);
+    doc.removeEventListener("drop", onDrop, true);
+    doc.removeEventListener("dragend", clearDrop, true);
+    chip.remove();
+    marker.remove();
     doc.removeEventListener("mouseover", onMouseOver, true);
     doc.removeEventListener("mousedown", onMouseDown, true);
     doc.removeEventListener("click", onClick, true);
@@ -373,4 +475,11 @@ export function showSection(doc: Document, index: number, opts: { scroll?: boole
   if (opts.scroll !== false) section.scrollIntoView({ behavior: "smooth", block: "start" });
   section.classList.add("fl-picked");
   setTimeout(() => section.classList.remove("fl-picked"), 1400);
+}
+
+/** Outlines a block of the preview while the pointer is on its row of the block list (null clears it). */
+export function hoverSection(doc: Document, index: number | null): void {
+  doc.querySelectorAll(".fl-hover").forEach((el) => el.classList.remove("fl-hover"));
+  if (index === null) return;
+  doc.querySelector<HTMLElement>(`section[data-sec="${index}"]`)?.classList.add("fl-hover");
 }

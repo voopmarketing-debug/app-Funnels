@@ -25,7 +25,7 @@ import { ImagePicker } from "./ImagePicker";
 import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
-import { attachPreviewEditor, showSection, type EditorHandlers } from "./previewEditor";
+import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
 import { RegenerateBox } from "./RegenerateBox";
 import { PublishControl } from "./PublishControl";
 
@@ -66,7 +66,7 @@ export function WebsiteBuilder({
   initialContent,
   stats,
   tracking,
-  initialTab = "chat",
+  initialTab = "bloques",
   savedBrief = "",
   published = true,
 }: {
@@ -419,6 +419,7 @@ export function WebsiteBuilder({
       setTab("bloques");
       setMobilePanel("panel");
     },
+    dropBlock: (type, at) => runBlock({ kind: "add", type: type as never, at }, "Agregando el bloque…"),
     add: (index) => setLibrary({ at: index + 1 }),
     duplicate: (index) => runBlock({ kind: "duplicate", index }, "Duplicando…"),
     remove: (index) => runBlock({ kind: "remove", index }, "Eliminando…"),
@@ -437,9 +438,10 @@ export function WebsiteBuilder({
   });
 
   const sel = selected !== null && selected < content.sections.length ? selected : null;
+  // Editing comes first (like a page builder); the AI chat is the second way to change the page.
   const TABS: { key: Tab; label: string }[] = [
+    { key: "bloques", label: "Elementos" },
     { key: "chat", label: "✦ IA" },
-    { key: "bloques", label: "Bloques" },
     { key: "estilo", label: "Estilo" },
     { key: "diseno", label: "Diseño" },
     { key: "ajustes", label: "Ajustes" },
@@ -642,6 +644,10 @@ export function WebsiteBuilder({
                 refreshPreview();
                 showToast("Imágenes de IA quitadas.", true);
               }}
+              onHover={(index) => {
+                const doc = iframeRef.current?.contentDocument;
+                if (doc) hoverSection(doc, index);
+              }}
               onSaveEventDate={async (index, date) => {
                 const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "eventDate", index, date });
                 if (!res.ok) {
@@ -739,7 +745,7 @@ export function WebsiteBuilder({
         {!hintDismissed && (
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
             <p className="min-w-0 flex-1">
-              <strong>✏️ Edita directo en la página:</strong> toca un texto para escribir sobre él o una imagen para cambiarla. La barra sobre cada bloque te deja cambiar su estilo, moverlo, duplicarlo, agregar otro o eliminarlo. Si te equivocas, usa ↶ Deshacer.
+              <strong>✏️ Edita directo en la página:</strong> toca un texto para escribir sobre él o una imagen para cambiarla. Arrastra elementos desde la izquierda y suéltalos donde quieras. La barra sobre cada bloque te deja cambiar su estilo, moverlo, duplicarlo, agregar otro o eliminarlo. Si te equivocas, usa ↶ Deshacer.
             </p>
             <button
               type="button"

@@ -158,7 +158,7 @@ export default async function WebsiteEditorPage({
           initialContent={v2.data}
           stats={{ views, clicks, leads: leadCount }}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
-          initialTab={tabParam === "ajustes" ? "ajustes" : "chat"}
+          initialTab={tabParam === "ajustes" ? "ajustes" : tabParam === "ia" ? "chat" : "bloques"}
           savedBrief={website.designPrompt ?? ""}
           published={website.published}
         />
