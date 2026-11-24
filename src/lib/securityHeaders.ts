@@ -22,7 +22,7 @@ import { SITE_SCRIPT_HASH } from "./siteScript";
 // page (the actual clickjacking risk this header defends against) — it only
 // allows same-origin embeds, which is this app's own dashboard.
 export const SITE_CSP =
-  `default-src 'self'; script-src 'sha256-${SITE_SCRIPT_HASH}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.youtube.com https://player.vimeo.com; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`;
+  `default-src 'self'; script-src 'sha256-${SITE_SCRIPT_HASH}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.youtube.com https://player.vimeo.com https://fast.wistia.net https://www.loom.com; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`;
 
 export const SECURITY_HEADERS: { key: string; value: string }[] = [
   // SAMEORIGIN, not DENY — see the frame-ancestors comment on SITE_CSP above;

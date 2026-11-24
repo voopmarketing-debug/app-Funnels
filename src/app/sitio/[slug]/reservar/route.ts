@@ -16,6 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const website = await prisma.website.findUnique({
     where: { slug },
     select: {
+      published: true,
       id: true,
       pageType: true,
       business: { select: { name: true } },
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (!website || website.pageType !== "agenda" || !website.agendaConfig) {
     return new NextResponse("Agenda no encontrada", { status: 404 });
   }
+  if (!website.published && !preview) return new NextResponse("Agenda no encontrada", { status: 404 });
 
   const formData = await req.formData();
   // Bots (hidden field) and floods from one IP don't reach the calendar.

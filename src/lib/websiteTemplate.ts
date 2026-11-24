@@ -33,9 +33,11 @@ export function readableTextColor(hex: string): "#ffffff" | "#0a0a0a" {
   return luminance > 0.55 ? "#0a0a0a" : "#ffffff";
 }
 
-/** Turns a YouTube/Vimeo watch/share URL into its embeddable iframe src — accepts whatever format a client pastes. */
+/** Turns a YouTube/Vimeo/Wistia/Loom watch/share URL into its embeddable iframe src — accepts whatever format a client pastes. */
 const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtube-nocookie.com", "www.youtube-nocookie.com"]);
 const VIMEO_HOSTS = new Set(["vimeo.com", "www.vimeo.com", "player.vimeo.com"]);
+const WISTIA_HOSTS = new Set(["wistia.com", "www.wistia.com", "fast.wistia.net", "fast.wistia.com"]);
+const LOOM_HOSTS = new Set(["loom.com", "www.loom.com"]);
 const VIDEO_ID = /^[\w-]{6,20}$/;
 
 // The host is compared whole (never "contains"): "youtube.com.evil.test" is not
@@ -58,6 +60,17 @@ export function toEmbedUrl(url: string): string | null {
     if (VIMEO_HOSTS.has(host)) {
       const id = u.pathname.split("/").filter(Boolean).find((p) => /^\d{5,12}$/.test(p));
       return id ? `https://player.vimeo.com/video/${id}` : null;
+    }
+    if (WISTIA_HOSTS.has(host) || (host.endsWith(".wistia.com") && host.split(".").length === 3)) {
+      const parts = u.pathname.split("/").filter(Boolean);
+      const at = parts.findIndex((p) => p === "medias" || p === "iframe");
+      const id = at >= 0 ? parts[at + 1] : null;
+      return id && /^[a-z0-9]{10}$/i.test(id) ? `https://fast.wistia.net/embed/iframe/${id}` : null;
+    }
+    if (LOOM_HOSTS.has(host)) {
+      const parts = u.pathname.split("/").filter(Boolean);
+      const id = ["share", "embed"].includes(parts[0]) ? parts[1] : null;
+      return id && /^[a-f0-9]{32}$/i.test(id) ? `https://www.loom.com/embed/${id}` : null;
     }
     return null;
   } catch {

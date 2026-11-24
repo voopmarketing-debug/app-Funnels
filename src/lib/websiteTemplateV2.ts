@@ -1,6 +1,6 @@
 import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS } from "@/lib/websiteContent";
-import { readableTextColor, sanitizeHexColor } from "@/lib/websiteTemplate";
+import { readableTextColor, sanitizeHexColor, toEmbedUrl } from "@/lib/websiteTemplate";
 import { LOOK_CSS, lookParts } from "@/lib/websiteLook";
 import { SITE_SCRIPT } from "@/lib/siteScript";
 import { ensureContrast } from "@/lib/colorContrast";
@@ -669,6 +669,17 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         return `<section class="mq"><p class="sr-only">${esc(lines.join(". "))}</p>${lines.map((l, li) => row(l, li % 2 === 1)).join("")}</section>`;
       }
 
+      case "video": {
+        const embed = toEmbedUrl(s.url);
+        if (!embed && !ctx.preview) return "";
+        const intro = s.intro ? `<p class="intro"${ed(fp("intro"))}>${esc(s.intro)}</p>` : "";
+        const frame = embed
+          ? `<div class="vid-frame"><iframe src="${esc(embed)}" title="${esc(s.heading)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+          : `<div class="vid-frame vid-empty"><p>Aquí irá tu video.</p></div>`;
+        const linkEditor = edit ? `<p class="vid-link">Enlace del video (YouTube, Vimeo, Wistia o Loom): <span${ed(fp("url"))}>${esc(s.url || "pega aquí el enlace")}</span></p>` : "";
+        return `<section class="sec" id="video"><div class="wrap narrow-lg center">${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>${intro}${frame}${linkEditor}</div></section>`;
+      }
+
       case "comparison":
         return `<section class="sec"><div class="wrap narrow-lg">
           <h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
@@ -936,6 +947,10 @@ section{position:relative}
 .promo-inner{display:flex;align-items:center;justify-content:space-between;gap:32px}
 .promo h2{margin-bottom:.25em}
 .promo p{margin:0;opacity:.8;max-width:56ch}
+.vid-frame{position:relative;aspect-ratio:16/9;width:100%;margin-top:28px;border-radius:var(--radius);overflow:hidden;background:#0b0b0f;box-shadow:0 24px 60px -24px rgba(0,0,0,.45)}
+.vid-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vid-empty{display:flex;align-items:center;justify-content:center;color:#fff;opacity:.85}
+.vid-link{margin-top:12px;font-size:13px;opacity:.75}
 .cmp-wrap{overflow-x:auto;margin-top:32px}
 .cmp{width:100%;border-collapse:collapse;font-size:16px}
 .cmp th,.cmp td{padding:16px;border-bottom:1px solid var(--line);text-align:left}

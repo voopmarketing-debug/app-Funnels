@@ -12,12 +12,22 @@ const content: WebsiteContentV2 = WebsiteContentV2Schema.parse({
     { type: "hero", variant: "split", eyebrow: "Odontología", heading: "Sonrisas en 30 días", highlight: "en 30 días", subheading: "Tratamientos sin dolor", chips: ["Lun a Sáb", "Cali"], showLeadForm: false, ctaLabel: "Agenda hoy", secondaryCtaLabel: null, badge: null, productId: null },
     { type: "features", variant: "cards", kicker: null, heading: "Lo que hacemos", intro: null, items: [{ icon: "check", title: "Blanqueamiento", description: "En una sesión" }] },
     { type: "host", kicker: null, heading: "Quién eres", name: "Dra. Ana", role: "Ortodoncista", body: "Línea 1\nLínea 2" },
+    { type: "video", kicker: null, heading: "Míranos", intro: null, url: "" },
   ],
   hidden: [],
   heroCtaUrl: null,
 });
 
 describe("setTextAtPath", () => {
+  it("accepts only supported video links in the video block", () => {
+    const ok = setTextAtPath(content, "sections.3.url", "https://youtu.be/dQw4w9WgXcQ");
+    expect(ok.ok && (ok.content.sections[3] as { url: string }).url).toBe("https://youtu.be/dQw4w9WgXcQ");
+    expect(setTextAtPath(content, "sections.3.url", "https://evil.test/video").ok).toBe(false);
+    const cleared = setTextAtPath(content, "sections.3.url", "");
+    expect(cleared.ok && (cleared.content.sections[3] as { url: string }).url).toBe("");
+    expect(setTextAtPath(content, "sections.2.url", "https://youtu.be/dQw4w9WgXcQ").ok).toBe(false);
+  });
+
   it("edits a heading and drops the highlight that is no longer in it", () => {
     const r = setTextAtPath(content, "sections.0.heading", "  Sonrisas   nuevas  ");
     expect(r.ok && r.content.sections[0]).toMatchObject({ heading: "Sonrisas nuevas", highlight: null });

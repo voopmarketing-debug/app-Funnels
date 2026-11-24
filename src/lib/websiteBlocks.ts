@@ -24,6 +24,7 @@ export const BLOCK_LIBRARY: BlockEntry[] = [
   { type: "fan", label: SECTION_LABELS.fan, help: "Colección en abanico que gira sola y se arrastra.", group: "venta" },
   { type: "traveler", label: SECTION_LABELS.traveler, help: "Tu producto acompaña el scroll y cambia de lugar en cada escena.", group: "venta" },
   { type: "marquee", label: SECTION_LABELS.marquee, help: "Frases gigantes que se desplazan al fondo.", group: "texto" },
+  { type: "video", label: SECTION_LABELS.video, help: "Tu video de YouTube, Vimeo, Wistia o Loom pegando el enlace.", group: "venta" },
   { type: "comparison", label: SECTION_LABELS.comparison, help: "Tabla: tú frente a las otras opciones.", group: "venta" },
   { type: "trustBar", label: SECTION_LABELS.trustBar, help: "Garantías cortas con ícono.", group: "confianza" },
   { type: "stats", label: SECTION_LABELS.stats, help: "Cifras grandes (solo si son reales).", group: "confianza" },
@@ -68,6 +69,8 @@ export function newSection(type: Exclude<SectionType, "hero">, ctx: { firstProdu
       return ctx.firstProductId ? { type, kicker: "El ritual", heading: "Así se vive", productId: ctx.firstProductId, scenes: [item("Primera escena", "Cuenta el primer momento de la experiencia."), item("Segunda escena", "Cuenta el segundo momento."), item("Tercera escena", "Cierra con el resultado.")] } : null;
     case "marquee":
       return { type, lines: ["Escribe una frase corta", "Y otra distinta"] };
+    case "video":
+      return { type, kicker: "Míralo en un minuto", heading: "Mira cómo funciona", intro: null, url: "" };
     case "comparison":
       return { type, heading: "Por qué elegirnos", usLabel: "Nosotros", othersLabel: "Lo típico", rows: [
         { label: "Atención", us: "Directa por WhatsApp", others: "Formularios y esperas" },

@@ -21,6 +21,7 @@ type Page = {
   hasTracking: boolean;
   // Which library template it came from, so pages from different templates can be compared.
   templateLabel?: string | null;
+  published: boolean;
 };
 
 export function WebsitePagesList({
@@ -290,6 +291,9 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
                   <span className="fl-mono flex-none rounded-full bg-[rgba(var(--glow-secondary),0.15)] px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[rgb(var(--glow-secondary))]">
                     Agenda
                   </span>
+                )}
+                {!page.published && (
+                  <span className="fl-mono flex-none rounded-full bg-[rgba(245,158,11,0.16)] px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[rgb(180,100,0)]">Borrador</span>
                 )}
                 <span className="truncate font-semibold text-ink">{page.name}</span>
                 <PencilIcon className="flex-none text-ink-faint opacity-0 transition group-hover/name:opacity-100 [@media(pointer:coarse)]:opacity-100" />

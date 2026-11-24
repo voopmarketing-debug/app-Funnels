@@ -26,6 +26,7 @@ export default async function WebsitePage({ params, searchParams }: { params: Pr
         name: true,
         purpose: true,
         slug: true,
+        published: true,
         model: true,
         generatedAt: true,
         customDomain: true,

@@ -13,10 +13,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   // real visitor, so testing the form doesn't create a fake lead.
   const preview = req.nextUrl.searchParams.get("preview") === "1";
 
-  const website = await prisma.website.findUnique({ where: { slug }, select: { id: true } });
+  const website = await prisma.website.findUnique({ where: { slug }, select: { id: true, published: true } });
   if (!website) {
     return new NextResponse("Sitio no encontrado", { status: 404 });
   }
+  // A draft takes no contacts from visitors.
+  if (!website.published && !preview) return new NextResponse("Sitio no encontrado", { status: 404 });
 
   const formData = await req.formData();
   // A bot (hidden field filled) sees the usual "gracias" but nothing is

@@ -6,6 +6,7 @@ import { applyWebsitePromptV2, regenerateWebsitePageV2 } from "@/lib/actions";
 import { fromPanelUrl } from "@/lib/panelBackLink";
 import { TrackingSettings } from "./TrackingSettings";
 import { RegenerateBox } from "./RegenerateBox";
+import { PublishControl } from "./PublishControl";
 
 type Device = "desktop" | "mobile";
 type ChatEntry = { role: "user" | "assistant"; text: string };
@@ -39,6 +40,7 @@ export function TemplateBuilder({
   stats,
   tracking,
   savedBrief = "",
+  published = true,
 }: {
   businessId: string;
   websiteId: string;
@@ -49,6 +51,7 @@ export function TemplateBuilder({
   stats: { views: number; clicks: number; leads: number };
   tracking: { metaPixelId: string | null; googleTagId: string | null };
   savedBrief?: string;
+  published?: boolean;
 }) {
   const [device, setDevice] = useState<Device>("desktop");
   const [version, setVersion] = useState(0);
@@ -137,9 +140,7 @@ export function TemplateBuilder({
           ))}
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <span className="hidden items-center gap-1.5 rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent sm:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Publicada
-          </span>
+          <PublishControl businessId={businessId} websiteId={websiteId} published={published} />
           <button type="button" onClick={copyLink} className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold hover:border-accent">
             {copied ? "¡Copiado!" : "Copiar link"}
           </button>

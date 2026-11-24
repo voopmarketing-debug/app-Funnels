@@ -2700,6 +2700,21 @@ export async function deleteWebsitePage(businessId: string, websiteId: string): 
   revalidatePath(`/dashboard/businesses/${businessId}/website`);
 }
 
+/** Publishes a page, or turns it back into a draft that only the owner can see. */
+export async function setWebsitePublished(businessId: string, websiteId: string, published: boolean): Promise<BuilderResult<{ published: boolean }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
+    await prisma.website.update({ where: { id: websiteId, businessId }, data: { published } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, published };
+  } catch (err) {
+    return builderError(`setWebsitePublished(${websiteId})`, err);
+  }
+}
+
 /**
  * Just the internal label shown on the page's card in the list (e.g. "Paso
  * 2 — Agendar demo") — never the public URL/slug, which stays fixed once

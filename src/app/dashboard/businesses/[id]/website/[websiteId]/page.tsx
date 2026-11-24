@@ -133,6 +133,7 @@ export default async function WebsiteEditorPage({
           stats={{ views, clicks, leads: leadCount }}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
           savedBrief={website.designPrompt ?? ""}
+          published={website.published}
         />
       );
     }
@@ -159,6 +160,7 @@ export default async function WebsiteEditorPage({
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
           initialTab={tabParam === "ajustes" ? "ajustes" : "chat"}
           savedBrief={website.designPrompt ?? ""}
+          published={website.published}
         />
       );
     }

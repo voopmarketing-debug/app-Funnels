@@ -499,6 +499,10 @@ model Website {
   // lib/agendaTemplate.ts. Lets a business chain pages into a funnel (an
   // offer page whose button points at its own agenda page's URL) entirely
   // within this app, no external scheduling tool required.
+  // Whether the public link shows the page. New pages are published; the owner can unpublish
+  // ("Borrador") from the builder and publish again. Only the owner sees a draft.
+  published Boolean @default(true)
+
   pageType String @default("landing")
 
   // Ad tracking the client adds to run campaigns to this page: their Meta

@@ -17,11 +17,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
   const website = await prisma.website.findUnique({
     where: { slug },
-    select: { id: true, content: true, whatsappNumber: true, businessId: true },
+    select: { id: true, published: true, content: true, whatsappNumber: true, businessId: true },
   });
   if (!website) {
     return new NextResponse("Sitio no encontrado", { status: 404 });
   }
+  if (!website.published && !preview) return new NextResponse("Sitio no encontrado", { status: 404 });
 
   // ?p=<productId>: "Pedir por WhatsApp" on a product card — opens the
   // chat with the order already written.

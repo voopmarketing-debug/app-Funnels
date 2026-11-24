@@ -1,4 +1,5 @@
 import { WebsiteContentV2Schema, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { toEmbedUrl } from "@/lib/websiteTemplate";
 
 // Click-to-edit in the builder's preview: every editable text carries the path
 // of its value in the stored content (data-edit="sections.2.items.1.title").
@@ -48,6 +49,14 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
   if (!section) return bad();
 
   // sections.<i>.<key>
+  // The video block's link: only YouTube, Vimeo, Wistia or Loom addresses (or empty to clear it).
+  if (parts.length === 3 && parts[2] === "url" && section.type === "video") {
+    const link = rawValue.trim();
+    if (link && !toEmbedUrl(link)) return bad("Pega un enlace de YouTube, Vimeo, Wistia o Loom.");
+    section.url = link.slice(0, 300);
+    return finish(next);
+  }
+
   if (parts.length === 3 && TEXT_KEYS.has(parts[2])) {
     const key = parts[2];
     if (typeof section[key] !== "string") return bad();

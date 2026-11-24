@@ -229,6 +229,15 @@ const MarqueeSection = z.object({
   lines: z.array(z.string()).describe("1 o 2 frases cortas en mayúsculas que se desplazan gigantes, en direcciones opuestas."),
 });
 
+const VideoSection = z.object({
+  ...media,
+  type: z.literal("video"),
+  kicker: nullableText("Etiqueta pequeña, ej. 'Míralo en 2 minutos'."),
+  heading: text(80, "Título sobre el video"),
+  intro: nullableText("Frase corta bajo el título."),
+  url: z.string().catch("").describe("Enlace del video (YouTube, Vimeo, Wistia o Loom). Vacío si el dueño aún no lo ha pegado: NUNCA inventes un enlace."),
+});
+
 const ComparisonSection = z.object({
   ...media,
   type: z.literal("comparison"),
@@ -311,6 +320,7 @@ export const SectionSchema = z.discriminatedUnion("type", [
   FanSection,
   TravelerSection,
   MarqueeSection,
+  VideoSection,
   ComparisonSection,
   AgendaSection,
   HostSection,
@@ -336,6 +346,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   fan: "Colección en abanico",
   traveler: "Producto viajero",
   marquee: "Texto en movimiento",
+  video: "Video",
   comparison: "Comparación",
   agenda: "Agenda",
   host: "Quién está detrás",

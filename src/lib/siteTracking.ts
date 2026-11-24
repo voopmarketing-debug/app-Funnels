@@ -27,7 +27,7 @@ export type SiteEvents = { lead?: boolean; schedule?: boolean };
 function csp(nonce: string, t: SiteTracking): string {
   const scripts = [`'nonce-${nonce}'`, `'sha256-${SITE_SCRIPT_HASH}'`];
   const connect = ["'self'"];
-  const frames = ["https://www.youtube.com", "https://player.vimeo.com"];
+  const frames = ["https://www.youtube.com", "https://player.vimeo.com", "https://fast.wistia.net", "https://www.loom.com"];
   if (t.metaPixelId) {
     scripts.push("https://connect.facebook.net");
     connect.push("https://www.facebook.com", "https://connect.facebook.net");

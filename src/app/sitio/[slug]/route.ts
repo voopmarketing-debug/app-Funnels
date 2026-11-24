@@ -14,6 +14,8 @@ import {
 } from "@/lib/agenda";
 import { siteSecurityHeaders } from "@/lib/securityHeaders";
 import { wantsPanelBack, withPanelBackLink } from "@/lib/panelBackLink";
+import { notPublishedHtml, withDraftRibbon } from "@/lib/sitePublish";
+import { auth } from "@/auth";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import type { WebsiteContentV2 } from "@/lib/websiteContentV2";
 
@@ -54,12 +56,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   // WebsiteEditor.tsx) — the owner opening their editor, or saving a
   // change and triggering a preview reload, isn't a real visitor and
   // shouldn't inflate their own view count.
-  const preview = req.nextUrl.searchParams.get("preview") === "1";
+  let preview = req.nextUrl.searchParams.get("preview") === "1";
 
   const website = await prisma.website.findUnique({
     where: { slug },
     select: {
       id: true,
+      published: true,
       pageType: true,
       metaPixelId: true,
       googleTagId: true,
@@ -87,8 +90,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     return new NextResponse("Sitio no encontrado", { status: 404, headers: siteSecurityHeaders() });
   }
 
+  // A page the owner unpublished (a draft): visitors see a neutral message; a member of the
+  // business still sees the page, as a preview that counts no visits.
+  let isDraftForOwner = false;
+  if (!website.published) {
+    const session = await auth();
+    const member = session?.user?.id
+      ? await prisma.membership.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: website.businessId } }, select: { id: true } })
+      : null;
+    if (!member) {
+      return new NextResponse(notPublishedHtml(), { status: 404, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", ...siteSecurityHeaders() } });
+    }
+    isDraftForOwner = true;
+    preview = true;
+  }
+
   // The owner opening the page from the dashboard (installed app, no browser bar) gets a way back.
-  const withBack = (html: string) => (!preview && wantsPanelBack(req.nextUrl.searchParams) ? withPanelBackLink(html, `/dashboard/businesses/${website.businessId}/website`) : html);
+  const withBack = (html: string) => {
+    const back = !preview && wantsPanelBack(req.nextUrl.searchParams) ? withPanelBackLink(html, `/dashboard/businesses/${website.businessId}/website`) : html;
+    return isDraftForOwner && req.nextUrl.searchParams.get("preview") !== "1" ? withDraftRibbon(back) : back;
+  };
 
   if (!preview) {
     try {
