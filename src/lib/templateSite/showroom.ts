@@ -4,7 +4,7 @@ import type { CatalogProduct } from "@/lib/websiteContentV2";
 import { TEMPLATE_FONTS, type ShowroomContent } from "./content";
 import type { ShowroomClientData } from "./showroomClient";
 import { SHOWROOM_CLIENT_SOURCE } from "./clientScripts.generated";
-import { ICON_PATHS, clientProducts, esc, iconSvg, jsonForHtml, withMonth, MONTHS, formatMoney } from "./shared";
+import { ICON_PATHS, clientProducts, editAttr, esc, iconSvg, jsonForHtml, withMonth, MONTHS, formatMoney } from "./shared";
 
 // The Showroom template: a light studio catalog. Portada with a 360° viewer and feature bubbles,
 // a row of key facts, the month's promotion, a budget quoter with progress bars, a services bento
@@ -286,6 +286,9 @@ export function renderShowroom(content: ShowroomContent, ctx: ShowroomRenderCtx)
   const tradePhoto = (cars[1] ?? cars[0])?.frames[0] ?? null;
   const noun = content.noun || "producto";
   const brandWord = content.brand.name.trim() || ctx.businessName;
+  const E = (path: string) => editAttr(ctx.edit, path);
+  // In the builder the text is shown as written ("{mes}" included) so it can be edited.
+  const W = (text: string) => (ctx.edit ? esc(text) : withMonth(text));
 
   const clientData: ShowroomClientData = {
     cars,
@@ -310,7 +313,7 @@ export function renderShowroom(content: ShowroomContent, ctx: ShowroomRenderCtx)
     : "";
   const promoHtml = pr.title
     ? `<section class="promo-wrap" aria-label="Promoción del mes"><div class="wrap"><div class="promo reveal${promoArt ? "" : " solo"}" id="promo"><span class="glow" aria-hidden="true"></span><span class="sweep" aria-hidden="true"></span>
-        <div class="promo-copy"><span class="mono promo-tag"><i></i><span>${withMonth(pr.tag)}</span></span><h3>${withMonth(pr.title)}</h3>${pr.text ? `<p>${esc(pr.text)}</p>` : ""}${clock}<a class="pill light" href="#prueba">${esc(pr.cta)} ${arrow}</a></div>
+        <div class="promo-copy"><span class="mono promo-tag"><i></i><span${E("promo.tag")}>${W(pr.tag)}</span></span><h3${E("promo.title")}>${W(pr.title)}</h3>${pr.text ? `<p${E("promo.text")}>${esc(pr.text)}</p>` : ""}${clock}<a class="pill light" href="#prueba">${esc(pr.cta)} ${arrow}</a></div>
         ${promoArt}</div></div></section>`
     : "";
 
@@ -321,11 +324,11 @@ export function renderShowroom(content: ShowroomContent, ctx: ShowroomRenderCtx)
   const bentoHtml =
     cards.length || trade
       ? `<section class="bento" id="servicios"><div class="wrap">
-        ${sv.title ? `<div class="reveal sec-head">${sv.kicker ? `<span class="mono eyebrow">${esc(sv.kicker)}</span>` : ""}<h2>${esc(sv.title)}</h2>${sv.text ? `<p class="lead">${esc(sv.text)}</p>` : ""}</div>` : ""}
-        ${cards.length ? `<div class="feat-row">${cards.map((c) => `<article class="reveal fcard"><span class="fic">${iconSvg(c.icon)}</span><b>${esc(c.title)}</b><span>${esc(c.text)}</span></article>`).join("")}</div>` : ""}
+        ${sv.title ? `<div class="reveal sec-head">${sv.kicker ? `<span class="mono eyebrow"${E("services.kicker")}>${esc(sv.kicker)}</span>` : ""}<h2${E("services.title")}>${esc(sv.title)}</h2>${sv.text ? `<p class="lead"${E("services.text")}>${esc(sv.text)}</p>` : ""}</div>` : ""}
+        ${cards.length ? `<div class="feat-row">${cards.map((c) => `<article class="reveal fcard"><span class="fic">${iconSvg(c.icon)}</span><b${E(`services.cards.${sv.cards.indexOf(c)}.title`)}>${esc(c.title)}</b><span${E(`services.cards.${sv.cards.indexOf(c)}.text`)}>${esc(c.text)}</span></article>`).join("")}</div>` : ""}
         ${trade
-          ? `<div class="trade-row${side.length ? "" : " solo"}"><div class="reveal tall${tradePhoto ? "" : " noimg"}"><div class="tall-copy">${trade.kicker ? `<span class="mono" style="color:var(--muted)">${esc(trade.kicker)}</span>` : ""}<h3>${esc(trade.title)}</h3>${trade.text ? `<p>${esc(trade.text)}</p>` : ""}<a class="pill" href="#prueba">${esc(trade.cta)} ${arrow}</a></div>${tradePhoto ? `<div class="tall-img"><img src="${esc(tradePhoto)}" alt="" loading="lazy"></div>` : ""}</div>
-            ${side.length ? `<div class="side">${side.map((c) => `<div class="reveal card">${iconSvg(c.icon)}<b>${esc(c.value)}</b><span>${esc(c.label)}</span></div>`).join("")}</div>` : ""}</div>`
+          ? `<div class="trade-row${side.length ? "" : " solo"}"><div class="reveal tall${tradePhoto ? "" : " noimg"}"><div class="tall-copy">${trade.kicker ? `<span class="mono" style="color:var(--muted)"${E("services.trade.kicker")}>${esc(trade.kicker)}</span>` : ""}<h3${E("services.trade.title")}>${esc(trade.title)}</h3>${trade.text ? `<p${E("services.trade.text")}>${esc(trade.text)}</p>` : ""}<a class="pill" href="#prueba">${esc(trade.cta)} ${arrow}</a></div>${tradePhoto ? `<div class="tall-img"><img src="${esc(tradePhoto)}" alt="" loading="lazy"></div>` : ""}</div>
+            ${side.length ? `<div class="side">${side.map((c) => `<div class="reveal card">${iconSvg(c.icon)}<b${E(`services.side.${sv.side.indexOf(c)}.value`)}>${esc(c.value)}</b><span${E(`services.side.${sv.side.indexOf(c)}.label`)}>${esc(c.label)}</span></div>`).join("")}</div>` : ""}</div>`
           : ""}
       </div></section>`
       : "";
@@ -352,7 +355,7 @@ export function renderShowroom(content: ShowroomContent, ctx: ShowroomRenderCtx)
   let n = 1;
   const quoteHtml = showQuote
     ? `<section class="quote alt" id="cotizador"><div class="wrap">
-        <div class="reveal sec-head"><span class="mono eyebrow">${num(++n)} · ${esc(content.quote.kicker)}</span><h2>${esc(content.quote.title)}</h2><p class="lead">${esc(content.quote.text)}</p></div>
+        <div class="reveal sec-head"><span class="mono eyebrow">${num(++n)} · <span${E("quote.kicker")}>${esc(content.quote.kicker)}</span></span><h2${E("quote.title")}>${esc(content.quote.title)}</h2><p class="lead"${E("quote.text")}>${esc(content.quote.text)}</p></div>
         <div class="quote-grid">
           <div class="reveal budget">
             <div class="mode" role="group" aria-label="Tipo de presupuesto"><button type="button" id="m-total" aria-pressed="true">Precio total</button><button type="button" id="m-cuota" aria-pressed="false">Cuota mensual</button></div>
@@ -404,7 +407,7 @@ export function renderShowroom(content: ShowroomContent, ctx: ShowroomRenderCtx)
 </header>
 <main>
   <section class="hero${hasCars || ctx.preview ? "" : " solo"}" id="vitrina" aria-label="Vitrina"><div class="wrap">
-    <div class="hero-copy"><h1>${esc(content.hero.title)}</h1><p>${esc(content.hero.text)}</p>
+    <div class="hero-copy"><h1${E("hero.title")}>${esc(content.hero.title)}</h1><p${E("hero.text")}>${esc(content.hero.text)}</p>
       <div class="hero-actions">${showQuote ? `<a class="pill" href="#cotizador">${esc(content.hero.primaryCta)} ${arrow}</a>` : `<a class="pill" href="#prueba">${esc(content.hero.secondaryCta)} ${arrow}</a>`}${showQuote ? `<a class="ghost" href="#prueba">${esc(content.hero.secondaryCta)} ${arrow}</a>` : ""}</div></div>
     ${heroViewer}
   </div></section>
@@ -413,9 +416,9 @@ export function renderShowroom(content: ShowroomContent, ctx: ShowroomRenderCtx)
   ${quoteHtml}
   ${bentoHtml}
   <section class="book alt" id="prueba"><div class="wrap">
-    <div class="reveal sec-head"><span class="mono eyebrow">${num(++n)} · ${esc(vs.kicker)}</span><h2>${esc(vs.title)}</h2>${vs.text ? `<p class="lead">${esc(vs.text)}</p>` : ""}</div>
+    <div class="reveal sec-head"><span class="mono eyebrow">${num(++n)} · <span${E("visit.kicker")}>${esc(vs.kicker)}</span></span><h2${E("visit.title")}>${esc(vs.title)}</h2>${vs.text ? `<p class="lead"${E("visit.text")}>${esc(vs.text)}</p>` : ""}</div>
     <div class="book-grid${where.length ? "" : " solo"}">
-      ${where.length ? `<div class="where">${where.map((w) => `<div><span class="fic">${iconSvg(w.icon)}</span><span class="mono">${esc(w.label)}</span><span>${esc(w.text)}</span></div>`).join("")}</div>` : ""}
+      ${where.length ? `<div class="where">${where.map((w) => `<div><span class="fic">${iconSvg(w.icon)}</span><span class="mono"${E(`visit.where.${vs.where.indexOf(w)}.label`)}>${esc(w.label)}</span><span${E(`visit.where.${vs.where.indexOf(w)}.text`)}>${esc(w.text)}</span></div>`).join("")}</div>` : ""}
       ${formHtml}
     </div></div></section>
 </main>

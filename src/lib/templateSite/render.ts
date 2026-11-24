@@ -8,6 +8,8 @@ export type TemplateRenderCtx = {
   trackingBasePath: string;
   preview?: boolean;
   leadSubmitted?: boolean;
+  /** Click-to-edit markers for the builder's preview. */
+  edit?: boolean;
   products: CatalogProduct[];
 };
 

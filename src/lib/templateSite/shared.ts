@@ -107,3 +107,8 @@ export function inlineScriptHashes(html: string): string[] {
   while ((m = re.exec(html))) hashes.push(scriptHash(m[1]));
   return hashes;
 }
+
+/** Click-to-edit marker (builder preview only): the path of the text in the stored content. */
+export function editAttr(edit: boolean | undefined, path: string): string {
+  return edit ? ` data-edit="${esc(path)}"` : "";
+}

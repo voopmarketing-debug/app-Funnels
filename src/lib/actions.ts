@@ -46,6 +46,7 @@ import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type
 import { isTemplateContent, templateForPageType } from "@/lib/templateSite/content";
 import { applyTemplateEdit, generateTemplateSite } from "@/lib/templateSite/generator";
 import { parseTemplateSite } from "@/lib/templateSite/render";
+import { setTemplateTextAtPath } from "@/lib/templateSite/edit";
 import { z } from "zod";
 import { setSectionImage, setTextAtPath, type SectionImageField } from "@/lib/websiteEdit";
 import { applyBlockOp, BLOCK_LIBRARY, MAX_SECTIONS, type BlockOp } from "@/lib/websiteBlocks";
@@ -3687,6 +3688,27 @@ export async function updateWebsiteTextV2(businessId: string, websiteId: string,
     return { ok: true, content: result.content };
   } catch (err) {
     return builderError(`updateWebsiteTextV2(${websiteId})`, err);
+  }
+}
+
+/** Saves one text edited directly on a Showroom / Scroll Story page's preview (see lib/templateSite/edit.ts). */
+export async function updateTemplateSiteTextV3(businessId: string, websiteId: string, path: string, value: string): Promise<BuilderResult<{ ok: true }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    if (typeof path !== "string" || typeof value !== "string" || path.length > 80 || value.length > 5000) throw new Error("No se pudo guardar ese texto");
+
+    const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
+    const current = parseTemplateSite(website.content);
+    if (!current) throw new Error("Esta página necesita actualizarse.");
+    const result = setTemplateTextAtPath(current, path, value);
+    if (!result.ok) throw new Error(result.error);
+    await prisma.website.update({ where: { id: websiteId }, data: { content: result.content } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true };
+  } catch (err) {
+    return builderError(`updateTemplateSiteTextV3(${websiteId})`, err);
   }
 }
 

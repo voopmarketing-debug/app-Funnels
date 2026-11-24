@@ -94,6 +94,7 @@ export async function renderStoredWebsite(
       trackingBasePath: opts.trackingBasePath,
       preview: opts.preview,
       leadSubmitted: opts.leadSubmitted,
+      edit: opts.edit,
       products: await getShowcaseProducts(website.businessId),
     });
   }

@@ -4,7 +4,7 @@ import type { CatalogProduct } from "@/lib/websiteContentV2";
 import { TEMPLATE_FONTS, type StoryContent } from "./content";
 import type { StoryClientData } from "./storyClient";
 import { STORY_CLIENT_SOURCE } from "./clientScripts.generated";
-import { clientProducts, esc, iconSvg, jsonForHtml, MONTHS, withMonth } from "./shared";
+import { clientProducts, editAttr, esc, iconSvg, jsonForHtml, MONTHS, withMonth } from "./shared";
 
 // The Scroll Story template: a product told while you scroll. One protagonist image travels and
 // turns between sections (portada, ritual, moving text, ingredients), then the collection fan, the
@@ -304,9 +304,12 @@ export function renderStory(content: StoryContent, ctx: StoryRenderCtx): string 
   const anchor = (rot: number, last = false) => (star ? `<div class="anchor" data-anchor data-rot="${rot}"${last ? " data-last" : ""}><img src="${esc(star)}" alt=""></div>` : "");
 
   const h = content.hero;
+  const E = (path: string) => editAttr(ctx.edit, path);
+  // In the builder the text is shown as written ("{mes}" included) so it can be edited.
+  const W = (text: string) => (ctx.edit ? esc(text) : withMonth(text));
   const trust = h.trust.filter((t) => t.text).slice(0, 3);
   const heroHtml = `<section class="hero${star ? "" : " solo"}" id="inicio" aria-label="Inicio"><div class="word" aria-hidden="true">${esc(brandWord)}</div><div class="wrap">
-      <div class="hero-copy">${h.kicker ? `<span class="mono" style="color:var(--muted)">${esc(h.kicker)}</span>` : ""}<h1 class="display">${esc(h.title)}</h1>${h.text ? `<p>${esc(h.text)}</p>` : ""}
+      <div class="hero-copy">${h.kicker ? `<span class="mono" style="color:var(--muted)"${E("hero.kicker")}>${esc(h.kicker)}</span>` : ""}<h1 class="display"${E("hero.title")}>${esc(h.title)}</h1>${h.text ? `<p${E("hero.text")}>${esc(h.text)}</p>` : ""}
         <div class="row"><a class="btn" href="#agenda">${esc(h.primaryCta)} ${ARROW}</a>${hasItems ? `<a class="link" href="#coleccion">${esc(h.secondaryCta)} ${ARROW}</a>` : ""}</div>
         ${trust.length ? `<div class="trust">${trust.map((t) => `<span>${iconSvg(t.icon)}${esc(t.text)}</span>`).join("")}</div>` : ""}</div>
       ${star ? `<div class="anchor" data-anchor data-rot="-14"><img src="${esc(star)}" alt="${esc(items[0].name)}"></div>` : ""}
@@ -319,9 +322,9 @@ export function renderStory(content: StoryContent, ctx: StoryRenderCtx): string 
   const ritualHtml =
     r.title || benefits.length
       ? `<section class="ritual${star ? "" : " noanchor"}" id="ritual" aria-label="El ritual"><div class="wrap">
-        <div style="display:flex;flex-direction:column;gap:18px"><span class="mono count">01<i></i></span><h2 class="display">${esc(r.title)}</h2>${r.text ? `<p>${esc(r.text)}</p>` : ""}${content.inside ? `<a class="link" href="#ingredientes">${esc(r.link)} ${ARROW}</a>` : ""}</div>
+        <div style="display:flex;flex-direction:column;gap:18px"><span class="mono count">01<i></i></span><h2 class="display"${E("ritual.title")}>${esc(r.title)}</h2>${r.text ? `<p${E("ritual.text")}>${esc(r.text)}</p>` : ""}${content.inside ? `<a class="link" href="#ingredientes">${esc(r.link)} ${ARROW}</a>` : ""}</div>
         ${anchor(0)}
-        <ul class="reveal benefits">${benefits.map((b, i) => `<li><span class="mono" style="color:var(--muted)">${String(i + 1).padStart(2, "0")}</span><span><b>${esc(b.title)}</b><small>${esc(b.text)}</small></span><span class="swatch ${swatches[i]}"></span></li>`).join("")}</ul>
+        <ul class="reveal benefits">${benefits.map((b, i) => `<li><span class="mono" style="color:var(--muted)">${String(i + 1).padStart(2, "0")}</span><span><b${E(`ritual.benefits.${r.benefits.indexOf(b)}.title`)}>${esc(b.title)}</b><small${E(`ritual.benefits.${r.benefits.indexOf(b)}.text`)}>${esc(b.text)}</small></span><span class="swatch ${swatches[i]}"></span></li>`).join("")}</ul>
       </div>${spec.length ? `<div class="wrap spec-line mono">${spec.map((s) => `<span>${esc(s)}</span>`).join("")}</div>` : ""}</section>`
       : "";
 
@@ -344,9 +347,9 @@ export function renderStory(content: StoryContent, ctx: StoryRenderCtx): string 
   const insideHtml =
     ins && ingItems.length
       ? `<section class="inside" id="ingredientes" aria-label="${esc(ins.title)}"><div class="wrap">
-        <div style="display:flex;flex-direction:column;gap:18px"><span class="mono count">02<i></i></span><h2 class="display">${esc(ins.title)}</h2>${ins.text ? `<p>${esc(ins.text)}</p>` : ""}${hasItems ? `<a class="link" href="#coleccion">${esc(h.secondaryCta)} ${ARROW}</a>` : ""}</div>
+        <div style="display:flex;flex-direction:column;gap:18px"><span class="mono count">02<i></i></span><h2 class="display"${E("inside.title")}>${esc(ins.title)}</h2>${ins.text ? `<p${E("inside.text")}>${esc(ins.text)}</p>` : ""}${hasItems ? `<a class="link" href="#coleccion">${esc(h.secondaryCta)} ${ARROW}</a>` : ""}</div>
         <div class="lab"><svg class="wires" viewBox="0 0 160 100" preserveAspectRatio="none" aria-hidden="true"><path d="M30 18 C 55 18, 62 34, 72 42"/><path d="M130 18 C 106 18, 98 34, 88 42"/><path d="M30 82 C 55 82, 62 66, 72 58"/><path d="M130 82 C 106 82, 98 66, 88 58"/></svg>
-          ${ingItems.map((it, i) => `<div class="ing" ${spots[i]}><span class="drop ${drops[i]}"></span><span><span class="mono">${String(i + 1).padStart(2, "0")}</span><b>${esc(it.title)}</b><small>${esc(it.text)}</small></span></div>`).join("")}
+          ${ingItems.map((it, i) => `<div class="ing" ${spots[i]}><span class="drop ${drops[i]}"></span><span><span class="mono">${String(i + 1).padStart(2, "0")}</span><b${E(`inside.items.${ins!.items.indexOf(it)}.title`)}>${esc(it.title)}</b><small${E(`inside.items.${ins!.items.indexOf(it)}.text`)}>${esc(it.text)}</small></span></div>`).join("")}
           ${anchor(-6, true)}</div></div></section>`
       : "";
 
@@ -366,14 +369,14 @@ export function renderStory(content: StoryContent, ctx: StoryRenderCtx): string 
     : "";
   const promoHtml = pr.title
     ? `<section class="promo-wrap" aria-label="Promoción del mes"><div class="wrap"><div class="promo reveal${art ? "" : " solo"}" id="promo"><span class="glow" aria-hidden="true"></span><span class="pb p1" aria-hidden="true"></span><span class="pb p2" aria-hidden="true"></span>
-        <div class="promo-copy"><span class="mono promo-tag"><i></i><span>${withMonth(pr.tag)}</span></span><h3 class="display">${withMonth(pr.title)}</h3>${pr.text ? `<p>${esc(pr.text)}</p>` : ""}${clock}<a class="btn" href="#agenda">${esc(pr.cta)} ${ARROW}</a></div>${art}</div></div></section>`
+        <div class="promo-copy"><span class="mono promo-tag"><i></i><span${E("promo.tag")}>${W(pr.tag)}</span></span><h3 class="display"${E("promo.title")}>${W(pr.title)}</h3>${pr.text ? `<p${E("promo.text")}>${esc(pr.text)}</p>` : ""}${clock}<a class="btn" href="#agenda">${esc(pr.cta)} ${ARROW}</a></div>${art}</div></div></section>`
     : "";
 
   const v = content.visit;
   const steps = v.steps.filter((s) => s.title).slice(0, 3);
   const visitHtml = steps.length
-    ? `<section class="visit" id="primera-visita"><div class="wrap"><div style="display:flex;flex-direction:column;gap:16px"><span class="mono count">03<i></i></span><h2 class="display">${esc(v.title)}</h2>${v.text ? `<p style="color:var(--muted);margin:0">${esc(v.text)}</p>` : ""}</div>
-        <ol class="reveal steps">${steps.map((s) => `<li><b>${esc(s.title)}</b><span>${esc(s.text)}</span>${s.meta ? `<span class="mono">${esc(s.meta)}</span>` : ""}</li>`).join("")}</ol></div></section>`
+    ? `<section class="visit" id="primera-visita"><div class="wrap"><div style="display:flex;flex-direction:column;gap:16px"><span class="mono count">03<i></i></span><h2 class="display"${E("visit.title")}>${esc(v.title)}</h2>${v.text ? `<p style="color:var(--muted);margin:0"${E("visit.text")}>${esc(v.text)}</p>` : ""}</div>
+        <ol class="reveal steps">${steps.map((s) => `<li><b${E(`visit.steps.${v.steps.indexOf(s)}.title`)}>${esc(s.title)}</b><span${E(`visit.steps.${v.steps.indexOf(s)}.text`)}>${esc(s.text)}</span>${s.meta ? `<span class="mono"${E(`visit.steps.${v.steps.indexOf(s)}.meta`)}>${esc(s.meta)}</span>` : ""}</li>`).join("")}</ol></div></section>`
     : "";
 
   const b = content.book;
@@ -390,8 +393,8 @@ export function renderStory(content: StoryContent, ctx: StoryRenderCtx): string 
           <label class="check full" for="f-ok"><input id="f-ok" name="consent" value="1" type="checkbox"><span>Autorizo el tratamiento de mis datos para que me contacten sobre esta cita (Ley 1581 de 2012).</span></label>
           <div class="full"><button class="btn light" type="submit" style="width:100%;justify-content:center">${esc(b.button)}</button></div>
           <div class="ok full" id="ok" hidden role="status"></div></form>`;
-  const bookHtml = `<section class="book" id="agenda"><div class="wrap"><div class="reveal book-card"><div><span class="mono count" style="color:var(--deep-muted)">04<i></i></span><h2 class="display" style="margin-top:16px">${esc(b.title)}</h2>${b.text ? `<p>${esc(b.text)}</p>` : ""}
-        ${facts.length ? `<div class="facts">${facts.map((f) => `<div><span class="mono">${esc(f.label)}</span><span>${esc(f.text)}</span></div>`).join("")}</div>` : ""}</div>
+  const bookHtml = `<section class="book" id="agenda"><div class="wrap"><div class="reveal book-card"><div><span class="mono count" style="color:var(--deep-muted)">04<i></i></span><h2 class="display" style="margin-top:16px"${E("book.title")}>${esc(b.title)}</h2>${b.text ? `<p${E("book.text")}>${esc(b.text)}</p>` : ""}
+        ${facts.length ? `<div class="facts">${facts.map((f) => `<div><span class="mono"${E(`book.facts.${b.facts.indexOf(f)}.label`)}>${esc(f.label)}</span><span${E(`book.facts.${b.facts.indexOf(f)}.text`)}>${esc(f.text)}</span></div>`).join("")}</div>` : ""}</div>
         ${formHtml}</div></div></section>`;
 
   const sheet = hasItems
