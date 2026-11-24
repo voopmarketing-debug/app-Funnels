@@ -22,7 +22,7 @@ export function AgentSwitcher({
   if (businesses.length <= 1) return null;
 
   return (
-    <label className="fl-raised relative inline-flex w-full max-w-[17rem] items-center gap-2 rounded-xl py-2 pl-2 pr-9">
+    <label className="fl-raised relative inline-flex w-full max-w-[10.5rem] items-center gap-2 sm:max-w-[17rem] rounded-xl py-2 pl-2 pr-9">
       <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-accent/15 text-accent" aria-hidden="true">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
           <rect x="4" y="7" width="16" height="12" rx="3.5" stroke="currentColor" strokeWidth="2" />

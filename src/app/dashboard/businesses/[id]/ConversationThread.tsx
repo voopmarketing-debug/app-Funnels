@@ -7,6 +7,7 @@ import { TemplateSendButton } from "./conversations/[conversationId]/TemplateSen
 import { MessageScrollArea } from "./MessageScrollArea";
 import { contactInitial, contactLabel, formatPhone } from "@/lib/contactDisplay";
 import { ContactFormDialog } from "./ContactFormDialog";
+import { ThreadActions } from "./ThreadActions";
 import { ImageLightbox } from "./ImageLightbox";
 import { RetryReplyButton } from "./RetryReplyButton";
 
@@ -140,31 +141,33 @@ export function ConversationThread({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Two rows on a phone (who → actions) so the name, phone and buttons
-          never overlap; a single row from md up, same as before. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface px-3 py-2.5 md:px-4 md:py-3">
+      {/* Phone: back, name, the IA/Tú switch and a "⋯" for the rest. Desktop: everything in one row. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-border bg-surface px-2 py-2 md:gap-x-3 md:px-4 md:py-3">
         {mobileBackHref && (
           <Link
             href={mobileBackHref}
             aria-label="Volver a las conversaciones"
-            className="-ml-1 flex h-10 w-8 flex-none items-center justify-center text-2xl leading-none text-ink-muted transition hover:text-ink md:hidden"
+            className="order-1 flex h-11 w-9 flex-none items-center justify-center text-3xl leading-none text-ink-muted transition hover:text-ink active:text-accent md:hidden"
           >
             ‹
           </Link>
         )}
-        <Avatar initial={customerInitial} variant="customer" />
-        <div className="min-w-[9rem] flex-1">
+        <div className="hidden md:block">
+          <Avatar initial={customerInitial} variant="customer" />
+        </div>
+        <div className="order-2 min-w-0 flex-1 md:order-none md:min-w-[9rem]">
           <h2 className="truncate text-base font-bold md:text-lg">{label}</h2>
           {label !== phoneLabel && <p className="fl-mono truncate text-xs tracking-wide text-ink-muted">{phoneLabel}</p>}
         </div>
-        <div className="flex w-full items-center gap-2 overflow-x-auto [scrollbar-width:none] md:w-auto md:flex-none md:overflow-visible">
-          <TemplateSendButton
-            businessId={businessId}
-            conversationId={conversationId}
-            templates={templates}
-            windowOpen={windowOpen}
-          />
+        {/* Who answers: a full-width, plainly worded switch on a phone; the small one on desktop. */}
+        <div className="order-4 w-full md:hidden">
+          <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} />
+        </div>
+        <div className="hidden md:block">
           <AiPauseButton businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} compact />
+        </div>
+        <ThreadActions>
+          <TemplateSendButton businessId={businessId} conversationId={conversationId} templates={templates} windowOpen={windowOpen} />
           <StageSelector businessId={businessId} conversationId={conversationId} stageId={stageId} stages={stages} />
           {/* Phones don't get the lead panel (desktop-only third column), so
               the contact's name/email and sales are handled from here instead. */}
@@ -172,7 +175,7 @@ export function ConversationThread({
             <SaleButton
               businessId={businessId}
               conversationId={conversationId}
-              className="whitespace-nowrap rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+              className="whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
             />
             <ContactFormDialog
               mode="edit"
@@ -181,10 +184,10 @@ export function ConversationThread({
               customerPhone={customerPhone}
               customerName={customerName}
               customerEmail={customerEmail}
-              triggerClassName="whitespace-nowrap rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+              triggerClassName="whitespace-nowrap rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
             />
           </div>
-        </div>
+        </ThreadActions>
       </div>
 
       <HumanAttentionBanner businessId={businessId} conversationId={conversationId} aiPaused={aiPaused} needsHuman={needsHuman} />
@@ -263,7 +266,7 @@ export function ConversationThread({
                   }`}
                 >
                   {startsTurn && (
-                    <p className={`mb-0.5 flex items-center gap-1 text-xs font-semibold ${SENDER_STYLES[sender]}`}>
+                    <p className={`mb-0.5 flex items-center gap-1 text-xs font-semibold ${SENDER_STYLES[sender]} ${sender === "customer" ? "max-md:hidden" : ""}`}>
                       {sender === "ai" && <SparkIcon />}
                       <span className="truncate">{senderName}</span>
                     </p>
@@ -305,6 +308,7 @@ export function ConversationThread({
         windowOpen={windowOpen}
         windowExpiresAt={windowExpiresAt}
         recipientLabel={label}
+        reopenSlot={<TemplateSendButton businessId={businessId} conversationId={conversationId} templates={templates} windowOpen={windowOpen} />}
       />
     </div>
   );

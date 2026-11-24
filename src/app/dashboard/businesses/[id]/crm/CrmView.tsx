@@ -300,14 +300,16 @@ export async function CrmView({
     <div className="space-y-4 md:space-y-6">
       <CrmLivePoller businessId={id} />
       <div className={hideChromeOnMobile}>
-        <Link href={`/dashboard/businesses/${id}`} className="text-sm text-ink-muted underline hover:text-ink">
+        <Link href={`/dashboard/businesses/${id}`} className="hidden text-sm text-ink-muted underline hover:text-ink sm:inline">
           ← {business.name}
         </Link>
-        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-4">
+        {/* On a phone the title and the business picker share one row, and the long explanation
+            goes away so the list of chats starts right below. */}
+        <div className="flex items-center justify-between gap-3 sm:mt-1 sm:flex-wrap sm:items-baseline sm:gap-4">
           <h1 className="text-xl font-bold">{title}</h1>
           <AgentSwitcher businesses={accessibleBusinesses.map((m) => m.business)} currentId={id} section={section} />
         </div>
-        <p className="mt-1 text-sm text-ink-muted">{blurb}</p>
+        <p className={`mt-1 text-sm text-ink-muted ${section === "conversaciones" ? "hidden sm:block" : ""}`}>{blurb}</p>
       </div>
 
       <div className="space-y-3">

@@ -66,7 +66,10 @@ export function ConversationSplitView({
     // of behind it. Desktop sizing is unchanged.
     <div
       className={`fl-card flex overflow-hidden md:h-[calc(100dvh-16rem)] md:min-h-[30rem] ${
-        showListOnMobile ? "h-[calc(100dvh-12rem)] min-h-[22rem]" : "h-[calc(100dvh-6rem)] min-h-[20rem]"
+        showListOnMobile
+          ? "h-[calc(100dvh-12rem)] min-h-[22rem]"
+          : // An open chat takes the whole phone screen (above the top bar), like a messaging app.
+            "max-md:fixed max-md:inset-0 max-md:z-50 max-md:h-[100dvh] max-md:rounded-none max-md:border-0 max-md:pt-[env(safe-area-inset-top,0px)] md:h-[calc(100dvh-16rem)]"
       }`}
     >
       <div

@@ -66,12 +66,15 @@ export function ManualMessageForm({
   conversationId,
   windowOpen,
   windowExpiresAt = null,
+  reopenSlot = null,
   recipientLabel,
 }: {
   businessId: string;
   conversationId: string;
   windowOpen: boolean;
   windowExpiresAt?: string | null;
+  /** A button that reopens the chat with a template (shown in the 24h notice, where it is needed). */
+  reopenSlot?: React.ReactNode;
   recipientLabel?: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -310,10 +313,15 @@ export function ManualMessageForm({
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="border-t border-border bg-surface p-2 md:p-3">
       {!windowOpen && (
-        <p className="mb-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-[13px] text-accent">
-          Pasaron más de 24h desde el último mensaje del cliente — usa el botón{" "}
-          <span className="font-semibold">📋 Plantilla</span> de arriba para reabrir la conversación.
-        </p>
+        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[13px] text-accent">
+          <p className="min-w-0 flex-1">
+            <span className="md:hidden">Pasaron más de 24 h: para escribirle, reabre el chat con una plantilla.</span>
+            <span className="hidden md:inline">
+              Pasaron más de 24h desde el último mensaje del cliente — usa el botón <span className="font-semibold">📋 Plantilla</span> de arriba para reabrir la conversación.
+            </span>
+          </p>
+          {reopenSlot && <span className="flex-none md:hidden">{reopenSlot}</span>}
+        </div>
       )}
       <input ref={fileInputRef} type="file" name="file" hidden onChange={handleFilePicked} />
       {/* Kommo-style composer: the text gets the full width, tools sit in a
