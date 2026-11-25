@@ -371,7 +371,7 @@ export function WebsiteBuilder({
 
   /** The style panel saves quietly in the background: the preview already shows the change. */
   async function saveLook(index: number, look: Look | undefined) {
-    const patch = Object.fromEntries((["bg", "color", "padY", "width", "align", "size", "hideOn"] as const).map((k) => [k, look?.[k] ?? null]));
+    const patch = Object.fromEntries((["bg", "color", "surface", "padY", "width", "align", "size", "hideOn"] as const).map((k) => [k, look?.[k] ?? null]));
     const res = await editWebsiteBlocksV2(businessId, websiteId, { kind: "look", index, patch });
     if (!res.ok) {
       showToast(res.error);
@@ -388,6 +388,7 @@ export function WebsiteBuilder({
     [...el.classList].filter((c) => c.startsWith("lk-")).forEach((c) => el.classList.remove(c));
     el.style.removeProperty("--lkbg");
     el.style.removeProperty("--lkc");
+    el.style.removeProperty("--lks");
     const parts = lookParts(look, { photoBg: el.classList.contains("has-bg") || el.classList.contains("hero-full"), showAll: true });
     parts.classes.forEach((c) => el.classList.add(c));
     for (const [k, v] of Object.entries(parts.vars)) el.style.setProperty(k, v);

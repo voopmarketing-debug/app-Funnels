@@ -23,6 +23,7 @@ export const LookSchema = z
   .object({
     bg: hex,
     color: hex,
+    surface: hex,
     padY: choice(LOOK_PAD),
     width: choice(LOOK_WIDTH),
     align: choice(LOOK_ALIGN),
@@ -79,6 +80,10 @@ export function lookParts(look: Look | null | undefined, opts: { photoBg?: boole
     classes.push("lk-c");
     vars["--lkc"] = text;
   }
+  if (look.surface) {
+    classes.push("lk-s");
+    vars["--lks"] = look.surface;
+  }
   if (look.padY) classes.push(`lk-p-${look.padY}`);
   if (look.width) classes.push(`lk-w-${look.width}`);
   if (look.align) classes.push(`lk-a-${look.align}`);
@@ -91,6 +96,7 @@ export function lookParts(look: Look | null | undefined, opts: { photoBg?: boole
 export const LOOK_CSS = `
 .lk-bg{background:var(--lkbg)!important;--bg:var(--lkbg);--surface:color-mix(in srgb,var(--lkbg) 90%,var(--lkc,#808080))}
 .lk-c{color:var(--lkc)!important;--text:var(--lkc);--muted:color-mix(in srgb,var(--lkc) 66%,transparent);--line:color-mix(in srgb,var(--lkc) 16%,transparent)}
+.lk-s{--surface:var(--lks)}
 .lk-bg.promo .btn{background:var(--lkc);color:var(--lkbg);border-color:var(--lkc)}
 .lk-p-none{padding-top:0!important;padding-bottom:0!important}
 .lk-p-sm{padding-top:40px!important;padding-bottom:40px!important}

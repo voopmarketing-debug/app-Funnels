@@ -205,6 +205,8 @@ export function StylePanel({
 
       <ColorRow label="Color del texto" hint="Si no eliges uno, se ajusta solo para que se lea bien." value={look.color} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ color: hex })} />
 
+      <ColorRow label="Color de los cuadros" hint="Las tarjetas y recuadros de este bloque (por ejemplo, el fondo detrás de cada foto). Si no eliges uno, se ajusta solo." value={look.surface} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ surface: hex })} />
+
       <Segmented
         label="Espacio arriba y abajo"
         value={look.padY ?? null}

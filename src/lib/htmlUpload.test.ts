@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkUploadedHtml, htmlBlockFromContent } from "./htmlBlock";
 import { SITE_SCRIPT } from "./siteScript";
 import { applyBlockOp } from "./websiteBlocks";
+import { LOOK_CSS, lookParts, mergeLook } from "./websiteLook";
 import { SAMPLE_HTML } from "./htmlSample";
 import { buildHtmlPageContent } from "./nicheTemplates";
 import { incompleteHtmlReason, WebsiteContentV2Schema } from "./websiteContentV2";
@@ -98,5 +99,14 @@ describe("Subir mi HTML", () => {
     const back = set.ok ? applyBlockOp(set.content, { kind: "galleryLayout", index: 1, layout: "grid" }) : set;
     expect(back.ok && "layout" in back.content.sections[1]).toBe(false);
     expect(applyBlockOp(page, { kind: "galleryLayout", index: 0, layout: "mosaic" }).ok).toBe(false);
+  });
+
+  it("the boxes of a block have their own color, apart from the text and the background", () => {
+    const parts = lookParts({ bg: "#111111", color: "#ffffff", surface: "#333333" });
+    expect(parts.classes).toEqual(expect.arrayContaining(["lk-bg", "lk-c", "lk-s"]));
+    expect(parts.vars["--lks"]).toBe("#333333");
+    expect(lookParts({ surface: "#333333" }).classes).toEqual(["lk-s"]);
+    expect(LOOK_CSS.indexOf(".lk-s{")).toBeGreaterThan(LOOK_CSS.indexOf(".lk-bg{"));
+    expect(mergeLook({ bg: "#111111" }, { surface: "#333333" })).toEqual({ bg: "#111111", surface: "#333333" });
   });
 });
