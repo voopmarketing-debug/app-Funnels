@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { SECTION_LABELS, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import type { BlockOp } from "@/lib/websiteBlocks";
-import { BlockGrid, NEW_BLOCK_MIME } from "./BlockLibrary";
+import { BlockGrid, ExtraGrid, NEW_BLOCK_MIME } from "./BlockLibrary";
 
 const MOVE_MIME = "application/x-fl-move-block";
 
@@ -43,6 +43,7 @@ export function BlocksPanel({
   busy,
   onSelect,
   onTogglePlain,
+  onAddExtra,
   onOp,
   onStyle,
   onToggleHidden,
@@ -57,6 +58,8 @@ export function BlocksPanel({
   onSelect: (index: number) => void;
   /** Hides or shows our top bar and footer (the blank page's "Portada" row). */
   onTogglePlain: () => void;
+  /** A text, button or photo goes inside the chosen block (or the one the page shows when it is dropped). */
+  onAddExtra: (kind: string) => void;
   onOp: (op: BlockOp) => void;
   onStyle: (index: number) => void;
   onToggleHidden: (index: number) => void;
@@ -113,6 +116,7 @@ export function BlocksPanel({
         {libraryOpen && (
           <div className="max-h-[17rem] overflow-y-auto rounded-xl border border-border bg-background p-2.5">
             <p className="mb-2 text-[12px] text-ink-muted"><strong>Arrástralo a la página</strong> y suéltalo donde quieras, o tócalo para agregarlo{selected !== null && selected > 0 ? " debajo del bloque elegido" : " al final"}.</p>
+            <ExtraGrid disabled={busy} onPick={onAddExtra} />
             <BlockGrid compact disabled={busy} onPick={(type) => {
                 setLibraryOpen(false);
                 onOp({ kind: "add", type, at: selected !== null && selected > 0 ? selected + 1 : undefined });

@@ -96,7 +96,16 @@ const imageUrl = z
   .optional()
   .catch(null);
 // `look`: the owner's own style for this section (see websiteLook.ts).
-const media = { image: imageUrl, bgImage: imageUrl, look: LookSchema };
+// `extras`: elements the owner adds inside a block, right under its title (a text, a button).
+export const MAX_EXTRAS = 6;
+export const ExtraSchema = z.union([
+  z.object({ type: z.literal("text"), text: z.string().max(600) }),
+  z.object({ type: z.literal("image"), url: z.string().regex(/^https:\/\/\S+$/).max(500) }),
+  z.object({ type: z.literal("button"), label: z.string().max(40), url: z.string().regex(/^$|^(https?:\/\/\S+|tel:\+?[0-9 ()-]{5,20}|mailto:\S+@\S+|#[A-Za-z0-9_-]+)$/).max(300) }),
+]);
+export type ExtraElement = z.infer<typeof ExtraSchema>;
+const ExtrasSchema = z.array(ExtraSchema).max(MAX_EXTRAS).optional().catch(undefined).describe("Elementos que agrega el dueño. NO lo escribas.");
+const media = { image: imageUrl, bgImage: imageUrl, look: LookSchema, extras: ExtrasSchema };
 
 const HeroSection = z.object({
   ...media,

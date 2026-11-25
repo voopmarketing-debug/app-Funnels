@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
 import { ColorSwatchButton } from "@/components/ColorSwatchButton";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
-import { SECTION_LABELS, type Section, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { SECTION_LABELS, type ExtraElement, type Section, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { tidyLook, type Look } from "@/lib/websiteLook";
 
 const SAVE_DELAY_MS = 500;
@@ -87,6 +87,53 @@ function FontPicker({ label, value, onChange }: { label: string; value: string |
   );
 }
 
+/** Texts and buttons the owner adds inside a block, right under its title. */
+function ExtrasEditor({ extras, busy, onChange, onPickPhoto }: { extras: ExtraElement[]; busy: boolean; onChange: (list: ExtraElement[]) => void; onPickPhoto: (at: number | null) => void }) {
+  const [list, setList] = useState<ExtraElement[]>(extras);
+  const full = list.length >= 6;
+  const commit = (next: ExtraElement[]) => {
+    setList(next);
+    onChange(next);
+  };
+  const edit = (i: number, patch: Partial<{ text: string; label: string; url: string }>) => setList((l) => l.map((x, k) => (k === i ? ({ ...x, ...patch } as ExtraElement) : x)));
+  const field = "w-full rounded-lg border border-border bg-background px-3 py-2 text-base text-ink outline-none focus:border-accent md:text-sm";
+  return (
+    <div className="space-y-2 rounded-xl border border-border p-3">
+      <div>
+        <p className="text-[13px] font-semibold text-ink">Elementos dentro del bloque</p>
+        <p className="text-[12px] text-ink-muted">Agrega un texto, un botón o una foto dentro de este bloque, justo debajo de su título. También puedes escribir sobre ellos en la página.</p>
+      </div>
+      {list.map((x, i) => (
+        <div key={i} className="space-y-1.5 rounded-lg bg-surface-2/60 p-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12px] font-bold text-ink-muted">{x.type === "text" ? "Texto" : x.type === "image" ? "Foto" : "Botón"} {i + 1}</span>
+            <button type="button" disabled={busy} onClick={() => commit(list.filter((_, k) => k !== i))} className="rounded-md border border-error/50 bg-error/10 px-2 py-1 text-[12px] font-bold text-error disabled:opacity-40">🗑 Quitar</button>
+          </div>
+          {x.type === "image" ? (
+            <div className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={x.url} alt="" className="h-14 w-20 flex-none rounded-md border border-border bg-background object-contain" />
+              <button type="button" disabled={busy} onClick={() => onPickPhoto(i)} className="h-10 flex-1 rounded-lg border border-border-strong text-sm font-bold text-ink hover:border-accent disabled:opacity-40">Cambiar foto</button>
+            </div>
+          ) : x.type === "text" ? (
+            <textarea aria-label={`Texto ${i + 1}`} rows={3} maxLength={600} value={x.text} onChange={(e) => edit(i, { text: e.target.value })} onBlur={() => onChange(list)} className={field} />
+          ) : (
+            <>
+              <input aria-label={`Texto del botón ${i + 1}`} maxLength={40} value={x.label} onChange={(e) => edit(i, { label: e.target.value })} onBlur={() => onChange(list)} placeholder="Texto del botón" className={field} />
+              <input aria-label={`Enlace del botón ${i + 1}`} inputMode="url" maxLength={300} value={x.url} onChange={(e) => edit(i, { url: e.target.value })} onBlur={() => onChange(list)} placeholder="https://… (vacío = tu WhatsApp)" className={field} />
+            </>
+          )}
+        </div>
+      ))}
+      <div className="grid grid-cols-3 gap-2">
+        <button type="button" disabled={busy || full} onClick={() => commit([...list, { type: "text", text: "Escribe aquí tu descripción." }])} className="h-11 rounded-lg bg-accent text-sm font-bold text-accent-ink transition hover:bg-accent-hover disabled:opacity-40">＋ Texto</button>
+        <button type="button" disabled={busy || full} onClick={() => commit([...list, { type: "button", label: "Escríbenos", url: "" }])} className="h-11 rounded-lg border border-border-strong text-sm font-bold text-ink transition hover:border-accent disabled:opacity-40">＋ Botón</button>
+        <button type="button" disabled={busy || full} onClick={() => onPickPhoto(null)} className="h-11 rounded-lg border border-border-strong text-sm font-bold text-ink transition hover:border-accent disabled:opacity-40">＋ Foto</button>
+      </div>
+    </div>
+  );
+}
+
 function ColorRow({
   label,
   hint,
@@ -153,6 +200,8 @@ export function StylePanel({
   onSave,
   onPickBgImage,
   onGalleryLayout,
+  onExtras,
+  onPickExtraPhoto,
 }: {
   section: Section;
   index: number;
@@ -162,6 +211,8 @@ export function StylePanel({
   onSave: (look: Look | undefined) => void;
   onPickBgImage: () => void;
   onGalleryLayout: (layout: "grid" | "mosaic" | "carousel") => void;
+  onExtras: (list: ExtraElement[]) => void;
+  onPickExtraPhoto: (at: number | null) => void;
 }) {
   const [look, setLook] = useState<Look>(section.look ?? {});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -203,6 +254,8 @@ export function StylePanel({
         <p className="text-sm font-semibold text-ink">Estilo · {SECTION_LABELS[section.type]}</p>
         <p className="text-[12px] text-ink-muted">Bloque {index + 1}. Cada cambio se ve al instante en la página.</p>
       </div>
+
+      <ExtrasEditor extras={section.extras ?? []} busy={busy} onChange={onExtras} onPickPhoto={onPickExtraPhoto} />
 
       {section.type === "gallery" && (
         <div className="space-y-2">

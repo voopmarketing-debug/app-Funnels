@@ -108,3 +108,42 @@ export function BlockLibraryDialog({ onPick, onClose, where }: { onPick: (type: 
     </div>
   );
 }
+
+/** Drag payload of an element (text, button, photo) dropped inside a block of the page. */
+export const NEW_EXTRA_MIME = "application/x-fl-new-extra";
+
+const EXTRA_CARDS = [
+  { kind: "text", label: "Texto", glyph: "T", help: "Un párrafo debajo del título" },
+  { kind: "button", label: "Botón", glyph: "▭", help: "Un botón con tu enlace" },
+  { kind: "image", label: "Foto", glyph: "▣", help: "Una foto que se acomoda sola" },
+] as const;
+
+/** Elements that go INSIDE a block: tap to put one in the chosen block, or drag it onto a block of the page. */
+export function ExtraGrid({ onPick, disabled }: { onPick: (kind: string) => void; disabled?: boolean }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Dentro de un bloque</p>
+      <ul className="grid grid-cols-3 gap-1.5">
+        {EXTRA_CARDS.map((c) => (
+          <li key={c.kind}>
+            <button
+              type="button"
+              disabled={disabled}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(NEW_EXTRA_MIME, c.kind);
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() => onPick(c.kind)}
+              title={c.help}
+              className="flex w-full cursor-grab flex-col items-center gap-1 rounded-lg border border-border bg-background p-2 text-center transition hover:border-accent hover:bg-accent/5 active:cursor-grabbing disabled:opacity-50"
+            >
+              <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/12 text-base font-bold text-accent">{c.glyph}</span>
+              <span className="text-[12px] font-semibold text-ink">{c.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

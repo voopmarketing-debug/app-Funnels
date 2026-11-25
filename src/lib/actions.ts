@@ -3744,6 +3744,7 @@ const BlockOpSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("remove"), index: z.number().int() }),
   z.object({ kind: z.literal("move"), from: z.number().int(), to: z.number().int() }),
   z.object({ kind: z.literal("eventDate"), index: z.number().int(), date: z.string().max(40) }),
+  z.object({ kind: z.literal("extras"), index: z.number().int(), extras: z.array(z.record(z.string(), z.string().max(600))).max(6) }),
   z.object({ kind: z.literal("galleryLayout"), index: z.number().int(), layout: z.enum(["grid", "mosaic", "carousel"]) }),
   z.object({ kind: z.literal("html"), index: z.number().int(), code: z.string().max(100_000), height: z.number().int().min(0).max(3000) }),
   z.object({ kind: z.literal("look"), index: z.number().int(), patch: z.record(z.string(), z.union([z.string().max(40), z.null()])) }),
@@ -3764,7 +3765,14 @@ export async function editWebsiteBlocksV2(businessId: string, websiteId: string,
     const website = await prisma.website.findFirstOrThrow({ where: { id: websiteId, businessId } });
     const op = parsedOp.data as BlockOp;
     const firstProduct = op.kind === "add" && op.type === "productSpotlight" ? await prisma.product.findFirst({ where: { businessId, active: true }, orderBy: { createdAt: "asc" }, select: { id: true } }) : null;
-    const result = applyBlockOp(WebsiteContentV2Schema.parse(website.content), op, { firstProductId: firstProduct?.id ?? null });
+    const stored = WebsiteContentV2Schema.parse(website.content);
+    if (op.kind === "extras") {
+      // A photo added inside a block must be one of the business's own (or one the block already had).
+      const allowed = await ownImageUrls(businessId, website.aiImageUrl);
+      for (const x of stored.sections[op.index]?.extras ?? []) if (x.type === "image") allowed.add(x.url);
+      for (const x of op.extras as { type?: string; url?: string }[]) if (x.type === "image" && !(x.url && allowed.has(x.url))) throw new Error("Esa foto no está en tu biblioteca: súbela primero.");
+    }
+    const result = applyBlockOp(stored, op, { firstProductId: firstProduct?.id ?? null });
     if (!result.ok) throw new Error(result.error);
     await prisma.website.update({ where: { id: websiteId }, data: { content: result.content } });
     revalidatePath(`/dashboard/businesses/${businessId}/website`);

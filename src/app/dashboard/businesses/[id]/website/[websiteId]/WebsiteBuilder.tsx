@@ -11,6 +11,7 @@ import { lookParts, type Look } from "@/lib/websiteLook";
 import {
   PAGE_TYPE_LABELS,
   SECTION_LABELS,
+  type ExtraElement,
   STYLE_INFO,
   STYLE_KEYS,
   type StyleKey,
@@ -123,6 +124,7 @@ export function WebsiteBuilder({
   const scrollRef = useRef(0);
   const detachRef = useRef<(() => void) | null>(null);
   const handlersRef = useRef<EditorHandlers | null>(null);
+  const [extraPhoto, setExtraPhoto] = useState<{ index: number; at: number | null } | null>(null);
   const [imageTarget, setImageTarget] = useState<{ index: number; field: "image" | "bgImage" } | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [toast, setToast] = useState<string | null>(null);
@@ -342,6 +344,26 @@ export function WebsiteBuilder({
   });
 
   /** Add / duplicate / delete / move a block. */
+  /** A text, a button or a photo goes inside a block, right under its title. */
+  function addExtra(kind: string, index: number | null) {
+    if (index === null || !content.sections[index]) {
+      showToast("Toca primero el bloque donde lo quieres, o arrástralo encima de uno.");
+      return;
+    }
+    if (kind === "image") {
+      setExtraPhoto({ index, at: null });
+      return;
+    }
+    const list = [...((content.sections[index].extras ?? []) as ExtraElement[])];
+    if (list.length >= 6) {
+      showToast("Un bloque admite hasta 6 elementos.");
+      return;
+    }
+    list.push(kind === "button" ? { type: "button", label: "Escríbenos", url: "" } : { type: "text", text: "Escribe aquí tu descripción." });
+    setSelected(index);
+    runBlock({ kind: "extras", index, extras: list }, "Agregando el elemento…");
+  }
+
   function runBlock(op: BlockOp, label = "Actualizando…") {
     setBusy(label);
     startTransition(async () => {
@@ -432,6 +454,7 @@ export function WebsiteBuilder({
       setHtmlDialog(index);
     },
     dropBlock: (type, at) => runBlock({ kind: "add", type: type as never, at }, "Agregando el bloque…"),
+    dropExtra: (kind, index) => addExtra(kind, index),
     add: (index) => setLibrary({ at: index + 1 }),
     duplicate: (index) => runBlock({ kind: "duplicate", index }, "Duplicando…"),
     remove: (index) => runBlock({ kind: "remove", index }, "Eliminando…"),
@@ -659,6 +682,7 @@ export function WebsiteBuilder({
               selected={sel}
               busy={!!busy}
               onTogglePlain={() => runDesign("Guardando…", { plain: !content.plain })}
+              onAddExtra={(kind) => addExtra(kind, sel)}
               onSelect={selectBlock}
               onOp={(op) => runBlock(op, op.kind === "add" ? "Agregando el bloque…" : op.kind === "remove" ? "Eliminando…" : op.kind === "duplicate" ? "Duplicando…" : "Moviendo…")}
               onStyle={(i) => {
@@ -709,6 +733,8 @@ export function WebsiteBuilder({
                 onSave={(look) => void saveLook(sel, look)}
                 onPickBgImage={() => setImageTarget({ index: sel, field: "bgImage" })}
                 onGalleryLayout={(layout) => runBlock({ kind: "galleryLayout", index: sel, layout }, "Cambiando el diseño…")}
+                onExtras={(extras) => runBlock({ kind: "extras", index: sel, extras }, "Guardando…")}
+                onPickExtraPhoto={(at) => setExtraPhoto({ index: sel, at })}
               />
             ))}
 
@@ -870,6 +896,25 @@ export function WebsiteBuilder({
         />
       )}
 
+      {extraPhoto && (
+        <ImagePicker
+          businessId={businessId}
+          title="Foto dentro del bloque"
+          help="Elige una de tus fotos o sube una nueva: se acomoda sola debajo del título, sin recortarse."
+          current={null}
+          removeLabel=""
+          onPick={(url) => {
+            const t = extraPhoto;
+            setExtraPhoto(null);
+            const list = [...((content.sections[t.index]?.extras ?? []) as ExtraElement[])];
+            if (t.at === null) list.push({ type: "image", url });
+            else list[t.at] = { type: "image", url };
+            runBlock({ kind: "extras", index: t.index, extras: list }, "Agregando la foto…");
+          }}
+          onRemove={null}
+          onClose={() => setExtraPhoto(null)}
+        />
+      )}
       {imageTarget && (() => {
         const section = content.sections[imageTarget.index];
         const isBg = imageTarget.field === "bgImage";

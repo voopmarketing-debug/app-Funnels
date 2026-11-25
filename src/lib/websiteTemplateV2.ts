@@ -883,8 +883,26 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       if (styles.length) a = /style="/.test(a) ? a.replace(/style="([^"]*)"/, (_x, css: string) => `style="${css};${styles.join(";")}"`) : `${a} style="${styles.join(";")}"`;
       return `${lead}<section${a}${edit ? ` data-sec="${index}" data-type="${s.type}"` : ""}>`;
     });
+  // The elements the owner added under a block's title (a text, a button).
+  const withExtras = (html: string, s: Section, index: number): string => {
+    const list = s.extras ?? [];
+    if (list.length === 0) return html;
+    const extrasHtml = `<div class="extras">${list
+      .map((x, k) =>
+        x.type === "text"
+          ? `<p class="extra-text"${ed(`sections.${index}.extras.${k}.text`)}>${esc(x.text)}</p>`
+          : x.type === "image"
+            ? `<img class="extra-img" src="${esc(x.url)}" alt="" loading="lazy">`
+            : `<a class="btn extra-btn" href="${esc(x.url || href("boton-extra"))}"${/^https?:/.test(x.url) ? ' target="_blank" rel="noopener"' : ""}${ed(`sections.${index}.extras.${k}.label`)}>${esc(x.label)}</a>`,
+      )
+      .join("")}</div>`;
+    const at = html.search(/<\/h[12]>/);
+    if (at < 0) return html.replace(/<\/section>\s*$/, `${extrasHtml}</section>`);
+    const end = at + 5;
+    return html.slice(0, end) + extrasHtml + html.slice(end);
+  };
   const body = sections
-    .map(({ s, i }) => decorate(renderSection(s, i), s, i))
+    .map(({ s, i }) => withExtras(decorate(renderSection(s, i), s, i), s, i))
     .join("\n")
     // Blocks that rise into view as the page scrolls (what is on screen at load never starts hidden: see siteScript).
     .replace(/class="(feat-item|pcard[^"]*|ag-item|trust-item|stat-v|host-img)"/g, 'class="$1 rv"')
@@ -942,6 +960,11 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,t
 .wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
 .narrow{max-width:760px}.narrow-lg{max-width:900px}
 .center{text-align:center}.mt{margin-top:32px}
+.extras{margin:6px 0 20px;display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.extra-text{max-width:64ch;margin:0;font-size:1.08em;color:var(--muted,var(--text));white-space:pre-line}
+.extra-btn{margin-top:4px}
+.extra-img{display:block;max-width:100%;width:min(100%,720px);height:auto;max-height:70vh;object-fit:contain;border-radius:var(--r);background:var(--surface)}
+.lk-a-center .extras{align-items:center}.lk-a-center .extra-text{margin-inline:auto}.lk-a-right .extras{align-items:flex-end}
 .kicker,.eyebrow{font-family:var(--bf);font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--primary-ink);margin:0 0 14px}
 .intro,.lead{color:var(--muted);font-size:19px;max-width:60ch}
 .center .intro,.center .lead{margin-inline:auto}

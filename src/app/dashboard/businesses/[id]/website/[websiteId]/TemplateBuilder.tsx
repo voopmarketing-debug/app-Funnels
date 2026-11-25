@@ -98,6 +98,7 @@ export function TemplateBuilder({
     hide: () => {},
     style: () => {},
     dropBlock: () => {},
+    dropExtra: () => {},
     code: () => {},
     add: () => {},
     duplicate: () => {},

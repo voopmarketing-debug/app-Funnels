@@ -26,6 +26,8 @@ export type EditorHandlers = {
   code(index: number): void;
   /** A block taken from the library was dropped on the page: add it so it ends up at `at`. */
   dropBlock(type: string, at: number): void;
+  /** A text, button or photo from the library was dropped on a block of the page. */
+  dropExtra(kind: string, index: number): void;
   /** A block was touched in the page: the side panel follows it. */
   select(index: number): void;
   undo(): void;
@@ -37,6 +39,7 @@ export type EditorHandlers = {
 const ACCENT = "#5b6cf0";
 /** Drag payload of a library block (the same one the block list accepts). */
 const NEW_BLOCK_TYPE = "application/x-fl-new-block";
+const NEW_EXTRA_TYPE = "application/x-fl-new-extra";
 
 const CSS = `
 [data-edit]{cursor:text;border-radius:4px;transition:outline-color .12s,background-color .12s}
@@ -382,7 +385,17 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   let dropAt: number | null = null;
   const hasNewBlock = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes(NEW_BLOCK_TYPE);
   const sections = () => Array.from(doc.querySelectorAll<HTMLElement>("section[data-sec]"));
+  // A text, button or photo dragged over a block of the page: that block lights up and receives it.
+  const hasNewExtra = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes(NEW_EXTRA_TYPE);
+  const sectionAt = (e: DragEvent) => (doc.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>("section[data-sec]") ?? null;
   const onDragOver = (e: DragEvent) => {
+    if (hasNewExtra(e)) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      const target = sectionAt(e);
+      if (target && Number(target.dataset.sec) >= 0) setActive(target);
+      return;
+    }
     if (!hasNewBlock(e)) return;
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
@@ -416,6 +429,13 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     if (!e.relatedTarget) clearDrop();
   };
   const onDrop = (e: DragEvent) => {
+    const extra = e.dataTransfer?.getData(NEW_EXTRA_TYPE);
+    if (extra) {
+      e.preventDefault();
+      const target = sectionAt(e);
+      if (target) getHandlers().dropExtra(extra, Number(target.dataset.sec));
+      return;
+    }
     const type = e.dataTransfer?.getData(NEW_BLOCK_TYPE);
     if (!type) return clearDrop();
     e.preventDefault();

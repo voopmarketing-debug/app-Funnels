@@ -10,14 +10,14 @@ import { toEmbedUrl } from "@/lib/websiteTemplate";
 /** Text fields a person can edit by clicking. Everything structural (type, variant, icon, ids…) is out. */
 const TEXT_KEYS = new Set([
   "heading", "subheading", "eyebrow", "kicker", "intro", "body", "name", "role", "title", "description", "question", "answer",
-  "value", "label", "quote", "price", "priceNote", "where", "ctaLabel", "secondaryCtaLabel", "buttonLabel", "badge", "when", "us", "others", "usLabel", "othersLabel",
+  "value", "label", "text", "quote", "price", "priceNote", "where", "ctaLabel", "secondaryCtaLabel", "buttonLabel", "badge", "when", "us", "others", "usLabel", "othersLabel",
 ]);
 /** Lists of items inside a section that hold text. */
-const ARRAYS = new Set(["items", "bullets", "rows"]);
+const ARRAYS = new Set(["items", "bullets", "rows", "extras"]);
 /** Fields that may be emptied (the element just disappears from the page). */
 const OPTIONAL_KEYS = new Set(["eyebrow", "kicker", "intro", "badge", "secondaryCtaLabel", "role", "when", "where", "price", "priceNote"]);
 /** Fields where a line break is part of the text. */
-const MULTILINE_KEYS = new Set(["body", "answer", "description", "intro", "subheading"]);
+const MULTILINE_KEYS = new Set(["body", "answer", "description", "intro", "subheading", "text"]);
 
 const MAX_LEN = 600;
 const MAX_SHORT = 200;

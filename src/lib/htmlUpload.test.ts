@@ -119,4 +119,19 @@ describe("Subir mi HTML", () => {
     expect(parts.classes).toEqual(expect.arrayContaining(["lk-bs", "lk-bf"]));
     expect(LookSchema.parse({ titleScale: "20", headingFont: "<script>" })).toEqual({ titleScale: null, headingFont: null });
   });
+
+  it("elements added inside a block (text, button, photo) go right under its title", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const page = { ...base, fullHtml: false, sections: [base.sections[0], { type: "gallery", kicker: null, heading: "Mira" }] } as unknown as typeof base;
+    const extras = [{ type: "text", text: "Una descripción" }, { type: "button", label: "Escríbenos", url: "https://example.com" }, { type: "image", url: "https://x.co/a.jpg" }];
+    const done = applyBlockOp(page, { kind: "extras", index: 1, extras });
+    expect(done.ok).toBe(true);
+    const html = done.ok ? renderWebsiteHtmlV2(done.content, { ...ctx, photos: ["https://x.co/a.jpg"] }) : "";
+    expect(html).toMatch(/<\/h2><div class="extras"><p class="extra-text">Una descripción<\/p><a class="btn extra-btn" href="https:\/\/example.com"[^>]*>Escríbenos<\/a><img class="extra-img" src="https:\/\/x.co\/a.jpg"/);
+    // A button link must be https://, tel:, mailto: or #; a script address is refused.
+    expect(applyBlockOp(page, { kind: "extras", index: 1, extras: [{ type: "button", label: "x", url: "javascript:alert(1)" }] }).ok).toBe(false);
+    expect(applyBlockOp(page, { kind: "extras", index: 1, extras: Array.from({ length: 7 }, () => ({ type: "text", text: "a" })) }).ok).toBe(false);
+    const cleared = done.ok ? applyBlockOp(done.content, { kind: "extras", index: 1, extras: [] }) : done;
+    expect(cleared.ok && "extras" in cleared.content.sections[1]).toBe(false);
+  });
 });

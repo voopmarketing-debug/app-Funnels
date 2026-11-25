@@ -1,4 +1,4 @@
-import { HTML_MAX_CHARS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { ExtraSchema, HTML_MAX_CHARS, MAX_EXTRAS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { mergeLook, type LookPatch } from "@/lib/websiteLook";
 
 // The builder's block operations: add a block from the library, duplicate,
@@ -129,6 +129,7 @@ export type BlockOp =
   | { kind: "look"; index: number; patch: LookPatch }
   | { kind: "html"; index: number; code: string; height: number }
   | { kind: "eventDate"; index: number; date: string }
+  | { kind: "extras"; index: number; extras: unknown[] }
   | { kind: "galleryLayout"; index: number; layout: "grid" | "mosaic" | "carousel" };
 
 export type BlockResult = { ok: true; content: WebsiteContentV2; focus: number } | { ok: false; error: string };
@@ -210,6 +211,17 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       if (cut) return bad(cut);
       section.code = op.code;
       section.height = Math.min(3000, Math.max(0, op.height));
+      focus = op.index;
+      break;
+    }
+    case "extras": {
+      const section = isInt(op.index) ? next.sections[op.index] : undefined;
+      if (!section || !Array.isArray(op.extras) || op.extras.length > MAX_EXTRAS) return bad("No se pudo cambiar los elementos de este bloque.");
+      const parsed = op.extras.map((x) => ExtraSchema.safeParse(x));
+      if (parsed.some((r) => !r.success)) return bad("Revisa el enlace del botón: debe empezar con https:// (también sirven tel:, mailto: o #).");
+      const list = parsed.flatMap((r) => (r.success ? [r.data] : []));
+      if (list.length) section.extras = list;
+      else delete section.extras;
       focus = op.index;
       break;
     }
