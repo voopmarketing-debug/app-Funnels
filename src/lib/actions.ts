@@ -3602,6 +3602,7 @@ export async function updateWebsiteDesignV2(
     thankYouUrl?: string | null;
     sticky?: boolean;
     fullHtml?: boolean;
+    plain?: boolean;
   },
 ): Promise<WebsiteContentV2> {
   const session = await auth();
@@ -3623,6 +3624,7 @@ export async function updateWebsiteDesignV2(
   if (patch.thankYouUrl !== undefined) next.thankYouUrl = patch.thankYouUrl && /^https?:\/\/\S+$/i.test(patch.thankYouUrl.trim()) ? patch.thankYouUrl.trim().slice(0, 500) : null;
   if (patch.sticky !== undefined) next.sticky = patch.sticky ? true : undefined;
   if (patch.fullHtml !== undefined) next.fullHtml = patch.fullHtml ? true : undefined;
+  if (patch.plain !== undefined) next.plain = patch.plain ? true : undefined;
   if (patch.move) {
     const { from, to } = patch.move;
     // The hero always stays first.

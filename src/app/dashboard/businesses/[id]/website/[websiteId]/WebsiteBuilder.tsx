@@ -654,6 +654,7 @@ export function WebsiteBuilder({
               content={content}
               selected={sel}
               busy={!!busy}
+              onTogglePlain={() => runDesign("Guardando…", { plain: !content.plain })}
               onSelect={selectBlock}
               onOp={(op) => runBlock(op, op.kind === "add" ? "Agregando el bloque…" : op.kind === "remove" ? "Eliminando…" : op.kind === "duplicate" ? "Duplicando…" : "Moviendo…")}
               onStyle={(i) => {
@@ -733,6 +734,13 @@ export function WebsiteBuilder({
                 help="Después de enviar el formulario, la persona va a este link (por ejemplo, tu página de gracias o el enlace de tu regalo). Vacío = ve un mensaje de gracias en esta misma página."
                 onSave={(url) => runDesign("Guardando…", { thankYouUrl: url })}
               />
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-1" checked={!!content.plain} disabled={!!busy} onChange={(e) => runDesign("Guardando…", { plain: e.target.checked })} />
+                <span>
+                  <span className="font-semibold text-ink">Quitar la barra de arriba y el pie</span>
+                  <span className="block text-[12px] text-ink-muted">La página se ve solo con tus bloques, sin el nombre ni el botón de arriba ni el pie «Escríbenos por WhatsApp».</span>
+                </span>
+              </label>
               {content.sections.some((s) => s.type === "html") && (
                 <label className="flex cursor-pointer items-start gap-2 text-sm">
                   <input type="checkbox" className="mt-1" checked={!!content.fullHtml} disabled={!!busy} onChange={(e) => runDesign("Guardando…", { fullHtml: e.target.checked })} />

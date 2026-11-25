@@ -1223,15 +1223,15 @@ ${LOOK_CSS}
 </head>
 <body class="st-${content.style} pt-${content.pageType}${content.sticky ? " has-sticky" : ""}">
 ${announcementHtml}
-<header class="top"><div class="wrap">
+${content.plain ? "" : `<header class="top"><div class="wrap">
   <a class="brand" href="#inicio">${esc(ctx.businessName)}</a>
   <nav class="nav" aria-label="Secciones">${navLinks.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("")}</nav>
   <a class="btn" href="${esc(href("header"))}">${isShop ? "Pedir por WhatsApp" : "Escríbenos"}</a>
-</div></header>
+</div></header>`}
 <main>
 ${body}
 </main>
-<footer class="foot"><div class="wrap"><span>© ${esc(ctx.businessName)}</span><a href="${esc(href("footer"))}">Escríbenos por WhatsApp</a></div></footer>
+${content.plain ? "" : `<footer class="foot"><div class="wrap"><span>© ${esc(ctx.businessName)}</span><a href="${esc(href("footer"))}">Escríbenos por WhatsApp</a></div></footer>`}
 ${content.sticky && firstHero && firstHero.type === "hero" ? `<div class="sticky-cta"><a class="btn" href="${esc(ctaHref("barra-fija"))}">${esc(firstHero.ctaLabel)}</a></div>` : ""}
 ${isShop ? `<div class="mbar"><a class="btn" href="${esc(href("barra-movil"))}">Pedir por WhatsApp</a></div>` : ""}
 <script>${SITE_SCRIPT}</script>

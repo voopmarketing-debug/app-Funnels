@@ -457,6 +457,8 @@ export const WebsiteContentV2Schema = AiWebsiteV2Schema.extend({
   /** Addresses of the pictures the platform created with AI on this page (so they can be counted, replaced or removed). */
   /** The public page shows only the owner's HTML block, with no header, footer or sections of ours ("Subir mi HTML"). */
   fullHtml: z.boolean().optional().catch(undefined),
+  /** Without our top bar (name + button) and our footer: the page is only its blocks. */
+  plain: z.boolean().optional().catch(undefined),
   /** A fixed button at the bottom of the screen on phones (landing and funnel pages). */
   sticky: z.boolean().optional().catch(undefined),
   /** Where the visitor goes after sending the form. Empty: the page itself, with a thank-you message. */

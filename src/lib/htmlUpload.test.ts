@@ -67,4 +67,12 @@ describe("Subir mi HTML", () => {
     expect(SITE_SCRIPT).toContain("/registro");
     expect(SITE_SCRIPT).toContain("flLeadResult");
   });
+
+  it("a plain page has no top bar and no footer of ours", () => {
+    const content = { ...buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" }), fullHtml: false };
+    expect(renderWebsiteHtmlV2(content, ctx)).toContain("<header");
+    const plain = renderWebsiteHtmlV2({ ...content, plain: true }, ctx);
+    expect(plain).not.toMatch(/<header|<footer/);
+    expect(plain).toContain("data-htmlframe");
+  });
 });

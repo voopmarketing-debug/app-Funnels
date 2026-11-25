@@ -42,6 +42,7 @@ export function BlocksPanel({
   selected,
   busy,
   onSelect,
+  onTogglePlain,
   onOp,
   onStyle,
   onToggleHidden,
@@ -54,6 +55,8 @@ export function BlocksPanel({
   selected: number | null;
   busy: boolean;
   onSelect: (index: number) => void;
+  /** Hides or shows our top bar and footer (the blank page's "Portada" row). */
+  onTogglePlain: () => void;
   onOp: (op: BlockOp) => void;
   onStyle: (index: number) => void;
   onToggleHidden: (index: number) => void;
@@ -196,7 +199,21 @@ export function BlocksPanel({
                   )}
                 </div>
                 {fixed ? (
-                  <span title="La portada va siempre primero y no se puede quitar" className="flex-none rounded bg-surface-2 px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink-muted">Fija</span>
+                  s.type === "hero" && s.variant === "blank" ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTogglePlain();
+                      }}
+                      className={`flex h-9 flex-none items-center gap-1 rounded-lg border px-2.5 text-xs font-bold transition disabled:opacity-40 ${content.plain ? "border-accent/60 bg-accent/10 text-accent hover:bg-accent/20" : "border-error/50 bg-error/10 text-error hover:bg-error/20"}`}
+                    >
+                      {content.plain ? "↺ Poner barra" : <><span aria-hidden="true">🗑</span> Quitar barra</>}
+                    </button>
+                  ) : (
+                    <span title="La portada va siempre primero y no se puede quitar" className="flex-none rounded bg-surface-2 px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink-muted">Fija</span>
+                  )
                 ) : (
                   <button
                     type="button"
