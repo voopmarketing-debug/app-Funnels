@@ -94,8 +94,8 @@ export function BlocksPanel({
   const accepts = (e: React.DragEvent) => e.dataTransfer.types.includes(NEW_BLOCK_MIME) || e.dataTransfer.types.includes(MOVE_MIME);
 
   return (
-    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-      <div className="space-y-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+      <div className="space-y-2 max-md:order-2">
         <button
           type="button"
           onClick={() => setLibraryOpen((v) => !v)}
@@ -141,9 +141,11 @@ export function BlocksPanel({
         </p>
       )}
 
-      <PhotosCard content={content} selected={selected} busy={busy} onPick={onPickPhoto} />
+      <div className="max-md:order-3"><PhotosCard content={content} selected={selected} busy={busy} onPick={onPickPhoto} /></div>
 
-      <p className="text-[12px] text-ink-faint">Capas de tu página: pasa el cursor por una para verla resaltada, tócala para ir a ella y arrastra ⠿ para reordenar.</p>
+      <div className="space-y-2 max-md:order-1">
+      <p className="text-sm font-bold text-ink">Bloques de tu página <span className="font-normal text-ink-muted">({count})</span></p>
+      <p className="text-[12px] text-ink-faint">Toca <strong>🗑 Quitar</strong> para borrar un bloque. Si te equivocas, usa ↶ Deshacer arriba. Toca un bloque para ver más opciones.</p>
 
       <ol
         className="space-y-1.5"
@@ -175,12 +177,12 @@ export function BlocksPanel({
                 }}
                 onDrop={(e) => drop(e, slotFor(e, i))}
                 onClick={() => onSelect(i)}
-                className={`group flex cursor-pointer items-center gap-2 rounded-lg border p-2 transition ${on ? "border-accent bg-accent/10" : "border-border bg-background hover:border-border-strong"} ${hidden.has(i) ? "opacity-55" : ""} ${dragging === i ? "opacity-30" : ""}`}
+                className={`group flex cursor-pointer flex-wrap items-center gap-2 rounded-lg border p-2 transition ${on ? "border-accent bg-accent/10" : "border-border bg-background hover:border-border-strong"} ${hidden.has(i) ? "opacity-55" : ""} ${dragging === i ? "opacity-30" : ""}`}
               >
                 <span aria-hidden="true" title={fixed ? "La portada va siempre primero" : "Arrastra para mover"} className={`flex-none select-none px-0.5 text-base leading-none ${fixed ? "text-ink-faint/40" : "cursor-grab text-ink-muted"}`}>
                   ⠿
                 </span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-24">
                   <p className="flex items-center gap-1.5 text-xs font-bold">
                     {SECTION_LABELS[s.type]}
                     {s.look && <span className="rounded bg-accent/15 px-1 text-[9px] font-bold uppercase tracking-wide text-accent">Estilo</span>}
@@ -193,7 +195,23 @@ export function BlocksPanel({
                     </button>
                   )}
                 </div>
-                <div className={`flex flex-none items-center gap-1 ${on ? "" : "sm:hidden sm:group-hover:flex sm:group-focus-within:flex"}`}>
+                {fixed ? (
+                  <span title="La portada va siempre primero y no se puede quitar" className="flex-none rounded bg-surface-2 px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink-muted">Fija</span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-label={`Quitar el bloque ${SECTION_LABELS[s.type]}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOp({ kind: "remove", index: i });
+                    }}
+                    className="flex h-9 flex-none items-center gap-1 rounded-lg border border-error/50 bg-error/10 px-2.5 text-xs font-bold text-error transition hover:bg-error/20 disabled:opacity-40"
+                  >
+                    <span aria-hidden="true">🗑</span> Quitar
+                  </button>
+                )}
+                <div className={on ? "flex w-full flex-wrap items-center justify-end gap-1.5 pt-1" : "hidden items-center gap-1 sm:group-hover:flex sm:group-focus-within:flex"}>
                   <IconButton label="Estilo del bloque" onClick={() => onStyle(i)}>
                     🎨
                   </IconButton>
@@ -210,9 +228,6 @@ export function BlocksPanel({
                       </IconButton>
                       <IconButton label={hidden.has(i) ? "Mostrar en la página" : "Ocultar de la página"} disabled={busy} onClick={() => onToggleHidden(i)}>
                         {hidden.has(i) ? "🚫" : "👁"}
-                      </IconButton>
-                      <IconButton label="Eliminar" danger disabled={busy} onClick={() => onOp({ kind: "remove", index: i })}>
-                        🗑
                       </IconButton>
                     </>
                   )}
@@ -234,6 +249,7 @@ export function BlocksPanel({
           onDrop={(e) => drop(e, count)}
         />
       </ol>
+      </div>
     </div>
   );
 }

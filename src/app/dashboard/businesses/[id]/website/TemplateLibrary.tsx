@@ -191,6 +191,18 @@ export function TemplateLibrary({
 
       {error && <p className="rounded-lg border border-error/40 bg-error/10 p-3 text-sm text-error">{error}</p>}
 
+      {/* Phones: the two ways to start from nothing, right at the top (no scrolling past the filters). */}
+      <div className="grid grid-cols-2 gap-2 sm:hidden">
+        <button type="button" onClick={createBlank} className="flex min-h-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-xl bg-accent px-3 py-3 text-sm font-bold text-accent-ink hover:bg-accent-hover">
+          <span aria-hidden="true" className="font-mono text-xl leading-none">{"</>"}</span>
+          Página en blanco
+        </button>
+        <button type="button" onClick={() => setHtmlOpen(true)} className="flex min-h-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-border-strong px-3 py-3 text-sm font-bold text-ink hover:border-accent">
+          <span aria-hidden="true" className="text-xl leading-none">⬆</span>
+          Subir mi HTML
+        </button>
+      </div>
+
       <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
         {/* Niches */}
         <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
@@ -317,7 +329,7 @@ export function TemplateLibrary({
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <article className="fl-card flex flex-col overflow-hidden border-dashed">
+              <article className="fl-card flex flex-col overflow-hidden border-dashed max-sm:hidden">
                 <button type="button" onClick={createBlank} className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-surface-2/50 text-ink-muted transition hover:text-ink max-sm:hidden" aria-label="Empezar con una página en blanco">
                   <span aria-hidden="true" className="font-mono text-4xl">{"</>"}</span>
                   <span className="text-xs">Sin nada: tú pones los bloques</span>
@@ -330,7 +342,7 @@ export function TemplateLibrary({
                   </button>
                 </div>
               </article>
-              <article className="fl-card flex flex-col overflow-hidden border-dashed">
+              <article className="fl-card flex flex-col overflow-hidden border-dashed max-sm:hidden">
                 <button type="button" onClick={() => setHtmlOpen(true)} className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-surface-2/50 text-ink-muted transition hover:text-ink max-sm:hidden" aria-label="Subir mi propio HTML">
                   <span aria-hidden="true" className="text-4xl">⬆</span>
                   <span className="text-xs">Tu archivo .html o tu código</span>

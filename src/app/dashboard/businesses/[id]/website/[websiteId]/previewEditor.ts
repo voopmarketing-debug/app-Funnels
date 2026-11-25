@@ -138,7 +138,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     add("add", "＋", "Agregar un bloque debajo de este", false, true);
     add("dup", "⧉", "Duplicar este bloque", !info.canRemove, true);
     add("hide", "👁", "Ocultar este bloque de la página", index === 0, true);
-    add("del", "🗑", "Eliminar este bloque", !info.canRemove, true, "fl-danger");
+    add("del", "🗑 Quitar", "Quitar este bloque de la página", !info.canRemove, false, "fl-danger");
     return true;
   }
 
