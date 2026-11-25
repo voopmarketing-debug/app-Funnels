@@ -29,7 +29,7 @@ export function PublishControl({ businessId, websiteId, published, variant = "ba
   }
 
   async function unpublish() {
-    if (!(await askConfirm({ title: "¿Pasar la página a borrador?", message: "Dejará de verse en su link: solo tú podrás verla. Puedes volver a publicarla cuando quieras.", confirmLabel: "Sí, pasar a borrador" }))) return;
+    if (!(await askConfirm({ title: "¿Volver al editor?", message: "La página deja de verse en su link y queda como borrador: solo tú podrás verla. Puedes volver a publicarla cuando quieras.", confirmLabel: "Sí, volver al editor" }))) return;
     change(false);
   }
 
@@ -59,7 +59,7 @@ export function PublishControl({ businessId, websiteId, published, variant = "ba
       </span>
       {live ? (
         <button type="button" onClick={unpublish} disabled={pending} className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-ink-muted hover:border-accent hover:text-ink disabled:opacity-60">
-          {pending ? "…" : "Despublicar"}
+          {pending ? "…" : "Volver al editor"}
         </button>
       ) : (
         <button type="button" onClick={() => change(true)} disabled={pending} className="rounded-md bg-accent px-3 py-1.5 text-xs font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-60">
