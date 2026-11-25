@@ -769,7 +769,8 @@ export function WebsiteBuilder({
 
         {/* Live preview */}
         <div className={`${mobilePanel === "preview" ? "flex" : "hidden"} min-w-0 flex-1 flex-col md:flex`}>
-        {!hintDismissed && (
+        {/* Not on a page that is only the owner's own code: it is edited from the code, not on the page. */}
+        {!hintDismissed && !content.fullHtml && (
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
             <p className="min-w-0 flex-1">
               <span className="md:hidden"><strong>✏️ Toca un texto</strong> para escribir sobre él, o una imagen para cambiarla. Los botones sobre cada bloque lo mueven, lo duplican o lo borran.</span>
