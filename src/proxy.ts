@@ -49,6 +49,20 @@ export async function proxy(request: NextRequest) {
     if (inStoreApp && STORE_APP_HIDDEN_PATHS.has(request.nextUrl.pathname)) {
       return remember(NextResponse.redirect(new URL("/login", request.url)));
     }
+    // Phones that installed the app before it opened on "Cargando tu sesión" still start it on /dashboard
+    // (iOS keeps the address it saw when the icon was added). A bare launch there (a page request with
+    // no referrer) gets the loading screen at once instead of a white wait; the screen then goes to
+    // /dashboard with a referrer, so it is never shown twice.
+    const bareLaunch =
+      !launching &&
+      request.method === "GET" &&
+      request.nextUrl.pathname === "/dashboard" &&
+      !request.nextUrl.search &&
+      !request.headers.get("referer") &&
+      !request.headers.has("rsc") &&
+      !request.headers.has("next-router-prefetch") &&
+      (request.headers.get("accept") ?? "").includes("text/html");
+    if (bareLaunch) return NextResponse.rewrite(new URL("/abrir", request.url));
     if (!launching) return NextResponse.next();
     const headers = new Headers(request.headers);
     headers.set("cookie", `${request.headers.get("cookie") ?? ""}; ${STORE_APP_COOKIE}=${appParam}`);
