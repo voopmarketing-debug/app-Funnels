@@ -829,7 +829,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       case "gallery":
         if (photos.length === 0) return "";
         return `<section class="sec"><div class="wrap">${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
-          <div class="gallery">${photos.slice(0, 8).map((u) => `<img src="${esc(u)}" alt="" loading="lazy"${note("La galería muestra tus fotos más recientes. Sube más desde “Imagen de fondo” de cualquier bloque.")}>`).join("")}</div></div></section>`;
+          <div class="gallery g${Math.min(photos.length, 8)}">${photos.slice(0, 8).map((u) => `<img src="${esc(u)}" alt="" loading="lazy"${note("La galería muestra tus fotos más recientes. Sube más desde “Imagen de fondo” de cualquier bloque.")}>`).join("")}</div></div></section>`;
 
       case "leadForm":
         return `<section class="sec alt" id="registro"><div class="wrap narrow">
@@ -1178,8 +1178,12 @@ section{position:relative}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:24px;text-align:center}
 .stat-v{font-family:var(--hf);font-size:clamp(36px,5vw,56px);font-weight:700;margin:0;color:var(--primary-ink)}
 .stat-l{margin:0;color:var(--muted)}
-.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:28px}
-.gallery img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--r)}
+.gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:28px}
+.gallery.g1{grid-template-columns:minmax(0,640px);justify-content:center}
+.gallery.g2,.gallery.g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+.gallery.g7,.gallery.g8{grid-template-columns:repeat(4,minmax(0,1fr))}
+.gallery img{width:100%;aspect-ratio:4/3;object-fit:contain;object-position:center;background:var(--surface);border-radius:var(--r);padding:6px;box-sizing:border-box}
+@media(max-width:640px){.gallery,.gallery.g3,.gallery.g5,.gallery.g6,.gallery.g7,.gallery.g8{grid-template-columns:repeat(2,minmax(0,1fr))}.gallery.g1{grid-template-columns:minmax(0,1fr)}.gallery:not(.g1) img:last-child:nth-child(odd){grid-column:1/-1}}
 .lead-form{display:grid;gap:12px;margin-top:24px}
 .lead-form input,.lead-form textarea{font:inherit;padding:15px 16px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
 .consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.4;color:var(--muted);cursor:pointer}
