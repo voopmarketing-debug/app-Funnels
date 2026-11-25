@@ -450,13 +450,15 @@ export function WebsiteBuilder({
 
   const sel = selected !== null && selected < content.sections.length ? selected : null;
   // Editing comes first (like a page builder); the AI chat is the second way to change the page.
+  // "Estilo" only exists while a block is chosen (it is that block's style): with nothing chosen it was an empty twin of Elementos.
   const TABS: { key: Tab; label: string }[] = [
     { key: "bloques", label: "Elementos" },
     { key: "chat", label: "✦ IA" },
-    { key: "estilo", label: "Estilo" },
+    ...(sel !== null ? [{ key: "estilo" as const, label: "Estilo del bloque" }] : []),
     { key: "diseno", label: "Diseño" },
     { key: "ajustes", label: "Ajustes" },
   ];
+  const activeTab: Tab = tab === "estilo" && sel === null ? "bloques" : tab;
 
   return (
     <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col md:-m-6">
@@ -556,14 +558,14 @@ export function WebsiteBuilder({
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
-                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${tab === t.key ? "bg-background text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${activeTab === t.key ? "bg-background text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
               >
                 {t.label}
               </button>
             ))}
           </nav>
 
-          {tab === "chat" && (
+          {activeTab === "chat" && (
             <div className="flex min-h-0 flex-1 flex-col">
               <div ref={chatRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
                 {chat.map((m, i) =>
@@ -618,7 +620,7 @@ export function WebsiteBuilder({
             </div>
           )}
 
-          {tab === "diseno" && (
+          {activeTab === "diseno" && (
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-3">
               <ThemeEditor
                 content={content}
@@ -650,7 +652,7 @@ export function WebsiteBuilder({
             </div>
           )}
 
-          {tab === "bloques" && (
+          {activeTab === "bloques" && (
             <BlocksPanel
               content={content}
               selected={sel}
@@ -686,7 +688,7 @@ export function WebsiteBuilder({
             />
           )}
 
-          {tab === "estilo" &&
+          {activeTab === "estilo" &&
             (sel === null ? (
               <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4 text-sm text-ink-muted">
                 <p className="font-semibold text-ink">Elige un bloque</p>
@@ -709,7 +711,7 @@ export function WebsiteBuilder({
               />
             ))}
 
-          {tab === "ajustes" && (
+          {activeTab === "ajustes" && (
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
               <div className="grid grid-cols-3 gap-2">
                 {[
