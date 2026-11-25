@@ -71,34 +71,63 @@ export function NotificationBell({ notifications, unreadCount }: { notifications
               </button>
             )}
           </div>
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-[70vh] space-y-2 overflow-y-auto p-2 md:max-h-96">
             {notifications.length === 0 && (
               <p className="p-4 text-center text-xs text-ink-faint">Sin notificaciones todavía.</p>
             )}
-            {notifications.map((n) => (
-              <Link
-                key={n.id}
-                href={n.href}
-                onClick={() => handleOpenNotification(n.id)}
-                className={`block border-b border-border px-3 py-2.5 text-sm transition hover:bg-background ${n.read ? "text-ink-muted" : "text-ink"}`}
-              >
-                <span className="flex items-start gap-2">
-                  {!n.read && <span className="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-accent" />}
-                  <span className="min-w-0 flex-1">
-                    <span className="block">{n.message}</span>
-                    <span className="fl-mono mt-0.5 block text-[12px] text-ink-faint">
-                      {n.businessName} · {n.createdAt}
+            {notifications.map((n) => {
+              const v = describe(n.message);
+              return (
+                <Link
+                  key={n.id}
+                  href={n.href}
+                  onClick={() => handleOpenNotification(n.id)}
+                  className={`block rounded-2xl border p-3 transition active:scale-[0.99] ${n.read ? "border-border bg-background/60 opacity-75" : v.card}`}
+                >
+                  <span className="flex items-start gap-3">
+                    <span aria-hidden="true" className={`flex h-10 w-10 flex-none items-center justify-center rounded-full text-xl ${v.badge}`}>
+                      {v.icon}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-sm font-bold text-ink">{v.title}</span>
+                        {!n.read && <span aria-label="Sin leer" className="h-2.5 w-2.5 flex-none rounded-full bg-accent" />}
+                      </span>
+                      {v.quote ? (
+                        <span className="mt-1.5 block rounded-2xl rounded-tl-sm border border-border bg-surface px-3 py-2 text-sm text-ink">{v.body}</span>
+                      ) : (
+                        <span className="mt-1 block text-sm text-ink-muted">{v.body}</span>
+                      )}
+                      <span className="fl-mono mt-1.5 block text-[12px] text-ink-faint">
+                        {n.businessName} · {n.createdAt}
+                      </span>
                     </span>
                   </span>
-                </span>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
           <PushToggleRow />
         </div>
       )}
     </div>
   );
+}
+
+const LEADING_EMOJI = /^(\p{Extended_Pictographic}\uFE0F?)\s*/u;
+
+/** Turns a stored notification text into a title, a body and a look, so each kind is easy to tell apart. */
+function describe(message: string): { icon: string; title: string; body: string; quote: boolean; card: string; badge: string } {
+  const lead = message.match(LEADING_EMOJI);
+  const text = lead ? message.slice(lead[0].length) : message;
+  const chat = text.match(/^(.*?)\s+te escribió:\s*"?([\s\S]*?)"?$/);
+  if (chat) {
+    return { icon: "💬", title: chat[1].trim() || "Cliente", body: chat[2].trim(), quote: true, card: "border-accent/50 bg-accent/10", badge: "bg-accent/25" };
+  }
+  const urgent = lead && ["⏰", "⚠", "❗", "🚨"].some((e) => lead[1].startsWith(e));
+  return urgent
+    ? { icon: lead![1], title: "Aviso importante", body: text, quote: false, card: "border-amber-400/50 bg-amber-400/10", badge: "bg-amber-400/25" }
+    : { icon: lead?.[1] ?? "🔔", title: "Aviso", body: text, quote: false, card: "border-border-strong bg-surface-2/60", badge: "bg-surface-2" };
 }
 
 function BellIcon() {
