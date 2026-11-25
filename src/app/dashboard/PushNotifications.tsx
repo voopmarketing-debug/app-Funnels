@@ -154,6 +154,7 @@ export function PushBanner() {
   const { state, busy, enable } = usePush();
   const pathname = usePathname();
   const [dismissed, setDismissed] = useState(true);
+  const [help, setHelp] = useState(false);
 
   useEffect(() => {
     try {
@@ -177,9 +178,10 @@ export function PushBanner() {
   if (/\/website\/[^/]+$/.test(pathname) && !pathname.endsWith("/website/muestra")) return null;
   if (dismissed || (state !== "off" && state !== "ios-install")) return null;
   return (
+    <>
     <div className="mb-3 flex items-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-sm sm:mb-4 sm:gap-3 sm:px-4 sm:py-3">
       <p className="min-w-0 flex-1 text-ink">
-        <strong className="sm:hidden">{state === "ios-install" ? "🔔 Activa los avisos: Compartir → Agregar a inicio" : "🔔 Avisos de chats nuevos"}</strong>
+        <strong className="sm:hidden">{state === "ios-install" ? "🔔 Activa los avisos en tu iPhone" : "🔔 Avisos de chats nuevos"}</strong>
         <strong className="hidden sm:inline">🔔 Entérate al instante cuando un cliente te escriba.</strong>{" "}
         <span className="hidden text-ink-muted sm:inline">
           {state === "ios-install"
@@ -188,6 +190,11 @@ export function PushBanner() {
         </span>
       </p>
       <div className="flex flex-none items-center gap-1 sm:gap-2">
+        {state === "ios-install" && (
+          <button type="button" onClick={() => setHelp(true)} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-accent-ink transition hover:bg-accent-hover sm:py-1.5 sm:text-sm">
+            Ver cómo
+          </button>
+        )}
         {state === "off" && (
           <button
             type="button"
@@ -204,6 +211,21 @@ export function PushBanner() {
         </button>
       </div>
     </div>
+    {help && (
+      <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 sm:items-center sm:p-4" onClick={() => setHelp(false)}>
+        <div role="dialog" aria-modal="true" aria-label="Cómo activar los avisos en iPhone" onClick={(e) => e.stopPropagation()} className="w-full max-w-md space-y-4 rounded-t-2xl border border-border bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] text-ink shadow-2xl sm:rounded-2xl">
+          <h2 className="text-base font-bold">🔔 Activa los avisos en tu iPhone</h2>
+          <p className="text-sm text-ink-muted">En iPhone los avisos solo funcionan con la app en tu pantalla de inicio. Son 3 pasos:</p>
+          <ol className="space-y-3 text-sm">
+            <li className="flex gap-3"><span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-accent font-bold text-accent-ink">1</span><span>En <strong>Safari</strong>, toca el botón <strong>Compartir</strong> <span aria-hidden="true">(el cuadrado con la flecha ⬆, abajo o arriba a la derecha)</span>.</span></li>
+            <li className="flex gap-3"><span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-accent font-bold text-accent-ink">2</span><span>Baja y toca <strong>«Agregar a pantalla de inicio»</strong> y luego <strong>«Agregar»</strong>.</span></li>
+            <li className="flex gap-3"><span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-accent font-bold text-accent-ink">3</span><span>Abre <strong>Funnels Labs desde el icono nuevo</strong> y toca <strong>«Activar»</strong> en este aviso.</span></li>
+          </ol>
+          <button type="button" onClick={() => setHelp(false)} className="h-11 w-full rounded-xl bg-accent text-sm font-bold text-accent-ink hover:bg-accent-hover">Entendido</button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
