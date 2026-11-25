@@ -207,6 +207,8 @@ export function CreationStudio({
   const [building, setBuilding] = useState(false);
   // Phones: the conversation fills the screen; the plan (preview + create button) is a second full screen.
   const [mobilePlan, setMobilePlan] = useState(false);
+  // Phones: the options of the chosen idea start folded, so the chat stays clean.
+  const [optionsOpen, setOptionsOpen] = useState(false);
   // Improvements ticked in the plan panel (ids from ENHANCERS).
   const [extras, setExtras] = useState<string[]>(serverDraft?.extras ?? []);
   const [step, setStep] = useState(0);
@@ -365,7 +367,6 @@ export function CreationStudio({
     // The business is already known, so choosing an idea goes straight to the plan: no extra
     // question. The improvements and the rest of the options are on the right.
     setPlan({ pageType: p.pageType, style: p.style, name: p.title, purpose: p.why, brief: p.brief });
-    setMobilePlan(true);
     setExtras([]);
     setQuickReplies([]);
     setMessages((m) => [
@@ -492,7 +493,26 @@ export function CreationStudio({
                     {m.proposals && m.proposals.length > 0 && (
                       <div className="grid gap-3 sm:grid-cols-2 lg:pl-11 xl:grid-cols-3">
                         {m.proposals.map((p, j) => (
-                          <div key={j} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-background text-left transition hover:border-accent">
+                          <div key={j} className="contents">
+                          {/* Phones: a small, easy row per idea: what it is, and two clear buttons. */}
+                          <div className="flex items-center gap-3 rounded-xl border border-border bg-background p-3 sm:hidden">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[15px] font-semibold leading-snug">{p.title}</p>
+                              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                                {PAGE_TYPE_LABELS[p.pageType]} · {STYLE_INFO[p.style].label}
+                              </p>
+                              <p className="mt-1 line-clamp-2 text-xs text-ink-muted">{p.why}</p>
+                            </div>
+                            <div className="flex w-24 flex-none flex-col gap-1.5">
+                              <button type="button" onClick={() => pickProposal(p)} disabled={thinking} className="h-10 rounded-lg bg-accent text-sm font-bold text-accent-ink disabled:opacity-60">
+                                Elegir
+                              </button>
+                              <button type="button" onClick={() => setFullPreview({ style: p.style, pageType: p.pageType, title: p.title, proposal: p })} className="h-9 rounded-lg border border-border text-xs font-semibold">
+                                Ver página
+                              </button>
+                            </div>
+                          </div>
+                          <div className="group hidden flex-col overflow-hidden rounded-xl border border-border bg-background text-left transition hover:border-accent sm:flex">
                             <button
                               type="button"
                               onClick={() => setFullPreview({ style: p.style, pageType: p.pageType, title: p.title, proposal: p })}
@@ -526,6 +546,7 @@ export function CreationStudio({
                               </div>
                             </div>
                           </div>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -540,13 +561,19 @@ export function CreationStudio({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-ink">Así queda tu página</p>
-                    <p className="text-xs text-ink-muted">Toca lo que quieras cambiar. Todo se guarda solo. <a href="#plan" onClick={() => setMobilePlan(true)} className="font-semibold text-accent hover:underline">Revisar el texto</a></p>
+                    <p className="text-xs text-ink-muted">Toca «Cambiar» para ajustarla. Todo se guarda solo. <a href="#plan" onClick={() => setMobilePlan(true)} className="font-semibold text-accent hover:underline">Revisar el texto</a></p>
                   </div>
-                  <button type="button" onClick={build} className="flex-none rounded-lg bg-accent px-3 py-2 text-xs font-bold text-accent-ink hover:bg-accent-hover">
-                    ✦ Crear
-                  </button>
+                  <div className="flex flex-none flex-col gap-1.5 sm:flex-row sm:items-center">
+                    <button type="button" onClick={() => setOptionsOpen((v) => !v)} aria-expanded={optionsOpen} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-ink hover:border-accent lg:hidden">
+                      {optionsOpen ? "Ocultar ▴" : "Cambiar ▾"}
+                    </button>
+                    <button type="button" onClick={build} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-accent-ink hover:bg-accent-hover">
+                      ✦ Crear
+                    </button>
+                  </div>
                 </div>
 
+                <div className={`space-y-3.5 ${optionsOpen ? "" : "max-lg:hidden"}`}>
                 <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm lg:hidden">
                   <ScaledPagePreview key={`chat-${plan.style}-${plan.pageType}`} src={previewSrc(plan.style, plan.pageType)} aspect={0.42} title={`Vista previa en estilo ${STYLE_INFO[plan.style].label}`} />
                   <div className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-1.5">
@@ -706,7 +733,7 @@ export function CreationStudio({
                     )}
                   </div>
                 </fieldset>
-
+                </div>
               </div>
             )}
             {thinking && (
@@ -723,7 +750,7 @@ export function CreationStudio({
             {error && <p className="rounded-lg border border-error/40 bg-error/10 p-3 text-sm text-error">{error}</p>}
           </div>
 
-          <div className="flex-none space-y-2 border-t border-border bg-surface p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] lg:bg-transparent">
+          <div className="flex-none space-y-2 border-t border-border bg-surface p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] max-lg:[@media(display-mode:browser)]:pb-20 lg:bg-transparent">
             {quickReplies.length > 0 && !thinking && (
               <div className="flex flex-wrap gap-1.5">
                 {quickReplies.map((q) => (
@@ -733,27 +760,34 @@ export function CreationStudio({
                 ))}
               </div>
             )}
+            <p className="px-1 text-[12px] font-semibold text-ink-muted lg:hidden">✍️ Escribe aquí tu respuesta</p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 send(input);
               }}
-              className="flex items-end gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-accent/60"
+              className="flex items-end gap-2 rounded-2xl border-2 border-accent/60 bg-background p-2 shadow-sm focus-within:border-accent"
             >
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onInput={(e) => {
+                  const t = e.currentTarget;
+                  t.style.height = "auto";
+                  t.style.height = `${Math.min(t.scrollHeight, 160)}px`;
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(min-width: 1024px)").matches) {
                     e.preventDefault();
                     send(input);
                   }
                 }}
-                rows={2}
-                placeholder="Cuéntale a la IA qué página quieres: para qué es, a quién le hablas, qué te gusta…"
-                className="max-h-64 min-h-[2.75rem] flex-1 resize-none bg-transparent px-2 py-1.5 text-base text-ink outline-none placeholder:text-ink-faint md:text-sm"
+                rows={1}
+                aria-label="Escribe tu mensaje a la IA"
+                placeholder="Escribe aquí tu idea…"
+                className="max-h-40 min-h-[2.75rem] flex-1 resize-none bg-transparent px-2 py-2.5 text-base text-ink outline-none placeholder:text-ink-faint lg:max-h-64 lg:py-1.5 lg:text-sm"
               />
-              <button type="submit" disabled={thinking || !input.trim()} className="h-10 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50">
+              <button type="submit" disabled={thinking || !input.trim()} className="h-11 flex-none rounded-xl bg-accent px-4 text-sm font-bold text-accent-ink disabled:opacity-50">
                 Enviar
               </button>
             </form>
