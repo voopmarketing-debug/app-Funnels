@@ -38,26 +38,6 @@ function subscribeClock(onChange: () => void) {
 }
 const getMinuteNow = () => Math.floor(Date.now() / 60_000) * 60_000;
 
-function WindowCountdown({ expiresAt }: { expiresAt: string }) {
-  const now = useSyncExternalStore(subscribeClock, getMinuteNow, () => null);
-  if (now === null) return null;
-  const msLeft = new Date(expiresAt).getTime() - now;
-  if (msLeft <= 0) return null;
-  const hours = Math.floor(msLeft / 3_600_000);
-  const minutes = Math.floor((msLeft % 3_600_000) / 60_000);
-  const urgent = msLeft < 2 * 3_600_000;
-  return (
-    <span
-      title="Tiempo que queda para responder con mensajes libres. Después, WhatsApp solo permite plantillas aprobadas."
-      className={`whitespace-nowrap text-[13px] ${urgent ? "font-semibold text-error" : "text-ink-faint"}`}
-    >
-      <span className="hidden 2xl:inline">La ventana de respuesta cierra en </span>
-      <span className="2xl:hidden">⏱ </span>
-      {hours}h {String(minutes).padStart(2, "0")}m
-    </span>
-  );
-}
-
 const ICON_BUTTON =
   "flex h-9 w-9 flex-none items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-50";
 
@@ -77,6 +57,9 @@ export function ManualMessageForm({
   reopenSlot?: React.ReactNode;
   recipientLabel?: string;
 }) {
+  // The 24h window can run out while the chat is open: the template notice then appears by itself.
+  const clock = useSyncExternalStore(subscribeClock, getMinuteNow, () => null);
+  const windowClosed = !windowOpen || (windowExpiresAt !== null && clock !== null && new Date(windowExpiresAt).getTime() <= clock);
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Where the caret was last — mobile browsers drop a textarea's selection
@@ -312,7 +295,7 @@ export function ManualMessageForm({
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="border-t border-border bg-surface p-2 md:p-3">
-      {!windowOpen && (
+      {windowClosed && (
         <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[13px] text-accent">
           <p className="min-w-0 flex-1">
             <span className="md:hidden">Pasaron más de 24 h: para escribirle, reabre el chat con una plantilla.</span>
@@ -420,7 +403,6 @@ export function ManualMessageForm({
             </select>
           )}
           <div className="ml-auto flex min-w-0 items-center gap-2 pl-2">
-            {windowOpen && windowExpiresAt && !isRecording && <WindowCountdown expiresAt={windowExpiresAt} />}
             {!isRecording && (
               <button
                 type="submit"
