@@ -64,7 +64,7 @@ export function WebsiteHome({
 
       {tab === "plantillas" && <TemplateLibrary businessId={businessId} cards={cards} needsWhatsapp={!!studio.needsWhatsapp} hasDraft={hasDraft} onChooseAI={() => setTab("ia")} />}
       {tab === "sitios" && <WebsitePagesList {...pagesList} onNewPage={() => setTab("plantillas")} />}
-      {tab === "ia" && <CreationStudio {...studio} />}
+      {tab === "ia" && <CreationStudio {...studio} onBack={() => setTab("plantillas")} />}
     </div>
   );
 }

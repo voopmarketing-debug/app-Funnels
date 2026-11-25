@@ -179,6 +179,7 @@ const BUILD_STEPS = [
  */
 export function CreationStudio({
   businessId,
+  onBack,
   businessName,
   productCount,
   showcaseCount,
@@ -187,6 +188,8 @@ export function CreationStudio({
   savedDraft = null,
 }: {
   businessId: string;
+  /** Goes back to the main Sitio web screen (the tabs live in the parent, so a link to the same address does nothing). */
+  onBack?: () => void;
   businessName: string;
   productCount: number;
   // Products with a photo plus photos in the library: what Showroom and Scroll Story pages show.
@@ -441,9 +444,9 @@ export function CreationStudio({
     <div className="flex flex-col gap-4 lg:h-[calc(100dvh-7rem)] lg:min-h-[34rem]">
       <div className="hidden flex-wrap items-center justify-between gap-2 lg:flex">
         <div>
-          <Link href={`/dashboard/businesses/${businessId}/website`} className="text-sm text-ink-muted underline hover:text-ink">
+          <button type="button" onClick={() => (onBack ? onBack() : router.push(`/dashboard/businesses/${businessId}/website`))} className="text-sm text-ink-muted underline hover:text-ink">
             ← Sitios web
-          </Link>
+          </button>
           <h1 className="mt-1 text-xl font-bold">Crear página con IA</h1>
         </div>
         {messages.length > 0 && !thinking && (
@@ -463,9 +466,9 @@ export function CreationStudio({
         <section className="fl-card fixed inset-0 z-[60] flex min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top,0px)] max-lg:rounded-none max-lg:border-0 max-lg:shadow-none lg:static lg:z-auto lg:h-auto lg:bg-transparent lg:pt-0">
           {/* Phones: a slim bar, like a chat app: back, title, and the way to the page being built. */}
           <div className="flex flex-none items-center gap-2 border-b border-border bg-surface px-2 py-2 lg:hidden">
-            <Link href={`/dashboard/businesses/${businessId}/website`} aria-label="Volver a Sitios web" className="flex h-10 w-9 flex-none items-center justify-center text-3xl leading-none text-ink-muted">
+            <button type="button" onClick={() => (onBack ? onBack() : router.push(`/dashboard/businesses/${businessId}/website`))} aria-label="Volver a Sitios web" className="flex h-10 w-10 flex-none items-center justify-center text-3xl leading-none text-ink-muted active:text-accent">
               ‹
-            </Link>
+            </button>
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-bold">Crear con IA</p>
               <p className="truncate text-[12px] text-ink-muted">{plan ? "Ya elegiste una idea" : "Cuéntale qué página quieres"}</p>
