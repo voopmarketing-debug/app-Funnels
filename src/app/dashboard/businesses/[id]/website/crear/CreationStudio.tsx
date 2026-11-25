@@ -557,7 +557,7 @@ export function CreationStudio({
               </div>
             ))}
             {plan && !thinking && messages[messages.length - 1]?.role === "assistant" && (
-              <div ref={optionsRef} className="ml-0 scroll-mt-20 space-y-3.5 rounded-xl border border-accent/40 bg-accent/5 p-3 sm:ml-11">
+              <div ref={optionsRef} className="ml-0 scroll-mt-20 space-y-3.5 rounded-xl border border-accent/40 bg-accent/5 p-3 max-lg:hidden sm:ml-11">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-ink">Así queda tu página</p>
@@ -751,13 +751,21 @@ export function CreationStudio({
           </div>
 
           <div className="flex-none space-y-2 border-t border-border bg-surface p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] max-lg:[@media(display-mode:browser)]:pb-20 lg:bg-transparent">
+            {plan && !thinking && (
+              <button type="button" onClick={() => setMobilePlan(true)} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold text-accent-ink shadow-sm lg:hidden">
+                ✦ Ver cómo queda tu página ›
+              </button>
+            )}
             {quickReplies.length > 0 && !thinking && (
-              <div className="flex flex-wrap gap-1.5">
-                {quickReplies.map((q) => (
-                  <button key={q} type="button" onClick={() => send(q)} className="rounded-full border border-border px-3 py-1 text-xs text-ink-muted hover:border-accent hover:text-ink">
-                    {q}
-                  </button>
-                ))}
+              <div className="space-y-1.5">
+                <p className="px-1 text-[12px] font-semibold text-ink-muted">👇 Toca una opción o escribe lo tuyo</p>
+                <div className="flex flex-wrap gap-2">
+                  {quickReplies.map((q) => (
+                    <button key={q} type="button" onClick={() => send(q)} className="rounded-xl border-2 border-accent/50 bg-accent/10 px-3.5 py-2 text-left text-sm font-semibold text-ink transition hover:border-accent hover:bg-accent/20 active:scale-[0.98]">
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             <p className="px-1 text-[12px] font-semibold text-ink-muted lg:hidden">✍️ Escribe aquí tu respuesta</p>
@@ -810,7 +818,7 @@ export function CreationStudio({
                   </p>
                 </div>
 
-                <div className="hidden overflow-hidden rounded-xl border border-border shadow-sm lg:block">
+                <div className="overflow-hidden rounded-xl border border-border shadow-sm">
                   <ScaledPagePreview
                     key={`${plan.style}-${plan.pageType}`}
                     src={previewSrc(plan.style, plan.pageType)}
