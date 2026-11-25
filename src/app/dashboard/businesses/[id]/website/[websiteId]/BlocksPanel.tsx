@@ -146,7 +146,7 @@ export function BlocksPanel({
 
       {hidden.size > 0 && (
         <p className="rounded-lg border border-border bg-background p-2.5 text-[12px] text-ink-muted">
-          Hay {hidden.size} {hidden.size === 1 ? "bloque oculto" : "bloques ocultos"} (marcados «Oculto»): no se ven en tu página. Tócalo con 🚫 cuando tengas tus datos reales (testimonios, precio, garantía) y cambia el texto por el tuyo.
+          Hay {hidden.size} {hidden.size === 1 ? "bloque oculto" : "bloques ocultos"} (marcados «Oculto»): no se ven en tu página. Toca «Mostrar» en ese bloque cuando quieras que se vea (por ejemplo, cuando tengas tus testimonios, precio o garantía reales).
         </p>
       )}
 
@@ -221,18 +221,32 @@ export function BlocksPanel({
                     <span title="La portada va siempre primero y no se puede quitar" className="flex-none rounded bg-surface-2 px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink-muted">Fija</span>
                   )
                 ) : (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    aria-label={`Quitar el bloque ${SECTION_LABELS[s.type]}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOp({ kind: "remove", index: i });
-                    }}
-                    className="flex h-9 flex-none items-center gap-1 rounded-lg border border-error/50 bg-error/10 px-2.5 text-xs font-bold text-error transition hover:bg-error/20 disabled:opacity-40"
-                  >
-                    <span aria-hidden="true">🗑</span> Quitar
-                  </button>
+                  <div className="flex flex-none gap-1.5">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-label={hidden.has(i) ? `Mostrar el bloque ${SECTION_LABELS[s.type]} en la página` : `Ocultar el bloque ${SECTION_LABELS[s.type]} de la página`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleHidden(i);
+                      }}
+                      className={`flex h-9 flex-none items-center gap-1 rounded-lg border px-2.5 text-xs font-bold transition disabled:opacity-40 ${hidden.has(i) ? "border-accent/60 bg-accent/15 text-accent hover:bg-accent/25" : "border-border-strong bg-surface text-ink hover:border-accent"}`}
+                    >
+                      <span aria-hidden="true">{hidden.has(i) ? "👁" : "🚫"}</span> {hidden.has(i) ? "Mostrar" : "Ocultar"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-label={`Quitar el bloque ${SECTION_LABELS[s.type]}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOp({ kind: "remove", index: i });
+                      }}
+                      className="flex h-9 flex-none items-center gap-1 rounded-lg border border-error/50 bg-error/10 px-2.5 text-xs font-bold text-error transition hover:bg-error/20 disabled:opacity-40"
+                    >
+                      <span aria-hidden="true">🗑</span> Quitar
+                    </button>
+                  </div>
                 )}
                 <div className={on ? "flex w-full flex-wrap items-center justify-end gap-1.5 pt-1" : "hidden items-center gap-1 sm:group-hover:flex sm:group-focus-within:flex"}>
                   <IconButton label="Estilo del bloque" onClick={() => onStyle(i)}>
@@ -248,9 +262,6 @@ export function BlocksPanel({
                       </IconButton>
                       <IconButton label="Duplicar" disabled={busy} onClick={() => onOp({ kind: "duplicate", index: i })}>
                         ⧉
-                      </IconButton>
-                      <IconButton label={hidden.has(i) ? "Mostrar en la página" : "Ocultar de la página"} disabled={busy} onClick={() => onToggleHidden(i)}>
-                        {hidden.has(i) ? "🚫" : "👁"}
                       </IconButton>
                     </>
                   )}
