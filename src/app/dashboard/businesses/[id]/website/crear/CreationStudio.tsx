@@ -205,6 +205,8 @@ export function CreationStudio({
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<Ready | null>(serverDraft?.plan ?? null);
   const [building, setBuilding] = useState(false);
+  // Phones: the conversation fills the screen; the plan (preview + create button) is a second full screen.
+  const [mobilePlan, setMobilePlan] = useState(false);
   // Improvements ticked in the plan panel (ids from ENHANCERS).
   const [extras, setExtras] = useState<string[]>(serverDraft?.extras ?? []);
   const [step, setStep] = useState(0);
@@ -363,12 +365,13 @@ export function CreationStudio({
     // The business is already known, so choosing an idea goes straight to the plan: no extra
     // question. The improvements and the rest of the options are on the right.
     setPlan({ pageType: p.pageType, style: p.style, name: p.title, purpose: p.why, brief: p.brief });
+    setMobilePlan(true);
     setExtras([]);
     setQuickReplies([]);
     setMessages((m) => [
       ...m,
       { role: "user", text: `Me gusta la idea "${p.title}".` },
-      { role: "assistant", text: "Perfecto. Mírala a la derecha: puedes mejorarla con un toque o crearla ya mismo." },
+      { role: "assistant", text: "Perfecto. Puedes mejorarla con un toque o crearla ya mismo." },
     ]);
     window.setTimeout(() => optionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   }
@@ -435,7 +438,7 @@ export function CreationStudio({
 
   return (
     <div className="flex flex-col gap-4 lg:h-[calc(100dvh-7rem)] lg:min-h-[34rem]">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="hidden flex-wrap items-center justify-between gap-2 lg:flex">
         <div>
           <Link href={`/dashboard/businesses/${businessId}/website`} className="text-sm text-ink-muted underline hover:text-ink">
             ← Sitios web
@@ -456,7 +459,27 @@ export function CreationStudio({
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_27rem]">
         {/* Chat */}
-        <section className={`fl-card flex min-h-0 flex-col overflow-hidden lg:h-auto ${plan ? "h-[90dvh]" : "h-[70dvh]"}`}>
+        <section className="fl-card fixed inset-0 z-[60] flex min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top,0px)] max-lg:rounded-none max-lg:border-0 max-lg:shadow-none lg:static lg:z-auto lg:h-auto lg:bg-transparent lg:pt-0">
+          {/* Phones: a slim bar, like a chat app: back, title, and the way to the page being built. */}
+          <div className="flex flex-none items-center gap-2 border-b border-border bg-surface px-2 py-2 lg:hidden">
+            <Link href={`/dashboard/businesses/${businessId}/website`} aria-label="Volver a Sitios web" className="flex h-10 w-9 flex-none items-center justify-center text-3xl leading-none text-ink-muted">
+              ‹
+            </Link>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-base font-bold">Crear con IA</p>
+              <p className="truncate text-[12px] text-ink-muted">{plan ? "Ya elegiste una idea" : "Cuéntale qué página quieres"}</p>
+            </div>
+            {plan && (
+              <button type="button" onClick={() => setMobilePlan(true)} className="h-10 flex-none rounded-full bg-accent px-3 text-xs font-bold text-accent-ink">
+                Ver mi página ›
+              </button>
+            )}
+            {messages.length > 0 && !thinking && (
+              <button type="button" onClick={() => void startOver()} aria-label="Empezar de nuevo" title="Empezar de nuevo" className="flex h-10 w-10 flex-none items-center justify-center rounded-full border border-border text-lg text-ink-muted">
+                ↺
+              </button>
+            )}
+          </div>
           <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 md:p-6">
             {messages.map((m, i) => (
               <div key={i} className={m.role === "user" ? "flex justify-end" : "space-y-3"}>
@@ -467,7 +490,7 @@ export function CreationStudio({
                       <p className="max-w-[46rem] whitespace-pre-line pt-1 text-[15px] leading-relaxed text-ink">{m.text}</p>
                     </div>
                     {m.proposals && m.proposals.length > 0 && (
-                      <div className="grid gap-3 pl-11 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:pl-11 xl:grid-cols-3">
                         {m.proposals.map((p, j) => (
                           <div key={j} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-background text-left transition hover:border-accent">
                             <button
@@ -517,7 +540,7 @@ export function CreationStudio({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-ink">Así queda tu página</p>
-                    <p className="text-xs text-ink-muted">Toca lo que quieras cambiar. Todo se guarda solo. <a href="#plan" className="font-semibold text-accent hover:underline">Revisar el texto</a></p>
+                    <p className="text-xs text-ink-muted">Toca lo que quieras cambiar. Todo se guarda solo. <a href="#plan" onClick={() => setMobilePlan(true)} className="font-semibold text-accent hover:underline">Revisar el texto</a></p>
                   </div>
                   <button type="button" onClick={build} className="flex-none rounded-lg bg-accent px-3 py-2 text-xs font-bold text-accent-ink hover:bg-accent-hover">
                     ✦ Crear
@@ -700,7 +723,7 @@ export function CreationStudio({
             {error && <p className="rounded-lg border border-error/40 bg-error/10 p-3 text-sm text-error">{error}</p>}
           </div>
 
-          <div className="space-y-2 border-t border-border p-3">
+          <div className="flex-none space-y-2 border-t border-border bg-surface p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] lg:bg-transparent">
             {quickReplies.length > 0 && !thinking && (
               <div className="flex flex-wrap gap-1.5">
                 {quickReplies.map((q) => (
@@ -738,7 +761,10 @@ export function CreationStudio({
         </section>
 
         {/* Plan */}
-        <aside id="plan" className="fl-card flex min-h-0 flex-col overflow-hidden">
+        <aside id="plan" className={`fl-card min-h-0 flex-col overflow-hidden ${mobilePlan ? "fixed inset-0 z-[61] flex bg-background pt-[env(safe-area-inset-top,0px)] max-lg:rounded-none max-lg:border-0 lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:pt-0" : "hidden lg:flex"}`}>
+          <div className="flex flex-none items-center gap-2 border-b border-border bg-surface px-2 py-2 lg:hidden">
+            <button type="button" onClick={() => setMobilePlan(false)} className="flex h-10 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-ink-muted">‹ Volver al chat</button>
+          </div>
           {plan ? (
             <>
               <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
