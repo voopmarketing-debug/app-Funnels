@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ColorCodeInput } from "@/components/ColorCodeInput";
 import { ColorSwatchButton } from "@/components/ColorSwatchButton";
+import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { SECTION_LABELS, type Section, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { tidyLook, type Look } from "@/lib/websiteLook";
 
@@ -39,6 +40,49 @@ function Segmented<T extends string | null>({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** A size as a percent: − and + buttons (easy on a phone), a slider, and "Normal" to go back. */
+function SizeControl({ label, value, onChange }: { label: string; value: string | null | undefined; onChange: (v: string | null) => void }) {
+  const n = value ? Number(value) : 100;
+  const set = (x: number) => {
+    const c = Math.min(200, Math.max(50, Math.round(x / 5) * 5));
+    onChange(c === 100 ? null : String(c));
+  };
+  const btn = "flex h-10 w-10 flex-none items-center justify-center rounded-lg border border-border text-lg font-bold text-ink transition hover:border-accent disabled:opacity-40";
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[13px] font-semibold text-ink">{label}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" aria-label={`Bajar ${label.toLowerCase()}`} onClick={() => set(n - 5)} disabled={n <= 50} className={btn}>−</button>
+        <input type="range" min={50} max={200} step={5} value={n} aria-label={label} onChange={(e) => set(Number(e.target.value))} className="min-w-0 flex-1 basis-24 accent-[var(--accent,#7ac70c)]" />
+        <button type="button" aria-label={`Subir ${label.toLowerCase()}`} onClick={() => set(n + 5)} disabled={n >= 200} className={btn}>+</button>
+        <button type="button" onClick={() => onChange(null)} disabled={!value} className="h-10 flex-none rounded-lg border border-border px-2.5 text-xs font-semibold text-ink-muted transition hover:text-ink disabled:opacity-40">
+          {value ? `${n}% · Normal` : "Normal"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FontPicker({ label, value, onChange }: { label: string; value: string | null | undefined; onChange: (v: string | null) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-[13px] font-semibold text-ink" htmlFor={`font-${label}`}>{label}</label>
+      <select
+        id={`font-${label}`}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        style={value ? { fontFamily: `"${value}"` } : undefined}
+        className="h-11 w-full rounded-lg border border-border bg-background px-3 text-base text-ink outline-none focus:border-accent md:text-sm"
+      >
+        <option value="">Automática (la de la página)</option>
+        {FONT_OPTIONS.map((f) => (
+          <option key={f} value={f}>{f}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -244,17 +288,10 @@ export function StylePanel({
           { value: "right", label: "Derecha" },
         ]}
       />
-      <Segmented
-        label="Tamaño de los títulos"
-        value={look.size ?? null}
-        onChange={(v) => change({ size: v })}
-        options={[
-          { value: null, label: "Normal" },
-          { value: "sm", label: "Pequeño" },
-          { value: "lg", label: "Grande" },
-          { value: "xl", label: "Enorme" },
-        ]}
-      />
+      <SizeControl label="Tamaño de los títulos" value={look.titleScale} onChange={(v) => change({ titleScale: v, size: null })} />
+      <SizeControl label="Tamaño del texto" value={look.textScale} onChange={(v) => change({ textScale: v })} />
+      <FontPicker label="Tipografía de los títulos" value={look.headingFont} onChange={(v) => change({ headingFont: v })} />
+      <FontPicker label="Tipografía del texto" value={look.bodyFont} onChange={(v) => change({ bodyFont: v })} />
       <Segmented
         label="Mostrar este bloque en"
         hint="Útil para un bloque que solo tiene sentido en el celular o en el computador. Aquí lo ves siempre para poder editarlo."

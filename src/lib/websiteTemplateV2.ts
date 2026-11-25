@@ -47,7 +47,7 @@ const FX_CSS = `
 .promo-rich .promo-copy>p{margin:0 0 6px;opacity:.82;max-width:52ch}
 .cd{display:flex;gap:10px;margin:22px 0 26px}
 .cd div{min-width:64px;text-align:center;padding:10px 8px;border-radius:14px;background:color-mix(in srgb,currentColor 11%,transparent);border:1px solid color-mix(in srgb,currentColor 14%,transparent)}
-.cd b{display:block;font-family:var(--hf);font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.cd b{display:block;font-family:var(--hf);font-size:calc(30px * var(--ts,1));line-height:1.1;font-variant-numeric:tabular-nums}
 .cd span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.7}
 .promo-media{position:relative;transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .25s ease;border-radius:var(--r);overflow:visible}
 .promo-media img{width:100%;height:auto;border-radius:var(--r);box-shadow:0 36px 70px -34px rgba(0,0,0,.55);animation:popIn .9s cubic-bezier(.2,.8,.2,1) both}
@@ -128,7 +128,7 @@ const FX_CSS = `
 .mq-row{overflow:hidden;white-space:nowrap}
 .mq-track{display:inline-flex;animation:mq 46s linear infinite}
 .mq-row.rev .mq-track{animation-direction:reverse}
-.mq-track span{font-family:var(--hf);font-weight:700;font-size:clamp(22px,3vw,40px);line-height:1.2;letter-spacing:-.01em;padding-right:1.2em;color:color-mix(in srgb,var(--text) 38%,transparent)}
+.mq-track span{font-family:var(--hf);font-weight:700;font-size:calc(clamp(22px,3vw,40px) * var(--ts,1));line-height:1.2;letter-spacing:-.01em;padding-right:1.2em;color:color-mix(in srgb,var(--text) 38%,transparent)}
 .mq-row.rev .mq-track span{color:color-mix(in srgb,var(--text) 22%,transparent)}
 @keyframes mq{to{transform:translateX(-50%)}}
 .tv{padding:var(--pad) 0 0}
@@ -324,7 +324,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   // accent used AS TEXT (kickers, highlights, prices) at 4.5:1. Buttons keep the exact brand color.
   const textColor = ensureContrast(sanitizeHexColor(theme.textColor, "#141414"), bg, 7);
   const primaryInk = ensureContrast(primary, bg, 4.5);
-  const fonts = Array.from(new Set([theme.headingFont, theme.bodyFont]));
+  const fonts = Array.from(new Set<string>([theme.headingFont, theme.bodyFont, ...content.sections.flatMap((x) => [x.look?.headingFont, x.look?.bodyFont]).filter((f): f is string => !!f)]));
   const fontStack = (f: string) => `"${f}", ${SERIF_FONTS.has(f) ? "Georgia, serif" : "system-ui, sans-serif"}`;
 
   const hidden = new Set(content.hidden ?? []);

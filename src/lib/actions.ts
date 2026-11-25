@@ -3746,7 +3746,7 @@ const BlockOpSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("eventDate"), index: z.number().int(), date: z.string().max(40) }),
   z.object({ kind: z.literal("galleryLayout"), index: z.number().int(), layout: z.enum(["grid", "mosaic", "carousel"]) }),
   z.object({ kind: z.literal("html"), index: z.number().int(), code: z.string().max(100_000), height: z.number().int().min(0).max(3000) }),
-  z.object({ kind: z.literal("look"), index: z.number().int(), patch: z.record(z.string(), z.union([z.string().max(12), z.null()])) }),
+  z.object({ kind: z.literal("look"), index: z.number().int(), patch: z.record(z.string(), z.union([z.string().max(40), z.null()])) }),
 ]);
 
 /**

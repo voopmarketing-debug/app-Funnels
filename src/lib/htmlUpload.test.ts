@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkUploadedHtml, htmlBlockFromContent } from "./htmlBlock";
 import { SITE_SCRIPT } from "./siteScript";
 import { applyBlockOp } from "./websiteBlocks";
-import { LOOK_CSS, lookParts, mergeLook } from "./websiteLook";
+import { LOOK_CSS, LookSchema, lookParts, mergeLook } from "./websiteLook";
 import { SAMPLE_HTML } from "./htmlSample";
 import { buildHtmlPageContent } from "./nicheTemplates";
 import { incompleteHtmlReason, WebsiteContentV2Schema } from "./websiteContentV2";
@@ -108,5 +108,15 @@ describe("Subir mi HTML", () => {
     expect(lookParts({ surface: "#333333" }).classes).toEqual(["lk-s"]);
     expect(LOOK_CSS.indexOf(".lk-s{")).toBeGreaterThan(LOOK_CSS.indexOf(".lk-bg{"));
     expect(mergeLook({ bg: "#111111" }, { surface: "#333333" })).toEqual({ bg: "#111111", surface: "#333333" });
+  });
+
+  it("a block can have its own title size, text size and fonts", () => {
+    const parts = lookParts({ titleScale: "130", textScale: "110", headingFont: "Playfair Display", bodyFont: "Inter" });
+    expect(parts.vars["--ts"]).toBe("1.3");
+    expect(parts.vars["--lkbs"]).toBe("1.1");
+    expect(parts.vars["--hf"]).toContain("Playfair Display");
+    expect(parts.vars["--hf"]).toContain("serif");
+    expect(parts.classes).toEqual(expect.arrayContaining(["lk-bs", "lk-bf"]));
+    expect(LookSchema.parse({ titleScale: "20", headingFont: "<script>" })).toEqual({ titleScale: null, headingFont: null });
   });
 });

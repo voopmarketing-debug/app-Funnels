@@ -11,6 +11,21 @@ export const LOOK_ALIGN = ["left", "center", "right"] as const;
 export const LOOK_SIZE = ["sm", "lg", "xl"] as const;
 export const LOOK_HIDE = ["mobile", "desktop"] as const;
 
+/** A size as a percent of the normal one, written as text ("120"): from 50 to 249. */
+const scale = z
+  .string()
+  .regex(/^(?:[5-9]\d|1\d\d|2[0-4]\d)$/)
+  .nullable()
+  .optional()
+  .catch(null);
+/** A font name the page can load (letters, digits, spaces); the list itself is the owner's choice in the panel. */
+const fontName = z
+  .string()
+  .regex(/^[A-Za-z0-9 ]{2,40}$/)
+  .nullable()
+  .optional()
+  .catch(null);
+
 const hex = z
   .string()
   .regex(/^#[0-9a-fA-F]{6}$/)
@@ -28,6 +43,10 @@ export const LookSchema = z
     width: choice(LOOK_WIDTH),
     align: choice(LOOK_ALIGN),
     size: choice(LOOK_SIZE),
+    titleScale: scale,
+    textScale: scale,
+    headingFont: fontName,
+    bodyFont: fontName,
     hideOn: choice(LOOK_HIDE),
   })
   .optional()
@@ -51,6 +70,11 @@ function readable(hexColor: string): string {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hexColor.slice(i, i + 2), 16) / 255);
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.55 ? "#0a0a0a" : "#ffffff";
+}
+
+const SERIF = new Set(["Playfair Display", "Merriweather", "Fraunces", "Cormorant Garamond", "Lora", "DM Serif Display", "Libre Baskerville", "Cinzel"]);
+function fontStackOf(name: string): string {
+  return `"${name}", ${SERIF.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}`;
 }
 
 export type LookParts = { classes: string[]; vars: Record<string, string> };
@@ -80,6 +104,16 @@ export function lookParts(look: Look | null | undefined, opts: { photoBg?: boole
     classes.push("lk-c");
     vars["--lkc"] = text;
   }
+  if (look.titleScale) vars["--ts"] = String(Number(look.titleScale) / 100);
+  if (look.textScale) {
+    classes.push("lk-bs");
+    vars["--lkbs"] = String(Number(look.textScale) / 100);
+  }
+  if (look.headingFont) vars["--hf"] = fontStackOf(look.headingFont);
+  if (look.bodyFont) {
+    classes.push("lk-bf");
+    vars["--bf"] = fontStackOf(look.bodyFont);
+  }
   if (look.surface) {
     classes.push("lk-s");
     vars["--lks"] = look.surface;
@@ -97,6 +131,9 @@ export const LOOK_CSS = `
 .lk-bg{background:var(--lkbg)!important;--bg:var(--lkbg);--surface:color-mix(in srgb,var(--lkbg) 90%,var(--lkc,#808080))}
 .lk-c{color:var(--lkc)!important;--text:var(--lkc);--muted:color-mix(in srgb,var(--lkc) 66%,transparent);--line:color-mix(in srgb,var(--lkc) 16%,transparent)}
 .lk-s{--surface:var(--lks)}
+.lk-bf{font-family:var(--bf)}
+.lk-bs{font-size:calc(17px * var(--lkbs))}
+.lk-bs :is(p,li,.intro,.lead,summary){font-size:1em}
 .lk-bg.promo .btn{background:var(--lkc);color:var(--lkbg);border-color:var(--lkc)}
 .lk-p-none{padding-top:0!important;padding-bottom:0!important}
 .lk-p-sm{padding-top:40px!important;padding-bottom:40px!important}
