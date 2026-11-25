@@ -52,6 +52,8 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Controlled: a form action resets its fields when it ends, which used to erase the email after a wrong password.
+  const [email, setEmail] = useState("");
 
   // Only our own pages (never another site, however the address is written).
   const callbackUrl = safeCallbackPath(searchParams.get("callbackUrl"));
@@ -135,6 +137,8 @@ function LoginForm() {
             id="email"
             name="email"
             type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
             placeholder="tu@correo.com"
             autoComplete="username"
