@@ -348,6 +348,7 @@ const GallerySection = z.object({
   type: z.literal("gallery"),
   kicker: nullableText("Etiqueta pequeña."),
   heading: text(70, "Título de la galería (usa las FOTOS reales del negocio)"),
+  layout: z.enum(["grid", "mosaic", "carousel"]).optional().catch(undefined).describe("Diseño de la galería. NO lo escribas: lo elige el dueño."),
 });
 
 const LeadFormSection = z.object({

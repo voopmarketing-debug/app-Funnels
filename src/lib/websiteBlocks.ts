@@ -128,7 +128,8 @@ export type BlockOp =
   | { kind: "move"; from: number; to: number }
   | { kind: "look"; index: number; patch: LookPatch }
   | { kind: "html"; index: number; code: string; height: number }
-  | { kind: "eventDate"; index: number; date: string };
+  | { kind: "eventDate"; index: number; date: string }
+  | { kind: "galleryLayout"; index: number; layout: "grid" | "mosaic" | "carousel" };
 
 export type BlockResult = { ok: true; content: WebsiteContentV2; focus: number } | { ok: false; error: string };
 
@@ -209,6 +210,14 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       if (cut) return bad(cut);
       section.code = op.code;
       section.height = Math.min(3000, Math.max(0, op.height));
+      focus = op.index;
+      break;
+    }
+    case "galleryLayout": {
+      const section = isInt(op.index) ? next.sections[op.index] : undefined;
+      if (!section || section.type !== "gallery" || !["grid", "mosaic", "carousel"].includes(op.layout)) return bad("No se pudo cambiar el diseño de la galería.");
+      if (op.layout === "grid") delete section.layout;
+      else section.layout = op.layout;
       focus = op.index;
       break;
     }

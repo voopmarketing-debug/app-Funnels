@@ -108,6 +108,7 @@ export function StylePanel({
   onLive,
   onSave,
   onPickBgImage,
+  onGalleryLayout,
 }: {
   section: Section;
   index: number;
@@ -116,6 +117,7 @@ export function StylePanel({
   onLive: (look: Look | undefined) => void;
   onSave: (look: Look | undefined) => void;
   onPickBgImage: () => void;
+  onGalleryLayout: (layout: "grid" | "mosaic" | "carousel") => void;
 }) {
   const [look, setLook] = useState<Look>(section.look ?? {});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -157,6 +159,42 @@ export function StylePanel({
         <p className="text-sm font-semibold text-ink">Estilo · {SECTION_LABELS[section.type]}</p>
         <p className="text-[12px] text-ink-muted">Bloque {index + 1}. Cada cambio se ve al instante en la página.</p>
       </div>
+
+      {section.type === "gallery" && (
+        <div className="space-y-2">
+          <p className="text-[13px] font-semibold text-ink">Diseño de la galería</p>
+          <div role="radiogroup" aria-label="Diseño de la galería" className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ["grid", "Cuadrícula", "Fotos ordenadas en filas iguales", [0, 1, 2, 3]],
+                ["mosaic", "Mosaico", "Fotos de distintos tamaños, sin recortar", [3, 2, 2, 3]],
+                ["carousel", "Banner", "Va pasando solo y se desliza con el dedo", [4, 4, 4]],
+              ] as const
+            ).map(([value, name, hint, bars]) => {
+              const on = (section.layout ?? "grid") === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  disabled={busy}
+                  title={hint}
+                  onClick={() => onGalleryLayout(value)}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-center text-[12px] font-semibold transition disabled:opacity-50 ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-border-strong hover:text-ink"}`}
+                >
+                  <span aria-hidden="true" className={`flex h-12 w-full gap-1 rounded-md bg-surface-2 p-1 ${value === "carousel" ? "" : "items-stretch"}`}>
+                    {value === "grid" && [0, 1].map((c) => <span key={c} className="flex flex-1 flex-col gap-1"><span className="flex-1 rounded-sm bg-ink-faint/60" /><span className="flex-1 rounded-sm bg-ink-faint/60" /></span>)}
+                    {value === "mosaic" && [[3, 2], [2, 3]].map((h, c) => <span key={c} className="flex flex-1 flex-col gap-1"><span style={{ flex: h[0] }} className="rounded-sm bg-ink-faint/60" /><span style={{ flex: h[1] }} className="rounded-sm bg-ink-faint/60" /></span>)}
+                    {value === "carousel" && bars.map((_, c) => <span key={c} className={`rounded-sm bg-ink-faint/60 ${c === 0 ? "w-3/4 flex-none" : "w-1/3 flex-none"}`} />)}
+                  </span>
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <ColorRow label="Color de fondo" hint={hasPhoto ? "Este bloque tiene foto de fondo: la foto manda." : "Pinta todo el bloque."} value={look.bg} autoLabel="Quitar" swatches={swatches} onChange={(hex) => change({ bg: hex })} />
 

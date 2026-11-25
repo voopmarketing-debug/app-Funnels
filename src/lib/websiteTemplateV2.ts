@@ -826,10 +826,20 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           .map((it, ii) => `<div><p class="stat-v"${ed(fp(`items.${ii}.value`))}>${esc(it.value)}</p><p class="stat-l"${ed(fp(`items.${ii}.label`))}>${esc(it.label)}</p></div>`)
           .join("")}</div></section>`;
 
-      case "gallery":
+      case "gallery": {
         if (photos.length === 0) return "";
+        const layout = s.layout === "mosaic" || s.layout === "carousel" ? s.layout : "grid";
+        const tip = note("La galería muestra tus fotos más recientes. Sube más desde “Imagen de fondo” de cualquier bloque.");
+        const pics = (n: number) => photos.slice(0, n).map((u) => `<img src="${esc(u)}" alt="" loading="lazy"${tip}>`).join("");
+        const grid =
+          layout === "carousel"
+            ? `<div class="gal-slider" data-slider>${pics(12)}</div>`
+            : layout === "mosaic"
+              ? `<div class="gal-mosaic">${pics(12)}</div>`
+              : `<div class="gallery g${Math.min(photos.length, 8)}">${pics(8)}</div>`;
         return `<section class="sec"><div class="wrap">${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
-          <div class="gallery g${Math.min(photos.length, 8)}">${photos.slice(0, 8).map((u) => `<img src="${esc(u)}" alt="" loading="lazy"${note("La galería muestra tus fotos más recientes. Sube más desde “Imagen de fondo” de cualquier bloque.")}>`).join("")}</div></div></section>`;
+          ${grid}</div></section>`;
+      }
 
       case "leadForm":
         return `<section class="sec alt" id="registro"><div class="wrap narrow">
@@ -1183,6 +1193,12 @@ section{position:relative}
 .gallery.g2,.gallery.g4{grid-template-columns:repeat(2,minmax(0,1fr))}
 .gallery.g7,.gallery.g8{grid-template-columns:repeat(4,minmax(0,1fr))}
 .gallery img{width:100%;aspect-ratio:4/3;object-fit:contain;object-position:center;background:var(--surface);border-radius:var(--r);padding:6px;box-sizing:border-box}
+.gal-mosaic{column-count:3;column-gap:14px;margin-top:28px}
+.gal-mosaic img{display:block;width:100%;height:auto;margin:0 0 14px;border-radius:var(--r);break-inside:avoid;background:var(--surface)}
+.gal-slider{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;margin-top:28px;scrollbar-width:none}
+.gal-slider::-webkit-scrollbar{display:none}
+.gal-slider img{flex:none;scroll-snap-align:center;height:clamp(240px,46vw,460px);width:auto;max-width:88%;object-fit:contain;background:var(--surface);border-radius:var(--r)}
+@media(max-width:640px){.gal-mosaic{column-count:2}}
 @media(max-width:640px){.gallery,.gallery.g3,.gallery.g5,.gallery.g6,.gallery.g7,.gallery.g8{grid-template-columns:repeat(2,minmax(0,1fr))}.gallery.g1{grid-template-columns:minmax(0,1fr)}.gallery:not(.g1) img:last-child:nth-child(odd){grid-column:1/-1}}
 .lead-form{display:grid;gap:12px;margin-top:24px}
 .lead-form input,.lead-form textarea{font:inherit;padding:15px 16px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text)}

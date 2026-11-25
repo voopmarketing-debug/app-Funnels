@@ -704,6 +704,7 @@ export function WebsiteBuilder({
                 onLive={(look) => liveLook(sel, look)}
                 onSave={(look) => void saveLook(sel, look)}
                 onPickBgImage={() => setImageTarget({ index: sel, field: "bgImage" })}
+                onGalleryLayout={(layout) => runBlock({ kind: "galleryLayout", index: sel, layout }, "Cambiando el diseño…")}
               />
             ))}
 

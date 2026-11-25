@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkUploadedHtml, htmlBlockFromContent } from "./htmlBlock";
 import { SITE_SCRIPT } from "./siteScript";
+import { applyBlockOp } from "./websiteBlocks";
 import { SAMPLE_HTML } from "./htmlSample";
 import { buildHtmlPageContent } from "./nicheTemplates";
 import { incompleteHtmlReason, WebsiteContentV2Schema } from "./websiteContentV2";
@@ -74,5 +75,28 @@ describe("Subir mi HTML", () => {
     const plain = renderWebsiteHtmlV2({ ...content, plain: true }, ctx);
     expect(plain).not.toMatch(/<header|<footer/);
     expect(plain).toContain("data-htmlframe");
+  });
+
+  it("the gallery has three layouts: grid, mosaic and a sliding banner", () => {
+    const base = { ...buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" }), fullHtml: false };
+    const withGallery = { ...base, sections: [base.sections[0], { type: "gallery" as const, kicker: null, heading: "Mira", media: undefined }] } as unknown as typeof base;
+    const photos = ["https://x.co/a.jpg", "https://x.co/b.jpg", "https://x.co/c.jpg", "https://x.co/d.jpg"];
+    const draw = (layout?: "grid" | "mosaic" | "carousel") => renderWebsiteHtmlV2({ ...withGallery, sections: [withGallery.sections[0], { ...(withGallery.sections[1] as object), ...(layout ? { layout } : {}) } as never] }, { ...ctx, photos });
+    expect(draw()).toContain('class="gallery g4"');
+    expect(draw("mosaic")).toContain('class="gal-mosaic"');
+    const slider = draw("carousel");
+    expect(slider).toContain("data-slider");
+    expect(slider).not.toContain('class="gallery g4"');
+    expect(SITE_SCRIPT).toContain("[data-slider]");
+  });
+
+  it("the layout op only works on a gallery and 'grid' goes back to the default", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const page = { ...base, sections: [base.sections[0], { type: "gallery", kicker: null, heading: "Mira" }] } as unknown as typeof base;
+    const set = applyBlockOp(page, { kind: "galleryLayout", index: 1, layout: "carousel" });
+    expect(set.ok && (set.content.sections[1] as { layout?: string }).layout).toBe("carousel");
+    const back = set.ok ? applyBlockOp(set.content, { kind: "galleryLayout", index: 1, layout: "grid" }) : set;
+    expect(back.ok && "layout" in back.content.sections[1]).toBe(false);
+    expect(applyBlockOp(page, { kind: "galleryLayout", index: 0, layout: "mosaic" }).ok).toBe(false);
   });
 });
