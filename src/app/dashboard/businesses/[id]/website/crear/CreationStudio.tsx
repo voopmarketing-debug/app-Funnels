@@ -217,7 +217,7 @@ export function CreationStudio({
   const [whatsapp, setWhatsapp] = useState(serverDraft?.whatsapp ?? "");
   const whatsappDigits = whatsapp.replace(/\D/g, "");
   const whatsappMissing = needsWhatsapp && (whatsappDigits.length < 8 || whatsappDigits.length > 15);
-  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  const [device, setDevice] = useState<"desktop" | "mobile">(() => (typeof window !== "undefined" && window.innerWidth < 640 ? "mobile" : "desktop"));
   // Brand colors: null = let the style decide.
   const [brandPrimary, setBrandPrimary] = useState<string | null>(serverDraft ? serverDraft.brandPrimary : initialBrand.primary);
   const [brandSecondary, setBrandSecondary] = useState<string | null>(serverDraft ? serverDraft.brandSecondary : initialBrand.secondary);
@@ -902,7 +902,7 @@ export function CreationStudio({
       </div>
 
       {fullPreview && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/70 p-3 backdrop-blur-sm md:p-6" role="dialog" aria-modal="true" aria-label="Vista previa">
+        <div className="fixed inset-0 z-[70] flex flex-col bg-black/70 p-3 backdrop-blur-sm md:p-6" role="dialog" aria-modal="true" aria-label="Vista previa">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 pb-3">
             <div className="inline-flex rounded-lg border border-white/20 bg-black/40 p-0.5">
               {(["desktop", "mobile"] as const).map((d) => (
