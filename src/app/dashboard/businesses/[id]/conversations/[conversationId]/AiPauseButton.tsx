@@ -115,20 +115,39 @@ export function HumanAttentionBanner({
     );
   }
 
+  const resume = (
+    <button
+      type="button"
+      disabled={isPending}
+      onClick={() => run(() => toggleConversationAiPaused(businessId, conversationId, false))}
+      className="flex-none rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent disabled:opacity-60"
+    >
+      🤖 Que responda la IA
+    </button>
+  );
+  const note = (
+    <>
+      <span className="font-semibold text-ink">🙋 Tú atiendes este chat.</span> La IA no responde a este contacto hasta que la vuelvas a activar.
+    </>
+  );
+
   return (
-    // Phones: the switch above already says "Respondo yo", so this long note only takes room from the chat.
-    <div className="hidden flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface-2/70 px-3 py-2 md:flex md:px-4">
-      <p className="min-w-[12rem] flex-1 text-sm text-ink-muted">
-        <span className="font-semibold text-ink">🙋 Tú atiendes este chat.</span> La IA no responde a este contacto hasta que la vuelvas a activar.
-      </p>
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={() => run(() => toggleConversationAiPaused(businessId, conversationId, false))}
-        className="flex-none rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent disabled:opacity-60"
-      >
-        🤖 Que responda la IA
-      </button>
-    </div>
+    <>
+      {/* Phone: one folded line that opens with a tap, so the chat keeps its room. */}
+      <details className="group border-b border-border bg-surface-2/70 px-3 py-2 md:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden">
+          <span>🙋 Tú atiendes este chat</span>
+          <span aria-hidden="true" className="text-ink-muted transition group-open:rotate-180">▾</span>
+        </summary>
+        <div className="mt-2 space-y-2">
+          <p className="text-sm text-ink-muted">La IA no responde a este contacto hasta que la vuelvas a activar.</p>
+          {resume}
+        </div>
+      </details>
+      <div className="hidden flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface-2/70 px-3 py-2 md:flex md:px-4">
+        <p className="min-w-[12rem] flex-1 text-sm text-ink-muted">{note}</p>
+        {resume}
+      </div>
+    </>
   );
 }
