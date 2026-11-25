@@ -74,6 +74,8 @@ export function BlocksPanel({
   const [dragging, setDragging] = useState<number | null>(null);
   const hidden = new Set(content.hidden);
   const count = content.sections.length;
+  // The code window is one tap away: the chosen HTML block, or else the first one of the page.
+  const codeIndex = selected !== null && content.sections[selected]?.type === "html" ? selected : content.sections.findIndex((x) => x.type === "html");
 
   // Where a block dragged over a row would land: above it or below it.
   function slotFor(e: React.DragEvent, index: number): number {
@@ -124,14 +126,14 @@ export function BlocksPanel({
         <EventDateEditor key={`ev${selected}`} date={(content.sections[selected] as { date: string }).date} busy={busy} onSave={(date) => onSaveEventDate(selected, date)} />
       )}
 
-      {selected !== null && content.sections[selected]?.type === "html" && (
+      {codeIndex >= 0 && (
         <button
           type="button"
-          onClick={() => onEditHtml(selected)}
+          onClick={() => onEditHtml(codeIndex)}
           className="flex w-full items-center justify-between gap-2 rounded-xl border-2 border-accent bg-accent/15 px-3 py-3 text-left text-sm font-bold text-ink transition hover:bg-accent/25"
         >
           <span>
-            <span className="font-mono">{"</>"}</span> {(content.sections[selected] as { code: string }).code.trim() ? "Editar el código HTML" : "Pegar el código HTML"}
+            <span className="font-mono">{"</>"}</span> {(content.sections[codeIndex] as { code: string }).code.trim() ? "Editar el código HTML" : "Pegar el código HTML"}
           </span>
           <span aria-hidden="true">›</span>
         </button>
@@ -193,8 +195,8 @@ export function BlocksPanel({
                   </p>
                   <p className="truncate text-[12px] text-ink-muted">{s.type === "html" ? (s.code.trim() ? `${s.code.length.toLocaleString("es")} caracteres de código` : "Vacío: pega tu código") : sectionTitle(s) || "—"}</p>
                   {s.type === "html" && (
-                    <button type="button" onClick={(e) => { e.stopPropagation(); onEditHtml(i); }} className="mt-1 rounded-md bg-accent px-2 py-1 text-[11px] font-bold text-accent-ink">
-                      {"</>"} {s.code.trim() ? "Editar código" : "Pegar código"}
+                    <button type="button" onClick={(e) => { e.stopPropagation(); onEditHtml(i); }} className="mt-2 flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-bold text-accent-ink shadow transition hover:bg-accent-hover">
+                      <span aria-hidden="true" className="font-mono">{"</>"}</span> {s.code.trim() ? "Editar el código" : "Pegar el código"}
                     </button>
                   )}
                 </div>

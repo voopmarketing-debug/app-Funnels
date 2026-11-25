@@ -277,11 +277,11 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       const first = content.sections[0];
       const title = esc(first && first.type === "hero" && first.heading ? first.heading : ctx.businessName);
       const editBtn = ctx.edit
-        ? `<button type="button" data-code-edit="${at}" style="all:unset;box-sizing:border-box;cursor:pointer;position:fixed;top:0;left:0;right:0;height:38px;z-index:5;background:#111827;color:#fff;font:600 13px/38px system-ui,sans-serif;text-align:center">&lt;/&gt; Editar el código de mi página</button>`
+        ? `<button type="button" data-code-edit="${at}" style="all:unset;box-sizing:border-box;cursor:pointer;position:fixed;top:0;left:0;right:0;height:46px;z-index:5;background:#b5ff2b;color:#0a0a0a;font:800 15px/46px system-ui,sans-serif;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.35)">&lt;/&gt; Editar el código de mi página &rsaquo;</button>`
         : "";
       return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${title}</title>
-<style>html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#fff}iframe{position:fixed;top:${ctx.edit ? 38 : 0}px;left:0;width:100%;height:${ctx.edit ? "calc(100% - 38px)" : "100%"};border:0;display:block}</style></head>
+<style>html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#fff}iframe{position:fixed;top:${ctx.edit ? 46 : 0}px;left:0;width:100%;height:${ctx.edit ? "calc(100% - 46px)" : "100%"};border:0;display:block}</style></head>
 <body><iframe title="${title}" src="${esc(src)}" data-htmlframe sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" referrerpolicy="no-referrer"></iframe>${editBtn}
 <script>${SITE_SCRIPT}</script></body></html>`;
     }
