@@ -51,7 +51,7 @@ export function HtmlCodeDialog({
           <div>
             <h2 className="text-base font-bold">Pega tu código HTML</h2>
             <p className="text-[12px] text-ink-muted">
-              Pega aquí el código completo (HTML, CSS y JavaScript). Se muestra en un recuadro aislado de tu página: no puede cambiar el resto del sitio. Los formularios de este código no guardan contactos en tu CRM.
+              Pega aquí el código completo (HTML, CSS y JavaScript). Se muestra en un recuadro aislado de tu página: no puede cambiar el resto del sitio. Los formularios sin dirección propia (sin action) guardan el contacto en tu CRM: usa un campo de nombre y uno de correo o teléfono.
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Cerrar" className="flex h-10 w-10 flex-none items-center justify-center rounded-lg border border-border text-lg hover:border-accent">

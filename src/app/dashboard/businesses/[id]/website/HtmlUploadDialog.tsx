@@ -151,7 +151,7 @@ export function HtmlUploadDialog({ businessId, needsWhatsapp, onClose }: { busin
         </div>
 
         <p className="rounded-lg bg-surface-2 p-2.5 text-[12px] text-ink-muted">
-          Los formularios de tu HTML no guardan contactos en tu CRM (para eso usa el bloque «Formulario» de la plataforma). Las imágenes deben estar en internet (un enlace https).
+          Si tu HTML trae un formulario sin dirección propia (sin action), guardamos cada contacto en tu CRM: usa un campo de nombre y uno de correo o teléfono. Las imágenes deben estar en internet (un enlace https).
         </p>
 
         {error && <p role="alert" className="rounded-lg border border-error/40 bg-error/5 p-2.5 text-sm text-error">{error}</p>}

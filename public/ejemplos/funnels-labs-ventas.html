@@ -59,6 +59,10 @@
   details{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:10px}
   summary{font-weight:700;cursor:pointer}
   details p{margin-top:10px;color:var(--mut);font-size:15px}
+  .demo{max-width:520px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:22px;padding:24px;box-shadow:0 18px 44px rgba(40,20,120,.1)}
+  .demo label{display:block;font-weight:700;font-size:14px;margin:12px 0 6px}
+  .demo input,.demo textarea{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;font:inherit;font-size:16px;background:#fbfaff;color:var(--ink)}
+  .demo .btn{width:100%;margin-top:16px}
   .final{text-align:center;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border-radius:28px;padding:44px 22px}
   .final h2{color:#fff}
   .final p{opacity:.9;margin:0 auto 22px;max-width:520px}
@@ -153,16 +157,33 @@
   </div>
 </section>
 
+<section id="demo">
+  <div class="wrap">
+    <h2>Pide tu demo gratis</h2>
+    <p class="lead">Déjanos tus datos y te escribimos por WhatsApp. Este formulario guarda el contacto en tu CRM de Funnels Labs.</p>
+    <form class="demo">
+      <label for="f-nombre">Tu nombre</label>
+      <input id="f-nombre" name="nombre" type="text" autocomplete="name" placeholder="María Pérez" required>
+      <label for="f-wa">Tu WhatsApp</label>
+      <input id="f-wa" name="whatsapp" type="tel" autocomplete="tel" placeholder="+57 300 123 4567" required>
+      <label for="f-msg">¿Qué vendes? (opcional)</label>
+      <textarea id="f-msg" name="mensaje" rows="3" placeholder="Cuéntanos de tu negocio"></textarea>
+      <button class="btn btn-p" type="submit">Quiero mi demo</button>
+    </form>
+  </div>
+</section>
+
 <div class="wrap">
   <div class="final">
     <h2>Haz que tu WhatsApp venda por ti</h2>
     <p>Pide tu demo gratis y mira cómo atiende tu asistente en minutos.</p>
     <a class="btn" href="https://wa.me/" target="_blank" rel="noopener">Hablar por WhatsApp</a>
   </div>
-  <footer>© Funnels Labs · Página de ejemplo para pruebas</footer>
+  <footer>© <span id="y">2026</span> Funnels Labs · Página de ejemplo para pruebas</footer>
 </div>
 
 <div class="sticky"><a class="btn btn-w" href="https://wa.me/" target="_blank" rel="noopener">💬 Pedir demo por WhatsApp</a></div>
 
+<script>document.getElementById("y").textContent=new Date().getFullYear();</script>
 </body>
 </html>

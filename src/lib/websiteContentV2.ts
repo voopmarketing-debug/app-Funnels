@@ -242,6 +242,16 @@ const VideoSection = z.object({
 
 export const HTML_MAX_CHARS = 100_000;
 
+/** Why pasted code looks cut off (a tag opened and never closed), in plain Spanish; null when it looks complete. A copy that stops halfway would otherwise show a blank page. */
+export function incompleteHtmlReason(code: string): string | null {
+  for (const tag of ["style", "script", "body", "html"]) {
+    const opened = (code.match(new RegExp(`<${tag}[\\s>]`, "gi")) ?? []).length;
+    const closed = (code.match(new RegExp(`</${tag}\\s*>`, "gi")) ?? []).length;
+    if (opened > closed) return `Al código le falta el final (no se cierra </${tag}>). Parece que se copió incompleto: vuelve a copiarlo completo, o sube el archivo .html.`;
+  }
+  return null;
+}
+
 const HtmlSection = z.object({
   ...media,
   type: z.literal("html"),

@@ -1,4 +1,4 @@
-import { HTML_MAX_CHARS, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { HTML_MAX_CHARS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { mergeLook, type LookPatch } from "@/lib/websiteLook";
 
 // The builder's block operations: add a block from the library, duplicate,
@@ -205,6 +205,8 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       const section = isInt(op.index) ? next.sections[op.index] : undefined;
       if (!section || section.type !== "html" || typeof op.code !== "string" || !isInt(op.height)) return bad("No se pudo guardar el código.");
       if (op.code.length > HTML_MAX_CHARS) return bad("El código es demasiado largo (máximo 100.000 caracteres).");
+      const cut = op.code.trim() ? incompleteHtmlReason(op.code) : null;
+      if (cut) return bad(cut);
       section.code = op.code;
       section.height = Math.min(3000, Math.max(0, op.height));
       focus = op.index;

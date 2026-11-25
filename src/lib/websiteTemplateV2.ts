@@ -267,20 +267,22 @@ export type RenderV2Context = {
 };
 
 export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Context): string {
-  // "Subir mi HTML": the public page is only the owner's own page inside its isolated frame. (The
-  // builder's editing preview keeps the normal layout so the block can be selected and edited.)
-  if (content.fullHtml && !ctx.edit) {
+  // "Subir mi HTML": the page is only the owner's own page inside its isolated frame, which fills the
+  // whole screen and scrolls by itself (so a long page is never cut and nothing depends on measuring
+  // its height). The builder's preview shows the same thing, plus a button to edit the code.
+  if (content.fullHtml) {
     const at = content.sections.findIndex((s, i) => s.type === "html" && s.code.trim() !== "" && !(content.hidden ?? []).includes(i));
     if (at >= 0) {
-      const block = content.sections[at];
-      const height = block.type === "html" && block.height > 0 ? block.height : 0;
       const src = `${ctx.trackingBasePath}/bloque/${at}${ctx.preview ? "?preview=1" : ""}`;
       const first = content.sections[0];
       const title = esc(first && first.type === "hero" && first.heading ? first.heading : ctx.businessName);
+      const editBtn = ctx.edit
+        ? `<button type="button" data-code-edit="${at}" style="all:unset;box-sizing:border-box;cursor:pointer;position:fixed;top:0;left:0;right:0;height:38px;z-index:5;background:#111827;color:#fff;font:600 13px/38px system-ui,sans-serif;text-align:center">&lt;/&gt; Editar el código de mi página</button>`
+        : "";
       return `<!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
-<style>html,body{margin:0;padding:0;background:#fff}iframe{display:block;width:100%;border:0;min-height:${height > 0 ? `${height}px` : "100dvh"}${height > 0 ? `;height:${height}px` : ""}}</style></head>
-<body><iframe title="${title}" src="${esc(src)}" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" referrerpolicy="no-referrer"${height > 0 ? "" : " data-autoheight"}></iframe>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${title}</title>
+<style>html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#fff}iframe{position:fixed;top:${ctx.edit ? 38 : 0}px;left:0;width:100%;height:${ctx.edit ? "calc(100% - 38px)" : "100%"};border:0;display:block}</style></head>
+<body><iframe title="${title}" src="${esc(src)}" data-htmlframe sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" referrerpolicy="no-referrer"></iframe>${editBtn}
 <script>${SITE_SCRIPT}</script></body></html>`;
     }
   }
@@ -414,7 +416,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         const src = `${ctx.trackingBasePath}/bloque/${index}${ctx.preview ? "?preview=1" : ""}`;
         const h = s.height > 0 ? `${s.height}px` : "320px";
         const editBtn = edit ? `<button type="button" data-code-edit="${index}" style="all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:8px 12px;background:#111827;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center">&lt;/&gt; Editar código de este bloque</button>` : "";
-        return `<section class="htmlw">${editBtn}<iframe class="htmlw-frame" src="${esc(src)}" title="Contenido" loading="lazy" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" referrerpolicy="no-referrer"${s.height > 0 ? "" : " data-autoheight"} style="height:${h}"></iframe></section>`;
+        return `<section class="htmlw">${editBtn}<iframe class="htmlw-frame" src="${esc(src)}" title="Contenido" loading="lazy" data-htmlframe sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" referrerpolicy="no-referrer"${s.height > 0 ? "" : " data-autoheight"} style="height:${h}"></iframe></section>`;
       }
 
       case "hero": {

@@ -182,7 +182,7 @@ export function WebsiteBuilder({
   // onLoad never fires: attach the editor to it here.
   useEffect(() => {
     const doc = iframeRef.current?.contentDocument;
-    if (doc && doc.readyState === "complete" && doc.querySelector("[data-edit]") && !doc.querySelector("style[data-fl-editor]")) onPreviewLoad();
+    if (doc && doc.readyState === "complete" && doc.querySelector("[data-edit], [data-code-edit]") && !doc.querySelector("style[data-fl-editor]")) onPreviewLoad();
   }, []);
 
   function applyImage(url: string | null) {
