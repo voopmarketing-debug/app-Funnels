@@ -116,7 +116,8 @@ export function HumanAttentionBanner({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface-2/70 px-3 py-2 md:px-4">
+    // Phones: the switch above already says "Respondo yo", so this long note only takes room from the chat.
+    <div className="hidden flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface-2/70 px-3 py-2 md:flex md:px-4">
       <p className="min-w-[12rem] flex-1 text-sm text-ink-muted">
         <span className="font-semibold text-ink">🙋 Tú atiendes este chat.</span> La IA no responde a este contacto hasta que la vuelvas a activar.
       </p>

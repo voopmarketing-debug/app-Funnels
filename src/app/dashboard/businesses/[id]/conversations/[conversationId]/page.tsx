@@ -72,19 +72,22 @@ export default async function ConversationPage({
           windowOpen={isReplyWindowOpen(conversation.messages)}
         />
       </div>
-      <LeadDetailPanel
-        businessId={id}
-        conversationId={conversationId}
-        customerPhone={conversation.customerPhone}
-        customerName={conversation.customerName}
-        customerEmail={conversation.customerEmail}
-        aiPaused={conversation.aiPaused}
-        tags={conversation.tags}
-        notes={conversation.notes}
-        appointmentAt={conversation.appointmentAt}
-        appointmentNote={conversation.appointmentNote}
-        stage={stageProgress}
-      />
+      {/* Desktop-only third column: on a phone the chat takes the whole screen. */}
+      <div className="hidden min-h-0 md:flex">
+        <LeadDetailPanel
+          businessId={id}
+          conversationId={conversationId}
+          customerPhone={conversation.customerPhone}
+          customerName={conversation.customerName}
+          customerEmail={conversation.customerEmail}
+          aiPaused={conversation.aiPaused}
+          tags={conversation.tags}
+          notes={conversation.notes}
+          appointmentAt={conversation.appointmentAt}
+          appointmentNote={conversation.appointmentNote}
+          stage={stageProgress}
+        />
+      </div>
     </div>
   );
 }
