@@ -154,7 +154,7 @@ export function StylePanel({
   const changed = !!tidyLook(look);
 
   return (
-    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
+    <div className="min-h-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto p-3">
       <div>
         <p className="text-sm font-semibold text-ink">Estilo · {SECTION_LABELS[section.type]}</p>
         <p className="text-[12px] text-ink-muted">Bloque {index + 1}. Cada cambio se ve al instante en la página.</p>
@@ -183,7 +183,7 @@ export function StylePanel({
                   onClick={() => onGalleryLayout(value)}
                   className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-center text-[12px] font-semibold transition disabled:opacity-50 ${on ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-border-strong hover:text-ink"}`}
                 >
-                  <span aria-hidden="true" className={`flex h-12 w-full gap-1 rounded-md bg-surface-2 p-1 ${value === "carousel" ? "" : "items-stretch"}`}>
+                  <span aria-hidden="true" className="flex h-12 w-full gap-1 overflow-hidden rounded-md bg-surface-2 p-1">
                     {value === "grid" && [0, 1].map((c) => <span key={c} className="flex flex-1 flex-col gap-1"><span className="flex-1 rounded-sm bg-ink-faint/60" /><span className="flex-1 rounded-sm bg-ink-faint/60" /></span>)}
                     {value === "mosaic" && [[3, 2], [2, 3]].map((h, c) => <span key={c} className="flex flex-1 flex-col gap-1"><span style={{ flex: h[0] }} className="rounded-sm bg-ink-faint/60" /><span style={{ flex: h[1] }} className="rounded-sm bg-ink-faint/60" /></span>)}
                     {value === "carousel" && bars.map((_, c) => <span key={c} className={`rounded-sm bg-ink-faint/60 ${c === 0 ? "w-3/4 flex-none" : "w-1/3 flex-none"}`} />)}
@@ -193,6 +193,7 @@ export function StylePanel({
               );
             })}
           </div>
+          <ColorRow label="Fondo de las fotos" hint="El recuadro que va detrás de cada foto. Si no eliges uno, se ajusta solo." value={look.surface} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ surface: hex })} />
         </div>
       )}
 
@@ -205,7 +206,9 @@ export function StylePanel({
 
       <ColorRow label="Color del texto" hint="Si no eliges uno, se ajusta solo para que se lea bien." value={look.color} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ color: hex })} />
 
-      <ColorRow label="Color de los cuadros" hint="Las tarjetas y recuadros de este bloque (por ejemplo, el fondo detrás de cada foto). Si no eliges uno, se ajusta solo." value={look.surface} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ surface: hex })} />
+      {section.type !== "gallery" && (
+        <ColorRow label="Color de los cuadros" hint="Las tarjetas y recuadros de este bloque (por ejemplo, el fondo detrás de cada foto). Si no eliges uno, se ajusta solo." value={look.surface} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ surface: hex })} />
+      )}
 
       <Segmented
         label="Espacio arriba y abajo"
