@@ -84,9 +84,8 @@ export default async function WebsitePage({ params, searchParams }: { params: Pr
     <WebsiteHome
       businessId={id}
       businessName={membership.business.name}
-      initialTab={tab === "sitios" ? "sitios" : tab === "ia" ? "ia" : "plantillas"}
+      initialTab={tab === "sitios" ? "sitios" : "plantillas"}
       cards={cards}
-      hasDraft={!!savedDraft?.data}
       pagesList={{
         businessId: id,
         pages,

@@ -5,21 +5,18 @@ import { useState, type ComponentProps } from "react";
 import type { TemplateCard } from "@/lib/websiteNicheTemplates";
 import { TemplateLibrary } from "./TemplateLibrary";
 import { WebsitePagesList } from "./WebsitePagesList";
-import { CreationStudio } from "./crear/CreationStudio";
+import type { CreationStudio } from "./crear/CreationStudio";
 
-type Tab = "plantillas" | "sitios" | "ia";
+type Tab = "plantillas" | "sitios";
 
 /**
- * The first screen of "Sitio web": the template library, with "Mis sitios" and "Crear con IA" one
- * tab away. The AI chat is only opened when chosen: it reads the business with the AI as soon as it
- * mounts, which costs.
+ * The first screen of "Sitio web": the template library, with "Mis sitios" one tab away.
  */
 export function WebsiteHome({
   businessId,
   businessName,
   initialTab,
   cards,
-  hasDraft,
   pagesList,
   studio,
 }: {
@@ -27,17 +24,14 @@ export function WebsiteHome({
   businessName: string;
   initialTab: Tab;
   cards: TemplateCard[];
-  hasDraft: boolean;
   pagesList: Omit<ComponentProps<typeof WebsitePagesList>, "onNewPage">;
   studio: ComponentProps<typeof CreationStudio>;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const count = pagesList.pages.length;
-  // Emoji only from wider screens; "Crear con IA" is just "Con IA" on a phone.
   const tabs: [Tab, string, string, string][] = [
     ["plantillas", "📄", "Plantillas", "Plantillas"],
     ["sitios", "🌐", count > 0 ? `Mis sitios (${count})` : "Mis sitios", count > 0 ? `Sitios (${count})` : "Sitios"],
-    ["ia", "✦", "Crear con IA", "Con IA"],
   ];
   return (
     <div className="space-y-4">
@@ -62,9 +56,8 @@ export function WebsiteHome({
         </div>
       </div>
 
-      {tab === "plantillas" && <TemplateLibrary businessId={businessId} cards={cards} needsWhatsapp={!!studio.needsWhatsapp} hasDraft={hasDraft} onChooseAI={() => setTab("ia")} />}
+      {tab === "plantillas" && <TemplateLibrary businessId={businessId} cards={cards} needsWhatsapp={!!studio.needsWhatsapp} />}
       {tab === "sitios" && <WebsitePagesList {...pagesList} onNewPage={() => setTab("plantillas")} />}
-      {tab === "ia" && <CreationStudio {...studio} onBack={() => setTab("plantillas")} />}
     </div>
   );
 }

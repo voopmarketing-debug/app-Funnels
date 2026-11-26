@@ -8,7 +8,7 @@ import { DevicePreviewFrame } from "@/components/DevicePreviewFrame";
 import { TemplateThumb } from "./TemplateThumb";
 import { HtmlUploadDialog } from "./HtmlUploadDialog";
 
-const PAGE = 24;
+const PAGE = 6;
 const plain = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 type Tone = "all" | "light" | "dark";
@@ -22,20 +22,16 @@ export function TemplateLibrary({
   businessId,
   cards,
   needsWhatsapp,
-  hasDraft,
-  onChooseAI,
 }: {
   businessId: string;
   cards: TemplateCard[];
   needsWhatsapp: boolean;
-  hasDraft: boolean;
-  onChooseAI: () => void;
 }) {
   const router = useRouter();
   const [niche, setNiche] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [tone, setTone] = useState<Tone>("all");
-  const [limit, setLimit] = useState(PAGE);
+  const [page, setPage] = useState(0);
   const [big, setBig] = useState<TemplateCard | null>(null);
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [busy, setBusy] = useState<TemplateCard | null>(null);
@@ -66,7 +62,9 @@ export function TemplateLibrary({
     });
   }, [cards, niche, query, tone]);
 
-  const visible = shown.slice(0, limit);
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE));
+  const current = Math.min(page, pages - 1);
+  const visible = shown.slice(current * PAGE, current * PAGE + PAGE);
   const digits = whatsapp.replace(/\D/g, "");
   const whatsappMissing = needsWhatsapp && (digits.length < 8 || digits.length > 15);
   const previewSrc = (id: string) => `/dashboard/businesses/${businessId}/website/muestra?template=${id}`;
@@ -163,15 +161,6 @@ export function TemplateLibrary({
 
   return (
     <div className="space-y-4">
-      {hasDraft && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm">
-          <span>Tienes una conversación con la IA en curso.</span>
-          <button type="button" onClick={onChooseAI} className="font-semibold text-accent hover:underline">
-            Continuar →
-          </button>
-        </div>
-      )}
-
       {needsWhatsapp && (
         <label className="fl-card block max-w-xl space-y-1.5 p-4">
           <span className="block text-sm font-semibold text-ink">¿A qué WhatsApp te van a escribir tus clientes?</span>
@@ -216,7 +205,7 @@ export function TemplateLibrary({
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
-                setLimit(PAGE);
+                setPage(0);
               }}
               placeholder="Buscar: contadores, citas, formulario…"
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-ink outline-none focus:border-accent md:text-sm"
@@ -230,7 +219,7 @@ export function TemplateLibrary({
               value={niche}
               onChange={(e) => {
                 setNiche(e.target.value);
-                setLimit(PAGE);
+                setPage(0);
               }}
               className="rounded-lg border border-border bg-background px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
             >
@@ -254,7 +243,7 @@ export function TemplateLibrary({
               type="button"
               onClick={() => {
                 setNiche("all");
-                setLimit(PAGE);
+                setPage(0);
               }}
               aria-current={niche === "all"}
               className={sidebarItem(niche === "all")}
@@ -268,7 +257,7 @@ export function TemplateLibrary({
                 type="button"
                 onClick={() => {
                   setNiche(n.id);
-                  setLimit(PAGE);
+                  setPage(0);
                 }}
                 aria-current={niche === n.id}
                 className={sidebarItem(niche === n.id)}
@@ -299,13 +288,6 @@ export function TemplateLibrary({
             </div>
           </div>
 
-          <div className="hidden rounded-xl border border-dashed border-border p-3 lg:block">
-            <p className="text-sm font-semibold text-ink">¿No ves tu nicho?</p>
-            <p className="mt-0.5 text-xs text-ink-muted">La IA arma una página a tu medida, con tus productos y tus fotos.</p>
-            <button type="button" onClick={onChooseAI} className="mt-2 w-full rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold hover:border-accent">
-              ✦ Crear con IA
-            </button>
-          </div>
         </aside>
 
         {/* Templates */}
@@ -322,10 +304,7 @@ export function TemplateLibrary({
           {shown.length === 0 ? (
             <div className="fl-card p-8 text-center">
               <p className="text-sm font-semibold text-ink">No encontramos plantillas con eso</p>
-              <p className="mt-1 text-xs text-ink-muted">Prueba con otra palabra, o pídele a la IA que arme la tuya.</p>
-              <button type="button" onClick={onChooseAI} className="mt-3 rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold hover:border-accent">
-                ✦ Crear con IA
-              </button>
+              <p className="mt-1 text-xs text-ink-muted">Prueba con otra palabra o cambia el filtro.</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -381,12 +360,34 @@ export function TemplateLibrary({
             </div>
           )}
 
-          {shown.length > visible.length && (
-            <div className="pt-2 text-center">
-              <button type="button" onClick={() => setLimit((l) => l + PAGE)} className="rounded-lg border border-border-strong px-5 py-2.5 text-sm font-semibold hover:border-accent">
-                Ver más plantillas ({shown.length - visible.length})
+          {pages > 1 && (
+            <nav aria-label="Páginas de plantillas" className="flex items-center justify-between gap-2 pt-2">
+              <button
+                type="button"
+                disabled={current === 0}
+                onClick={() => {
+                  setPage(current - 1);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="h-11 flex-1 rounded-lg border border-border-strong px-4 text-sm font-semibold hover:border-accent disabled:opacity-40 sm:flex-none"
+              >
+                ‹ Anterior
               </button>
-            </div>
+              <p className="flex-none text-center text-sm text-ink-muted">
+                Página <strong className="text-ink">{current + 1}</strong> de {pages}
+              </p>
+              <button
+                type="button"
+                disabled={current >= pages - 1}
+                onClick={() => {
+                  setPage(current + 1);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="h-11 flex-1 rounded-lg bg-accent px-4 text-sm font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-40 sm:flex-none"
+              >
+                Siguiente ›
+              </button>
+            </nav>
           )}
         </section>
       </div>
