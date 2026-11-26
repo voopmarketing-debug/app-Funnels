@@ -405,7 +405,7 @@ export function WebsiteBuilder({
   // "Estilo" only exists while a block is chosen (it is that block's style): with nothing chosen it was an empty twin of Elementos.
   const TABS: { key: Tab; label: string }[] = [
     { key: "bloques", label: "Elementos" },
-    ...(sel !== null ? [{ key: "estilo" as const, label: "Estilo del bloque" }] : []),
+    ...(sel !== null ? [{ key: "estilo" as const, label: "Estilo" }] : []),
     { key: "diseno", label: "Diseño" },
     { key: "ajustes", label: "Ajustes" },
   ];
