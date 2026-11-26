@@ -1,30 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { applyWebsitePromptV2, regenerateWebsitePageV2, updateTemplateSiteTextV3 } from "@/lib/actions";
+import { useEffect, useRef, useState } from "react";
+import { updateTemplateSiteTextV3 } from "@/lib/actions";
 import { attachPreviewEditor, type EditorHandlers } from "./previewEditor";
 import { fromPanelUrl } from "@/lib/panelBackLink";
 import { TrackingSettings } from "./TrackingSettings";
-import { RegenerateBox } from "./RegenerateBox";
 import { PublishControl } from "./PublishControl";
 
 type Device = "desktop" | "mobile";
-type ChatEntry = { role: "user" | "assistant"; text: string };
-
 const DEVICE_WIDTH: Record<Device, string> = { desktop: "100%", mobile: "390px" };
-
-const INTRO_CHAT: ChatEntry = {
-  role: "assistant",
-  text: "Pídeme cualquier cambio como se lo pedirías a tu diseñador: titulares, ofertas, textos, colores. Los productos, fotos y precios se cambian en Productos y se actualizan solos aquí.",
-};
-
-const IDEAS = [
-  "Cambia el titular por uno más corto",
-  "Agrega una oferta del mes con descuento",
-  "Quita la cuenta regresiva",
-  "Cambia el color de acento a verde",
-];
 
 /**
  * The builder for Showroom and Scroll Story pages: the page itself is a fixed, hand-designed
@@ -40,7 +25,6 @@ export function TemplateBuilder({
   templateLabel,
   stats,
   tracking,
-  savedBrief = "",
   published = true,
 }: {
   businessId: string;
@@ -51,15 +35,10 @@ export function TemplateBuilder({
   templateLabel: string;
   stats: { views: number; clicks: number; leads: number };
   tracking: { metaPixelId: string | null; googleTagId: string | null };
-  savedBrief?: string;
   published?: boolean;
 }) {
   const [device, setDevice] = useState<Device>("desktop");
-  const [version, setVersion] = useState(0);
-  const [tab, setTab] = useState<"chat" | "ajustes">("chat");
-  const [chat, setChat] = useState<ChatEntry[]>([INTRO_CHAT]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
+  const version = 0;
   const [copied, setCopied] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"panel" | "preview">("preview");
   const [phoneMenu, setPhoneMenu] = useState(false);
@@ -72,8 +51,6 @@ export function TemplateBuilder({
       setHintDismissed(false);
     }
   }, []);
-  const [, startTransition] = useTransition();
-  const chatRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const detachRef = useRef<(() => void) | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -130,54 +107,6 @@ export function TemplateBuilder({
     return () => detachRef.current?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight });
-  }, [chat, busy]);
-
-  function send(text: string) {
-    const t = text.trim();
-    if (!t || busy) return;
-    setInput("");
-    setChat((c) => [...c, { role: "user", text: t }]);
-    setBusy("Aplicando tu cambio…");
-    startTransition(async () => {
-      const result = await applyWebsitePromptV2(businessId, websiteId, t);
-      setBusy(null);
-      if (!result.ok) {
-        setChat((c) => [...c, { role: "assistant", text: result.error }]);
-        return;
-      }
-      setChat((c) => [...c, { role: "assistant", text: "Listo, ya lo apliqué. Míralo en la vista previa." }]);
-      setVersion((v) => v + 1);
-      setMobilePanel("preview");
-    });
-  }
-
-  function regenerate(brief: string) {
-    if (busy) return;
-    setBusy("Rehaciendo tu página…");
-    startTransition(async () => {
-      try {
-        const result = await regenerateWebsitePageV2(businessId, websiteId, brief);
-        if (!result.ok) {
-          setChat((c) => [...c, { role: "assistant", text: result.error }]);
-          setTab("chat");
-          return;
-        }
-        // A fresh page starts a fresh conversation.
-        setChat([INTRO_CHAT, { role: "assistant", text: "Listo, rehice la página con tu prompt, tus productos y tus fotos. Míralo en la vista previa." }]);
-        setTab("chat");
-        setVersion((v) => v + 1);
-        setMobilePanel("preview");
-      } catch (err) {
-        setChat((c) => [...c, { role: "assistant", text: err instanceof Error && err.message ? err.message : "No pude rehacer la página. Intenta de nuevo en un momento." }]);
-        setTab("chat");
-      } finally {
-        setBusy(null);
-      }
-    });
-  }
 
   async function copyLink() {
     try {
@@ -254,66 +183,7 @@ export function TemplateBuilder({
 
       <div className="flex min-h-0 flex-1">
         <aside className={`${mobilePanel === "panel" ? "flex" : "hidden"} min-h-0 w-full flex-col border-r border-border bg-surface md:flex md:w-[22rem] md:flex-none`}>
-          <div className="fl-seg m-3 inline-flex" role="radiogroup" aria-label="Pestañas">
-            {(["chat", "ajustes"] as const).map((t) => (
-              <button key={t} type="button" role="radio" aria-checked={tab === t} onClick={() => setTab(t)} className="fl-seg-item flex-1 px-3 py-1.5 text-xs">
-                {t === "chat" ? "✦ Cambios con IA" : "Ajustes"}
-              </button>
-            ))}
-          </div>
-
-          {tab === "chat" && (
-            <>
-              <div ref={chatRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-2">
-                {chat.map((m, i) => (
-                  <p key={i} className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm ${m.role === "user" ? "ml-auto bg-accent text-accent-ink" : "bg-surface-2 text-ink"}`}>
-                    {m.text}
-                  </p>
-                ))}
-                {busy && <p className="max-w-[92%] rounded-2xl bg-surface-2 px-3 py-2 text-sm text-ink-muted">✦ {busy}</p>}
-                {chat.length < 3 && !busy && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {IDEAS.map((idea) => (
-                      <button key={idea} type="button" onClick={() => send(idea)} className="rounded-full border border-border px-2.5 py-1 text-[12px] text-ink-muted hover:border-accent hover:text-ink">
-                        {idea}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  send(input);
-                }}
-                className="flex gap-2 border-t border-border p-3"
-              >
-                <label htmlFor="template-chat" className="sr-only">
-                  Qué quieres cambiar
-                </label>
-                <textarea
-                  id="template-chat"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      send(input);
-                    }
-                  }}
-                  rows={2}
-                  maxLength={6000}
-                  placeholder="Ej.: pon la oferta de noviembre con 10 % de descuento"
-                  className="min-w-0 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-base outline-none focus:border-accent md:text-sm"
-                />
-                <button type="submit" disabled={!!busy || !input.trim()} className="self-end rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:opacity-50">
-                  Enviar
-                </button>
-              </form>
-            </>
-          )}
-
-          {tab === "ajustes" && (
+          {true && (
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -336,7 +206,6 @@ export function TemplateBuilder({
                 <span className="block text-xs text-ink-muted">Cambia productos, precios y fotos (incluidas las de otros ángulos para el giro 360°). Se actualizan solos en la página.</span>
               </Link>
               <TrackingSettings businessId={businessId} websiteId={websiteId} metaPixelId={tracking.metaPixelId} googleTagId={tracking.googleTagId} />
-              <RegenerateBox savedBrief={savedBrief} busy={!!busy} onRegenerate={regenerate} />
             </div>
           )}
         </aside>
@@ -355,11 +224,6 @@ export function TemplateBuilder({
         <main className={`flex relative min-h-0 min-w-0 flex-1 justify-center overflow-auto bg-[repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2)_10px,var(--background)_10px,var(--background)_20px)] p-0 md:flex md:p-4`}>
           <div className="relative h-full overflow-hidden bg-white transition-[width] duration-300 md:rounded-xl md:border md:border-border md:shadow-2xl" style={{ width: DEVICE_WIDTH[device], maxWidth: "100%" }}>
             <iframe ref={iframeRef} onLoad={onPreviewLoad} key={version} src={`/sitio/${slug}?preview=1&edit=1&v=${version}`} title="Vista previa de tu página, editable: toca un texto para cambiarlo" className="h-full w-full border-0" />
-            {busy && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
-                <span className="rounded-full bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-lg">✦ {busy}</span>
-              </div>
-            )}
           </div>
         </main>
         </div>

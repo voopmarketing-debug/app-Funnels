@@ -459,7 +459,7 @@ function NewPageForm({
     <form action={handleSubmit} className="space-y-4 p-6">
       <div className="space-y-1">
         <h2 className="text-lg font-bold text-ink">
-          {isFirstPage ? "Genera tu sitio web con IA" : `Nueva página (Página ${pageNumber})`}
+          {isFirstPage ? "Crea tu primera página" : `Nueva página (Página ${pageNumber})`}
         </h2>
         <p className="text-sm text-ink-muted">
           {isFirstPage

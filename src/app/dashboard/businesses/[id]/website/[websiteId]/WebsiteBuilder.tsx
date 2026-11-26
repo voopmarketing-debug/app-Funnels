@@ -5,7 +5,7 @@ import { TrackingSettings } from "./TrackingSettings";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { applyWebsitePromptV2, editWebsiteBlocksV2, regenerateWebsitePageV2, restoreWebsiteContentV2, setWebsiteSectionImageV2, updateWebsiteDesignV2, updateWebsiteTextV2 } from "@/lib/actions";
+import { editWebsiteBlocksV2, restoreWebsiteContentV2, setWebsiteSectionImageV2, updateWebsiteDesignV2, updateWebsiteTextV2 } from "@/lib/actions";
 import type { BlockOp } from "@/lib/websiteBlocks";
 import { lookParts, type Look } from "@/lib/websiteLook";
 import {
@@ -27,31 +27,15 @@ import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
-import { RegenerateBox } from "./RegenerateBox";
 import { PublishControl } from "./PublishControl";
 import { HtmlCodeDialog } from "./HtmlCodeDialog";
 
-type Tab = "chat" | "bloques" | "estilo" | "diseno" | "ajustes";
+type Tab = "bloques" | "estilo" | "diseno" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
-type ChatEntry = { role: "user" | "assistant"; text: string; error?: boolean };
-
-const INTRO_CHAT: ChatEntry = {
-  role: "assistant",
-  text: "Pídeme cualquier cambio como se lo pedirías a tu diseñador: textos, colores, secciones, estilo. Lo aplico y lo ves al instante en la vista previa.",
-};
 
 const DEVICE_WIDTH: Record<Device, string> = { desktop: "100%", tablet: "820px", mobile: "390px" };
 const HINT_KEY = "fl-builder-edit-hint";
 type SaveState = "idle" | "saving" | "saved" | "error";
-
-const SUGGESTIONS = [
-  "Haz el titular más corto y directo",
-  "Agrega una sección de preguntas frecuentes",
-  "Cambia a un estilo más elegante",
-  "Usa colores más cálidos",
-  "Pon el botón principal más llamativo",
-  "Agrega una franja con una promoción",
-];
 
 /**
  * Full-screen builder for v2 pages: live preview in the middle (desktop /
@@ -69,7 +53,6 @@ export function WebsiteBuilder({
   stats,
   tracking,
   initialTab = "bloques",
-  savedBrief = "",
   published = true,
 }: {
   businessId: string;
@@ -83,10 +66,8 @@ export function WebsiteBuilder({
   // ?tab=ajustes from the pages list's "Píxel" shortcut.
   initialTab?: Tab;
   // The prompt this page was made from, offered again when remaking it.
-  savedBrief?: string;
   published?: boolean;
 }) {
-  const router = useRouter();
   const [content, setContent] = useState(initialContent);
   // Undo / redo: the versions of the page before and after this one (this session only).
   const contentRef = useRef(initialContent);
@@ -111,13 +92,10 @@ export function WebsiteBuilder({
     const id = setTimeout(() => setPreviewTheme(draftTheme), 350);
     return () => clearTimeout(id);
   }, [draftTheme]);
-  const [chat, setChat] = useState<ChatEntry[]>([INTRO_CHAT]);
-  const [input, setInput] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"panel" | "preview">("panel");
   const [isPending, startTransition] = useTransition();
-  const chatRef = useRef<HTMLDivElement>(null);
 
   // Click-to-edit on the preview itself (see previewEditor.ts).
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -147,10 +125,6 @@ export function WebsiteBuilder({
     const id = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(id);
   }, [toast]);
-
-  useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
-  }, [chat, busy]);
 
   const refreshPreview = () => {
     // The reload keeps the person where they were instead of jumping back to the top.
@@ -214,52 +188,6 @@ export function WebsiteBuilder({
         const next = await updateWebsiteDesignV2(businessId, websiteId, patch);
         adopt(next);
         refreshPreview();
-      } finally {
-        setBusy(null);
-      }
-    });
-  }
-
-  function sendChat(text: string) {
-    const t = text.trim();
-    if (!t || busy) return;
-    setInput("");
-    setChat((c) => [...c, { role: "user", text: t }]);
-    setBusy("Aplicando tu cambio…");
-    startTransition(async () => {
-      try {
-        const result = await applyWebsitePromptV2(businessId, websiteId, t);
-        if (!result.ok) throw new Error(result.error);
-        adopt(result.content);
-        refreshPreview();
-        setChat((c) => [...c, { role: "assistant", text: "Listo, ya está aplicado. Revísalo en la vista previa y dime si quieres ajustar algo más." }]);
-        setMobilePanel("preview");
-      } catch (err) {
-        setChat((c) => [...c, { role: "assistant", text: err instanceof Error ? err.message : "No pude aplicar el cambio", error: true }]);
-      } finally {
-        setBusy(null);
-      }
-    });
-  }
-
-  function regenerate(brief: string) {
-    setBusy("Rehaciendo la página con IA…");
-    startTransition(async () => {
-      try {
-        const result = await regenerateWebsitePageV2(businessId, websiteId, brief);
-        if (!result.ok) {
-          setChat((c) => [...c, { role: "assistant", text: result.error, error: true }]);
-          setTab("chat");
-          return;
-        }
-        // A fresh page starts a fresh conversation.
-        setChat([INTRO_CHAT]);
-        setTab("chat");
-        router.refresh();
-        refreshPreview();
-      } catch (err) {
-        setChat((c) => [...c, { role: "assistant", text: err instanceof Error && err.message ? err.message : "No pude rehacer la página. Intenta de nuevo en un momento.", error: true }]);
-        setTab("chat");
       } finally {
         setBusy(null);
       }
@@ -477,7 +405,6 @@ export function WebsiteBuilder({
   // "Estilo" only exists while a block is chosen (it is that block's style): with nothing chosen it was an empty twin of Elementos.
   const TABS: { key: Tab; label: string }[] = [
     { key: "bloques", label: "Elementos" },
-    { key: "chat", label: "✦ IA" },
     ...(sel !== null ? [{ key: "estilo" as const, label: "Estilo del bloque" }] : []),
     { key: "diseno", label: "Diseño" },
     { key: "ajustes", label: "Ajustes" },
@@ -588,61 +515,6 @@ export function WebsiteBuilder({
               </button>
             ))}
           </nav>
-
-          {activeTab === "chat" && (
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div ref={chatRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-                {chat.map((m, i) =>
-                  m.role === "user" ? (
-                    <p key={i} className="ml-8 rounded-2xl rounded-tr-md bg-accent/15 px-3 py-2 text-sm">{m.text}</p>
-                  ) : (
-                    <div key={i} className="flex gap-2">
-                      <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-accent text-xs text-accent-ink">✦</span>
-                      <p className={`pt-1 text-sm ${m.error ? "text-error" : "text-ink"}`}>{m.text}</p>
-                    </div>
-                  ),
-                )}
-                {busy && (
-                  <p className="flex items-center gap-2 pl-9 text-xs text-ink-muted">
-                    <span className="h-1.5 w-1.5 animate-ping rounded-full bg-accent" /> {busy}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2 border-t border-border p-3">
-                <div className="flex flex-wrap gap-1.5">
-                  {SUGGESTIONS.slice(0, 4).map((s) => (
-                    <button key={s} type="button" disabled={!!busy} onClick={() => sendChat(s)} className="rounded-full border border-border px-2.5 py-1 text-[12px] text-ink-muted hover:border-accent hover:text-ink disabled:opacity-50">
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    sendChat(input);
-                  }}
-                  className="flex items-end gap-2 rounded-xl border border-border bg-background p-2 focus-within:border-accent/60"
-                >
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        sendChat(input);
-                      }
-                    }}
-                    rows={2}
-                    placeholder="Ej: cambia el titular por algo sobre envíos gratis y pon el fondo más claro"
-                    className="max-h-32 min-h-[2.75rem] flex-1 resize-none bg-transparent px-1.5 py-1 text-base outline-none placeholder:text-ink-faint md:text-sm"
-                  />
-                  <button type="submit" disabled={!!busy || !input.trim()} className="h-9 rounded-lg bg-accent px-3 text-sm font-semibold text-accent-ink disabled:opacity-50">
-                    Enviar
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
 
           {activeTab === "diseno" && (
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-3">
@@ -793,7 +665,6 @@ export function WebsiteBuilder({
                 🛍️ <strong>Productos</strong>
                 <span className="block text-xs text-ink-muted">Agrega o edita los productos que aparecen en tu tienda.</span>
               </Link>
-              <RegenerateBox savedBrief={savedBrief} busy={!!busy} onRegenerate={regenerate} />
             </div>
           )}
         </aside>

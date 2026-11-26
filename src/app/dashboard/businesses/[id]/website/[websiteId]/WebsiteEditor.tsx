@@ -2,13 +2,11 @@
 
 import { TrackingSettings } from "./TrackingSettings";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { updateWebsiteContent, updateWebsiteCustomDomain, regenerateWebsitePage, applyWebsitePrompt } from "@/lib/actions";
+import { updateWebsiteContent, updateWebsiteCustomDomain } from "@/lib/actions";
 import { FONT_OPTIONS, type WebsiteContent } from "@/lib/websiteContent";
 import { DownloadCsvButton } from "@/components/DownloadCsvButton";
 import { ClientDate } from "@/components/ClientDate";
 import { fromPanelUrl } from "@/lib/panelBackLink";
-import { askConfirm } from "@/components/ConfirmHost";
 
 export function WebsiteEditor({
   businessId,
@@ -36,20 +34,13 @@ export function WebsiteEditor({
   // instead of the owner having to copy-paste its URL by hand.
   otherPages: { name: string; pageType: string; publicUrl: string }[];
 }) {
-  const router = useRouter();
   const [content, setContent] = useState<WebsiteContent>(initialContent);
   const [isSaving, startSaving] = useTransition();
-  const [isRegenerating, startRegenerating] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [promptText, setPromptText] = useState("");
-  const [isApplyingPrompt, startApplyingPrompt] = useTransition();
-  const [promptError, setPromptError] = useState<string | null>(null);
-  const [promptApplied, setPromptApplied] = useState(false);
   const [generatedAt, setGeneratedAt] = useState(initialGeneratedAt);
-  const [regenerateError, setRegenerateError] = useState<string | null>(null);
 
   function save() {
     setSaveError(null);
@@ -67,91 +58,9 @@ export function WebsiteEditor({
     });
   }
 
-  async function regenerate() {
-    if (!(await askConfirm({ title: "¿Generar una nueva versión con IA?", message: "Se reemplazan todo el texto y los colores actuales por una versión nueva.", confirmLabel: "Sí, generar" }))) return;
-    setRegenerateError(null);
-    startRegenerating(async () => {
-      try {
-        const result = await regenerateWebsitePage(businessId, websiteId);
-        setContent(result.content);
-        setGeneratedAt(new Date(result.generatedAt));
-        setPreviewKey((k) => k + 1);
-        router.refresh();
-      } catch (err) {
-        setRegenerateError(err instanceof Error ? err.message : "No se pudo regenerar la página");
-      }
-    });
-  }
-
-  function applyPrompt() {
-    if (!promptText.trim()) return;
-    setPromptError(null);
-    setPromptApplied(false);
-    startApplyingPrompt(async () => {
-      try {
-        const updated = await applyWebsitePrompt(businessId, websiteId, promptText);
-        setContent(updated);
-        setGeneratedAt(new Date());
-        setPromptText("");
-        setPromptApplied(true);
-        setPreviewKey((k) => k + 1);
-        setTimeout(() => setPromptApplied(false), 6000);
-      } catch (err) {
-        setPromptError(err instanceof Error ? err.message : "No se pudo aplicar el cambio");
-      }
-    });
-  }
-
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-4">
-        <div className="fl-card space-y-2 p-4">
-          <h2 className="text-sm font-semibold text-ink">✨ Pide cambios con IA</h2>
-          <p className="text-xs text-ink-muted">
-            Escribe qué quieres cambiar, como si le hablaras a un diseñador — ej. "pon el botón principal en azul",
-            "hazlo sonar más formal", "cambia el título del hero". La IA reescribe textos, colores y fuentes de las
-            secciones que ya existen en la página.
-          </p>
-          <p className="rounded-md border border-border bg-background px-3 py-2 text-xs text-ink-muted">
-            No agrega bloques nuevos ni animaciones — para que agenden, crea una página de Agenda y apúntale el
-            botón ahí.
-          </p>
-          <textarea
-            value={promptText}
-            onChange={(e) => setPromptText(e.target.value)}
-            rows={2}
-            placeholder="Ej: cambia el color principal a morado y hazlo más corto"
-            disabled={isApplyingPrompt}
-            className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent disabled:opacity-60"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                applyPrompt();
-              }
-            }}
-          />
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={applyPrompt}
-              disabled={isApplyingPrompt || !promptText.trim()}
-              className="rounded-md bg-accent-secondary px-4 py-2 text-sm font-semibold text-accent-ink transition hover:opacity-90 disabled:opacity-50"
-            >
-              {isApplyingPrompt ? "Aplicando... (puede tardar un minuto)" : "Aplicar cambio"}
-            </button>
-          </div>
-          {promptApplied && (
-            <p className="fl-mono rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent">
-              ✓ Cambio aplicado y guardado — ya está en tu página, revisa la vista previa a la derecha
-            </p>
-          )}
-          {promptError && (
-            <p className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-xs font-semibold text-error">
-              ✕ {promptError}
-            </p>
-          )}
-        </div>
-
         <div className="fl-card flex flex-wrap items-center gap-3 p-4">
           <button
             type="button"
@@ -161,18 +70,9 @@ export function WebsiteEditor({
           >
             {isSaving ? "Guardando..." : "Guardar cambios"}
           </button>
-          <button
-            type="button"
-            onClick={regenerate}
-            disabled={isRegenerating}
-            className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink transition hover:border-accent disabled:opacity-50"
-          >
-            {isRegenerating ? "Regenerando... (puede tardar un minuto)" : "Regenerar todo con IA"}
-          </button>
           {saved && <span className="fl-mono text-xs text-accent">✓ Guardado</span>}
           {saveError && <span className="text-xs text-error">{saveError}</span>}
-          {regenerateError && <span className="text-xs text-error">{regenerateError}</span>}
-        </div>
+                  </div>
 
         <Section title="Colores y tipografía" defaultOpen>
           <div className="grid grid-cols-3 gap-3">

@@ -6,10 +6,8 @@ import { WebsiteContentSchema } from "@/lib/websiteContent";
 import { AvailabilitySchema, DEFAULT_AVAILABILITY, parseMonthStr, getCurrentMonthStr } from "@/lib/agenda";
 import { WebsiteEditor } from "./WebsiteEditor";
 import { WebsiteBuilder } from "./WebsiteBuilder";
-import { UpgradeToBuilderBanner } from "./UpgradeToBuilderBanner";
 import { WebsiteContentV2Schema, isV2Content } from "@/lib/websiteContentV2";
 import { AgendaEditor } from "./AgendaEditor";
-import { RegenerateOldPageButton } from "./RegenerateOldPageButton";
 import { TemplateBuilder } from "./TemplateBuilder";
 import { isTemplateContent } from "@/lib/templateSite/content";
 import { parseTemplateSite } from "@/lib/templateSite/render";
@@ -132,7 +130,6 @@ export default async function WebsiteEditorPage({
           templateLabel={template.template === "showroom" ? "Showroom · productos para comparar" : "Scroll Story · historia de marca"}
           stats={{ views, clicks, leads: leadCount }}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
-          savedBrief={website.designPrompt ?? ""}
           published={website.published}
         />
       );
@@ -158,8 +155,7 @@ export default async function WebsiteEditorPage({
           initialContent={v2.data}
           stats={{ views, clicks, leads: leadCount }}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
-          initialTab={tabParam === "ajustes" ? "ajustes" : tabParam === "ia" ? "chat" : "bloques"}
-          savedBrief={website.designPrompt ?? ""}
+          initialTab={tabParam === "ajustes" ? "ajustes" : "bloques"}
           published={website.published}
         />
       );
@@ -175,11 +171,13 @@ export default async function WebsiteEditorPage({
           ← Sitios web
         </Link>
         <div className="fl-card space-y-2 p-6 text-center">
-          <p className="text-sm font-medium text-ink">Esta página se generó con una versión anterior del sistema</p>
+          <p className="text-sm font-medium text-ink">Esta página es de una versión anterior del sistema</p>
           <p className="text-xs text-ink-muted">
-            Necesita regenerarse una vez para poder editarla — el contenido actual no se perderá hasta que lo hagas.
+            Ya no se puede editar. Sigue publicada como está; para cambiarla, crea una nueva desde las plantillas.
           </p>
-          <RegenerateOldPageButton businessId={id} websiteId={websiteId} />
+          <Link href={`/dashboard/businesses/${id}/website`} className="inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
+            Ver las plantillas
+          </Link>
         </div>
       </div>
     );
@@ -215,8 +213,6 @@ export default async function WebsiteEditorPage({
         <h1 className="mt-1 text-xl font-bold">{website.name}</h1>
         {website.purpose && <p className="mt-1 max-w-2xl text-sm text-ink-muted">{website.purpose}</p>}
       </div>
-
-      <UpgradeToBuilderBanner businessId={id} websiteId={websiteId} />
 
       <WebsiteEditor
         businessId={id}
