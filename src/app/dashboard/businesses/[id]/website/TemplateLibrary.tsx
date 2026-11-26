@@ -180,13 +180,9 @@ export function TemplateLibrary({
 
       {error && <p className="rounded-lg border border-error/40 bg-error/10 p-3 text-sm text-error">{error}</p>}
 
-      {/* Phones: the two ways to start from nothing, right at the top (no scrolling past the filters). */}
-      <div className="grid grid-cols-2 gap-2 sm:hidden">
-        <button type="button" onClick={createBlank} className="flex min-h-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-xl bg-accent px-3 py-3 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-          <span aria-hidden="true" className="font-mono text-xl leading-none">{"</>"}</span>
-          Página en blanco
-        </button>
-        <button type="button" onClick={() => setHtmlOpen(true)} className="flex min-h-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-border-strong px-3 py-3 text-sm font-bold text-ink hover:border-accent">
+      {/* Phones: the blank page is built on a computer only; here, the one way to bring your own page. */}
+      <div className="sm:hidden">
+        <button type="button" onClick={() => setHtmlOpen(true)} className="flex min-h-[4.5rem] w-full flex-col items-center justify-center gap-0.5 rounded-xl border border-border-strong px-3 py-3 text-sm font-bold text-ink hover:border-accent">
           <span aria-hidden="true" className="text-xl leading-none">⬆</span>
           Subir mi HTML
         </button>
