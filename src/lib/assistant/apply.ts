@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import {
   addPipelineStage,
-  applyWebsitePromptV2,
   createMessageTemplate,
   sendBroadcast,
   toggleAgentEnabled,
@@ -109,11 +108,6 @@ export async function executeProposal(kind: ProposeToolName, businessId: string,
       const res = await saveProduct(businessId, productId, input);
       if (!res.ok) throw new Error(res.error);
       return existing ? `Listo: «${input.name}» quedó actualizado en tu catálogo.` : `Listo: «${input.name}» ya está en tu catálogo y el agente lo puede ofrecer.`;
-    }
-    case "propose_website_edit": {
-      const res = await applyWebsitePromptV2(businessId, String(p.websiteId), String(p.instruction));
-      if (!res.ok) throw new Error(res.error);
-      return "Listo: la página quedó actualizada. Ábrela en Sitio web para verla.";
     }
   }
 }

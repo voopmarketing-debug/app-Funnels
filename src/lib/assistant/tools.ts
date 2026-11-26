@@ -157,11 +157,6 @@ const PROPOSE_TOOLS = {
       explanation: Explanation,
     }),
   },
-  propose_website_edit: {
-    description:
-      "Propone un cambio en una página web del negocio, descrito en palabras (ej. 'cambia el título por…', 'agrega una sección de preguntas frecuentes'). Solo páginas que list_websites marca como editables con IA.",
-    schema: z.object({ businessId: BusinessId, websiteId: z.string().max(40), instruction: z.string().min(5).max(2000), explanation: Explanation }),
-  },
 } as const;
 
 export type ProposeToolName = keyof typeof PROPOSE_TOOLS;
@@ -337,7 +332,6 @@ export async function runReadTool(name: string, input: unknown, scope: ToolScope
           name: w.name,
           type: w.pageType,
           url: `/sitio/${w.slug}`,
-          editableWithAi: w.pageType === "landing" && v2.success,
           summary: v2.success ? clip(JSON.stringify(v2.data), 1500) : null,
         };
       });
@@ -563,14 +557,6 @@ export async function buildProposal(name: ProposeToolName, input: unknown, busin
           ...(p.description ? { body: p.description } : {}),
         },
       };
-    }
-    case "propose_website_edit": {
-      const p = payload as { websiteId: string; instruction: string };
-      const site = await prisma.website.findFirst({ where: { id: p.websiteId, businessId }, select: { name: true, content: true, pageType: true } });
-      if (!site || site.pageType !== "landing" || !WebsiteContentV2Schema.safeParse(site.content).success) {
-        throw new ToolInputError("Esa página no se puede editar con IA. Usa list_websites para ver cuáles sí.");
-      }
-      return { ...base, preview: { title: `Cambiar la página «${site.name}»`, lines: [biz, { label: "Por qué", value: explanation }], body: p.instruction } };
     }
   }
 }

@@ -11,7 +11,7 @@ Cada negocio tiene un agente de IA que responde por WhatsApp a sus clientes, má
 - CRM: conversaciones estilo WhatsApp Web, tablero por etapas (embudos), lista de contactos, difusiones (mensajes masivos) e importar contactos. En cada chat se elige quién responde: la IA o una persona («Respondo yo»).
 - KPIs: métricas de conversaciones, automatización, citas y sitio web, con diagnóstico de ventas con IA.
 - Plantillas: mensajes de WhatsApp aprobados por Meta, necesarios para escribir a alguien que no ha escrito en las últimas 24 horas.
-- Sitio web: páginas de venta y de agenda generadas con IA.
+- Sitio web: plantillas listas para publicar, páginas propias en HTML y un editor visual. TÚ no creas ni editas páginas web: si te lo piden, explícales que entren a Sitio web → Plantillas (o Mis sitios para editar una que ya tienen).
 - Inventario: catálogo de productos y servicios que el agente usa para responder precios y disponibilidad.
 - Redes sociales: métricas de Facebook e Instagram, diagnóstico de contenido con IA, Mensajes (Messenger e Instagram Direct, los responde el equipo, no la IA), Comentarios y Respuestas automáticas por palabra clave.
 - Mi perfil, Clientes y Rentabilidad (estas dos solo para la agencia).
