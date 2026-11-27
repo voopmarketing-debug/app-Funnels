@@ -44,6 +44,16 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
     return finish(next);
   }
 
+  // The page's own top bar and footer: chrome.brandName, chrome.footerText, chrome.footerLink (empty = back to the automatic text).
+  if (parts.length === 2 && parts[0] === "chrome" && (parts[1] === "brandName" || parts[1] === "footerText" || parts[1] === "footerLink")) {
+    const text = clean("name", rawValue).slice(0, parts[1] === "footerText" ? 120 : 60);
+    const chrome = { ...(next.chrome ?? {}) } as Record<string, unknown>;
+    if (text) chrome[parts[1]] = text;
+    else delete chrome[parts[1]];
+    next.chrome = (Object.keys(chrome).length ? chrome : undefined) as typeof next.chrome;
+    return finish(next);
+  }
+
   if (parts[0] !== "sections" || !isIndex(parts[1])) return bad();
   const section = next.sections[Number(parts[1])] as unknown as Record<string, unknown> | undefined;
   if (!section) return bad();

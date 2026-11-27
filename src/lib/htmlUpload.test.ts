@@ -155,4 +155,22 @@ describe("Subir mi HTML", () => {
     expect(LOOK_CSS).toContain(".lk-cols-3 :is(");
     expect(LOOK_CSS).toContain("minmax(0,2fr) minmax(0,1fr)");
   });
+  it("the page's own top bar and footer: logo, menu colors, footer texts", () => {
+    const base = buildHtmlPageContent({ businessName: "Mi Negocio", html: "<p>Hola</p>" });
+    const page = { ...base, fullHtml: false, plain: false, chrome: { logo: "https://x.co/logo.png", headerBg: "#112233", headerColor: "#ffffff", headerBtn: "#e11d48", footerText: "Todos los derechos", footerLink: "Hablemos", footerBg: "#000000" } } as unknown as typeof base;
+    const html = renderWebsiteHtmlV2(page, ctx);
+    expect(html).toContain('<a class="brand brand-logo" href="#inicio"><img src="https://x.co/logo.png"');
+    expect(html).toContain("--hbg:#112233");
+    expect(html).toContain("--hbtn:#e11d48");
+    expect(html).toContain(">Todos los derechos</span>");
+    expect(html).toContain(">Hablemos</a>");
+    expect(html).toContain("--fbg:#000000");
+    // Not a color: ignored, nothing injected.
+    const bad = renderWebsiteHtmlV2({ ...page, chrome: { headerBg: "red;}</style><script>", brandName: "Otra marca" } } as unknown as typeof base, ctx);
+    expect(bad).not.toContain("red;}");
+    expect(bad).toContain(">Otra marca</a>");
+    // A button color only for one block.
+    expect(lookParts({ btn: "#e11d48" }).classes).toContain("lk-btn");
+    expect(lookParts({ btn: "#e11d48" }).vars["--lkbtn"]).toBe("#e11d48");
+  });
 });

@@ -451,6 +451,24 @@ export const ThemeSchema = z.object({
   bodyFont: z.enum(FONT_OPTIONS).catch("Inter"),
 });
 
+const chromeHex = z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional().catch(null);
+const chromeText = (max: number) => z.string().max(max).nullable().optional().catch(null);
+export const ChromeSchema = z
+  .object({
+    logo: imageUrl,
+    brandName: chromeText(60),
+    headerBg: chromeHex,
+    headerColor: chromeHex,
+    headerBtn: chromeHex,
+    footerText: chromeText(120),
+    footerLink: chromeText(60),
+    footerBg: chromeHex,
+    footerColor: chromeHex,
+  })
+  .optional()
+  .catch(undefined);
+export type Chrome = NonNullable<z.infer<typeof ChromeSchema>>;
+
 // What the AI returns.
 export const AiWebsiteV2Schema = z.object({
   pageType: z.enum(PAGE_TYPES).catch("servicios"),
@@ -471,6 +489,8 @@ export const WebsiteContentV2Schema = AiWebsiteV2Schema.extend({
   /** Addresses of the pictures the platform created with AI on this page (so they can be counted, replaced or removed). */
   /** The public page shows only the owner's HTML block, with no header, footer or sections of ours ("Subir mi HTML"). */
   fullHtml: z.boolean().optional().catch(undefined),
+  /** The page's own top bar and footer: logo, name, colors and footer texts (all optional; what is empty stays automatic). */
+  chrome: ChromeSchema,
   /** Without our top bar (name + button) and our footer: the page is only its blocks. */
   plain: z.boolean().optional().catch(undefined),
   /** A fixed button at the bottom of the screen on phones (landing and funnel pages). */

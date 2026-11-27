@@ -40,7 +40,7 @@ import { assertWebsiteGenerationAllowed, recordWebsiteGeneration } from "@/lib/w
 import { checkUploadedHtml } from "@/lib/htmlBlock";
 import { buildBlankContent, buildFunnelContent, buildHtmlPageContent, buildNicheContent, getFunnelTemplate, getNicheTemplate } from "@/lib/websiteNicheTemplates";
 import { WebsiteContentSchema, type WebsiteContent } from "@/lib/websiteContent";
-import { WebsiteContentV2Schema, isV2Content, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { WebsiteContentV2Schema, isV2Content, type Chrome, type PageType, type StyleKey, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { isTemplateContent, templateForPageType } from "@/lib/templateSite/content";
 import { applyTemplateEdit, generateTemplateSite } from "@/lib/templateSite/generator";
 import { parseTemplateSite } from "@/lib/templateSite/render";
@@ -3603,6 +3603,8 @@ export async function updateWebsiteDesignV2(
     sticky?: boolean;
     fullHtml?: boolean;
     plain?: boolean;
+    /** Logo, name, colors and footer texts of the page (only what is sent changes; null/"" clears it). */
+    chrome?: Partial<Record<keyof Chrome, string | null>>;
   },
 ): Promise<WebsiteContentV2> {
   const session = await auth();
@@ -3625,6 +3627,16 @@ export async function updateWebsiteDesignV2(
   if (patch.sticky !== undefined) next.sticky = patch.sticky ? true : undefined;
   if (patch.fullHtml !== undefined) next.fullHtml = patch.fullHtml ? true : undefined;
   if (patch.plain !== undefined) next.plain = patch.plain ? true : undefined;
+  if (patch.chrome) {
+    // Only the business's own pictures can be the logo: never a url typed in by the browser.
+    if (patch.chrome.logo && !(await ownImageUrls(businessId, website.aiImageUrl)).has(patch.chrome.logo)) throw new Error("Esa foto ya no está en tu biblioteca");
+    const merged: Record<string, unknown> = { ...(current.chrome ?? {}) };
+    for (const [k, v] of Object.entries(patch.chrome)) {
+      if (v === null || v === "" || v === undefined) delete merged[k];
+      else merged[k] = v;
+    }
+    next.chrome = (Object.keys(merged).length ? merged : undefined) as WebsiteContentV2["chrome"];
+  }
   if (patch.move) {
     const { from, to } = patch.move;
     // The hero always stays first.

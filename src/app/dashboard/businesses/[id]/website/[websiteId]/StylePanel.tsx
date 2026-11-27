@@ -175,7 +175,7 @@ function ExtrasEditor({ extras, busy, onChange, onPickPhoto }: { extras: ExtraEl
   );
 }
 
-function ColorRow({
+export function ColorRow({
   label,
   hint,
   value,
@@ -344,6 +344,8 @@ export function StylePanel({
       </button>
 
       <ColorRow label="Color del texto" value={look.color} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ color: hex })} />
+
+      <ColorRow label="Color de los botones" hint="Solo los botones de este bloque." value={look.btn} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ btn: hex })} />
 
       {section.type !== "gallery" && (
         <ColorRow label="Color de los cuadros" value={look.surface} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ surface: hex })} />

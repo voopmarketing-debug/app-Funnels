@@ -309,6 +309,14 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     return m ? (content.sections[Number(m[1])]?.fc?.[m[2]] ?? null) : null;
   };
   const ed = (path: string) => (edit ? ` data-edit="${esc(path)}"` : "") + (fcOf(path) ? ` data-fc="${esc(path)}"` : "");
+  // The page's own top bar and footer (see "Encabezado y pie" in the builder).
+  const chrome = content.chrome ?? {};
+  const brandName = chrome.brandName || ctx.businessName;
+  const hexOk = (c: string | null | undefined) => (c && /^#[0-9a-fA-F]{6}$/.test(c) ? c : null);
+  const hdrParts = [hexOk(chrome.headerBg) && `--hbg:${chrome.headerBg}`, hexOk(chrome.headerColor) && `--hc:${chrome.headerColor}`, hexOk(chrome.headerBtn) && `--hbtn:${chrome.headerBtn};--hbtnt:${readableTextColor(chrome.headerBtn as string)}`].filter(Boolean);
+  const hdrVars = hdrParts.join(";");
+  const ftrParts = [hexOk(chrome.footerBg) && `--fbg:${chrome.footerBg}`, hexOk(chrome.footerColor) && `--fc:${chrome.footerColor}`].filter(Boolean);
+  const ftrVars = ftrParts.join(";");
   const fcCss = content.sections
     .flatMap((sec, i) => Object.entries(sec.fc ?? {}).map(([k, c]) => `[data-fc="sections.${i}.${k}"]{color:${c}!important}`))
     .join("");
@@ -1002,6 +1010,12 @@ header.top .wrap{display:flex;align-items:center;gap:24px;height:68px}
 .nav a{text-decoration:none;color:var(--muted)}
 .nav a:hover{color:var(--text)}
 header.top .btn{padding:10px 18px;font-size:14px}
+header.top.hc{background:var(--hbg,color-mix(in srgb,var(--bg) 88%,transparent))}
+header.top.hc .brand,header.top.hc .nav a{color:var(--hc,inherit)}
+header.top.hc .btn{background:var(--hbtn,var(--primary));border-color:var(--hbtn,var(--primary));color:var(--hbtnt,var(--btn-text))}
+.brand-logo img{display:block;height:38px;width:auto;max-width:180px;object-fit:contain}
+footer.foot.fc{background:var(--fbg,transparent);color:var(--fc,var(--muted))}
+footer.foot.fc a{color:var(--fc,var(--muted))}
 section{position:relative}
 .sec{padding:var(--pad) 0}
 .sec.alt,.trust{background:var(--surface)}
@@ -1287,15 +1301,15 @@ ${fcCss}
 </head>
 <body class="st-${content.style} pt-${content.pageType}${content.sticky ? " has-sticky" : ""}">
 ${announcementHtml}
-${content.plain ? "" : `<header class="top"><div class="wrap">
-  <a class="brand" href="#inicio">${esc(ctx.businessName)}</a>
+${content.plain ? "" : `<header class="top${hdrVars ? " hc" : ""}"${hdrVars ? ` style="${hdrVars}"` : ""}><div class="wrap">
+  ${chrome.logo && safeUrl(chrome.logo) ? `<a class="brand brand-logo" href="#inicio"><img src="${esc(safeUrl(chrome.logo) ?? "")}" alt="${esc(brandName)}"${edit ? ` data-logo` : ""}></a>` : `<a class="brand" href="#inicio"${ed("chrome.brandName")}>${esc(brandName)}</a>`}
   <nav class="nav" aria-label="Secciones">${navLinks.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("")}</nav>
   <a class="btn" href="${esc(href("header"))}">${isShop ? "Pedir por WhatsApp" : "Escríbenos"}</a>
 </div></header>`}
 <main>
 ${body}
 </main>
-${content.plain ? "" : `<footer class="foot"><div class="wrap"><span>© ${esc(ctx.businessName)}</span><a href="${esc(href("footer"))}">Escríbenos por WhatsApp</a></div></footer>`}
+${content.plain ? "" : `<footer class="foot${ftrVars ? " fc" : ""}"${ftrVars ? ` style="${ftrVars}"` : ""}><div class="wrap"><span${ed("chrome.footerText")}>${esc(chrome.footerText || `© ${ctx.businessName}`)}</span><a href="${esc(href("footer"))}"${ed("chrome.footerLink")}>${esc(chrome.footerLink || "Escríbenos por WhatsApp")}</a></div></footer>`}
 ${content.sticky && firstHero && firstHero.type === "hero" ? `<div class="sticky-cta"><a class="btn" href="${esc(ctaHref("barra-fija"))}">${esc(firstHero.ctaLabel)}</a></div>` : ""}
 ${isShop ? `<div class="mbar"><a class="btn" href="${esc(href("barra-movil"))}">Pedir por WhatsApp</a></div>` : ""}
 <script>${SITE_SCRIPT}</script>

@@ -26,6 +26,7 @@ import { ImagePicker } from "./ImagePicker";
 import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
+import { ChromePanel } from "./ChromePanel";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
 import { BagIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
 import { PublishControl } from "./PublishControl";
@@ -89,6 +90,7 @@ export function WebsiteBuilder({
   const [zoom, setZoom] = useState(100);
   // Desktop: the left panel folds away to give the page the whole width.
   const [panelOpen, setPanelOpen] = useState(true);
+  const [logoPicker, setLogoPicker] = useState(false);
   const [previewVersion, setPreviewVersion] = useState(0);
   // Unsaved colors/fonts from the Diseño tab, shown live in the preview.
   const [draftTheme, setDraftTheme] = useState<WebsiteContentV2["theme"] | null>(null);
@@ -568,6 +570,14 @@ export function WebsiteBuilder({
                   runDesign("Guardando colores…", { theme });
                 }}
               />
+              <ChromePanel
+                key={`chrome:${rev}`}
+                chrome={content.chrome}
+                theme={content.theme}
+                busy={!!busy}
+                onChange={(patch) => runDesign("Guardando…", { chrome: patch })}
+                onPickLogo={() => setLogoPicker(true)}
+              />
               <div className="space-y-2 border-t border-border pt-5">
                 <p className="text-sm font-semibold text-ink">Estilo de la página</p>
                 <p className="text-[12px] text-ink-muted">Cambia formas, colores y tipografías de una vez.</p>
@@ -861,6 +871,22 @@ export function WebsiteBuilder({
             setLibrary(null);
             runBlock({ kind: "add", type, at }, "Agregando el bloque…");
           }}
+        />
+      )}
+
+      {logoPicker && (
+        <ImagePicker
+          businessId={businessId}
+          title="Logo de tu negocio"
+          help="Sube tu logo o elige uno de tus archivos. Se ve pequeño en el menú de la página."
+          current={content.chrome?.logo ?? null}
+          removeLabel="Quitar el logo"
+          onPick={(url) => {
+            setLogoPicker(false);
+            runDesign("Guardando el logo…", { chrome: { logo: url } });
+          }}
+          onRemove={content.chrome?.logo ? () => { setLogoPicker(false); runDesign("Quitando el logo…", { chrome: { logo: null } }); } : null}
+          onClose={() => setLogoPicker(false)}
         />
       )}
 

@@ -41,6 +41,7 @@ export const LookSchema = z
     bg: hex,
     color: hex,
     surface: hex,
+    btn: hex,
     padY: choice(LOOK_PAD),
     width: choice(LOOK_WIDTH),
     align: choice(LOOK_ALIGN),
@@ -117,6 +118,11 @@ export function lookParts(look: Look | null | undefined, opts: { photoBg?: boole
     classes.push("lk-bf");
     vars["--bf"] = fontStackOf(look.bodyFont);
   }
+  if (look.btn) {
+    classes.push("lk-btn");
+    vars["--lkbtn"] = look.btn;
+    vars["--lkbtnt"] = readable(look.btn);
+  }
   if (look.surface) {
     classes.push("lk-s");
     vars["--lks"] = look.surface;
@@ -135,6 +141,7 @@ export const LOOK_CSS = `
 .lk-bg{background:var(--lkbg)!important;--bg:var(--lkbg);--surface:color-mix(in srgb,var(--lkbg) 90%,var(--lkc,#808080))}
 .lk-c{color:var(--lkc)!important;--text:var(--lkc);--muted:color-mix(in srgb,var(--lkc) 66%,transparent);--line:color-mix(in srgb,var(--lkc) 16%,transparent)}
 .lk-s{--surface:var(--lks)}
+.lk-btn .btn:not(.btn-ghost){background:var(--lkbtn)!important;border-color:var(--lkbtn)!important;color:var(--lkbtnt)!important}
 .lk-bf{font-family:var(--bf)}
 .lk-bs{font-size:calc(17px * var(--lkbs))}
 .lk-bs :is(p,li,.intro,.lead,summary){font-size:1em}
