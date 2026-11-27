@@ -309,13 +309,28 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     const m = /^sections\.(\d+)\.(.+)$/.exec(path);
     return m ? (content.sections[Number(m[1])]?.fc?.[m[2]] ?? null) : null;
   };
+  // The look a button has of its own (background, text color, shape): rules added at the end of the styles.
+  const bsOf = (path: string) => {
+    const m = /^sections\.(\d+)\.(.+)$/.exec(path);
+    return m ? (content.sections[Number(m[1])]?.bs?.[m[2]] ?? null) : null;
+  };
+  const SHAPE_PX: Record<string, string> = { square: "0px", soft: "10px", round: "999px" };
+  const bsCss = content.sections
+    .flatMap((sec, i) =>
+      Object.entries(sec.bs ?? {}).map(([k, b]) => {
+        const sel = `a.btn[data-bs="sections.${i}.${k}"][data-bs="sections.${i}.${k}"][data-bs="sections.${i}.${k}"]`;
+        const css = [b.bg && `background:${b.bg}!important;border-color:${b.bg}!important;${!b.color ? `color:${readableTextColor(b.bg)}!important;` : ""}`, b.color && `color:${b.color}!important;`, b.shape && SHAPE_PX[b.shape] && `border-radius:${SHAPE_PX[b.shape]}!important;`].filter(Boolean).join("");
+        return css ? `${sel}{${css}}` : "";
+      }),
+    )
+    .join("");
   // The address a button has of its own (set in "Ajustes" or on the page); the rest follow the page's main link.
   const linkOf = (path: string): string | null => {
     if (path === "chrome.headerLabel") return content.chrome?.headerLink ?? null;
     const m = /^sections\.(\d+)\.(.+)$/.exec(path);
     return m ? (content.sections[Number(m[1])]?.links?.[m[2]] ?? null) : null;
   };
-  const ed = (path: string) => (edit ? ` data-edit="${esc(path)}"` : "") + (fcOf(path) ? ` data-fc="${esc(path)}"` : "") + (linkOf(path) ? ` data-bk="${esc(path)}"` : "");
+  const ed = (path: string) => (edit ? ` data-edit="${esc(path)}"` : "") + (fcOf(path) ? ` data-fc="${esc(path)}"` : "") + (linkOf(path) ? ` data-bk="${esc(path)}"` : "") + (bsOf(path) ? ` data-bs="${esc(path)}"` : "");
   // The page's own top bar and footer (see "Encabezado y pie" in the builder).
   const chrome = content.chrome ?? {};
   const brandName = chrome.brandName || ctx.businessName;
@@ -1318,7 +1333,7 @@ footer.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 ${FX_CSS}
 ${LOOK_CSS}
-${fcCss}
+${fcCss}${bsCss}
 </style>
 </head>
 <body class="st-${content.style} pt-${content.pageType}${content.sticky ? " has-sticky" : ""}">

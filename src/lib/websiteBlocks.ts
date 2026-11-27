@@ -129,6 +129,8 @@ export type BlockOp =
   | { kind: "look"; index: number; patch: LookPatch }
   /** The color of one text of a block (null: back to the automatic color). */
   /** Where one button of a block goes (null: back to the page's own link). */
+  /** The look of one button of a block: only the fields sent change (null clears one). */
+  | { kind: "buttonStyle"; index: number; key: string; patch: { bg?: string | null; color?: string | null; shape?: string | null } }
   | { kind: "buttonLink"; index: number; key: string; url: string | null }
   | { kind: "fieldColor"; index: number; key: string; color: string | null }
   | { kind: "html"; index: number; code: string; height: number }
@@ -204,6 +206,25 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       const look = mergeLook(section.look, op.patch);
       if (look) section.look = look;
       else delete section.look;
+      focus = op.index;
+      break;
+    }
+    case "buttonStyle": {
+      if (!isInt(op.index) || op.index < 0 || op.index >= n || typeof op.key !== "string" || !FIELD_COLOR_KEY.test(op.key)) return bad("No se pudo cambiar ese botón.");
+      const p = op.patch ?? {};
+      if ((p.bg && !FIELD_COLOR_VALUE.test(p.bg)) || (p.color && !FIELD_COLOR_VALUE.test(p.color)) || (p.shape && !["square", "soft", "round"].includes(p.shape))) return bad("Ese color o forma no es válido.");
+      const section = next.sections[op.index];
+      const all = { ...(section.bs ?? {}) } as Record<string, Record<string, unknown>>;
+      const one = { ...(all[op.key] ?? {}) };
+      for (const k of ["bg", "color", "shape"] as const) {
+        if (!(k in p)) continue;
+        if (p[k]) one[k] = p[k];
+        else delete one[k];
+      }
+      if (Object.keys(one).length) all[op.key] = one;
+      else delete all[op.key];
+      if (Object.keys(all).length) section.bs = all as typeof section.bs;
+      else delete section.bs;
       focus = op.index;
       break;
     }

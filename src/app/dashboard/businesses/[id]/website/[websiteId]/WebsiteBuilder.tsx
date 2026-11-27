@@ -28,13 +28,14 @@ import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { ChromePanel } from "./ChromePanel";
 import { ButtonLinksPanel } from "./ButtonLinksPanel";
+import { ElementPanel, type Inspect } from "./ElementPanel";
 import { ButtonShapePicker } from "./ButtonShapePicker";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
-import { BagIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
+import { BagIcon, CursorIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
 import { PublishControl } from "./PublishControl";
 import { HtmlCodeDialog } from "./HtmlCodeDialog";
 
-type Tab = "bloques" | "estilo" | "diseno" | "ajustes";
+type Tab = "bloques" | "estilo" | "elemento" | "diseno" | "ajustes";
 type Device = "desktop" | "tablet" | "mobile";
 
 const DEVICE_WIDTH: Record<Device, string> = { desktop: "100%", tablet: "820px", mobile: "390px" };
@@ -93,6 +94,8 @@ export function WebsiteBuilder({
   // Desktop: the left panel folds away to give the page the whole width.
   const [panelOpen, setPanelOpen] = useState(true);
   const [logoPicker, setLogoPicker] = useState(false);
+  // The element chosen on the page (a button or a text): its settings open in the left panel.
+  const [inspect, setInspect] = useState<Inspect | null>(null);
   const [previewVersion, setPreviewVersion] = useState(0);
   // Unsaved colors/fonts from the Diseño tab, shown live in the preview.
   const [draftTheme, setDraftTheme] = useState<WebsiteContentV2["theme"] | null>(null);
@@ -435,6 +438,11 @@ export function WebsiteBuilder({
         },
       );
     },
+    inspect: (path, kind) => {
+      setInspect({ path, kind });
+      setTab("elemento");
+      setPanelOpen(true);
+    },
     pickLogo: () => setLogoPicker(true),
     removeLogo: () => runDesign("Quitando el logo…", { chrome: { logo: null } }),
     setTextColor: (path, color) => {
@@ -462,11 +470,12 @@ export function WebsiteBuilder({
   // "Estilo" only exists while a block is chosen (it is that block's style): with nothing chosen it was an empty twin of Elementos.
   const TABS: { key: Tab; label: string; Icon: (p: { className?: string }) => React.JSX.Element; hint: string }[] = [
     { key: "bloques", label: "Elementos", Icon: PlusSquareIcon, hint: "Agrega bloques y elementos a tu página" },
+    ...(inspect !== null ? [{ key: "elemento" as const, label: inspect.kind === "button" ? "Botón" : "Texto", Icon: CursorIcon, hint: "Ajustes del elemento que elegiste en la página" }] : []),
     ...(sel !== null ? [{ key: "estilo" as const, label: "Estilo", Icon: EditIcon, hint: "Fondo, colores, espacios y tamaños del bloque elegido" }] : []),
     { key: "diseno", label: "Diseño", Icon: PaletteIcon, hint: "Colores y estilo de toda la página" },
     { key: "ajustes", label: "Ajustes", Icon: GearIcon, hint: "Link, formulario, pixel y estadísticas" },
   ];
-  const activeTab: Tab = tab === "estilo" && sel === null ? "bloques" : tab;
+  const activeTab: Tab = (tab === "estilo" && sel === null) || (tab === "elemento" && inspect === null) ? "bloques" : tab;
 
   return (
     <>
@@ -681,6 +690,61 @@ export function WebsiteBuilder({
                 setHtmlDialog(index);
               }}
               onToggleHidden={(i) => runDesign("Actualizando…", { hidden: content.hidden.includes(i) ? content.hidden.filter((h) => h !== i) : [...content.hidden, i] })}
+            />
+          )}
+
+          {activeTab === "elemento" && inspect && (
+            <ElementPanel
+              key={inspect.path}
+              content={content}
+              inspect={inspect}
+              busy={!!busy}
+              onClose={() => {
+                setInspect(null);
+                setTab("bloques");
+              }}
+              onText={(path, value) => {
+                setBusy("Guardando…");
+                startTransition(async () => {
+                  try {
+                    const res = await updateWebsiteTextV2(businessId, websiteId, path, value);
+                    if (!res.ok) showToast(res.error);
+                    else {
+                      adopt(res.content);
+                      refreshPreview();
+                    }
+                  } finally {
+                    setBusy(null);
+                  }
+                });
+              }}
+              onLink={(path, url) => {
+                const m = /^sections\.(\d+)\.(.+)$/.exec(path);
+                if (path === "chrome.headerLabel") return runDesign("Guardando…", { chrome: { headerLink: url } });
+                if (!m) return;
+                const extra = /^extras\.(\d+)\.label$/.exec(m[2]);
+                if (extra) {
+                  const list = [...((content.sections[Number(m[1])]?.extras ?? []) as ExtraElement[])];
+                  const at = Number(extra[1]);
+                  const item = list[at];
+                  if (item && item.type === "button") {
+                    list[at] = { ...item, url: url ?? "" };
+                    runBlock({ kind: "extras", index: Number(m[1]), extras: list }, "Guardando…");
+                  }
+                  return;
+                }
+                runBlock({ kind: "buttonLink", index: Number(m[1]), key: m[2], url }, "Guardando…");
+              }}
+              onStyle={(path, patch) => {
+                if (path === "chrome.headerLabel") return runDesign("Guardando…", { chrome: { headerBtn: patch.bg ?? null } });
+                const m = /^sections\.(\d+)\.(.+)$/.exec(path);
+                if (m) runBlock({ kind: "buttonStyle", index: Number(m[1]), key: m[2], patch }, "Guardando…");
+              }}
+              onColor={(path, color) => {
+                if (path === "chrome.headerLabel") return runDesign("Guardando…", { chrome: { headerColor: color } });
+                const m = /^sections\.(\d+)\.(.+)$/.exec(path);
+                if (m) runBlock({ kind: "fieldColor", index: Number(m[1]), key: m[2], color }, "Guardando…");
+              }}
             />
           )}
 

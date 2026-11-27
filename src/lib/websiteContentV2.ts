@@ -116,7 +116,15 @@ const ButtonLinksSchema = z.record(z.string().regex(FIELD_COLOR_KEY), z.string()
 const NumsSchema = z.record(z.string().regex(/^[a-z0-9]{1,6}$/), z.string().max(12)).optional().catch(undefined).describe("Números propios. NO lo escribas.");
 // `navLabel`: the name this block has in the top menu.
 const NavLabelSchema = z.string().max(24).optional().catch(undefined).describe("Nombre en el menú. NO lo escribas.");
-const media = { nums: NumsSchema, navLabel: NavLabelSchema, image: imageUrl, bgImage: imageUrl, look: LookSchema, extras: ExtrasSchema, fc: FieldColorsSchema, links: ButtonLinksSchema };
+// `bs`: the look of one button of the block (key = the button text's field): its own background, text color and shape.
+export const ButtonStyleSchema = z.object({
+  bg: z.string().regex(FIELD_COLOR_VALUE).nullable().optional().catch(null),
+  color: z.string().regex(FIELD_COLOR_VALUE).nullable().optional().catch(null),
+  shape: z.enum(["square", "soft", "round"]).nullable().optional().catch(null),
+});
+export type ButtonStyle = z.infer<typeof ButtonStyleSchema>;
+const ButtonStylesSchema = z.record(z.string().regex(FIELD_COLOR_KEY), ButtonStyleSchema).optional().catch(undefined).describe("Estilo propio de botones. NO lo escribas.");
+const media = { bs: ButtonStylesSchema, nums: NumsSchema, navLabel: NavLabelSchema, image: imageUrl, bgImage: imageUrl, look: LookSchema, extras: ExtrasSchema, fc: FieldColorsSchema, links: ButtonLinksSchema };
 
 const HeroSection = z.object({
   ...media,

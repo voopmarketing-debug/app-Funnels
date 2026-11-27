@@ -40,6 +40,8 @@ export type EditorHandlers = {
   palette(): string[];
   /** Saves the color of one text ("sections.2.heading"); null brings the automatic color back. */
   setTextColor(path: string, color: string | null): void;
+  /** An element of the page was chosen (clicked to edit): its settings open on the left. */
+  inspect(path: string, kind: "button" | "text"): void;
   /** The page's logo: opens the photo window / takes it off (the top bar goes back to the name). */
   pickLogo(): void;
   removeLogo(): void;
@@ -464,6 +466,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     el.focus();
     if (el.dataset.edit === "chrome.brandName") showBrandBar(el);
     else showColors(el);
+    if (el.dataset.edit && !/^chrome\.(brandName|footer)/.test(el.dataset.edit)) getHandlers().inspect(el.dataset.edit, el.closest(".btn") ? "button" : "text");
   }
 
   function stopEditing(el: HTMLElement) {

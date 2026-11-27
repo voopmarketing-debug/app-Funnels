@@ -94,6 +94,7 @@ export function TemplateBuilder({
     pickLogo: () => {},
     removeLogo: () => {},
     setHeaderColor: () => {},
+    inspect: () => {},
   };
   const handlersRef = useRef(handlers);
   useEffect(() => {

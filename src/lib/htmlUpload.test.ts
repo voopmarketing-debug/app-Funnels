@@ -217,4 +217,18 @@ describe("Subir mi HTML", () => {
     expect(back.ok && "nums" in back.content.sections[1]).toBe(false);
     expect(setTextAtPath(page, "sections.1.nums.<b>", "x").ok).toBe(false);
   });
+  it("one button can have its own background, text color and shape", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const hero = { type: "hero", variant: "centered", heading: "Hola", subheading: "x", ctaLabel: "Quiero mi llamada", secondaryCtaLabel: null, eyebrow: null, badge: null, chips: [] };
+    const page = { ...base, fullHtml: false, plain: false, sections: [hero] } as unknown as typeof base;
+    const done = applyBlockOp(page, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { bg: "#112233", shape: "square" } });
+    expect(done.ok).toBe(true);
+    const html = done.ok ? renderWebsiteHtmlV2(done.content, ctx) : "";
+    expect(html).toContain('data-bs="sections.0.ctaLabel"');
+    expect(html).toMatch(/a\.btn\[data-bs="sections\.0\.ctaLabel"\]\[data-bs="sections\.0\.ctaLabel"\]\[data-bs="sections\.0\.ctaLabel"\]\{background:#112233!important;border-color:#112233!important;color:#[0-9a-f]{6}!important;border-radius:0px!important;\}/);
+    expect(applyBlockOp(page, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { bg: "red;}" } }).ok).toBe(false);
+    expect(applyBlockOp(page, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { shape: "star" } }).ok).toBe(false);
+    const back = done.ok ? applyBlockOp(done.content, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { bg: null, shape: null } }) : done;
+    expect(back.ok && "bs" in back.content.sections[0]).toBe(false);
+  });
 });
