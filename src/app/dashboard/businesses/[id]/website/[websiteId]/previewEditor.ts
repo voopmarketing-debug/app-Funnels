@@ -29,7 +29,12 @@ export type EditorHandlers = {
   /** A block taken from the library was dropped on the page: add it so it ends up at `at`. */
   dropBlock(type: string, at: number): void;
   /** A text, button or photo from the library was dropped on a block of the page. */
-  dropExtra(kind: string, index: number): void;
+  dropExtra(kind: string, index: number, cell?: number): void;
+  /** A structure was picked in an empty Contenedor (or changed): its elements are laid out again. */
+  layoutStructure(index: number, structure: string): void;
+  /** An element (title, text, button, photo) goes into a column of a Contenedor. */
+  addToCell(index: number, cell: number, kind: string): void;
+  removeFromCell(index: number, cell: number, item: number): void;
   /** A block was touched in the page: the side panel follows it. */
   select(index: number): void;
   undo(): void;
@@ -455,6 +460,34 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     tcFor = el;
   }
 
+  // The "+" of an empty column: choose what goes in (title, text, button, photo).
+  function showCellMenu(anchor: HTMLElement, where: string) {
+    hideColors();
+    const [si, ci] = where.split(".").map(Number);
+    const box = doc.createElement("div");
+    box.className = "fl-tc";
+    box.setAttribute("role", "toolbar");
+    box.setAttribute("aria-label", "Agregar un elemento");
+    for (const [kind, label] of [["heading", "Título"], ["text", "Texto"], ["button", "Botón"], ["image", "Foto"]] as const) {
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.className = "auto";
+      b.textContent = label;
+      b.addEventListener("click", () => {
+        hideColors();
+        getHandlers().addToCell(si, ci, kind);
+      });
+      box.appendChild(b);
+    }
+    box.addEventListener("mousedown", (e) => e.preventDefault());
+    doc.body.appendChild(box);
+    const r = anchor.getBoundingClientRect();
+    box.style.top = `${r.top + (win!.scrollY || 0) - 44}px`;
+    box.style.left = `${Math.max(8, Math.min(r.left + (win!.scrollX || 0), doc.documentElement.clientWidth - box.offsetWidth - 8))}px`;
+    tc = box;
+    tcFor = anchor;
+  }
+
   function startEditing(el: HTMLElement) {
     lastRange = null;
     editing = el;
@@ -532,6 +565,26 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     const t = asElement(e.target);
     if (!t) return;
     if (t.closest(".fl-tc")) return;
+    const struct = t.closest<HTMLElement>("[data-struct]");
+    if (struct) {
+      e.preventDefault();
+      const sec = sectionOf(t);
+      if (sec && struct.dataset.struct) getHandlers().layoutStructure(Number(sec.dataset.sec), struct.dataset.struct);
+      return;
+    }
+    const cellDel = t.closest<HTMLElement>("[data-cell-del]");
+    if (cellDel?.dataset.cellDel) {
+      e.preventDefault();
+      const [si, ci, ki] = cellDel.dataset.cellDel.split(".").map(Number);
+      getHandlers().removeFromCell(si, ci, ki);
+      return;
+    }
+    const cellAdd = t.closest<HTMLElement>("[data-cell-add]");
+    if (cellAdd?.dataset.cellAdd) {
+      e.preventDefault();
+      showCellMenu(cellAdd, cellAdd.dataset.cellAdd);
+      return;
+    }
     const button = t.closest<HTMLElement>(".fl-bar-wrap button");
     if (button) {
       e.preventDefault();
@@ -710,7 +763,8 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     if (extra) {
       e.preventDefault();
       const target = sectionAt(e);
-      if (target) getHandlers().dropExtra(extra, Number(target.dataset.sec));
+      const cellEl = asElement(e.target)?.closest<HTMLElement>("[data-cell]");
+      if (target) getHandlers().dropExtra(extra, Number(target.dataset.sec), cellEl?.dataset.cell ? Number(cellEl.dataset.cell.split(".")[1]) : undefined);
       return;
     }
     const type = e.dataTransfer?.getData(NEW_BLOCK_TYPE);

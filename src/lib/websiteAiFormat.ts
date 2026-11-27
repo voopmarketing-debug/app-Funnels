@@ -266,6 +266,7 @@ function toAiSectionBase(s: Section): AiSection {
     case "video":
       return { ...base, kicker: s.kicker, heading: s.heading, body: s.intro };
     case "html":
+    case "layout":
       return { ...base, heading: "" };
     case "event":
       return { ...base, kicker: s.kicker, heading: s.heading, ctaLabel: s.ctaLabel };

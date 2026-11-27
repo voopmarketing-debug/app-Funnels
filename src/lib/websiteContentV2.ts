@@ -99,6 +99,7 @@ const imageUrl = z
 // `extras`: elements the owner adds inside a block, right under its title (a text, a button).
 export const MAX_EXTRAS = 6;
 export const ExtraSchema = z.union([
+  z.object({ type: z.literal("heading"), text: z.string().max(200) }),
   z.object({ type: z.literal("text"), text: z.string().max(600) }),
   z.object({ type: z.literal("image"), url: z.string().regex(/^https:\/\/\S+$/).max(500) }),
   z.object({ type: z.literal("button"), label: z.string().max(40), url: z.string().regex(/^$|^(https?:\/\/\S+|tel:\+?[0-9 ()-]{5,20}|mailto:\S+@\S+|#[A-Za-z0-9_-]+)$/).max(300) }),
@@ -253,6 +254,14 @@ const TravelerSection = z.object({
   scenes: z.array(item).describe("2 a 4 escenas: cada una es un momento del ritual o de la historia del producto (título + texto corto, datos reales)."),
 });
 
+// The container: columns (a structure) that hold the elements the owner puts in each one.
+const LayoutSection = z.object({
+  ...media,
+  type: z.literal("layout"),
+  structure: z.string().max(8).nullable().optional().catch(null),
+  cells: z.array(z.object({ w: z.number().int().min(1).max(12), row: z.number().int().min(0).max(8), items: z.array(ExtraSchema).max(8) })).max(16).catch([]),
+});
+
 const MarqueeSection = z.object({
   ...media,
   type: z.literal("marquee"),
@@ -399,6 +408,7 @@ const CtaSection = z.object({
 
 export const SectionSchema = z.discriminatedUnion("type", [
   HeroSection,
+  LayoutSection,
   TrustBarSection,
   FeaturesSection,
   StepsSection,
@@ -430,6 +440,7 @@ export type SectionType = Section["type"];
 
 export const SECTION_LABELS: Record<SectionType, string> = {
   hero: "Portada",
+  layout: "Contenedor",
   trustBar: "Garantías",
   features: "Beneficios",
   steps: "Cómo funciona",

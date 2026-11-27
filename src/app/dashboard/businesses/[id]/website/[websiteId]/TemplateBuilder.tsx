@@ -95,6 +95,9 @@ export function TemplateBuilder({
     removeLogo: () => {},
     setHeaderColor: () => {},
     inspect: () => {},
+    layoutStructure: () => {},
+    addToCell: () => {},
+    removeFromCell: () => {},
   };
   const handlersRef = useRef(handlers);
   useEffect(() => {

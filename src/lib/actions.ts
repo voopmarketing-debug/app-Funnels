@@ -3762,6 +3762,8 @@ const BlockOpSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("extras"), index: z.number().int(), extras: z.array(z.record(z.string(), z.string().max(600))).max(6) }),
   z.object({ kind: z.literal("galleryLayout"), index: z.number().int(), layout: z.enum(["grid", "mosaic", "carousel"]) }),
   z.object({ kind: z.literal("html"), index: z.number().int(), code: z.string().max(100_000), height: z.number().int().min(0).max(3000) }),
+  z.object({ kind: z.literal("layoutStructure"), index: z.number().int(), structure: z.string().max(8).nullable() }),
+  z.object({ kind: z.literal("cellItems"), index: z.number().int(), cell: z.number().int(), items: z.array(z.unknown()).max(8) }),
   z.object({ kind: z.literal("buttonStyle"), index: z.number().int(), key: z.string().max(40), patch: z.object({ bg: z.string().max(7).nullable().optional(), color: z.string().max(7).nullable().optional(), shape: z.string().max(8).nullable().optional() }) }),
   z.object({ kind: z.literal("buttonLink"), index: z.number().int(), key: z.string().max(40), url: z.string().max(300).nullable() }),
   z.object({ kind: z.literal("fieldColor"), index: z.number().int(), key: z.string().max(40), color: z.string().max(7).nullable() }),
@@ -3789,6 +3791,13 @@ export async function editWebsiteBlocksV2(businessId: string, websiteId: string,
       const allowed = await ownImageUrls(businessId, website.aiImageUrl);
       for (const x of stored.sections[op.index]?.extras ?? []) if (x.type === "image") allowed.add(x.url);
       for (const x of op.extras as { type?: string; url?: string }[]) if (x.type === "image" && !(x.url && allowed.has(x.url))) throw new Error("Esa foto no está en tu biblioteca: súbela primero.");
+    }
+    if (op.kind === "cellItems") {
+      // A photo put in a column must be one of the business's own (or one the column already had).
+      const allowed = await ownImageUrls(businessId, website.aiImageUrl);
+      const sec = stored.sections[op.index];
+      if (sec?.type === "layout") for (const c of sec.cells) for (const x of c.items) if (x.type === "image") allowed.add(x.url);
+      for (const x of op.items as { type?: string; url?: string }[]) if (x?.type === "image" && !(x.url && allowed.has(x.url))) throw new Error("Esa foto no está en tu biblioteca: súbela primero.");
     }
     const result = applyBlockOp(stored, op, { firstProductId: firstProduct?.id ?? null });
     if (!result.ok) throw new Error(result.error);

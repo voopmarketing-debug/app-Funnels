@@ -7,6 +7,7 @@ import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { SECTION_LABELS, type ExtraElement, type Section, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { tidyLook, type Look } from "@/lib/websiteLook";
 import { ButtonShapePicker } from "./ButtonShapePicker";
+import { STRUCTURES as LAYOUT_STRUCTURES } from "@/lib/websiteStructures";
 import { AlignCenterIcon, AlignLeftIcon, AlignRightIcon, DesktopIcon, DevicesIcon, ImageIcon, PhoneIcon, RefreshIcon, TrashIcon } from "./builderIcons";
 
 const SAVE_DELAY_MS = 500;
@@ -113,6 +114,37 @@ function StructurePicker({ value, suggested, onChange }: { value: string | null;
   );
 }
 
+/** The structure of a Contenedor: pick another one and what is inside is laid out again in the new columns. */
+function LayoutStructurePicker({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[13px] font-semibold text-ink">Estructura</p>
+      <div role="radiogroup" aria-label="Estructura del contenedor" className="flex flex-wrap gap-1.5">
+        {LAYOUT_STRUCTURES.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            role="radio"
+            aria-checked={value === o.key}
+            aria-label={o.label}
+            title={o.label}
+            onClick={() => onChange(o.key)}
+            className={`flex h-10 w-16 flex-col gap-[2px] rounded-md border p-1 transition ${value === o.key ? "border-accent bg-accent/15" : "border-border hover:border-border-strong"}`}
+          >
+            {o.rows.map((r, i) => (
+              <span key={i} className="flex flex-1 gap-[2px]">
+                {r.map((w, k) => (
+                  <span key={k} style={{ flex: w }} className={`rounded-[2px] ${value === o.key ? "bg-accent/60" : "bg-ink-faint/50"}`} />
+                ))}
+              </span>
+            ))}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** A size as a percent: − and + buttons (easy on a phone), a slider, and "Normal" to go back. */
 function SizeControl({ label, value, onChange }: { label: string; value: string | null | undefined; onChange: (v: string | null) => void }) {
   const n = value ? Number(value) : 100;
@@ -184,7 +216,7 @@ function ExtrasEditor({ extras, busy, onChange, onPickPhoto }: { extras: ExtraEl
               <img src={x.url} alt="" className="h-14 w-20 flex-none rounded-md border border-border bg-background object-contain" />
               <button type="button" disabled={busy} onClick={() => onPickPhoto(i)} className="h-10 flex-1 rounded-lg border border-border-strong text-sm font-bold text-ink hover:border-accent disabled:opacity-40">Cambiar foto</button>
             </div>
-          ) : x.type === "text" ? (
+          ) : x.type === "text" || x.type === "heading" ? (
             <textarea aria-label={`Texto ${i + 1}`} rows={3} maxLength={600} value={x.text} onChange={(e) => edit(i, { text: e.target.value })} onBlur={() => onChange(list)} className={field} />
           ) : (
             <>
@@ -271,6 +303,7 @@ export function StylePanel({
   onGalleryLayout,
   onExtras,
   onPickExtraPhoto,
+  onLayoutStructure,
 }: {
   section: Section;
   index: number;
@@ -282,6 +315,7 @@ export function StylePanel({
   onGalleryLayout: (layout: "grid" | "mosaic" | "carousel") => void;
   onExtras: (list: ExtraElement[]) => void;
   onPickExtraPhoto: (at: number | null) => void;
+  onLayoutStructure: (structure: string) => void;
 }) {
   const [look, setLook] = useState<Look>(section.look ?? {});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -324,8 +358,12 @@ export function StylePanel({
         <p className="text-[12px] text-ink-muted">Bloque {index + 1}. Cada cambio se ve al instante en la página.</p>
       </div>
 
+      {section.type === "layout" ? (
+        <LayoutStructurePicker value={section.structure ?? null} onChange={onLayoutStructure} />
+      ) : (
       <StructurePicker value={look.cols ?? null} suggested={templateCols(section as unknown as { type: string; variant?: string; items?: unknown[] })} onChange={(v) => change({ cols: v as Look["cols"] })} />
-      <ExtrasEditor extras={section.extras ?? []} busy={busy} onChange={onExtras} onPickPhoto={onPickExtraPhoto} />
+      )}
+      {section.type !== "layout" && <ExtrasEditor extras={section.extras ?? []} busy={busy} onChange={onExtras} onPickPhoto={onPickExtraPhoto} />}
 
       {section.type === "gallery" && (
         <div className="space-y-2">

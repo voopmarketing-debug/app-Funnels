@@ -70,6 +70,19 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
     return finish(next);
   }
 
+  // sections.<i>.cells.<c>.items.<k>.<text|label>: a title, text or button inside a column of a Contenedor.
+  if (parts.length === 7 && section.type === "layout" && parts[2] === "cells" && isIndex(parts[3]) && parts[4] === "items" && isIndex(parts[5]) && (parts[6] === "text" || parts[6] === "label")) {
+    const cells = section.cells as { items: Record<string, unknown>[] }[];
+    const item = cells[Number(parts[3])]?.items[Number(parts[5])];
+    if (!item) return bad();
+    const isText = parts[6] === "text" && (item.type === "text" || item.type === "heading");
+    const isLabel = parts[6] === "label" && item.type === "button";
+    if (!isText && !isLabel) return bad();
+    const value = clean(isText ? "text" : "label", rawValue).slice(0, isLabel ? 40 : item.type === "heading" ? 200 : 600);
+    if (!value) return bad("Este texto no puede quedar vacío.");
+    item[parts[6]] = value;
+    return finish(next);
+  }
   // sections.<i>.nums.<key>: a number the block draws ("01", "02 / 06"); empty = back to the automatic one.
   if (parts.length === 4 && parts[2] === "nums" && /^[a-z0-9]{1,6}$/.test(parts[3])) {
     const text = rawValue.replace(/\s+/g, " ").trim().slice(0, 12);

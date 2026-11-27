@@ -87,6 +87,7 @@ export function BlockLibraryDialog({ onPick, onClose, where }: { onPick: (type: 
 export const NEW_EXTRA_MIME = "application/x-fl-new-extra";
 
 const EXTRA_CARDS = [
+  { kind: "heading", label: "Título", help: "Un título grande" },
   { kind: "text", label: "Texto", help: "Un párrafo debajo del título" },
   { kind: "button", label: "Botón", help: "Un botón con tu enlace" },
   { kind: "image", label: "Foto", help: "Una foto que se acomoda sola" },

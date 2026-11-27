@@ -231,4 +231,34 @@ describe("Subir mi HTML", () => {
     const back = done.ok ? applyBlockOp(done.content, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { bg: null, shape: null } }) : done;
     expect(back.ok && "bs" in back.content.sections[0]).toBe(false);
   });
+  it("a Contenedor: pick a structure, put elements in its columns, change the structure and they are laid out again", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const page = { ...base, fullHtml: false, plain: false, sections: [base.sections[0], { type: "layout", structure: null, cells: [] }] } as unknown as typeof base;
+    // Empty: the page offers the structures.
+    const empty = renderWebsiteHtmlV2(page, { ...ctx, preview: true, edit: true });
+    expect(empty).toContain("Selecciona tu estructura");
+    expect(empty).toContain('data-struct="2x2"');
+    const three = applyBlockOp(page, { kind: "layoutStructure", index: 1, structure: "3" });
+    expect(three.ok && (three.content.sections[1] as unknown as { cells: unknown[] }).cells.length).toBe(3);
+    const filled = three.ok ? applyBlockOp(three.content, { kind: "cellItems", index: 1, cell: 0, items: [{ type: "heading", text: "Hola" }, { type: "text", text: "Un texto" }] }) : three;
+    const more = filled.ok ? applyBlockOp(filled.content, { kind: "cellItems", index: 1, cell: 2, items: [{ type: "button", label: "Ir", url: "https://x.co/a" }] }) : filled;
+    expect(more.ok).toBe(true);
+    const html = more.ok ? renderWebsiteHtmlV2(more.content, { ...ctx, preview: true, edit: true }) : "";
+    expect(html).toContain('<h3 class="extra-h" data-edit="sections.1.cells.0.items.0.text">Hola</h3>');
+    expect(html).toContain('data-edit="sections.1.cells.2.items.0.label"');
+    expect(html).toContain('grid-column:span 4');
+    // Another structure: the 3 elements keep their order in the new columns.
+    const two = more.ok ? applyBlockOp(more.content, { kind: "layoutStructure", index: 1, structure: "2" }) : more;
+    const cells = two.ok ? (two.content.sections[1] as unknown as { cells: { items: { type: string }[] }[] }).cells : [];
+    expect(cells.map((c) => c.items.map((i) => i.type))).toEqual([["heading", "text"], ["button"]]);
+    // A script link in a button, a column that does not exist and an unknown structure are refused.
+    expect(applyBlockOp(three.ok ? three.content : page, { kind: "cellItems", index: 1, cell: 0, items: [{ type: "button", label: "x", url: "javascript:alert(1)" }] }).ok).toBe(false);
+    expect(applyBlockOp(three.ok ? three.content : page, { kind: "cellItems", index: 1, cell: 9, items: [] }).ok).toBe(false);
+    expect(applyBlockOp(page, { kind: "layoutStructure", index: 1, structure: "99" }).ok).toBe(false);
+    // The published page shows no empty container.
+    expect(renderWebsiteHtmlV2(page, ctx)).not.toContain("data-struct");
+    // Text inside a column can be written.
+    const edited = more.ok ? setTextAtPath(more.content, "sections.1.cells.0.items.0.text", "Nuevo título") : null;
+    expect(edited && edited.ok && (edited.content.sections[1] as unknown as { cells: { items: { text: string }[] }[] }).cells[0].items[0].text).toBe("Nuevo título");
+  });
 });

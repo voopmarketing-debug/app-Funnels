@@ -1,6 +1,8 @@
 import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS } from "@/lib/websiteContent";
+import type { ExtraElement } from "@/lib/websiteContentV2";
 import { renderMarks, stripMarks } from "@/lib/textMarks";
+import { STRUCTURES } from "@/lib/websiteStructures";
 import { readableTextColor, sanitizeHexColor, toEmbedUrl } from "@/lib/websiteTemplate";
 import { eventDateOk, toIsoWithZone } from "@/lib/websiteBlocks";
 import { LOOK_CSS, lookParts } from "@/lib/websiteLook";
@@ -893,6 +895,26 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           ${leadFormHtml(s.buttonLabel, fp("buttonLabel"))}
         </div></section>`;
 
+      case "layout": {
+        if (s.cells.length === 0) {
+          if (!edit) return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Contenedor vacío: elige una estructura.</div></div></section>` : "";
+          return `<section class="sec lay"><div class="wrap"><div class="lay-pick"><p>Selecciona tu estructura</p><div class="lay-structs">${STRUCTURES.map((st) => `<button type="button" class="lay-struct" data-struct="${st.key}" title="${esc(st.label)}" aria-label="${esc(st.label)}">${st.rows.map((r) => `<span class="lay-srow">${r.map((w) => `<i style="flex:${w}"></i>`).join("")}</span>`).join("")}</button>`).join("")}</div></div></div></section>`;
+        }
+        const rows = [...new Set(s.cells.map((c) => c.row))].sort((a, b) => a - b);
+        return `<section class="sec lay"><div class="wrap">${rows
+          .map(
+            (r) =>
+              `<div class="lay-row">${s.cells
+                .map((c, ci) => ({ c, ci }))
+                .filter(({ c }) => c.row === r)
+                .map(
+                  ({ c, ci }) =>
+                    `<div class="lay-cell" style="grid-column:span ${c.w}"${edit ? ` data-cell="${index}.${ci}"` : ""}>${c.items.map((x, k) => `<div class="lay-item">${itemHtml(x, `sections.${index}.cells.${ci}.items.${k}`)}${edit ? `<button type="button" class="lay-del" data-cell-del="${index}.${ci}.${k}" title="Quitar este elemento" aria-label="Quitar este elemento">×</button>` : ""}</div>`).join("")}${edit ? `<button type="button" class="lay-add" data-cell-add="${index}.${ci}">${c.items.length ? "+ Agregar elemento" : "+ Arrastra un elemento aquí"}</button>` : ""}</div>`,
+                )
+                .join("")}</div>`,
+          )
+          .join("")}</div></section>`;
+      }
       case "cta":
         if (s.variant === "giant") {
           return `<section class="final-cta final-giant"><div class="wrap">
@@ -929,19 +951,20 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       if (styles.length) a = /style="/.test(a) ? a.replace(/style="([^"]*)"/, (_x, css: string) => `style="${css};${styles.join(";")}"`) : `${a} style="${styles.join(";")}"`;
       return `${lead}<section${a}${edit ? ` data-sec="${index}" data-type="${s.type}"` : ""}>`;
     });
+  // One element a block holds (a title, a text, a button, a photo); `path` is where it lives in the stored content.
+  const itemHtml = (x: ExtraElement, path: string): string =>
+    x.type === "heading"
+      ? `<h3 class="extra-h"${ed(`${path}.text`)}>${esc(x.text)}</h3>`
+      : x.type === "text"
+        ? `<p class="extra-text"${ed(`${path}.text`)}>${esc(x.text)}</p>`
+        : x.type === "image"
+          ? `<img class="extra-img" src="${esc(x.url)}" alt="" loading="lazy">`
+          : `<a class="btn extra-btn" href="${esc(x.url || href("boton-extra"))}"${/^https?:/.test(x.url) ? ' target="_blank" rel="noopener"' : ""}${ed(`${path}.label`)}>${esc(x.label)}</a>`;
   // The elements the owner added under a block's title (a text, a button).
   const withExtras = (html: string, s: Section, index: number): string => {
     const list = s.extras ?? [];
     if (list.length === 0) return html;
-    const extrasHtml = `<div class="extras">${list
-      .map((x, k) =>
-        x.type === "text"
-          ? `<p class="extra-text"${ed(`sections.${index}.extras.${k}.text`)}>${esc(x.text)}</p>`
-          : x.type === "image"
-            ? `<img class="extra-img" src="${esc(x.url)}" alt="" loading="lazy">`
-            : `<a class="btn extra-btn" href="${esc(x.url || href("boton-extra"))}"${/^https?:/.test(x.url) ? ' target="_blank" rel="noopener"' : ""}${ed(`sections.${index}.extras.${k}.label`)}>${esc(x.label)}</a>`,
-      )
-      .join("")}</div>`;
+    const extrasHtml = `<div class="extras">${list.map((x, k) => itemHtml(x, `sections.${index}.extras.${k}`)).join("")}</div>`;
     const at = html.search(/<\/h[12]>/);
     if (at < 0) return html.replace(/<\/section>\s*$/, `${extrasHtml}</section>`);
     const end = at + 5;
@@ -1020,6 +1043,22 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,t
 .narrow{max-width:min(var(--max),860px)}.narrow-lg{max-width:min(var(--max),1120px)}
 .hero-centered .narrow{max-width:min(var(--max),1100px)}
 .center{text-align:center}.mt{margin-top:32px}
+.lay-row{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:24px;margin-bottom:24px}
+.lay-cell{min-width:0;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.lay-item{position:relative;max-width:100%}
+.extra-h{margin:0;font-family:var(--hf);font-size:clamp(22px,2.6vw,32px);line-height:1.15}
+.lay-add{all:unset;box-sizing:border-box;cursor:pointer;width:100%;padding:18px 12px;text-align:center;border:2px dashed color-mix(in srgb,var(--text) 28%,transparent);border-radius:12px;font:600 13px/1.2 system-ui,sans-serif;color:color-mix(in srgb,var(--text) 55%,transparent)}
+.lay-add:hover{border-color:#5b6cf0;color:#5b6cf0}
+.lay-del{all:unset;position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:#111827;color:#fff;text-align:center;line-height:22px;font:700 14px/22px system-ui,sans-serif;cursor:pointer;opacity:0}
+.lay-item:hover .lay-del{opacity:1}
+.lay-pick{padding:28px 12px;text-align:center;border:2px dashed color-mix(in srgb,var(--text) 22%,transparent);border-radius:14px}
+.lay-pick p{margin:0 0 18px;font:600 15px/1.2 system-ui,sans-serif;color:color-mix(in srgb,var(--text) 70%,transparent)}
+.lay-structs{display:grid;grid-template-columns:repeat(6,72px);gap:10px;justify-content:center}
+.lay-struct{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;height:44px;padding:0}
+.lay-struct:hover i{background:#5b6cf0}
+.lay-srow{display:flex;gap:2px;flex:1}
+.lay-srow i{display:block;background:#cbd0d6;border-radius:2px}
+@media(max-width:700px){.lay-row{grid-template-columns:1fr}.lay-cell{grid-column:1/-1!important}.lay-structs{grid-template-columns:repeat(3,72px)}}
 .extras{margin:6px 0 20px;display:flex;flex-direction:column;align-items:flex-start;gap:12px}
 .extra-text{max-width:64ch;margin:0;font-size:1.08em;color:var(--muted,var(--text));white-space:pre-line}
 .extra-btn{margin-top:4px}

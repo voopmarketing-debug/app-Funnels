@@ -1,5 +1,7 @@
 import { BUTTON_LINK, ExtraSchema, FIELD_COLOR_KEY, FIELD_COLOR_VALUE, HTML_MAX_CHARS, MAX_EXTRAS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { mergeLook, type LookPatch } from "@/lib/websiteLook";
+import { cellsFor } from "@/lib/websiteStructures";
+import { z } from "zod";
 
 // The builder's block operations: add a block from the library, duplicate,
 // delete, move, restyle. Pure functions over the page content; the server
@@ -22,6 +24,7 @@ export type BlockEntry = { type: Exclude<SectionType, "hero">; label: string; he
 
 /** What the "Agregar bloque" library offers, in the order it shows them. */
 export const BLOCK_LIBRARY: BlockEntry[] = [
+  { type: "layout", label: SECTION_LABELS.layout, help: "Elige una estructura de columnas y arrastra elementos a cada una.", group: "texto" },
   { type: "features", label: SECTION_LABELS.features, help: "Tarjetas con ícono: lo que ofreces o por qué elegirte.", group: "texto" },
   { type: "steps", label: SECTION_LABELS.steps, help: "Pasos numerados para explicar cómo trabajas.", group: "texto" },
   { type: "host", label: SECTION_LABELS.host, help: "Foto y presentación de ti o de tu negocio.", group: "texto" },
@@ -82,6 +85,8 @@ export function newSection(type: Exclude<SectionType, "hero">, ctx: { firstProdu
       return ctx.firstProductId ? { type, kicker: "La colección", heading: "Elige tu favorito", intro: "Arrastra para ver todos.", productIds: [] } : null;
     case "traveler":
       return ctx.firstProductId ? { type, kicker: "El ritual", heading: "Así se vive", productId: ctx.firstProductId, scenes: [item("Primera escena", "Cuenta el primer momento de la experiencia."), item("Segunda escena", "Cuenta el segundo momento."), item("Tercera escena", "Cierra con el resultado.")] } : null;
+    case "layout":
+      return { type, structure: null, cells: [] };
     case "marquee":
       return { type, lines: ["Escribe una frase corta", "Y otra distinta"] };
     case "html":
@@ -130,6 +135,10 @@ export type BlockOp =
   /** The color of one text of a block (null: back to the automatic color). */
   /** Where one button of a block goes (null: back to the page's own link). */
   /** The look of one button of a block: only the fields sent change (null clears one). */
+  /** Picks (or changes) the structure of a Contenedor: its elements are laid out again in the new columns. */
+  | { kind: "layoutStructure"; index: number; structure: string | null }
+  /** The elements of one column of a Contenedor. */
+  | { kind: "cellItems"; index: number; cell: number; items: unknown[] }
   | { kind: "buttonStyle"; index: number; key: string; patch: { bg?: string | null; color?: string | null; shape?: string | null } }
   | { kind: "buttonLink"; index: number; key: string; url: string | null }
   | { kind: "fieldColor"; index: number; key: string; color: string | null }
@@ -206,6 +215,28 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       const look = mergeLook(section.look, op.patch);
       if (look) section.look = look;
       else delete section.look;
+      focus = op.index;
+      break;
+    }
+    case "layoutStructure": {
+      const section = isInt(op.index) ? next.sections[op.index] : undefined;
+      if (!section || section.type !== "layout") return bad("Ese bloque no tiene estructura.");
+      const cells = cellsFor(op.structure);
+      if (op.structure && cells.length === 0) return bad("Esa estructura no existe.");
+      // What was in the old columns goes, in order, into the new ones.
+      const items = section.cells.flatMap((c) => c.items);
+      const per = cells.length ? Math.ceil(items.length / cells.length) : 0;
+      section.structure = op.structure;
+      section.cells = cells.map((c, k) => ({ ...c, items: items.slice(k * per, (k + 1) * per) }));
+      focus = op.index;
+      break;
+    }
+    case "cellItems": {
+      const section = isInt(op.index) ? next.sections[op.index] : undefined;
+      if (!section || section.type !== "layout" || !isInt(op.cell) || op.cell < 0 || op.cell >= section.cells.length) return bad("Esa columna ya no existe.");
+      const parsed = z.array(ExtraSchema).max(8).safeParse(op.items);
+      if (!parsed.success) return bad("Ese elemento no es válido (los botones llevan enlace https://, tel:, mailto: o #).");
+      section.cells[op.cell].items = parsed.data;
       focus = op.index;
       break;
     }

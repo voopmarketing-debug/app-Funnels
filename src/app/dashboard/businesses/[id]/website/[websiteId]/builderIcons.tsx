@@ -122,6 +122,7 @@ const wrap = (children: ReactNode) => {
 
 /** One drawn icon per block of the library (and per element that goes inside a block), like a widget panel. */
 export const BLOCK_ICON: Record<BlockEntry["type"], (p: IconProps) => React.JSX.Element> = {
+  layout: wrap(<><rect x="3.500" y="3.500" width="17" height="17" rx="2.500" /><path d="M12 3.500v17M3.500 12H12" /></>),
   features: wrap(<><rect x="3.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.8" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.8" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.8" /></>),
   steps: wrap(<><circle cx="6" cy="6" r="2.4" /><circle cx="12" cy="12" r="2.4" /><circle cx="18" cy="18" r="2.4" /><path d="M7.7 7.7 10.3 10.3M13.7 13.7l2.6 2.6" /></>),
   host: wrap(<><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20c.8-4 3.6-6 7.5-6s6.700 2 7.500 6" /></>),
@@ -150,6 +151,7 @@ export const BLOCK_ICON: Record<BlockEntry["type"], (p: IconProps) => React.JSX.
 };
 
 export const EXTRA_ICON = {
+  heading: wrap(<path d="M6 5v14M18 5v14M6 12h12" />),
   text: wrap(<path d="M4 6.500h16M4 11h16M4 15.500h10" />),
   button: wrap(<><path d="M4.500 8.500V7a2 2 0 0 1 2-2H18a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-4" /><path d="m9 10 .2 9 2.200-2.200 2.300 3.200 1.600-1.100-2.300-3.200 3.100-.3L9 10Z" /></>),
   image: wrap(<><rect x="3" y="4" width="18" height="16" rx="2.500" /><circle cx="9" cy="10" r="1.600" /><path d="m3.500 17 5-4.500 4 3.500 3-2.500 5 4" /></>),

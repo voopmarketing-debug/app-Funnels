@@ -114,7 +114,7 @@ export function WebsiteBuilder({
   const scrollRef = useRef(0);
   const detachRef = useRef<(() => void) | null>(null);
   const handlersRef = useRef<EditorHandlers | null>(null);
-  const [extraPhoto, setExtraPhoto] = useState<{ index: number; at: number | null } | null>(null);
+  const [extraPhoto, setExtraPhoto] = useState<{ index: number; at: number | null; cell?: number } | null>(null);
   const [imageTarget, setImageTarget] = useState<{ index: number; field: "image" | "bgImage" } | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [toast, setToast] = useState<string | null>(null);
@@ -301,9 +301,38 @@ export function WebsiteBuilder({
 
   /** Add / duplicate / delete / move a block. */
   /** A text, a button or a photo goes inside a block, right under its title. */
+  // A title, text, button or photo goes into one column of a Contenedor.
+  function addToCell(index: number, cell: number, kind: string) {
+    const sec = content.sections[index];
+    if (!sec || sec.type !== "layout" || !sec.cells[cell]) return;
+    if (kind === "image") {
+      setExtraPhoto({ index, at: null, cell });
+      return;
+    }
+    const items = [...sec.cells[cell].items];
+    if (items.length >= 8) {
+      showToast("Una columna admite hasta 8 elementos.");
+      return;
+    }
+    items.push(kind === "button" ? { type: "button", label: "Escríbenos", url: "" } : kind === "heading" ? { type: "heading", text: "Escribe tu título" } : { type: "text", text: "Escribe aquí tu texto." });
+    setSelected(index);
+    runBlock({ kind: "cellItems", index, cell, items }, "Agregando el elemento…");
+  }
+
   function addExtra(kind: string, index: number | null) {
     if (index === null || !content.sections[index]) {
       showToast("Toca primero el bloque donde lo quieres, o arrástralo encima de uno.");
+      return;
+    }
+    const target = content.sections[index];
+    if (target.type === "layout") {
+      // In a Contenedor an element goes into a column: the first empty one, or else the first.
+      if (target.cells.length === 0) {
+        showToast("Primero elige la estructura del contenedor.");
+        return;
+      }
+      const empty = target.cells.findIndex((c) => c.items.length === 0);
+      addToCell(index, empty >= 0 ? empty : 0, kind);
       return;
     }
     if (kind === "image") {
@@ -315,7 +344,7 @@ export function WebsiteBuilder({
       showToast("Un bloque admite hasta 6 elementos.");
       return;
     }
-    list.push(kind === "button" ? { type: "button", label: "Escríbenos", url: "" } : { type: "text", text: "Escribe aquí tu descripción." });
+    list.push(kind === "button" ? { type: "button", label: "Escríbenos", url: "" } : kind === "heading" ? { type: "heading", text: "Escribe tu título" } : { type: "text", text: "Escribe aquí tu descripción." });
     setSelected(index);
     runBlock({ kind: "extras", index, extras: list }, "Agregando el elemento…");
   }
@@ -410,7 +439,14 @@ export function WebsiteBuilder({
       setHtmlDialog(index);
     },
     dropBlock: (type, at) => runBlock({ kind: "add", type: type as never, at }, "Agregando el bloque…"),
-    dropExtra: (kind, index) => addExtra(kind, index),
+    dropExtra: (kind, index, cell) => (cell !== undefined ? addToCell(index, cell, kind) : addExtra(kind, index)),
+    layoutStructure: (index, structure) => runBlock({ kind: "layoutStructure", index, structure }, "Aplicando la estructura…"),
+    addToCell: (index, cell, kind) => addToCell(index, cell, kind),
+    removeFromCell: (index, cell, k) => {
+      const sec = content.sections[index];
+      if (!sec || sec.type !== "layout" || !sec.cells[cell]) return;
+      runBlock({ kind: "cellItems", index, cell, items: sec.cells[cell].items.filter((_, i) => i !== k) }, "Quitando…");
+    },
     add: (index) => setLibrary({ at: index + 1 }),
     duplicate: (index) => runBlock({ kind: "duplicate", index }, "Duplicando…"),
     remove: (index) => runBlock({ kind: "remove", index }, "Eliminando…"),
@@ -770,6 +806,7 @@ export function WebsiteBuilder({
                 onGalleryLayout={(layout) => runBlock({ kind: "galleryLayout", index: sel, layout }, "Cambiando el diseño…")}
                 onExtras={(extras) => runBlock({ kind: "extras", index: sel, extras }, "Guardando…")}
                 onPickExtraPhoto={(at) => setExtraPhoto({ index: sel, at })}
+                onLayoutStructure={(structure) => runBlock({ kind: "layoutStructure", index: sel, structure }, "Aplicando la estructura…")}
               />
             ))}
 
@@ -1017,6 +1054,11 @@ export function WebsiteBuilder({
           onPick={(url) => {
             const t = extraPhoto;
             setExtraPhoto(null);
+            if (t.cell !== undefined) {
+              const sec = content.sections[t.index];
+              if (sec?.type === "layout" && sec.cells[t.cell]) runBlock({ kind: "cellItems", index: t.index, cell: t.cell, items: [...sec.cells[t.cell].items, { type: "image", url }] }, "Agregando la foto…");
+              return;
+            }
             const list = [...((content.sections[t.index]?.extras ?? []) as ExtraElement[])];
             if (t.at === null) list.push({ type: "image", url });
             else list[t.at] = { type: "image", url };
