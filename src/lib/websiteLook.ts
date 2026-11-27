@@ -10,6 +10,8 @@ export const LOOK_WIDTH = ["narrow", "wide", "full"] as const;
 export const LOOK_ALIGN = ["left", "center", "right"] as const;
 export const LOOK_SIZE = ["sm", "lg", "xl"] as const;
 export const LOOK_HIDE = ["mobile", "desktop"] as const;
+/** The structure of a block: how many columns its content is laid out in ("2-1": wide left, "1-2": wide right). */
+export const LOOK_COLS = ["1", "2", "3", "4", "2-1", "1-2"] as const;
 
 /** A size as a percent of the normal one, written as text ("120"): from 50 to 249. */
 const scale = z
@@ -48,6 +50,7 @@ export const LookSchema = z
     headingFont: fontName,
     bodyFont: fontName,
     hideOn: choice(LOOK_HIDE),
+    cols: choice(LOOK_COLS),
   })
   .optional()
   .catch(undefined);
@@ -122,6 +125,7 @@ export function lookParts(look: Look | null | undefined, opts: { photoBg?: boole
   if (look.width) classes.push(`lk-w-${look.width}`);
   if (look.align) classes.push(`lk-a-${look.align}`);
   if (look.size) classes.push(`lk-t-${look.size}`);
+  if (look.cols) classes.push(`lk-cols-${look.cols}`);
   if (look.hideOn && !opts.showAll) classes.push(look.hideOn === "mobile" ? "lk-hide-m" : "lk-hide-d");
   return { classes, vars };
 }
@@ -148,6 +152,15 @@ export const LOOK_CSS = `
 .lk-a-center .hero-actions,.lk-a-center .chips,.lk-a-center .cat-tabs{justify-content:center}
 .lk-a-right .hero-actions,.lk-a-right .chips{justify-content:flex-end}
 .lk-t-sm{--ts:.8}.lk-t-lg{--ts:1.22}.lk-t-xl{--ts:1.5}
+/* Structure ("Selecciona tu estructura"): the columns of the block's lists, of its two-part layouts and of the elements added inside it. */
+.lk-cols-1 :is(.feat:not(.feat-bento):not(.feat-numbered),.steps:not(.steps-timeline),.tm-grid,.stats-grid,.trust-grid,.pgrid,.gallery,.specs,.extras),.lk-cols-1 :is(.host,.spot,.promo-rich-grid,.hero-split-grid,.hero-product-grid,.giant-row,.faq-split){grid-template-columns:minmax(0,1fr)!important}
+.lk-cols-2 :is(.feat:not(.feat-bento):not(.feat-numbered),.steps:not(.steps-timeline),.tm-grid,.stats-grid,.trust-grid,.pgrid,.gallery,.specs,.extras),.lk-cols-2 :is(.host,.spot,.promo-rich-grid,.hero-split-grid,.hero-product-grid,.giant-row,.faq-split){grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.lk-cols-3 :is(.feat:not(.feat-bento):not(.feat-numbered),.steps:not(.steps-timeline),.tm-grid,.stats-grid,.trust-grid,.pgrid,.gallery,.specs,.extras){grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.lk-cols-4 :is(.feat:not(.feat-bento):not(.feat-numbered),.steps:not(.steps-timeline),.tm-grid,.stats-grid,.trust-grid,.pgrid,.gallery,.specs,.extras){grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.lk-cols-2-1 :is(.feat:not(.feat-bento):not(.feat-numbered),.steps:not(.steps-timeline),.tm-grid,.stats-grid,.trust-grid,.pgrid,.gallery,.specs,.extras),.lk-cols-2-1 :is(.host,.spot,.promo-rich-grid,.hero-split-grid,.hero-product-grid,.giant-row,.faq-split){grid-template-columns:minmax(0,2fr) minmax(0,1fr)!important}
+.lk-cols-1-2 :is(.feat:not(.feat-bento):not(.feat-numbered),.steps:not(.steps-timeline),.tm-grid,.stats-grid,.trust-grid,.pgrid,.gallery,.specs,.extras),.lk-cols-1-2 :is(.host,.spot,.promo-rich-grid,.hero-split-grid,.hero-product-grid,.giant-row,.faq-split){grid-template-columns:minmax(0,1fr) minmax(0,2fr)!important}
+[class*="lk-cols-"] .extras{display:grid!important;align-items:start}
+@media (max-width:700px){[class*="lk-cols-"] :is(.feat:not(.feat-bento):not(.feat-numbered),.steps:not(.steps-timeline),.tm-grid,.stats-grid,.trust-grid,.pgrid,.gallery,.specs,.extras,.host,.spot,.promo-rich-grid,.hero-split-grid,.hero-product-grid,.giant-row,.faq-split){grid-template-columns:minmax(0,1fr)!important}}
 @media (max-width:860px){.lk-hide-m{display:none!important}.lk-p-lg{padding-top:84px!important;padding-bottom:84px!important}.lk-p-xl{padding-top:112px!important;padding-bottom:112px!important}.lk-t-xl{--ts:1.25}}
 @media (min-width:861px){.lk-hide-d{display:none!important}}
 `;

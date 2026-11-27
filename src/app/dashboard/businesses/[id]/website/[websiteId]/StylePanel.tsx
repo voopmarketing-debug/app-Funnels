@@ -47,6 +47,44 @@ function Segmented<T extends string | null>({
   );
 }
 
+/** "Selecciona tu estructura": how many columns the block's content goes in, drawn as small grey layouts. */
+const STRUCTURES: { value: string | null; label: string; cells: number[] }[] = [
+  { value: null, label: "Automática", cells: [] },
+  { value: "1", label: "1 columna", cells: [12] },
+  { value: "2", label: "2 columnas", cells: [6, 6] },
+  { value: "2-1", label: "2 columnas, ancha a la izquierda", cells: [8, 4] },
+  { value: "1-2", label: "2 columnas, ancha a la derecha", cells: [4, 8] },
+  { value: "3", label: "3 columnas", cells: [4, 4, 4] },
+  { value: "4", label: "4 columnas", cells: [3, 3, 3, 3] },
+];
+function StructurePicker({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[13px] font-semibold text-ink">Estructura</p>
+      <div role="radiogroup" aria-label="Estructura del bloque" className="flex flex-wrap gap-1.5">
+        {STRUCTURES.map((o) => (
+          <button
+            key={String(o.value)}
+            type="button"
+            role="radio"
+            aria-checked={value === o.value}
+            aria-label={o.label}
+            title={o.label}
+            onClick={() => onChange(o.value)}
+            className={`flex h-10 w-16 items-stretch gap-[2px] rounded-md border p-1 transition ${value === o.value ? "border-accent bg-accent/15" : "border-border hover:border-border-strong"}`}
+          >
+            {o.cells.length === 0 ? (
+              <span className="flex w-full items-center justify-center text-[10px] font-bold text-ink-muted">Auto</span>
+            ) : (
+              o.cells.map((w, i) => <span key={i} style={{ flex: w }} className={`rounded-[2px] ${value === o.value ? "bg-accent/60" : "bg-ink-faint/50"}`} />)
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** A size as a percent: − and + buttons (easy on a phone), a slider, and "Normal" to go back. */
 function SizeControl({ label, value, onChange }: { label: string; value: string | null | undefined; onChange: (v: string | null) => void }) {
   const n = value ? Number(value) : 100;
@@ -258,6 +296,7 @@ export function StylePanel({
         <p className="text-[12px] text-ink-muted">Bloque {index + 1}. Cada cambio se ve al instante en la página.</p>
       </div>
 
+      <StructurePicker value={look.cols ?? null} onChange={(v) => change({ cols: v as Look["cols"] })} />
       <ExtrasEditor extras={section.extras ?? []} busy={busy} onChange={onExtras} onPickPhoto={onPickExtraPhoto} />
 
       {section.type === "gallery" && (

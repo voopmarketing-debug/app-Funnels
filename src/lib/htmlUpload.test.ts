@@ -149,4 +149,10 @@ describe("Subir mi HTML", () => {
     const back = done.ok ? applyBlockOp(done.content, { kind: "fieldColor", index: 1, key: "heading", color: null }) : done;
     expect(back.ok && "fc" in back.content.sections[1]).toBe(false);
   });
+  it("a block can have its own structure (columns)", () => {
+    expect(lookParts({ cols: "2-1" }).classes).toContain("lk-cols-2-1");
+    expect(LookSchema.parse({ cols: "9" })).toEqual({ cols: null });
+    expect(LOOK_CSS).toContain(".lk-cols-3 :is(");
+    expect(LOOK_CSS).toContain("minmax(0,2fr) minmax(0,1fr)");
+  });
 });
