@@ -10,6 +10,8 @@ export const LOOK_WIDTH = ["narrow", "wide", "full"] as const;
 export const LOOK_ALIGN = ["left", "center", "right"] as const;
 export const LOOK_SIZE = ["sm", "lg", "xl"] as const;
 export const LOOK_HIDE = ["mobile", "desktop"] as const;
+/** Shape of the buttons: square corners, slightly rounded ("soft") or pill-shaped. */
+export const BTN_SHAPES = ["square", "soft", "round"] as const;
 /** The structure of a block: how many columns its content is laid out in ("2-1": wide left, "1-2": wide right). */
 export const LOOK_COLS = ["1", "2", "3", "4", "2-1", "1-2"] as const;
 
@@ -52,6 +54,7 @@ export const LookSchema = z
     bodyFont: fontName,
     hideOn: choice(LOOK_HIDE),
     cols: choice(LOOK_COLS),
+    btnShape: choice(BTN_SHAPES),
   })
   .optional()
   .catch(undefined);
@@ -132,6 +135,7 @@ export function lookParts(look: Look | null | undefined, opts: { photoBg?: boole
   if (look.align) classes.push(`lk-a-${look.align}`);
   if (look.size) classes.push(`lk-t-${look.size}`);
   if (look.cols) classes.push(`lk-cols-${look.cols}`);
+  if (look.btnShape) classes.push(`lk-bsh-${look.btnShape}`);
   if (look.hideOn && !opts.showAll) classes.push(look.hideOn === "mobile" ? "lk-hide-m" : "lk-hide-d");
   return { classes, vars };
 }
@@ -141,6 +145,7 @@ export const LOOK_CSS = `
 .lk-bg{background:var(--lkbg)!important;--bg:var(--lkbg);--surface:color-mix(in srgb,var(--lkbg) 90%,var(--lkc,#808080))}
 .lk-c{color:var(--lkc)!important;--text:var(--lkc);--muted:color-mix(in srgb,var(--lkc) 66%,transparent);--line:color-mix(in srgb,var(--lkc) 16%,transparent)}
 .lk-s{--surface:var(--lks)}
+.lk-bsh-square .btn{border-radius:0!important}.lk-bsh-soft .btn{border-radius:10px!important}.lk-bsh-round .btn{border-radius:999px!important}
 .lk-btn .btn:not(.btn-ghost){background:var(--lkbtn)!important;border-color:var(--lkbtn)!important;color:var(--lkbtnt)!important}
 .lk-bf{font-family:var(--bf)}
 .lk-bs{font-size:calc(17px * var(--lkbs))}

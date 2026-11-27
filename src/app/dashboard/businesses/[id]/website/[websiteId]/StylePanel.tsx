@@ -6,6 +6,7 @@ import { ColorSwatchButton } from "@/components/ColorSwatchButton";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { SECTION_LABELS, type ExtraElement, type Section, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { tidyLook, type Look } from "@/lib/websiteLook";
+import { ButtonShapePicker } from "./ButtonShapePicker";
 import { AlignCenterIcon, AlignLeftIcon, AlignRightIcon, DesktopIcon, DevicesIcon, ImageIcon, PhoneIcon, RefreshIcon, TrashIcon } from "./builderIcons";
 
 const SAVE_DELAY_MS = 500;
@@ -345,6 +346,7 @@ export function StylePanel({
 
       <ColorRow label="Color del texto" value={look.color} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ color: hex })} />
 
+      <ButtonShapePicker label="Forma de los botones" value={look.btnShape} onChange={(v) => change({ btnShape: v })} />
       <ColorRow label="Color de los botones" hint="Solo los botones de este bloque." value={look.btn} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ btn: hex })} />
 
       {section.type !== "gallery" && (

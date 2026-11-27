@@ -173,4 +173,12 @@ describe("Subir mi HTML", () => {
     expect(lookParts({ btn: "#e11d48" }).classes).toContain("lk-btn");
     expect(lookParts({ btn: "#e11d48" }).vars["--lkbtn"]).toBe("#e11d48");
   });
+  it("buttons can be square, soft or round: for the whole page or for one block", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    expect(renderWebsiteHtmlV2({ ...base, fullHtml: false, btnShape: "square" } as unknown as typeof base, ctx)).toContain("--br:0px;");
+    expect(renderWebsiteHtmlV2({ ...base, fullHtml: false, btnShape: "round" } as unknown as typeof base, ctx)).toContain("--br:999px;");
+    expect(lookParts({ btnShape: "soft" }).classes).toContain("lk-bsh-soft");
+    expect(LookSchema.parse({ btnShape: "triangle" })).toEqual({ btnShape: null });
+    expect(LOOK_CSS).toContain(".lk-bsh-square .btn{border-radius:0!important}");
+  });
 });

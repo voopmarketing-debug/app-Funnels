@@ -3605,6 +3605,8 @@ export async function updateWebsiteDesignV2(
     plain?: boolean;
     /** Logo, name, colors and footer texts of the page (only what is sent changes; null/"" clears it). */
     chrome?: Partial<Record<keyof Chrome, string | null>>;
+    /** Shape of all the buttons (null: the style's own). */
+    btnShape?: "square" | "soft" | "round" | null;
   },
 ): Promise<WebsiteContentV2> {
   const session = await auth();
@@ -3627,6 +3629,7 @@ export async function updateWebsiteDesignV2(
   if (patch.sticky !== undefined) next.sticky = patch.sticky ? true : undefined;
   if (patch.fullHtml !== undefined) next.fullHtml = patch.fullHtml ? true : undefined;
   if (patch.plain !== undefined) next.plain = patch.plain ? true : undefined;
+  if (patch.btnShape !== undefined) next.btnShape = patch.btnShape && ["square", "soft", "round"].includes(patch.btnShape) ? patch.btnShape : undefined;
   if (patch.chrome) {
     // Only the business's own pictures can be the logo: never a url typed in by the browser.
     if (patch.chrome.logo && !(await ownImageUrls(businessId, website.aiImageUrl)).has(patch.chrome.logo)) throw new Error("Esa foto ya no está en tu biblioteca");

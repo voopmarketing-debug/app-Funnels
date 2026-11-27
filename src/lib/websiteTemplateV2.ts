@@ -967,7 +967,7 @@ ${fontLink(fonts)}
 :root{color-scheme:light;--primary:${primary};--primary-base:${primary};--primary-ink:${primaryInk};--primary-on-dark:color-mix(in srgb,${primary} 50%,#fff);--btn-text:${readableTextColor(primary)};--bg:${bg};--surface:${surface};--text:${textColor};
 --muted:color-mix(in srgb,var(--text) 64%,transparent);--line:color-mix(in srgb,var(--text) 12%,transparent);
 --hf:${fontStack(theme.headingFont)};--bf:${fontStack(theme.bodyFont)};
---r:${style.radius};--br:${style.btnRadius};--pad:${style.sectionPad};--max:max(${style.maxWidth},min(88vw,1560px))}
+--r:${style.radius};--br:${({ square: "0px", soft: "10px", round: "999px" } as Record<string, string>)[content.btnShape ?? ""] ?? style.btnRadius};--pad:${style.sectionPad};--max:max(${style.maxWidth},min(88vw,1560px))}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--bf);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}

@@ -27,6 +27,7 @@ import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { ChromePanel } from "./ChromePanel";
+import { ButtonShapePicker } from "./ButtonShapePicker";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
 import { BagIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
 import { PublishControl } from "./PublishControl";
@@ -570,6 +571,9 @@ export function WebsiteBuilder({
                   runDesign("Guardando colores…", { theme });
                 }}
               />
+              <div className="border-t border-border pt-5">
+                <ButtonShapePicker label="Forma de todos los botones" value={content.btnShape} onChange={(v) => runDesign("Guardando…", { btnShape: v })} />
+              </div>
               <ChromePanel
                 key={`chrome:${rev}`}
                 chrome={content.chrome}

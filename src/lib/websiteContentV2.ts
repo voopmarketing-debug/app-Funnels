@@ -489,6 +489,8 @@ export const WebsiteContentV2Schema = AiWebsiteV2Schema.extend({
   /** Addresses of the pictures the platform created with AI on this page (so they can be counted, replaced or removed). */
   /** The public page shows only the owner's HTML block, with no header, footer or sections of ours ("Subir mi HTML"). */
   fullHtml: z.boolean().optional().catch(undefined),
+  /** Shape of every button of the page (a block can have its own): square, soft or round. */
+  btnShape: z.enum(["square", "soft", "round"]).optional().catch(undefined),
   /** The page's own top bar and footer: logo, name, colors and footer texts (all optional; what is empty stays automatic). */
   chrome: ChromeSchema,
   /** Without our top bar (name + button) and our footer: the page is only its blocks. */
