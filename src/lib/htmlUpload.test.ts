@@ -3,6 +3,7 @@ import { checkUploadedHtml, htmlBlockFromContent } from "./htmlBlock";
 import { SITE_SCRIPT } from "./siteScript";
 import { applyBlockOp } from "./websiteBlocks";
 import { setTextAtPath } from "./websiteEdit";
+import { providerOf, withVideoOptions } from "./videoEmbed";
 import { LOOK_CSS, LookSchema, lookParts, mergeLook } from "./websiteLook";
 import { SAMPLE_HTML } from "./htmlSample";
 import { buildHtmlPageContent } from "./nicheTemplates";
@@ -285,5 +286,53 @@ describe("Subir mi HTML", () => {
     expect(lookParts({ speed: "fast" }).classes).toContain("lk-sp-fast");
     expect(LookSchema.parse({ speed: "warp" })).toEqual({ speed: null });
     expect(LOOK_CSS).toContain(".lk-sp-slow{--mq-d:92s}");
+  });
+  it("a video has start and end time, autoplay, mute, loop, controls and related videos, each platform in its own way", () => {
+    const yt = "https://www.youtube.com/embed/dQw4w9WgXcQ";
+    expect(providerOf(yt)).toBe("youtube");
+    const full = withVideoOptions(yt, { start: 90, end: 120, autoplay: true, loop: true, controls: false, related: false });
+    expect(full).toContain("start=90");
+    expect(full).toContain("end=120");
+    expect(full).toContain("autoplay=1");
+    expect(full).toContain("mute=1"); // autoplay always goes muted
+    expect(full).toContain("loop=1&playlist=dQw4w9WgXcQ");
+    expect(full).toContain("controls=0");
+    expect(full).toContain("rel=0");
+    // The editor's preview never autoplays.
+    expect(withVideoOptions(yt, { autoplay: true }, { preview: true })).toBe(yt);
+    expect(withVideoOptions("https://player.vimeo.com/video/123456789", { start: 30, mute: true })).toBe("https://player.vimeo.com/video/123456789?muted=1#t=30s");
+    expect(withVideoOptions("https://fast.wistia.net/embed/iframe/abcdefghij", { loop: true, controls: false })).toContain("endVideoBehavior=loop");
+    expect(withVideoOptions("https://www.loom.com/embed/" + "a".repeat(32), { start: 10 })).toContain("t=10");
+    expect(withVideoOptions(yt, undefined)).toBe(yt);
+
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const page = { ...base, fullHtml: false, plain: false, sections: [base.sections[0], { type: "video", kicker: null, heading: "Mira", intro: null, url: "https://youtu.be/dQw4w9WgXcQ" }] } as unknown as typeof base;
+    const set = applyBlockOp(page, { kind: "videoOpts", index: 1, opts: { start: 90, mute: true, controls: false } });
+    expect(set.ok).toBe(true);
+    const html = set.ok ? renderWebsiteHtmlV2(set.content, ctx) : "";
+    expect(html).toContain("youtube.com/embed/dQw4w9WgXcQ?start=90&amp;mute=1&amp;controls=0");
+    // Back to the defaults leaves nothing stored; a bad time or an end before the start is refused.
+    const back = set.ok ? applyBlockOp(set.content, { kind: "videoOpts", index: 1, opts: { start: null, mute: false, controls: true } }) : set;
+    expect(back.ok && "opts" in back.content.sections[1]).toBe(false);
+    expect(applyBlockOp(page, { kind: "videoOpts", index: 1, opts: { start: -5 } }).ok).toBe(false);
+    expect(applyBlockOp(page, { kind: "videoOpts", index: 1, opts: { start: 100, end: 50 } }).ok).toBe(false);
+    expect(applyBlockOp(page, { kind: "videoOpts", index: 1, opts: { speed: 2 } }).ok).toBe(false);
+  });
+  it("the icon of an item can be changed and colored", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const feat = { type: "features", variant: "list", kicker: null, heading: "Lo que incluye", intro: null, items: [{ icon: "check", title: "Uno", description: "a" }, { icon: "check", title: "Dos", description: "b" }] };
+    const page = { ...base, fullHtml: false, plain: false, sections: [base.sections[0], feat] } as unknown as typeof base;
+    const set = setTextAtPath(page, "sections.1.items.0.icon", "bolt");
+    expect(set.ok).toBe(true);
+    const colored = set.ok ? applyBlockOp(set.content, { kind: "fieldColor", index: 1, key: "items.0.icon", color: "#e11d48" }) : set;
+    const html = colored.ok ? renderWebsiteHtmlV2(colored.content, { ...ctx, preview: true, edit: true }) : "";
+    expect(html).toContain('data-icon="sections.1.items.0.icon" data-fc="sections.1.items.0.icon"');
+    expect(html).toContain('[data-fc="sections.1.items.0.icon"]{color:#e11d48!important}');
+    expect(html).toContain("M13 3L5 14h6l-1 7 8-11h-6z"); // the bolt
+    // Only an icon of the page's own list.
+    expect(setTextAtPath(page, "sections.1.items.0.icon", "<script>").ok).toBe(false);
+    expect(setTextAtPath(page, "sections.1.items.9.icon", "bolt").ok).toBe(false);
+    // The published page has no editor marks.
+    expect(colored.ok ? renderWebsiteHtmlV2(colored.content, ctx) : "").not.toContain("data-icon");
   });
 });

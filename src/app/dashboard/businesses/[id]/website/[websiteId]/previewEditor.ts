@@ -9,6 +9,7 @@
 // Nothing runs inside the public page itself (it ships with script-src 'none').
 
 import { joinMarks, parseMarks } from "@/lib/textMarks";
+import { ICONS } from "@/lib/websiteIcons";
 
 export type SectionInfo = { index: number; label: string; canMoveUp: boolean; canMoveDown: boolean; canRemove: boolean; hasBg: boolean };
 
@@ -50,7 +51,9 @@ export type EditorHandlers = {
   /** Saves the color of one text ("sections.2.heading"); null brings the automatic color back. */
   setTextColor(path: string, color: string | null): void;
   /** An element of the page was chosen (clicked to edit): its settings open on the left. */
-  inspect(path: string, kind: "button" | "text"): void;
+  inspect(path: string, kind: "button" | "text" | "video"): void;
+  /** Another icon for an item of a block ("sections.2.items.0.icon"). */
+  setIcon(path: string, name: string): void;
   /** The page's logo: opens the photo window / takes it off (the top bar goes back to the name). */
   pickLogo(): void;
   removeLogo(): void;
@@ -99,7 +102,12 @@ section[data-sec].fl-hover{box-shadow:inset 0 0 0 2px ${ACCENT};background-image
 .fl-bar button[disabled]{opacity:.3;cursor:default}
 .fl-bar button[disabled]:hover{background:none}
 .fl-tc{position:absolute;z-index:2147483300;display:flex;align-items:center;gap:6px;padding:6px 8px;background:#111827;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font:600 11px/1 system-ui,sans-serif;color:#9ca3af;white-space:nowrap}
-.fl-tc.col{flex-direction:column;align-items:stretch;gap:8px}
+.fl-tc .ics{display:grid;grid-template-columns:repeat(8,30px);gap:4px}
+.fl-tc .ics button{all:unset;box-sizing:border-box;cursor:pointer;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff}
+.fl-tc .ics button:hover{background:#374151}
+.fl-tc .ics button[aria-pressed="true"]{background:#5b6cf0}
+.fl-tc .ics svg{width:18px;height:18px}
+.fl-tc.col{max-width:320px;flex-direction:column;align-items:stretch;gap:8px}
 .fl-tc .row{display:flex;align-items:center;gap:6px}
 .fl-tc .row>span.lab{min-width:46px}
 .fl-tc button.sw{all:unset;box-sizing:border-box;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.55);cursor:pointer}
@@ -464,6 +472,87 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     tcFor = el;
   }
 
+  // The icon of an item: all the icons to choose from, and a color for it.
+  function showIconMenu(svg: Element, path: string) {
+    hideColors();
+    const h = getHandlers();
+    const box = doc.createElement("div");
+    box.className = "fl-tc col";
+    box.setAttribute("role", "toolbar");
+    box.setAttribute("aria-label", "Icono");
+    const grid = doc.createElement("div");
+    grid.className = "ics";
+    const current = svg.innerHTML;
+    for (const [name, inner] of Object.entries(ICONS)) {
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.title = name;
+      b.setAttribute("aria-label", `Icono ${name}`);
+      b.setAttribute("aria-pressed", current === inner ? "true" : "false");
+      b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+      b.addEventListener("click", () => {
+        hideColors();
+        h.setIcon(path, name);
+      });
+      grid.appendChild(b);
+    }
+    box.appendChild(grid);
+    const row = doc.createElement("div");
+    row.className = "row";
+    const lab = doc.createElement("span");
+    lab.className = "lab";
+    lab.textContent = "Color";
+    row.appendChild(lab);
+    const seen = new Set<string>();
+    for (const c of [...h.palette(), "#ffffff", "#111827"]) {
+      const hex = c.toLowerCase();
+      if (!/^#[0-9a-f]{6}$/.test(hex) || seen.has(hex)) continue;
+      seen.add(hex);
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.className = "sw";
+      b.style.background = hex;
+      b.title = hex;
+      b.setAttribute("aria-label", `Color del icono ${hex}`);
+      b.addEventListener("click", () => {
+        (svg as HTMLElement).style.setProperty("color", hex, "important");
+        svg.setAttribute("data-fc", path);
+        h.setTextColor(path, hex);
+      });
+      row.appendChild(b);
+    }
+    const pick = doc.createElement("input");
+    pick.type = "color";
+    pick.title = "Elegir otro color";
+    pick.setAttribute("aria-label", "Color del icono: otro color");
+    pick.addEventListener("change", () => {
+      (svg as HTMLElement).style.setProperty("color", pick.value, "important");
+      svg.setAttribute("data-fc", path);
+      h.setTextColor(path, pick.value);
+    });
+    row.appendChild(pick);
+    const auto = doc.createElement("button");
+    auto.type = "button";
+    auto.className = "auto";
+    auto.textContent = "Auto";
+    auto.addEventListener("click", () => {
+      (svg as HTMLElement).style.removeProperty("color");
+      svg.removeAttribute("data-fc");
+      h.setTextColor(path, null);
+    });
+    row.appendChild(auto);
+    box.appendChild(row);
+    box.addEventListener("mousedown", (e) => {
+      if ((e.target as HTMLElement).tagName !== "INPUT") e.preventDefault();
+    });
+    doc.body.appendChild(box);
+    const r = svg.getBoundingClientRect();
+    box.style.top = `${r.bottom + (win!.scrollY || 0) + 8}px`;
+    box.style.left = `${Math.max(8, Math.min(r.left + (win!.scrollX || 0), doc.documentElement.clientWidth - box.offsetWidth - 8))}px`;
+    tc = box;
+    tcFor = svg as HTMLElement;
+  }
+
   // The "+" of an empty column: choose what goes in (title, text, button, photo).
   function showCellMenu(anchor: HTMLElement, where: string) {
     hideColors();
@@ -569,6 +658,18 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     const t = asElement(e.target);
     if (!t) return;
     if (t.closest(".fl-tc")) return;
+    const icon = t.closest("[data-icon]");
+    if (icon?.getAttribute("data-icon")) {
+      e.preventDefault();
+      showIconMenu(icon, icon.getAttribute("data-icon")!);
+      return;
+    }
+    const vid = t.closest<HTMLElement>("[data-video]");
+    if (vid?.dataset.video) {
+      e.preventDefault();
+      getHandlers().inspect(`sections.${vid.dataset.video}.url`, "video");
+      return;
+    }
     if (t.closest("[data-add-container]")) {
       e.preventDefault();
       getHandlers().addContainer();

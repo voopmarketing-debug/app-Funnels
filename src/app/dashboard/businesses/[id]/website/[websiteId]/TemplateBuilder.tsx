@@ -97,6 +97,7 @@ export function TemplateBuilder({
     inspect: () => {},
     layoutStructure: () => {},
     addContainer: () => {},
+    setIcon: () => {},
     openLibrary: () => {},
     addToCell: () => {},
     removeFromCell: () => {},

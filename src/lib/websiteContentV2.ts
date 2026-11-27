@@ -272,6 +272,19 @@ const MarqueeSection = z.object({
   lines: z.array(z.string()).describe("1 o 2 frases cortas en mayúsculas que se desplazan gigantes, en direcciones opuestas."),
 });
 
+export const VideoOptsSchema = z
+  .object({
+    start: z.number().int().min(1).max(86400).optional().catch(undefined),
+    end: z.number().int().min(1).max(86400).optional().catch(undefined),
+    autoplay: z.literal(true).optional().catch(undefined),
+    mute: z.literal(true).optional().catch(undefined),
+    loop: z.literal(true).optional().catch(undefined),
+    controls: z.literal(false).optional().catch(undefined),
+    related: z.literal(false).optional().catch(undefined),
+  })
+  .optional()
+  .catch(undefined);
+
 const VideoSection = z.object({
   ...media,
   type: z.literal("video"),
@@ -279,6 +292,7 @@ const VideoSection = z.object({
   heading: text(80, "Título sobre el video"),
   intro: nullableText("Frase corta bajo el título."),
   url: z.string().catch("").describe("Enlace del video (YouTube, Vimeo, Wistia o Loom). Vacío si el dueño aún no lo ha pegado: NUNCA inventes un enlace."),
+  opts: VideoOptsSchema,
 });
 
 export const HTML_MAX_CHARS = 100_000;

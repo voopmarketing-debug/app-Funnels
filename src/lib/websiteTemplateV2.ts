@@ -3,6 +3,8 @@ import { SERIF_FONTS } from "@/lib/websiteContent";
 import type { ExtraElement } from "@/lib/websiteContentV2";
 import { renderMarks, stripMarks } from "@/lib/textMarks";
 import { STRUCTURES } from "@/lib/websiteStructures";
+import { withVideoOptions } from "@/lib/videoEmbed";
+import { ICONS, icon } from "@/lib/websiteIcons";
 import { readableTextColor, sanitizeHexColor, toEmbedUrl } from "@/lib/websiteTemplate";
 import { eventDateOk, toIsoWithZone } from "@/lib/websiteBlocks";
 import { LOOK_CSS, lookParts } from "@/lib/websiteLook";
@@ -218,28 +220,7 @@ const STYLES: Record<StyleKey, StylePreset> = {
   lujo: { radius: "2px", btnRadius: "2px", headingWeight: 400, headingTransform: "none", headingTracking: "0.01em", h1: "clamp(40px, 6.5vw, 80px)", h2: "clamp(28px, 4vw, 48px)", sectionPad: "120px", cardBorder: true, cardShadow: false, heroDecor: "none", maxWidth: "1120px" },
 };
 
-const ICONS: Record<string, string> = {
-  truck: '<path d="M3 6h11v9H3zM14 9h4l3 3v3h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>',
-  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
-  card: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
-  refresh: '<path d="M20 11a8 8 0 0 0-14-5l-2 2M4 13a8 8 0 0 0 14 5l2-2"/><path d="M4 4v4h4M20 20v-4h-4"/>',
-  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.5 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
-  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
-  leaf: '<path d="M5 19c0-8 6-14 15-14 0 9-6 15-14 15"/><path d="M5 19c3-3 6-5 9-7"/>',
-  bolt: '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
-  chat: '<path d="M4 5h16v11H9l-5 4z"/>',
-  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
-  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
-  gift: '<rect x="3" y="9" width="18" height="12" rx="1"/><path d="M3 13h18M12 9v12M12 9C9 9 7 4 10 4s2 5 2 5 0-5 2-5 1 5-2 5"/>',
-  sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
-  users: '<circle cx="9" cy="8" r="3"/><path d="M3 20c.5-3 3-5 6-5s5.5 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c2.5.2 4.2 1.8 4.7 4.5"/>',
-  map: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
-};
 
-function icon(name: string): string {
-  return `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] ?? ICONS.check}</svg>`;
-}
 
 function fontLink(fonts: string[]): string {
   const families = fonts.map((f) => `family=${encodeURIComponent(f)}:wght@400;600;700`).join("&");
@@ -341,6 +322,9 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   const hdrVars = hdrParts.join(";");
   const ftrParts = [hexOk(chrome.footerBg) && `--fbg:${chrome.footerBg}`, hexOk(chrome.footerColor) && `--fc:${chrome.footerColor}`].filter(Boolean);
   const ftrVars = ftrParts.join(";");
+  // An item's icon: in the editor it can be clicked (to pick another icon or color); a color of its own is a rule at the end of the styles.
+  const iconAt = (name: string, path: string): string =>
+    icon(name).replace('<svg class="ico"', `<svg class="ico"${edit ? ` data-icon="${esc(path)}"` : ""}${fcOf(path) ? ` data-fc="${esc(path)}"` : ""}`);
   const fcCss = content.sections
     .flatMap((sec, i) => Object.entries(sec.fc ?? {}).map(([k, c]) => `[data-fc="sections.${i}.${k}"]{color:${c}!important}`))
     .join("");
@@ -559,7 +543,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         }
         return `<section class="trust"><div class="wrap trust-grid">${s.items
           .slice(0, 4)
-          .map((it, ii) => `<div class="trust-item">${icon(it.icon)}<div><p class="t-title"${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</p><p class="t-desc"${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p></div></div>`)
+          .map((it, ii) => `<div class="trust-item">${iconAt(it.icon, fp(`items.${ii}.icon`))}<div><p class="t-title"${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</p><p class="t-desc"${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p></div></div>`)
           .join("")}</div></section>`;
 
       case "features": {
@@ -568,7 +552,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           const t = `<h3${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</h3>`;
           const d = `<p${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p>`;
           if (s.variant === "numbered") return `<div class="feat-item"><span class="feat-num"${ed(fp(`nums.i${ii}`))}>${esc(s.nums?.[`i${ii}`] ?? pad2(ii + 1))}</span>${t}${d}</div>`;
-          return `<div class="feat-item">${s.variant !== "list" ? `<span class="feat-ico">${icon(it.icon)}</span>` : `<span class="feat-check">${icon("check")}</span>`}<div>${t}${d}</div></div>`;
+          return `<div class="feat-item">${s.variant !== "list" ? `<span class="feat-ico">${iconAt(it.icon, fp(`items.${ii}.icon`))}</span>` : `<span class="feat-check">${iconAt(it.icon, fp(`items.${ii}.icon`))}</span>`}<div>${t}${d}</div></div>`;
         };
         return `<section class="sec" id="${index === 1 ? "detalles" : `s${index}`}"><div class="wrap">
           ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>${s.intro ? `<p class="intro"${ed(fp("intro"))}>${esc(s.intro)}</p>` : ""}
@@ -626,7 +610,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           <div class="spot-media">${productImage(p, "spot-img")}</div>
           <div class="spot-info">
             <h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
-            <ul class="spot-bullets">${s.bullets.slice(0, 4).map((b, bi) => `<li>${icon(b.icon)}<div><strong${ed(fp(`bullets.${bi}.title`))}>${esc(b.title)}</strong><span${ed(fp(`bullets.${bi}.description`))}>${esc(b.description)}</span></div></li>`).join("")}</ul>
+            <ul class="spot-bullets">${s.bullets.slice(0, 4).map((b, bi) => `<li>${iconAt(b.icon, fp(`bullets.${bi}.icon`))}<div><strong${ed(fp(`bullets.${bi}.title`))}>${esc(b.title)}</strong><span${ed(fp(`bullets.${bi}.description`))}>${esc(b.description)}</span></div></li>`).join("")}</ul>
             ${specs.length ? `<dl class="specs">${specs.map((sp) => `<div><dt>${esc(sp.label)}</dt><dd>${esc(sp.value)}</dd></div>`).join("")}</dl>` : ""}
             <div class="prow prow-lg">${priceHtml(p)}</div>
             ${orderButton(p, "btn", p.isService ? "Agendar por WhatsApp" : "Pedir por WhatsApp")}
@@ -820,7 +804,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         if (!embed && !ctx.preview) return "";
         const intro = s.intro ? `<p class="intro"${ed(fp("intro"))}>${esc(s.intro)}</p>` : "";
         const frame = embed
-          ? `<div class="vid-frame"><iframe src="${esc(embed)}" title="${esc(s.heading)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+          ? `<div class="vid-frame"${edit ? " style=\"position:relative\"" : ""}><iframe src="${esc(withVideoOptions(embed, s.opts, { preview: ctx.preview }))}" title="${esc(s.heading)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>${edit ? `<button type="button" class="vid-ov" data-video="${index}">Ajustes del video</button>` : ""}</div>`
           : edit
             ? `<div class="vid-frame vid-empty"><span class="vid-ph" data-ph="Toca aquí y pega el enlace de tu video (YouTube, Vimeo, Wistia o Loom)"${ed(fp("url"))}></span></div>`
             : `<div class="vid-frame vid-empty"><p>Aquí irá tu video.</p></div>`;
@@ -1283,6 +1267,9 @@ section{position:relative}
 .vid-frame{position:relative;aspect-ratio:16/9;width:100%;margin-top:28px;border-radius:var(--radius);overflow:hidden;background:#0b0b0f;box-shadow:0 24px 60px -24px rgba(0,0,0,.45)}
 .vid-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .vid-empty{display:flex;align-items:center;justify-content:center;color:#fff;opacity:.85}
+.vid-ov{all:unset;position:absolute;inset:0;cursor:pointer;display:flex;align-items:flex-start;justify-content:flex-end;padding:10px;font:600 12px/1 system-ui,sans-serif;color:#fff;z-index:2}
+.vid-ov::after{content:"Ajustes del video";padding:7px 10px;border-radius:8px;background:#111827cc}
+.vid-ov{font-size:0}.vid-ov::after{font:600 12px/1 system-ui,sans-serif}
 .vid-link{margin-top:12px;font-size:13px;opacity:.75}
 .vid-ph{display:inline-block;max-width:90%;min-width:12em;padding:14px 22px;border:2px dashed rgba(255,255,255,.65);border-radius:12px;font-size:15px;line-height:1.4;cursor:text;word-break:break-all}
 .vid-ph:empty::before{content:attr(data-ph);opacity:.85}

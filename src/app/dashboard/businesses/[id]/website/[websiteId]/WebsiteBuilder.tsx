@@ -501,6 +501,7 @@ export function WebsiteBuilder({
       setTab("elemento");
       setPanelOpen(true);
     },
+    setIcon: (path, name) => saveTextRefresh(path, name),
     pickLogo: () => setLogoPicker(true),
     removeLogo: () => runDesign("Quitando el logo…", { chrome: { logo: null } }),
     setTextColor: (path, color) => {
@@ -528,7 +529,7 @@ export function WebsiteBuilder({
   // "Estilo" only exists while a block is chosen (it is that block's style): with nothing chosen it was an empty twin of Elementos.
   const TABS: { key: Tab; label: string; Icon: (p: { className?: string }) => React.JSX.Element; hint: string }[] = [
     { key: "bloques", label: "Elementos", Icon: PlusSquareIcon, hint: "Agrega bloques y elementos a tu página" },
-    ...(inspect !== null ? [{ key: "elemento" as const, label: inspect.kind === "button" ? "Botón" : "Texto", Icon: CursorIcon, hint: "Ajustes del elemento que elegiste en la página" }] : []),
+    ...(inspect !== null ? [{ key: "elemento" as const, label: inspect.kind === "button" ? "Botón" : inspect.kind === "video" ? "Video" : "Texto", Icon: CursorIcon, hint: "Ajustes del elemento que elegiste en la página" }] : []),
     ...(sel !== null ? [{ key: "estilo" as const, label: "Estilo", Icon: EditIcon, hint: "Fondo, colores, espacios y tamaños del bloque elegido" }] : []),
     { key: "diseno", label: "Diseño", Icon: PaletteIcon, hint: "Colores y estilo de toda la página" },
     { key: "ajustes", label: "Ajustes", Icon: GearIcon, hint: "Link, formulario, pixel y estadísticas" },
@@ -761,6 +762,8 @@ export function WebsiteBuilder({
                 setInspect(null);
                 setTab("bloques");
               }}
+              onVideoUrl={(index, url) => saveTextRefresh(`sections.${index}.url`, url)}
+              onVideoOpts={(index, opts) => runBlock({ kind: "videoOpts", index, opts }, "Guardando…")}
               onText={(path, value) => {
                 setBusy("Guardando…");
                 startTransition(async () => {

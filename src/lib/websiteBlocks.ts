@@ -136,6 +136,8 @@ export type BlockOp =
   /** Where one button of a block goes (null: back to the page's own link). */
   /** The look of one button of a block: only the fields sent change (null clears one). */
   /** Picks (or changes) the structure of a Contenedor: its elements are laid out again in the new columns. */
+  /** Options of a video block (start, end, autoplay…). Only the fields sent change; false/null/0 puts one back to the default. */
+  | { kind: "videoOpts"; index: number; opts: Record<string, number | boolean | null> }
   | { kind: "layoutStructure"; index: number; structure: string | null }
   /** The elements of one column of a Contenedor. */
   | { kind: "cellItems"; index: number; cell: number; items: unknown[] }
@@ -215,6 +217,29 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       const look = mergeLook(section.look, op.patch);
       if (look) section.look = look;
       else delete section.look;
+      focus = op.index;
+      break;
+    }
+    case "videoOpts": {
+      const section = isInt(op.index) ? next.sections[op.index] : undefined;
+      if (!section || section.type !== "video") return bad("Ese bloque no es un video.");
+      const cur = { ...(section.opts ?? {}) } as Record<string, unknown>;
+      for (const [k, v] of Object.entries(op.opts ?? {})) {
+        if (k === "start" || k === "end") {
+          if (v === null || v === 0) delete cur[k];
+          else if (typeof v === "number" && Number.isInteger(v) && v > 0 && v <= 86400) cur[k] = v;
+          else return bad("El tiempo no es válido.");
+        } else if (k === "autoplay" || k === "mute" || k === "loop") {
+          if (v === true) cur[k] = true;
+          else delete cur[k];
+        } else if (k === "controls" || k === "related") {
+          if (v === false) cur[k] = false;
+          else delete cur[k];
+        } else return bad("Esa opción no existe.");
+      }
+      if (typeof cur.start === "number" && typeof cur.end === "number" && cur.end <= cur.start) return bad("La hora de finalización debe ser después de la de inicio.");
+      if (Object.keys(cur).length) section.opts = cur as typeof section.opts;
+      else delete section.opts;
       focus = op.index;
       break;
     }

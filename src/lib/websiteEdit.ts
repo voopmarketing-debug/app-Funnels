@@ -1,6 +1,7 @@
 import { WebsiteContentV2Schema, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { toEmbedUrl } from "@/lib/websiteTemplate";
 import { stripMarks } from "@/lib/textMarks";
+import { ICON_KEYS } from "@/lib/websiteContentV2";
 
 // Click-to-edit in the builder's preview: every editable text carries the path
 // of its value in the stored content (data-edit="sections.2.items.1.title").
@@ -70,6 +71,15 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
     return finish(next);
   }
 
+  // sections.<i>.(items|bullets).<j>.icon: the icon of an item, one of the page's icons.
+  if (parts.length === 5 && (parts[2] === "items" || parts[2] === "bullets") && isIndex(parts[3]) && parts[4] === "icon") {
+    const list = section[parts[2]] as Record<string, unknown>[] | undefined;
+    const item = Array.isArray(list) ? list[Number(parts[3])] : undefined;
+    const name = rawValue.trim();
+    if (!item || !(ICON_KEYS as readonly string[]).includes(name)) return bad("Ese icono no existe.");
+    item.icon = name;
+    return finish(next);
+  }
   // sections.<i>.cells.<c>.items.<k>.<text|label>: a title, text or button inside a column of a Contenedor.
   if (parts.length === 7 && section.type === "layout" && parts[2] === "cells" && isIndex(parts[3]) && parts[4] === "items" && isIndex(parts[5]) && (parts[6] === "text" || parts[6] === "label")) {
     const cells = section.cells as { items: Record<string, unknown>[] }[];

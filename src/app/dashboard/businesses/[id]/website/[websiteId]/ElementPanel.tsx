@@ -6,8 +6,10 @@ import { stripMarks } from "@/lib/textMarks";
 import { ButtonShapePicker } from "./ButtonShapePicker";
 import { ColorRow } from "./StylePanel";
 import { CloseIcon } from "./builderIcons";
+import { toEmbedUrl } from "@/lib/websiteTemplate";
+import { VIDEO_CAPS, VIDEO_PROVIDERS, providerOf, type VideoOpts, type VideoProvider } from "@/lib/videoEmbed";
 
-export type Inspect = { path: string; kind: "button" | "text" };
+export type Inspect = { path: string; kind: "button" | "text" | "video" };
 
 type Style = { bg?: string | null; color?: string | null; shape?: string | null; w?: string | null; h?: string | null; fs?: string | null };
 
@@ -23,6 +25,8 @@ export function ElementPanel({
   onLink,
   onStyle,
   onColor,
+  onVideoUrl,
+  onVideoOpts,
   onClose,
 }: {
   content: WebsiteContentV2;
@@ -32,6 +36,8 @@ export function ElementPanel({
   onLink: (path: string, url: string | null) => void;
   onStyle: (path: string, patch: Style) => void;
   onColor: (path: string, color: string | null) => void;
+  onVideoUrl: (index: number, url: string) => void;
+  onVideoOpts: (index: number, opts: Record<string, number | boolean | null>) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<"general" | "estilo">("general");
@@ -45,6 +51,26 @@ export function ElementPanel({
   const cellItem = section && section.type === "layout" && cellMatch ? (section.cells[Number(cellMatch[1])]?.items[Number(cellMatch[2])] as ExtraElement | undefined) : undefined;
   const extraItem = (section && extra ? ((section.extras ?? [])[Number(extra[1])] as ExtraElement | undefined) : undefined) ?? (cellItem && cellItem.type === "button" ? cellItem : undefined);
   if (!header && !section) return null;
+
+  if (inspect.kind === "video" && section && section.type === "video" && m) {
+    const index = Number(m[1]);
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-ink">Editar video</p>
+            <p className="truncate text-[12px] text-ink-muted">YouTube, Vimeo, Wistia o Loom</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Cerrar" title="Cerrar" className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink">
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
+          <VideoFields key={`${index}:${section.url}`} url={section.url} opts={section.opts ?? {}} disabled={busy} onUrl={(u) => onVideoUrl(index, u)} onOpts={(o) => onVideoOpts(index, o)} />
+        </div>
+      </div>
+    );
+  }
 
   const isButton = inspect.kind === "button";
   const raw = header
@@ -158,6 +184,104 @@ function RangeRow({ label, unit, min, max, step, auto, value, onChange }: { labe
         className="w-full accent-[var(--accent,#7ac70c)]"
       />
     </div>
+  );
+}
+
+const fmtTime = (n: number | undefined) => (n ? `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}` : "");
+/** "1:30" or "90" (seconds) → seconds; null when empty; undefined when it is not a time. */
+function parseTime(v: string): number | null | undefined {
+  const t = v.trim();
+  if (!t) return null;
+  const m = /^(?:(\d{1,3}):)?(\d{1,2})$/.exec(t) ?? /^(\d{1,5})$/.exec(t);
+  if (!m) return undefined;
+  const secs = m.length === 3 ? Number(m[1] ?? 0) * 60 + Number(m[2]) : Number(m[1]);
+  return secs > 0 && secs <= 86400 ? secs : undefined;
+}
+
+/** "Editar video": the platform (a dropdown that tells each kind of link apart), the link and the player's options. */
+function VideoFields({ url, opts, disabled, onUrl, onOpts }: { url: string; opts: VideoOpts; disabled: boolean; onUrl: (u: string) => void; onOpts: (o: Record<string, number | boolean | null>) => void }) {
+  const detected = providerOf(toEmbedUrl(url));
+  const [provider, setProvider] = useState<VideoProvider>(detected ?? "youtube");
+  const [link, setLink] = useState(url);
+  const [start, setStart] = useState(fmtTime(opts.start));
+  const [end, setEnd] = useState(fmtTime(opts.end));
+  const [error, setError] = useState<string | null>(null);
+  const info = VIDEO_PROVIDERS.find((p) => p.key === provider)!;
+  const caps = VIDEO_CAPS[provider];
+  const input = "w-full rounded-md border border-border bg-surface px-2.5 py-2 text-sm outline-none focus:border-accent";
+  const saveLink = () => {
+    const t = link.trim();
+    if (t === url) return;
+    if (t) {
+      const found = providerOf(toEmbedUrl(t));
+      if (!found) return setError(`Pega un enlace de ${info.label}.`);
+      if (found !== provider) return setError(`Ese enlace es de ${VIDEO_PROVIDERS.find((p) => p.key === found)?.label}. Elige esa plataforma arriba o pega uno de ${info.label}.`);
+    }
+    setError(null);
+    onUrl(t);
+  };
+  const saveTime = (k: "start" | "end", v: string) => {
+    const n = parseTime(v);
+    if (n === undefined) return setError("Escribe el tiempo como 1:30 o en segundos (90).");
+    setError(null);
+    if ((n ?? undefined) !== opts[k]) onOpts({ [k]: n });
+  };
+  const toggle = (k: keyof VideoOpts, label: string, on: boolean, value: (checked: boolean) => boolean) => (
+    <label key={k} className="flex cursor-pointer items-center justify-between gap-3 text-[13px] text-ink">
+      <span>{label}</span>
+      <input type="checkbox" role="switch" disabled={disabled} checked={on} onChange={(e) => onOpts({ [k]: value(e.target.checked) })} className="h-5 w-9 cursor-pointer accent-[var(--accent,#7ac70c)]" />
+    </label>
+  );
+  return (
+    <>
+      <Fold title="Contenido">
+        <label className="block space-y-1.5">
+          <span className="text-[13px] font-semibold text-ink">Plataforma</span>
+          <select
+            id="video-provider"
+            value={provider}
+            disabled={disabled}
+            onChange={(e) => {
+              setProvider(e.target.value as VideoProvider);
+              setError(null);
+            }}
+            className={input}
+          >
+            {VIDEO_PROVIDERS.map((p) => (
+              <option key={p.key} value={p.key}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-[13px] font-semibold text-ink">Enlace de {info.label}</span>
+          <input id="video-link" inputMode="url" maxLength={300} disabled={disabled} value={link} placeholder={info.placeholder} onChange={(e) => setLink(e.target.value)} onBlur={saveLink} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className={`${input} ${error ? "border-error" : ""}`} />
+        </label>
+        {error && <p className="text-[12px] text-error">{error}</p>}
+        {caps.start && (
+          <label className="block space-y-1.5">
+            <span className="text-[13px] font-semibold text-ink">Hora de inicio</span>
+            <input id="video-start" disabled={disabled} value={start} placeholder="0:00" onChange={(e) => setStart(e.target.value)} onBlur={() => saveTime("start", start)} className={input} />
+          </label>
+        )}
+        {caps.end && (
+          <label className="block space-y-1.5">
+            <span className="text-[13px] font-semibold text-ink">Hora de finalización</span>
+            <input id="video-end" disabled={disabled} value={end} placeholder="Hasta el final" onChange={(e) => setEnd(e.target.value)} onBlur={() => saveTime("end", end)} className={input} />
+          </label>
+        )}
+      </Fold>
+      <Fold title="Reproducción">
+        <div className="space-y-3">
+          {caps.autoplay && toggle("autoplay", "Auto-reproducir (sin sonido)", !!opts.autoplay, (c) => c)}
+          {caps.mute && toggle("mute", "Silenciar", !!opts.mute, (c) => c)}
+          {caps.loop && toggle("loop", "Bucle", !!opts.loop, (c) => c)}
+          {caps.controls && toggle("controls", "Controles del reproductor", opts.controls !== false, (c) => c)}
+          {caps.related && toggle("related", "Videos relacionados", opts.related !== false, (c) => c)}
+        </div>
+      </Fold>
+    </>
   );
 }
 
