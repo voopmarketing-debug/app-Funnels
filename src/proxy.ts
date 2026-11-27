@@ -128,6 +128,9 @@ export async function proxy(request: NextRequest) {
 
       const url = new URL("/", request.url);
       if (preview) url.searchParams.set("preview", "1");
+      if (preview && request.nextUrl.searchParams.get("draft")) url.searchParams.set("draft", request.nextUrl.searchParams.get("draft") as string);
+      const serviceId = String(formData.get("service") ?? "").trim().slice(0, 40);
+      if (serviceId) url.searchParams.set("service", serviceId);
       if (outcome.ok && outcome.professionalId) url.searchParams.set("professional", outcome.professionalId);
       if (outcome.ok) {
         url.searchParams.set("reservado_fecha", outcome.dateStr);

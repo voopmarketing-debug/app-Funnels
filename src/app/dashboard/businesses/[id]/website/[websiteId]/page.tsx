@@ -9,7 +9,7 @@ import { WebsiteBuilder } from "./WebsiteBuilder";
 import { WebsiteContentV2Schema, isV2Content } from "@/lib/websiteContentV2";
 import { AgendaEditor } from "./AgendaEditor";
 import { parseServices } from "@/lib/agendaServices";
-import { isAgendaStyle } from "@/lib/agendaStyles";
+import { agendaStyleOrDefault } from "@/lib/agendaStyles";
 import { TemplateBuilder } from "./TemplateBuilder";
 import { isTemplateContent } from "@/lib/templateSite/content";
 import { parseTemplateSite } from "@/lib/templateSite/render";
@@ -22,10 +22,10 @@ export default async function WebsiteEditorPage({
   searchParams,
 }: {
   params: Promise<{ id: string; websiteId: string }>;
-  searchParams: Promise<{ month?: string; tab?: string }>;
+  searchParams: Promise<{ month?: string; tab?: string; week?: string }>;
 }) {
   const { id, websiteId } = await params;
-  const { month: monthParam, tab: tabParam } = await searchParams;
+  const { month: monthParam, tab: tabParam, week: weekParam } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -46,8 +46,9 @@ export default async function WebsiteEditorPage({
     // Padded a day on each side so a booking near the month's edge in the
     // business's own timezone (which can differ from this query's UTC
     // boundaries) never gets silently dropped from the calendar.
-    const monthQueryStart = new Date(Date.UTC(year, month, 1) - 24 * 60 * 60 * 1000);
-    const monthQueryEnd = new Date(Date.UTC(year, month + 1, 1) + 24 * 60 * 60 * 1000);
+    // The weekly view moves a month either way without another trip to the server.
+    const monthQueryStart = new Date(Date.UTC(year, month - 1, 1) - 24 * 60 * 60 * 1000);
+    const monthQueryEnd = new Date(Date.UTC(year, month + 2, 1) + 24 * 60 * 60 * 1000);
 
     const [totalAppointments, upcomingAppointments, monthAppointments, professionals, pipelines] = await Promise.all([
       prisma.appointment.count({ where: { websiteId, status: "confirmed" } }),
@@ -60,7 +61,7 @@ export default async function WebsiteEditorPage({
       prisma.appointment.findMany({
         where: { websiteId, status: "confirmed", startsAt: { gte: monthQueryStart, lt: monthQueryEnd } },
         orderBy: { startsAt: "asc" },
-        select: { id: true, name: true, contact: true, startsAt: true, service: true, note: true, professional: { select: { name: true } } },
+        select: { id: true, name: true, contact: true, startsAt: true, durationMinutes: true, service: true, note: true, professionalId: true, professional: { select: { name: true } } },
       }),
       website.agendaConfig
         ? prisma.professional.findMany({ where: { agendaConfigId: website.agendaConfig.id }, orderBy: { position: "asc" } })
@@ -89,7 +90,7 @@ export default async function WebsiteEditorPage({
             slotMinutes: website.agendaConfig?.slotMinutes ?? 30,
             availability,
             primaryColor: website.agendaConfig?.primaryColor ?? "#1f6feb",
-            style: isAgendaStyle(website.agendaConfig?.style) ? website.agendaConfig.style : "clasico",
+            style: agendaStyleOrDefault(website.agendaConfig?.style),
             title: website.agendaConfig?.title ?? "",
             subtitle: website.agendaConfig?.subtitle ?? "",
             address: website.agendaConfig?.address ?? "",
@@ -105,6 +106,7 @@ export default async function WebsiteEditorPage({
           totalAppointments={totalAppointments}
           upcomingAppointments={upcomingAppointments}
           monthStr={monthStr}
+          initialWeek={weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? weekParam : null}
           monthAppointments={monthAppointments}
           professionals={professionals.map((p) => ({
             id: p.id,

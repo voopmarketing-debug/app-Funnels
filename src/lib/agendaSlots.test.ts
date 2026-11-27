@@ -10,7 +10,11 @@ const base = {
   trackingBasePath: "/sitio/x",
   professionals: [],
   professionalId: null,
-  upcomingDates: ["2030-01-07"],
+  monthStr: "2030-01",
+  todayStr: "2030-01-02",
+  availableDates: ["2030-01-07", "2030-01-08"],
+  prevMonth: null,
+  nextMonth: "2030-02",
   dateStr: null,
   availableSlots: [],
   timeStr: null,
@@ -58,6 +62,14 @@ describe("parseServices", () => {
 });
 
 describe("renderAgendaHtml", () => {
+  it("shows the month calendar with the bookable days and the times of the chosen day", () => {
+    const html = renderAgendaHtml({ ...base, dateStr: "2030-01-07", availableSlots: ["09:00", "09:30"] });
+    expect(html).toContain("Elige día y hora");
+    expect(html).toContain("Enero de 2030");
+    expect(html).toContain("date=2030-01-08");
+    expect(html).toContain("time=09%3A30");
+    expect(html).toContain("d-sel");
+  });
   it("draws every style", () => {
     for (const style of AGENDA_STYLES) {
       const html = renderAgendaHtml({ ...base, style });
@@ -75,6 +87,12 @@ describe("renderAgendaHtml", () => {
     expect(second).toContain("service=s1");
     expect(second).toContain("Ortodoncista");
   });
+  it("keeps the chosen look and color through the steps, and the color is the owner's", () => {
+    const html = renderAgendaHtml({ ...base, style: "oscuro", primaryColor: "#e11d48" });
+    expect(html).toContain("--primary: #e11d48");
+    expect(html).toContain("color-scheme: dark");
+    expect(renderAgendaHtml({ ...base, style: "compacto" })).toContain('data-style="cielo"');
+  });
   it("carries the service and the note field into the form", () => {
     const html = renderAgendaHtml({ ...base, services: [{ id: "s1", name: "Limpieza", minutes: 45 }], serviceId: "s1", dateStr: "2030-01-07", timeStr: "09:00", askNote: true });
     expect(html).toContain('name="service" value="s1"');
@@ -87,5 +105,22 @@ describe("renderAgendaHtml", () => {
     expect(html).not.toContain("javascript:");
     expect(safeHttpUrl("https://maps.google.com/?q=1")).toBe("https://maps.google.com/?q=1");
     expect(safeHttpUrl("ftp://x")).toBeNull();
+  });
+});
+
+import { parseAgendaDraft } from "./agendaDraft";
+
+describe("parseAgendaDraft", () => {
+  it("reads the editor's unsaved settings", () => {
+    const d = parseAgendaDraft(JSON.stringify({ style: "editorial", color: "#ff0000", title: "Hola", services: [{ id: "a", name: "X", minutes: 30 }] }));
+    expect(d).toMatchObject({ style: "editorial", color: "#ff0000", title: "Hola" });
+    expect(d?.services?.[0].name).toBe("X");
+  });
+  it("ignores bad values and junk", () => {
+    expect(parseAgendaDraft("not json")).toBeNull();
+    expect(parseAgendaDraft(null)).toBeNull();
+    const d = parseAgendaDraft(JSON.stringify({ style: "hack", color: "red" }));
+    expect(d?.style).toBeUndefined();
+    expect(d?.color).toBeUndefined();
   });
 });

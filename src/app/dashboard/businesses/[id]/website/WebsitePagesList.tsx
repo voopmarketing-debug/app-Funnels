@@ -381,7 +381,7 @@ function NewPageDialog({
 }) {
   const router = useRouter();
   const [state, setState] = useState<FormState>(INITIAL_STATE);
-  const [style, setStyle] = useState<AgendaStyle>("clasico");
+  const [style, setStyle] = useState<AgendaStyle>("cielo");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {

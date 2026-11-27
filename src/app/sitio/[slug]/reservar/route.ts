@@ -57,6 +57,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   const url = new URL(`/sitio/${slug}`, req.url);
   if (preview) url.searchParams.set("preview", "1");
+  if (preview && req.nextUrl.searchParams.get("draft")) url.searchParams.set("draft", req.nextUrl.searchParams.get("draft") as string);
+  const serviceId = String(formData.get("service") ?? "").trim().slice(0, 40);
+  if (serviceId) url.searchParams.set("service", serviceId);
   if (outcome.ok && outcome.professionalId) url.searchParams.set("professional", outcome.professionalId);
   if (outcome.ok) {
     url.searchParams.set("reservado_fecha", outcome.dateStr);

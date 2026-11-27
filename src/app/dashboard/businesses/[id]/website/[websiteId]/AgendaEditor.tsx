@@ -2,7 +2,7 @@
 
 import { fromPanelUrl } from "@/lib/panelBackLink";
 import { TrackingSettings } from "./TrackingSettings";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { updateAgendaConfig, createProfessional, updateProfessional, deleteProfessional } from "@/lib/actions";
@@ -14,6 +14,8 @@ import { ClientDate } from "@/components/ClientDate";
 import { askConfirm } from "@/components/ConfirmHost";
 import { ChatIcon } from "./builderIcons";
 import { ImagePicker } from "./ImagePicker";
+import { AgendaWeek, mondayOf, type WeekAppointment } from "./AgendaWeek";
+import { draftToParam } from "@/lib/agendaDraft";
 import { AGENDA_STYLES, AGENDA_STYLE_DEFS, type AgendaStyle } from "@/lib/agendaStyles";
 import { durationLabel, MAX_AGENDA_SERVICES, type AgendaService } from "@/lib/agendaServices";
 
@@ -27,7 +29,7 @@ function waLink(contact: string): string | null {
   return digits.length >= 8 ? `https://wa.me/${digits}` : null;
 }
 
-type Appointment = { id: string; name: string; contact: string; startsAt: Date; service?: string | null; note?: string | null; professional?: { name: string } | null };
+type Appointment = WeekAppointment;
 
 type ProfessionalData = {
   id: string;
@@ -99,6 +101,7 @@ export function AgendaEditor({
   totalAppointments,
   upcomingAppointments,
   monthStr,
+  initialWeek,
   monthAppointments,
   professionals,
   pipelines,
@@ -127,6 +130,7 @@ export function AgendaEditor({
   totalAppointments: number;
   upcomingAppointments: Appointment[];
   monthStr: string;
+  initialWeek: string | null;
   monthAppointments: Appointment[];
   professionals: ProfessionalData[];
   pipelines: PipelineOption[];
@@ -139,6 +143,20 @@ export function AgendaEditor({
   const [copied, setCopied] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [logoOpen, setLogoOpen] = useState(false);
+  const [view, setView] = useState<"week" | "month">("week");
+  const router = useRouter();
+  const [weekStart, setWeekStart] = useState(() => {
+    if (initialWeek) return mondayOf(initialWeek);
+    const today = formatDateInZone(new Date(), initialConfig.timezone);
+    return mondayOf(today.slice(0, 7) === monthStr ? today : `${monthStr}-01`);
+  });
+  // The preview shows what is on screen (not only what was saved): the settings travel in the URL, a moment after the last change.
+  const draftNow = draftToParam(config);
+  const [draft, setDraft] = useState(draftNow);
+  useEffect(() => {
+    const t = setTimeout(() => setDraft(draftNow), 350);
+    return () => clearTimeout(t);
+  }, [draftNow]);
 
   const gridDates = useMemo(() => getMonthGridDates(monthStr), [monthStr]);
   const appointmentsByDate = useMemo(() => {
@@ -165,6 +183,15 @@ export function AgendaEditor({
     setConfig((c) => ({ ...c, availability: { ...c.availability, [day]: { ...c.availability[day], ...patch } } }));
   }
 
+  function changeWeek(monday: string) {
+    setWeekStart(monday);
+    // The page loads the month before and after the one in the URL; going further asks for that month.
+    const last = new Date(Date.UTC(Number(monday.slice(0, 4)), Number(monday.slice(5, 7)) - 1, Number(monday.slice(8, 10)) + 6)).toISOString().slice(0, 7);
+    const lo = shiftMonthStr(monthStr, -1);
+    const hi = shiftMonthStr(monthStr, 1);
+    if (monday.slice(0, 7) < lo || last > hi) router.push(`${editorBaseUrl}?month=${monday.slice(0, 7)}&week=${monday}`);
+  }
+
   function save() {
     setSaveError(null);
     setSaved(false);
@@ -181,6 +208,153 @@ export function AgendaEditor({
   }
 
   return (
+    <div className="space-y-6">
+      <div className="fl-card overflow-hidden p-0">
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
+          <h2 className="text-sm font-semibold text-ink">Calendario de citas</h2>
+          <div className="fl-seg flex" role="radiogroup" aria-label="Vista del calendario">
+            {([["week", "Semana"], ["month", "Mes"]] as const).map(([key, label]) => (
+              <button key={key} type="button" role="radio" aria-checked={view === key} onClick={() => setView(key)} className="fl-seg-item px-3 py-1 text-xs">
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {view === "week" ? (
+          <AgendaWeek
+            appointments={monthAppointments}
+            professionals={professionals.map((p) => ({ id: p.id, name: p.name }))}
+            availabilities={[config.availability, ...professionals.map((p) => p.availability)]}
+            slotMinutes={config.slotMinutes}
+            timezone={config.timezone}
+            accent={accent}
+            weekStart={weekStart}
+            onWeekChange={changeWeek}
+          />
+        ) : (
+                <div className="grid md:grid-cols-[minmax(0,1fr)_240px]">
+          <div className="space-y-3 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-ink">{formatMonthLabel(monthStr)}</h2>
+              <div className="flex items-center gap-1">
+                <Link
+                  href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, -1)}`}
+                  className="rounded-full border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
+                  aria-label="Mes anterior"
+                >
+                  ‹
+                </Link>
+                <Link
+                  href={editorBaseUrl}
+                  className="rounded-full border border-border px-3 py-1 text-xs font-medium text-ink-muted transition hover:border-accent hover:text-ink"
+                >
+                  Hoy
+                </Link>
+                <Link
+                  href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, 1)}`}
+                  className="rounded-full border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
+                  aria-label="Mes siguiente"
+                >
+                  ›
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+              {MONTH_DAY_LABELS.map((d) => (
+                <div key={d} className="fl-mono py-1 text-center text-[12px] uppercase tracking-wide text-ink-faint">
+                  {d}
+                </div>
+              ))}
+              {gridDates.map((date) => {
+                const inMonth = date.startsWith(monthStr);
+                const appts = appointmentsByDate.get(date) ?? [];
+                const isToday = date === todayStr;
+                const isSelected = date === activeDate;
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    onClick={() => setSelectedDate(date)}
+                    className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-full text-sm transition ${
+                      !inMonth ? "opacity-30" : ""
+                    } ${isSelected ? "" : "hover:bg-surface-2"}`}
+                    style={
+                      isSelected
+                        ? { backgroundColor: accent, color: accentText }
+                        : isToday
+                          ? { boxShadow: `inset 0 0 0 1.5px ${accent}`, color: accent, fontWeight: 700 }
+                          : undefined
+                    }
+                  >
+                    <span>{Number(date.slice(8, 10))}</span>
+                    {appts.length > 0 && (
+                      <span
+                        className="h-1 w-1 rounded-full"
+                        style={{ backgroundColor: isSelected ? accentText : accent }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-border p-4 md:border-l md:border-t-0" style={{ backgroundColor: withAlpha(accent, "0a") }}>
+            <p className="text-xs font-semibold text-ink">
+              {activeDate === todayStr
+                ? "Hoy"
+                : new Date(`${activeDate}T00:00:00Z`).toLocaleDateString("es-CO", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    timeZone: "UTC",
+                  })}
+            </p>
+            {activeAppointments.length === 0 ? (
+              <p className="text-xs text-ink-faint">No hay citas este día.</p>
+            ) : (
+              <div className="space-y-2">
+                {activeAppointments.map((a) => {
+                  const wa = waLink(a.contact);
+                  return (
+                    <div key={a.id} className="rounded-md border border-border bg-background p-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p
+                            className="fl-mono text-xs font-bold"
+                            style={{ color: accent }}
+                          >
+                            <ClientDate date={a.startsAt} options={{ hour: "2-digit", minute: "2-digit" }} timeZone={config.timezone} />
+                          </p>
+                          <p className="truncate text-sm font-medium text-ink">{a.name}</p>
+                          <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
+                          {a.service && <p className="truncate text-[13px] text-ink">{a.service}</p>}
+                          {a.professional && <p className="truncate text-[13px] text-ink-faint">{a.professional.name}</p>}
+                          {a.note && <p className="text-[12px] text-ink-muted">“{a.note}”</p>}
+                        </div>
+                        {wa && (
+                          <a
+                            href={wa}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Escribir por WhatsApp"
+                            className="flex-none rounded-full border border-border p-1.5 text-ink-muted transition hover:border-accent hover:text-accent"
+                          >
+                            <ChatIcon className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+        )}
+      </div>
+
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-4">
         <div className="fl-card flex flex-wrap items-center gap-3 p-4">
@@ -202,129 +376,6 @@ export function AgendaEditor({
               ✕ {saveError}
             </span>
           )}
-        </div>
-
-        <div className="fl-card overflow-hidden p-0">
-          <div className="grid md:grid-cols-[minmax(0,1fr)_240px]">
-            <div className="space-y-3 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-ink">{formatMonthLabel(monthStr)}</h2>
-                <div className="flex items-center gap-1">
-                  <Link
-                    href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, -1)}`}
-                    className="rounded-full border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
-                    aria-label="Mes anterior"
-                  >
-                    ‹
-                  </Link>
-                  <Link
-                    href={editorBaseUrl}
-                    className="rounded-full border border-border px-3 py-1 text-xs font-medium text-ink-muted transition hover:border-accent hover:text-ink"
-                  >
-                    Hoy
-                  </Link>
-                  <Link
-                    href={`${editorBaseUrl}?month=${shiftMonthStr(monthStr, 1)}`}
-                    className="rounded-full border border-border px-2.5 py-1 text-sm text-ink-muted transition hover:border-accent hover:text-ink"
-                    aria-label="Mes siguiente"
-                  >
-                    ›
-                  </Link>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-7 gap-1">
-                {MONTH_DAY_LABELS.map((d) => (
-                  <div key={d} className="fl-mono py-1 text-center text-[12px] uppercase tracking-wide text-ink-faint">
-                    {d}
-                  </div>
-                ))}
-                {gridDates.map((date) => {
-                  const inMonth = date.startsWith(monthStr);
-                  const appts = appointmentsByDate.get(date) ?? [];
-                  const isToday = date === todayStr;
-                  const isSelected = date === activeDate;
-                  return (
-                    <button
-                      key={date}
-                      type="button"
-                      onClick={() => setSelectedDate(date)}
-                      className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-full text-sm transition ${
-                        !inMonth ? "opacity-30" : ""
-                      } ${isSelected ? "" : "hover:bg-surface-2"}`}
-                      style={
-                        isSelected
-                          ? { backgroundColor: accent, color: accentText }
-                          : isToday
-                            ? { boxShadow: `inset 0 0 0 1.5px ${accent}`, color: accent, fontWeight: 700 }
-                            : undefined
-                      }
-                    >
-                      <span>{Number(date.slice(8, 10))}</span>
-                      {appts.length > 0 && (
-                        <span
-                          className="h-1 w-1 rounded-full"
-                          style={{ backgroundColor: isSelected ? accentText : accent }}
-                        />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2 border-t border-border p-4 md:border-l md:border-t-0" style={{ backgroundColor: withAlpha(accent, "0a") }}>
-              <p className="text-xs font-semibold text-ink">
-                {activeDate === todayStr
-                  ? "Hoy"
-                  : new Date(`${activeDate}T00:00:00Z`).toLocaleDateString("es-CO", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      timeZone: "UTC",
-                    })}
-              </p>
-              {activeAppointments.length === 0 ? (
-                <p className="text-xs text-ink-faint">No hay citas este día.</p>
-              ) : (
-                <div className="space-y-2">
-                  {activeAppointments.map((a) => {
-                    const wa = waLink(a.contact);
-                    return (
-                      <div key={a.id} className="rounded-md border border-border bg-background p-2.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p
-                              className="fl-mono text-xs font-bold"
-                              style={{ color: accent }}
-                            >
-                              <ClientDate date={a.startsAt} options={{ hour: "2-digit", minute: "2-digit" }} timeZone={config.timezone} />
-                            </p>
-                            <p className="truncate text-sm font-medium text-ink">{a.name}</p>
-                            <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
-                            {a.service && <p className="truncate text-[13px] text-ink">{a.service}</p>}
-                            {a.professional && <p className="truncate text-[13px] text-ink-faint">{a.professional.name}</p>}
-                            {a.note && <p className="text-[12px] text-ink-muted">“{a.note}”</p>}
-                          </div>
-                          {wa && (
-                            <a
-                              href={wa}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Escribir por WhatsApp"
-                              className="flex-none rounded-full border border-border p-1.5 text-ink-muted transition hover:border-accent hover:text-accent"
-                            >
-                              <ChatIcon className="h-4 w-4" />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         <Section title="Apariencia" defaultOpen>
@@ -544,7 +595,7 @@ export function AgendaEditor({
           <div className="border-b border-border bg-surface-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
             Vista previa
           </div>
-          <iframe key={previewKey} src={`${publicUrl}?preview=1`} className="h-[70vh] w-full" title="Vista previa de la agenda" />
+          <iframe key={`${previewKey}-${professionals.length}`} src={`${publicUrl}?preview=1&draft=${encodeURIComponent(draft)}`} className="h-[70vh] w-full" title="Vista previa de la agenda" />
         </div>
       </div>
       {logoOpen && (
@@ -563,6 +614,7 @@ export function AgendaEditor({
         />
       )}
     </div>
+    </div>
   );
 }
 
@@ -578,22 +630,22 @@ function TextField({ label, value, max, placeholder, onChange }: { label: string
 /** One look of the public page, drawn small with its own colors so the owner picks by sight. */
 export function StyleCard({ id, accent, selected, onSelect }: { id: AgendaStyle; accent: string; selected: boolean; onSelect: () => void }) {
   const d = AGENDA_STYLE_DEFS[id];
-  const r = Math.min(d.radius, 10);
+  const r = Math.min(d.radius, 9);
+  const dayR = d.dayRadius > 100 ? 999 : 2;
+  const ground = id === "cielo" ? `linear-gradient(180deg, ${accent}22, ${accent}88)` : d.bg;
   return (
     <button type="button" onClick={onSelect} aria-pressed={selected} className={`rounded-lg border p-1.5 text-left transition ${selected ? "border-accent ring-2 ring-accent/40" : "border-border hover:border-accent"}`}>
-      <span className="block overflow-hidden" style={{ background: d.bg, borderRadius: r, padding: 8, border: `1px solid ${d.border}` }}>
-        <span className="flex gap-1.5" style={{ flexDirection: d.split ? "row" : "column" }}>
-          <span className="flex flex-col gap-1" style={{ flex: d.split ? "0 0 38%" : undefined }}>
-            <span style={{ height: 5, width: "70%", background: d.text, borderRadius: 2, opacity: 0.85 }} />
-            <span style={{ height: 3, width: "50%", background: d.text, borderRadius: 2, opacity: 0.3 }} />
+      <span className="block overflow-hidden" style={{ background: ground, borderRadius: r, padding: 7, border: `1px solid ${d.border}` }}>
+        <span className="flex gap-1.5" style={{ background: d.surface, border: `1px solid ${d.border}`, borderRadius: r, padding: 6 }}>
+          <span className="grid flex-[1.2] grid-cols-4 gap-[3px]">
+            {Array.from({ length: 12 }, (_, i) => (
+              <span key={i} style={{ aspectRatio: "1", borderRadius: dayR, background: i === 6 ? accent : i % 5 === 3 ? "transparent" : `${accent}30` }} />
+            ))}
           </span>
-          <span className="flex flex-1 flex-col gap-1" style={{ background: d.surface, border: `1px solid ${d.border}`, borderRadius: r, padding: 5 }}>
-            <span className="flex gap-1">
-              {[0, 1, 2].map((i) => (
-                <span key={i} style={{ height: 9, flex: 1, border: `1px solid ${i === 1 ? accent : d.border}`, background: i === 1 ? `${accent}22` : "transparent", borderRadius: id === "suave" ? 9 : Math.min(d.radius, 4) }} />
-              ))}
-            </span>
-            <span style={{ height: 8, background: accent, borderRadius: id === "suave" ? 9 : Math.min(d.radius, 4) }} />
+          <span className="flex flex-1 flex-col gap-[3px]">
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} style={{ height: 9, borderRadius: Math.min(r, 4), background: i === 1 ? accent : `${accent}30` }} />
+            ))}
           </span>
         </span>
       </span>

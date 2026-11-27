@@ -79,7 +79,7 @@ import { convertToOggOpus } from "@/lib/audioConvert";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { clientIpFrom, isHoneypotFilled, overLimit } from "@/lib/abuseGuard";
 import { headers } from "next/headers";
-import { isAgendaStyle } from "@/lib/agendaStyles";
+import { agendaStyleOrDefault } from "@/lib/agendaStyles";
 import { parseServices } from "@/lib/agendaServices";
 import { safeHttpUrl } from "@/lib/agendaTemplate";
 import { isAgencyAdmin, requireActiveAccount, requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
@@ -2781,7 +2781,7 @@ export async function createAgendaPage(businessId: string, input: { name?: strin
             timezone: "America/Bogota",
             slotMinutes: 30,
             availability: DEFAULT_AVAILABILITY,
-            style: isAgendaStyle(input.style) ? input.style : "clasico",
+            style: agendaStyleOrDefault(input.style),
           },
         },
       },
@@ -2835,7 +2835,7 @@ export async function updateAgendaConfig(
   const slotMinutes = Math.max(5, Math.min(240, Math.round(input.slotMinutes) || 30));
   const primaryColor = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/.test(input.primaryColor) ? input.primaryColor : "#1f6feb";
 
-  const style = isAgendaStyle(input.style) ? input.style : "clasico";
+  const style = agendaStyleOrDefault(input.style);
   const title = input.title.trim().slice(0, 80) || null;
   const subtitle = input.subtitle.trim().slice(0, 200) || null;
   const address = input.address.trim().slice(0, 200) || null;

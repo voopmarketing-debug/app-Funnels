@@ -133,3 +133,19 @@ export function getUpcomingAvailableDates(availability: Availability, timezone: 
   }
   return dates;
 }
+
+/** Calendar days of `monthStr` ("YYYY-MM") that can be booked: weekday enabled, today or later (in the business's zone), within `horizonDays`. */
+export function getAvailableDatesInMonth(availability: Availability, monthStr: string, timezone: string, horizonDays = 120): string[] {
+  const todayStr = formatDateInZone(new Date(), timezone);
+  const [ty, tm, td] = todayStr.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(ty, tm - 1, td + horizonDays)).toISOString().slice(0, 10);
+  const [year, month] = monthStr.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const out: string[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${monthStr}-${String(d).padStart(2, "0")}`;
+    if (dateStr < todayStr || dateStr > lastDay) continue;
+    if (getDayAvailability(availability, dateStr).enabled) out.push(dateStr);
+  }
+  return out;
+}

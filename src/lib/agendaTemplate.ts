@@ -1,7 +1,7 @@
 import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
 import { ANY_PROFESSIONAL_ID } from "@/lib/agendaAvailability";
-import { AGENDA_STYLE_DEFS, isAgendaStyle, type AgendaStyle } from "@/lib/agendaStyles";
+import { AGENDA_STYLE_DEFS, agendaStyleOrDefault, type AgendaStyle } from "@/lib/agendaStyles";
 import { durationLabel, type AgendaService } from "@/lib/agendaServices";
 
 function escapeHtml(text: string): string {
@@ -74,13 +74,21 @@ export type AgendaPageParams = {
   // Staff a visitor can pick to book with — empty on a single-provider agenda (that step is skipped).
   professionals: { id: string; name: string; title: string | null; photoUrl?: string | null }[];
   professionalId: string | null; // picked professional, once chosen
-  upcomingDates: string[]; // shown when no date is selected yet
-  dateStr: string | null; // selected date ("YYYY-MM-DD"), once picked
-  availableSlots: string[]; // this date's free "HH:mm" slots, shown when a date but no time is selected
+  slotMinutes?: number; // length of an appointment when there are no services
+  // The calendar: the month shown, today (in the business's zone) and which of its days can be booked.
+  monthStr: string;
+  todayStr: string;
+  availableDates: string[];
+  prevMonth: string | null;
+  nextMonth: string | null;
+  dateStr: string | null; // selected date ("YYYY-MM-DD")
+  availableSlots: string[]; // this date's free "HH:mm" slots
   timeStr: string | null; // selected time, once picked — shows the booking form
   confirmed: { dateStr: string; timeStr: string } | null; // just booked
   bookingError: string | null; // the previous booking attempt failed (e.g. slot just taken)
   preview?: boolean;
+  // The editor's unsaved settings, carried through every preview link so the look survives navigating the steps.
+  draftParam?: string | null;
 };
 
 function initials(name: string): string {
@@ -92,13 +100,26 @@ function initials(name: string): string {
     .join("");
 }
 
+const ICON_CLOCK = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
+const ICON_PIN = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>`;
+const ICON_CHECK = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+function monthLabel(monthStr: string): string {
+  const [y, m] = monthStr.split("-").map(Number);
+  const label = new Intl.DateTimeFormat("es-CO", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, 1)));
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 /**
- * Public booking page of an "agenda"-type Website. Everything comes from the business's AgendaConfig
- * (look, texts, address, services, hours) plus the step the visitor is on:
- * service → professional → day → time → details, driven by query params.
+ * Public booking page of an "agenda"-type Website: a month calendar with the bookable days, the free
+ * times of the chosen day beside it, and a floating card with what is being booked. Before the
+ * calendar, services and professionals are picked from a short list. Everything comes from the
+ * AgendaConfig plus the step in the URL (service → professional → day → time → details), so it works
+ * with no client-side JS.
  */
 export function renderAgendaHtml(params: AgendaPageParams): string {
-  const style: AgendaStyle = isAgendaStyle(params.style) ? params.style : "clasico";
+  const style: AgendaStyle = agendaStyleOrDefault(params.style);
   const def = AGENDA_STYLE_DEFS[style];
   const primary = sanitizeHexColor(params.primaryColor, "#1f6feb");
   const btnText = readableTextColor(primary);
@@ -114,31 +135,23 @@ export function renderAgendaHtml(params: AgendaPageParams): string {
   const hasProfessionals = params.professionals.length > 0;
   const needsProfessional = !needsService && hasProfessionals && !selectedProfessional && !isAnyProfessional;
   const serviceId = selectedService?.id;
+  const listStep = needsService || needsProfessional;
 
-  const href = (q: { service?: string | null; professional?: string | null; date?: string | null; time?: string | null }) =>
-    `${params.trackingBasePath}${buildQuery({ service: q.service, professional: q.professional, date: q.date, time: q.time, preview: previewParam })}`;
-  const serviceHref = (id: string) => href({ service: id });
-  const professionalHref = (id: string) => href({ service: serviceId, professional: id });
-  const dayHref = (d: string) => href({ service: serviceId, professional: effectiveProfessionalId, date: d });
-  const slotHref = (t: string) => href({ service: serviceId, professional: effectiveProfessionalId, date: params.dateStr, time: t });
-  const backToServicesHref = href({});
-  const backToProfessionalsHref = href({ service: serviceId });
-  const backToDaysHref = href({ service: serviceId, professional: effectiveProfessionalId });
-  const backToSlotsHref = href({ service: serviceId, professional: effectiveProfessionalId, date: params.dateStr });
-  const formAction = `${params.trackingBasePath}/reservar${buildQuery({ preview: previewParam })}`;
+  const draftParam = params.preview ? params.draftParam : null;
+  type Q = { service?: string | null; professional?: string | null; date?: string | null; time?: string | null; month?: string | null };
+  const href = (q: Q) =>
+    `${params.trackingBasePath}${buildQuery({ service: q.service, professional: q.professional, date: q.date, time: q.time, month: q.month, preview: previewParam, draft: draftParam })}`;
+  const baseQ: Q = { service: serviceId, professional: effectiveProfessionalId };
+  const monthHref = (m: string) => href({ ...baseQ, month: m });
+  const dayHref = (d: string) => href({ ...baseQ, date: d, month: params.monthStr });
+  const slotHref = (t: string) => href({ ...baseQ, date: params.dateStr, time: t, month: params.monthStr });
+  const backToSlotsHref = href({ ...baseQ, date: params.dateStr, month: params.monthStr });
+  const formAction = `${params.trackingBasePath}/reservar${buildQuery({ preview: previewParam, draft: draftParam })}`;
   const address = (params.address ?? "").trim();
   const mapUrl = safeHttpUrl(params.mapUrl);
   const logoUrl = safeHttpUrl(params.logoUrl);
   const whatsapp = (params.whatsapp ?? "").replace(/\D/g, "");
-
-  // What the visitor has chosen so far, shown above each step.
-  const chosen: string[] = [];
-  if (selectedService) chosen.push(escapeHtml(selectedService.name));
-  if (selectedProfessional) chosen.push(escapeHtml(selectedProfessional.name));
-  else if (isAnyProfessional) chosen.push("Cualquiera disponible");
-  if (params.dateStr) chosen.push(formatDateLabel(params.dateStr));
-  if (params.timeStr) chosen.push(escapeHtml(params.timeStr));
-  const summary = !params.confirmed && chosen.length > 0 ? `<p class="chosen">${chosen.map((c) => `<span>${c}</span>`).join("")}</p>` : "";
+  const duration = selectedService?.minutes ?? params.slotMinutes ?? 30;
   const withProfessional = selectedProfessional ? ` con ${escapeHtml(selectedProfessional.name)}` : "";
 
   const avatar = (p: { name: string; photoUrl?: string | null }) => {
@@ -146,28 +159,70 @@ export function renderAgendaHtml(params: AgendaPageParams): string {
     return photo ? `<img class="avatar" src="${escapeHtml(photo)}" alt="" loading="lazy">` : `<span class="avatar avatar-i" aria-hidden="true">${escapeHtml(initials(p.name))}</span>`;
   };
 
-  let stepHtml: string;
-  let heading: string;
-  let sub: string;
+  // ---- Floating card: what is being booked ----
+  const pageTitle = (params.title ?? "").trim() || "Agenda tu cita";
+  const pageSub = (params.subtitle ?? "").trim();
+  const infoTitle = selectedService ? selectedService.name : pageTitle;
+  const infoSub = selectedProfessional ? [selectedProfessional.name, selectedProfessional.title].filter(Boolean).join(" · ") : isAnyProfessional ? "Cualquiera disponible" : pageSub;
+  const faces = selectedProfessional ? [selectedProfessional] : hasProfessionals && !isAnyProfessional ? params.professionals.slice(0, 3) : [];
+  const infoHtml = `
+    <div class="info-main">
+      <h2>${escapeHtml(infoTitle)}</h2>
+      ${infoSub ? `<p class="info-sub">${escapeHtml(infoSub)}</p>` : ""}
+      <ul class="info-meta">
+        <li>${ICON_CLOCK}<span>${durationLabel(duration)}</span></li>
+        ${address ? `<li>${ICON_PIN}<span>${escapeHtml(address)}${mapUrl ? ` <a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">Cómo llegar</a>` : ""}</span></li>` : ""}
+      </ul>
+    </div>
+    ${faces.length > 0 ? `<div class="avatars">${faces.map(avatar).join("")}</div>` : ""}`;
 
+  // ---- What the visitor has chosen so far (list steps) ----
+  const chosen: string[] = [];
+  if (selectedService) chosen.push(escapeHtml(selectedService.name));
+  if (selectedProfessional) chosen.push(escapeHtml(selectedProfessional.name));
+  const summary = chosen.length > 0 ? `<p class="chosen">${chosen.map((c) => `<span>${c}</span>`).join("")}</p>` : "";
+
+  // ---- Month calendar ----
+  const [cy, cm] = params.monthStr.split("-").map(Number);
+  const offset = (new Date(Date.UTC(cy, cm - 1, 1)).getUTCDay() + 6) % 7; // Monday first
+  const daysInMonth = new Date(Date.UTC(cy, cm, 0)).getUTCDate();
+  const available = new Set(params.availableDates);
+  const locked = !!params.confirmed;
+  const cells: string[] = Array.from({ length: offset }, () => `<span class="d d-blank"></span>`);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${params.monthStr}-${String(d).padStart(2, "0")}`;
+    const selected = dateStr === (params.confirmed?.dateStr ?? params.dateStr);
+    const today = dateStr === params.todayStr ? " d-today" : "";
+    if (selected) cells.push(`<${locked ? "span" : `a href="${escapeHtml(dayHref(dateStr))}"`} class="d d-on d-sel${today}" aria-current="date">${d}</${locked ? "span" : "a"}>`);
+    else if (available.has(dateStr) && !locked) cells.push(`<a class="d d-on${today}" href="${escapeHtml(dayHref(dateStr))}">${d}</a>`);
+    else cells.push(`<span class="d d-off${today}">${d}</span>`);
+  }
+  const arrow = (dir: "prev" | "next", target: string | null) =>
+    target && !locked
+      ? `<a class="nav" href="${escapeHtml(monthHref(target))}" aria-label="${dir === "prev" ? "Mes anterior" : "Mes siguiente"}">${dir === "prev" ? "‹" : "›"}</a>`
+      : `<span class="nav nav-off" aria-hidden="true">${dir === "prev" ? "‹" : "›"}</span>`;
+  const calendarHtml = `
+    <div class="cal">
+      <h2 class="cal-title">${params.confirmed ? "Tu cita" : "Elige día y hora"}</h2>
+      <div class="cal-nav">${arrow("prev", params.prevMonth)}<span class="cal-month">${escapeHtml(monthLabel(params.monthStr))}</span>${arrow("next", params.nextMonth)}</div>
+      <div class="cal-grid">${WEEKDAYS.map((w) => `<span class="wd">${w}</span>`).join("")}${cells.join("")}</div>
+    </div>`;
+
+  // ---- Right column: times / form / confirmation ----
+  let sideHtml: string;
   if (params.confirmed) {
-    heading = "¡Cita confirmada!";
-    sub = "";
-    stepHtml = `
+    sideHtml = `
       <div class="confirm">
-        <div class="confirm-check" aria-hidden="true">✓</div>
-        <h2>¡Listo, tu cita quedó confirmada!</h2>
-        <p class="confirm-when">${formatDateLabel(params.confirmed.dateStr)} a las ${escapeHtml(params.confirmed.timeStr)}${withProfessional}</p>
-        ${selectedService ? `<p class="confirm-service">${escapeHtml(selectedService.name)} · ${durationLabel(selectedService.minutes)}</p>` : ""}
-        ${address ? `<p class="confirm-where">${escapeHtml(address)}${mapUrl ? ` · <a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">Cómo llegar</a>` : ""}</p>` : ""}
+        <div class="pill pill-sel">${ICON_CHECK}<span>Cita confirmada</span></div>
+        <p class="confirm-when">${formatDateLabel(params.confirmed.dateStr)}<br>${escapeHtml(params.confirmed.timeStr)}${withProfessional}</p>
+        ${selectedService ? `<p class="confirm-line">${escapeHtml(selectedService.name)} · ${durationLabel(selectedService.minutes)}</p>` : ""}
+        ${address ? `<p class="confirm-line">${escapeHtml(address)}${mapUrl ? ` · <a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">Cómo llegar</a>` : ""}</p>` : ""}
         <p class="muted">Te escribimos para confirmar. Si necesitas cambiarla, contáctanos.</p>
       </div>`;
   } else if (params.dateStr && params.timeStr) {
-    heading = "Tus datos";
-    sub = "Un último paso para dejar tu cita lista.";
-    stepHtml = `
-      <a class="back" href="${escapeHtml(backToSlotsHref)}">‹ Elegir otro horario</a>
-      ${summary}
+    sideHtml = `
+      <a class="back" href="${escapeHtml(backToSlotsHref)}">‹ Elegir otra hora</a>
+      <div class="pill pill-sel pill-time"><span>${formatDateLabelShort(params.dateStr)} · ${escapeHtml(params.timeStr)}</span></div>
       ${params.bookingError ? `<p class="booking-error">${escapeHtml(params.bookingError)}</p>` : ""}
       <form class="booking-form" method="POST" action="${escapeHtml(formAction)}">${HONEYPOT_HTML}
         <input type="hidden" name="date" value="${escapeHtml(params.dateStr)}">
@@ -176,74 +231,54 @@ export function renderAgendaHtml(params: AgendaPageParams): string {
         ${serviceId ? `<input type="hidden" name="service" value="${escapeHtml(serviceId)}">` : ""}
         <label class="field"><span>Tu nombre</span><input type="text" name="name" maxlength="120" required autocomplete="name"></label>
         <label class="field"><span>Tu WhatsApp o teléfono</span><input type="text" name="contact" maxlength="120" required autocomplete="tel" inputmode="tel"></label>
-        <label class="field"><span>Tu correo <em>(opcional, para tu confirmación)</em></span><input type="email" name="email" maxlength="180" autocomplete="email"></label>
-        ${params.askNote !== false ? `<label class="field"><span>Motivo de la cita o algo que debamos saber <em>(opcional)</em></span><textarea name="note" rows="3" maxlength="500"></textarea></label>` : ""}
+        <label class="field"><span>Tu correo <em>(opcional)</em></span><input type="email" name="email" maxlength="180" autocomplete="email"></label>
+        ${params.askNote !== false ? `<label class="field"><span>Motivo de la cita <em>(opcional)</em></span><textarea name="note" rows="2" maxlength="500"></textarea></label>` : ""}
         <button class="btn" type="submit">Confirmar cita</button>
       </form>`;
-  } else if (params.dateStr) {
-    heading = "Elige la hora";
-    sub = "Estos son los horarios libres de ese día.";
-    stepHtml = `
-      <a class="back" href="${escapeHtml(backToDaysHref)}">‹ Elegir otro día</a>
-      ${summary}
-      ${
-        params.availableSlots.length === 0
-          ? `<p class="muted">No quedan horarios libres este día — elige otro.</p>`
-          : `<div class="slots">${params.availableSlots.map((t) => `<a class="slot" href="${escapeHtml(slotHref(t))}">${escapeHtml(t)}</a>`).join("")}</div>`
-      }`;
-  } else if (needsService) {
-    heading = "¿Qué necesitas?";
-    sub = "Elige el servicio que quieres agendar.";
-    stepHtml = `<div class="options">${services
+  } else {
+    sideHtml = !params.dateStr
+      ? `<p class="muted side-empty">Elige un día para ver los horarios.</p>`
+      : params.availableSlots.length === 0
+        ? `<p class="muted side-empty">No quedan horarios libres este día. Elige otro.</p>`
+        : `<p class="side-date">${formatDateLabel(params.dateStr)}</p><div class="slots">${params.availableSlots.map((t) => `<a class="pill" href="${escapeHtml(slotHref(t))}">${escapeHtml(t)}</a>`).join("")}</div>`;
+  }
+
+  // ---- Short lists: service, professional ----
+  let listHtml = "";
+  if (needsService) {
+    listHtml = `<h2 class="cal-title">¿Qué necesitas?</h2><p class="muted list-sub">Elige el servicio que quieres agendar.</p><div class="options">${services
       .map(
         (x) =>
-          `<a class="option" href="${escapeHtml(serviceHref(x.id))}"><span class="option-main"><span class="option-name">${escapeHtml(x.name)}</span>${x.description ? `<span class="option-desc">${escapeHtml(x.description)}</span>` : ""}</span><span class="option-meta"><span>${durationLabel(x.minutes)}</span>${x.price ? `<strong>${escapeHtml(x.price)}</strong>` : ""}</span></a>`,
+          `<a class="option" href="${escapeHtml(href({ service: x.id }))}"><span class="option-main"><span class="option-name">${escapeHtml(x.name)}</span>${x.description ? `<span class="option-desc">${escapeHtml(x.description)}</span>` : ""}</span><span class="option-meta"><span>${durationLabel(x.minutes)}</span>${x.price ? `<strong>${escapeHtml(x.price)}</strong>` : ""}</span></a>`,
       )
       .join("")}</div>`;
   } else if (needsProfessional) {
-    heading = "¿Con quién?";
-    sub = "Elige con quién te quieres atender.";
-    stepHtml = `
-      ${services.length > 0 ? `<a class="back" href="${escapeHtml(backToServicesHref)}">‹ Elegir otro servicio</a>` : ""}
+    listHtml = `
+      ${services.length > 0 ? `<a class="back" href="${escapeHtml(href({}))}">‹ Elegir otro servicio</a>` : ""}
       ${summary}
+      <h2 class="cal-title">¿Con quién?</h2><p class="muted list-sub">Elige con quién te quieres atender.</p>
       <div class="options">
-      <a class="option option-any" href="${escapeHtml(professionalHref(ANY_PROFESSIONAL_ID))}"><span class="avatar avatar-i" aria-hidden="true">★</span><span class="option-main"><span class="option-name">Cualquiera disponible</span><span class="option-desc">Te asignamos con quien tenga cupo más pronto</span></span></a>
-      ${params.professionals
-        .map(
-          (p) =>
-            `<a class="option" href="${escapeHtml(professionalHref(p.id))}">${avatar(p)}<span class="option-main"><span class="option-name">${escapeHtml(p.name)}</span>${p.title ? `<span class="option-desc">${escapeHtml(p.title)}</span>` : ""}</span></a>`,
-        )
-        .join("")}
+        <a class="option option-any" href="${escapeHtml(href({ service: serviceId, professional: ANY_PROFESSIONAL_ID }))}"><span class="avatar avatar-i" aria-hidden="true">★</span><span class="option-main"><span class="option-name">Cualquiera disponible</span><span class="option-desc">Te asignamos con quien tenga cupo más pronto</span></span></a>
+        ${params.professionals
+          .map(
+            (p) =>
+              `<a class="option" href="${escapeHtml(href({ service: serviceId, professional: p.id }))}">${avatar(p)}<span class="option-main"><span class="option-name">${escapeHtml(p.name)}</span>${p.title ? `<span class="option-desc">${escapeHtml(p.title)}</span>` : ""}</span></a>`,
+          )
+          .join("")}
       </div>`;
-  } else {
-    heading = "Elige el día";
-    sub = "Elige el día y la hora que mejor te queden.";
-    const backHref = hasProfessionals ? backToProfessionalsHref : services.length > 0 ? backToServicesHref : null;
-    const backText = hasProfessionals ? "‹ Elegir otro profesional" : "‹ Elegir otro servicio";
-    stepHtml = `
-      ${backHref ? `<a class="back" href="${escapeHtml(backHref)}">${backText}</a>` : ""}
-      ${summary}
-      ${
-        params.upcomingDates.length === 0
-          ? `<p class="muted">Este negocio no tiene horarios disponibles configurados por ahora.</p>`
-          : `<div class="days">${params.upcomingDates.map((d) => `<a class="day" href="${escapeHtml(dayHref(d))}">${formatDateLabelShort(d)}</a>`).join("")}</div>`
-      }`;
   }
 
-  const pageTitle = (params.title ?? "").trim() || "Agenda tu cita";
-  const pageSub = (params.subtitle ?? "").trim();
+  const backBar = !listStep && (hasProfessionals || services.length > 0) && !params.confirmed && !(params.dateStr && params.timeStr)
+    ? `<a class="back back-top" href="${escapeHtml(hasProfessionals ? href({ service: serviceId }) : href({}))}">${hasProfessionals ? "‹ Elegir otro profesional" : "‹ Elegir otro servicio"}</a>`
+    : "";
+  const chips = !listStep && chosen.length > 0 && !params.confirmed ? summary : "";
+
+  const cardHtml = listStep
+    ? `<section class="card card-list">${listHtml}</section>`
+    : `<section class="card card-cal">${backBar}${chips}<div class="split">${calendarHtml}<div class="side" aria-live="polite">${sideHtml}</div></div></section>`;
+
   const dark = def.dark;
-
-  const infoHtml = `
-    <div class="brand">${logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(params.businessName)}">` : ""}<span class="brand-name">${escapeHtml(params.businessName)}</span></div>
-    <h1>${escapeHtml(pageTitle)}</h1>
-    ${pageSub ? `<p class="subheading">${escapeHtml(pageSub)}</p>` : ""}
-    ${
-      address || whatsapp
-        ? `<ul class="facts">${address ? `<li><span class="fact-label">Dónde</span><span>${escapeHtml(address)}${mapUrl ? ` <a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">Ver en el mapa</a>` : ""}</span></li>` : ""}${whatsapp ? `<li><span class="fact-label">WhatsApp</span><span><a href="https://wa.me/${whatsapp}" target="_blank" rel="noopener noreferrer">Escríbenos</a></span></li>` : ""}</ul>`
-        : ""
-    }`;
-
+  const isSky = style === "cielo";
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -260,92 +295,119 @@ ${fontLink(def)}
     --surface: ${def.surface};
     --border: ${def.border};
     --radius: ${def.radius}px;
-    --soft: color-mix(in srgb, var(--primary) ${dark ? 16 : 8}%, ${dark ? "var(--surface)" : "transparent"});
-    --muted: color-mix(in srgb, var(--text) 62%, transparent);
+    --day-radius: ${def.dayRadius}px;
+    --tint: color-mix(in srgb, var(--primary) ${dark ? 20 : 13}%, ${dark ? "var(--surface)" : "#fff"});
+    --tint-hover: color-mix(in srgb, var(--primary) ${dark ? 32 : 24}%, ${dark ? "var(--surface)" : "#fff"});
+    --sel: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 62%, #8b5cf6));
+    --sel-text: ${btnText};
+    --muted: color-mix(in srgb, var(--text) 58%, transparent);
     --head: "${def.headFont}", "${def.bodyFont}", system-ui, sans-serif;
     color-scheme: ${dark ? "dark" : "light"};
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-family: "${def.bodyFont}", system-ui, sans-serif; line-height: 1.55; -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column; }
+  html { min-height: 100%; }
+  body { margin: 0; min-height: 100vh; background: ${isSky ? "linear-gradient(180deg, color-mix(in srgb, var(--primary) 9%, #fff) 0%, color-mix(in srgb, var(--primary) 30%, #fff) 55%, color-mix(in srgb, var(--primary) 62%, #fff) 100%) fixed" : "var(--bg)"}; color: var(--text); font-family: "${def.bodyFont}", system-ui, sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
   a { color: inherit; }
   img { max-width: 100%; }
-  .shell { flex: 1; width: 100%; max-width: ${def.split ? 1040 : 680}px; margin: 0 auto; padding: ${def.split ? "40px 24px 56px" : "32px 24px 56px"}; display: grid; align-content: start; gap: 28px; ${def.split ? "grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start;" : ""} }
-  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: ${def.split ? 28 : 20}px; }
-  .logo { height: 44px; max-width: 160px; object-fit: contain; border-radius: calc(var(--radius) / 2); }
-  .brand-name { font-weight: 700; font-size: 16px; }
-  h1 { font-family: var(--head); font-size: clamp(26px, 5vw, ${def.split ? 36 : 34}px); line-height: 1.15; margin: 0 0 10px; text-wrap: balance; }
-  .subheading { color: var(--muted); margin: 0 0 18px; max-width: 46ch; }
-  .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 14px; }
-  .facts li { display: grid; grid-template-columns: 76px 1fr; gap: 10px; }
-  .fact-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
-  .facts a { color: var(--primary); font-weight: 600; text-underline-offset: 3px; }
-  .flow { background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px); padding: 24px; ${dark ? "" : "box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -12px rgba(0,0,0,.12);"} }
-  .step-head { margin: 0 0 16px; }
-  .step-head h2 { font-family: var(--head); font-size: 20px; margin: 0; }
-  .step-head p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
-  .muted { color: var(--muted); font-size: 14px; }
-  .back { display: inline-block; margin-bottom: 14px; font-size: 13px; color: var(--muted); text-decoration: none; }
+  .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; gap: 22px; }
+  .brand { display: flex; align-items: center; gap: 12px; width: min(900px, 100%); }
+  .logo { height: 40px; max-width: 160px; object-fit: contain; border-radius: 8px; }
+  .brand-name { font-weight: 700; font-size: 17px; font-family: var(--head); }
+  .wrap { position: relative; width: min(900px, 100%); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 34px 36px 36px; ${dark ? "" : "box-shadow: 0 30px 70px -34px color-mix(in srgb, var(--primary) 55%, transparent), 0 2px 6px rgba(15,35,66,.06);"} }
+  .card-list { max-width: 560px; margin: 0 auto; }
+  .info { background: color-mix(in srgb, var(--surface) 94%, transparent); border: 1px solid var(--border); border-left: 6px solid var(--primary); border-radius: calc(var(--radius) * .8); padding: 20px 22px; display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; ${dark ? "" : "box-shadow: 0 18px 44px -20px rgba(15,35,66,.28);"} backdrop-filter: blur(8px); }
+  .info h2 { font-family: var(--head); font-size: 20px; line-height: 1.2; margin: 0; text-wrap: balance; }
+  .info-sub { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
+  .info-meta { list-style: none; margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border); display: grid; gap: 8px; font-size: 14px; color: var(--muted); }
+  .info-meta li { display: flex; gap: 9px; align-items: flex-start; }
+  .info-meta svg { flex: none; margin-top: 1px; }
+  .info-meta a { color: var(--primary); font-weight: 600; }
+  .avatars { display: flex; flex: none; }
+  .avatars .avatar { border: 3px solid var(--surface); margin-left: -12px; width: 52px; height: 52px; }
+  .avatars .avatar:first-child { margin-left: 0; }
+  .avatar { width: 44px; height: 44px; border-radius: 999px; object-fit: cover; flex: none; }
+  .avatar-i { display: inline-flex; align-items: center; justify-content: center; background: var(--tint); color: var(--primary); font-weight: 700; font-size: 15px; }
+  .wrap-cal .info { position: relative; z-index: 2; width: min(380px, 100%); margin: 0 -26px -54px auto; }
+  .wrap-cal .card { padding-top: 80px; }
+  .wrap-list .info { max-width: 560px; margin: 0 auto 16px; }
+  .split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 0; }
+  .cal { padding-right: 34px; }
+  .cal-title { font-family: var(--head); font-size: 24px; font-weight: 800; margin: 0 0 18px; text-align: center; text-wrap: balance; }
+  .list-sub { text-align: center; margin: -8px 0 18px; }
+  .cal-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 18px; }
+  .cal-month { font-weight: 700; font-size: 16px; min-width: 150px; text-align: center; }
+  .nav { width: 42px; height: 42px; border-radius: 999px; background: var(--tint); color: var(--text); display: inline-flex; align-items: center; justify-content: center; font-size: 22px; text-decoration: none; line-height: 1; }
+  .nav:hover { background: var(--tint-hover); }
+  .nav-off { opacity: .35; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px 6px; justify-items: center; }
+  .wd { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-bottom: 4px; }
+  .d { width: 100%; max-width: 54px; aspect-ratio: 1; border-radius: var(--day-radius); display: inline-flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; text-decoration: none; position: relative; }
+  .d-off { color: color-mix(in srgb, var(--text) 30%, transparent); font-weight: 500; }
+  .d-on { background: var(--tint); color: var(--text); transition: background .15s, transform .15s; }
+  a.d-on:hover { background: var(--tint-hover); transform: translateY(-1px); }
+  .d-sel { background: var(--sel) !important; color: var(--sel-text) !important; box-shadow: 0 10px 22px -10px var(--primary); }
+  .d-today::after { content: ""; position: absolute; bottom: 7px; width: 5px; height: 5px; border-radius: 999px; background: currentColor; opacity: .7; }
+  .side { padding-left: 34px; border-left: 1px solid var(--border); min-height: 280px; display: flex; flex-direction: column; gap: 12px; }
+  .side-date { margin: 0; font-weight: 700; font-size: 15px; }
+  .side-empty { margin: auto 0; text-align: center; }
+  .slots { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; padding: 2px 4px 2px 0; }
+  .pill { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 16px; border-radius: calc(var(--radius) * .5); background: var(--tint); color: var(--text); font-weight: 700; font-size: 16px; text-decoration: none; transition: background .15s; }
+  a.pill:hover { background: var(--tint-hover); }
+  .pill-sel { background: var(--sel); color: var(--sel-text); box-shadow: 0 12px 26px -14px var(--primary); }
+  .pill-time { justify-content: center; }
+  .btn { display: inline-block; width: 100%; background: var(--sel); color: var(--sel-text); padding: 14px; border-radius: calc(var(--radius) * .5); border: none; font-weight: 700; font-size: 15px; cursor: pointer; font-family: inherit; }
+  .btn:hover { filter: brightness(1.05); }
+  .booking-form { display: flex; flex-direction: column; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 600; }
+  .field em { font-style: normal; font-weight: 400; color: var(--muted); }
+  .field input, .field textarea { font: inherit; font-size: 15px; font-weight: 400; padding: 10px 12px; border-radius: calc(var(--radius) * .4); border: 1px solid color-mix(in srgb, var(--text) 20%, transparent); background: var(--surface); color: var(--text); resize: vertical; }
+  .field input:focus, .field textarea:focus, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .booking-error { color: #d92d20; font-size: 13px; font-weight: 600; margin: 0; }
+  .back { display: inline-block; font-size: 13px; color: var(--muted); text-decoration: none; }
   .back:hover { text-decoration: underline; }
-  .chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; padding: 0; }
-  .chosen span { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--soft); }
+  .back-top { margin-bottom: 8px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .chosen { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; padding: 0; }
+  .chosen span { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--tint); }
   .options { display: grid; gap: 10px; }
-  .option { display: flex; align-items: center; gap: 14px; justify-content: space-between; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; transition: border-color .15s, background .15s; }
-  .option:hover, .day:hover, .slot:hover { border-color: var(--primary); background: var(--soft); }
+  .option { display: flex; align-items: center; gap: 14px; justify-content: space-between; padding: 14px 16px; border: 1px solid var(--border); border-radius: calc(var(--radius) * .6); text-decoration: none; transition: border-color .15s, background .15s; }
+  .option:hover { border-color: var(--primary); background: var(--tint); }
   .option-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-  .option-name { font-weight: 600; }
+  .option-name { font-weight: 700; }
   .option-desc { font-size: 13px; color: var(--muted); }
   .option-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 13px; color: var(--muted); white-space: nowrap; }
   .option-meta strong { color: var(--text); font-size: 14px; }
   .option-any { border-style: dashed; }
-  .avatar { width: 44px; height: 44px; border-radius: 999px; object-fit: cover; flex: none; }
-  .avatar-i { display: inline-flex; align-items: center; justify-content: center; background: var(--soft); color: var(--primary); font-weight: 700; font-size: 15px; }
-  .days { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
-  .day { display: block; padding: 13px 8px; text-align: center; white-space: nowrap; border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; font-weight: 600; font-size: 14px; transition: border-color .15s, background .15s; }
-  .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
-  .slot { display: block; padding: 10px 6px; text-align: center; border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; font-weight: 600; font-size: 14px; transition: border-color .15s, background .15s; }
-  .btn { display: inline-block; width: 100%; background: var(--primary); color: var(--btn-text); padding: 14px; border-radius: var(--radius); border: none; font-weight: 700; font-size: 15px; cursor: pointer; font-family: inherit; }
-  .btn:hover { opacity: .92; }
-  .booking-form { display: flex; flex-direction: column; gap: 12px; }
-  .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
-  .field em { font-style: normal; font-weight: 400; color: var(--muted); }
-  .field input, .field textarea { font: inherit; font-size: 15px; font-weight: 400; padding: 11px 13px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--text) 22%, transparent); background: var(--surface); color: var(--text); resize: vertical; }
-  .field input:focus, .field textarea:focus, .option:focus-visible, .day:focus-visible, .slot:focus-visible, .btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-  .booking-error { color: #d92d20; font-size: 13px; font-weight: 600; margin: 0 0 12px; }
-  .confirm { text-align: center; padding: 16px 0; }
-  .confirm h2 { font-family: var(--head); margin: 0 0 8px; font-size: 22px; }
-  .confirm p { margin: 4px 0; }
-  .confirm-when { font-weight: 700; font-size: 17px; }
-  .confirm-service, .confirm-where { color: var(--muted); font-size: 14px; }
-  .confirm-where a { color: var(--primary); font-weight: 600; }
-  .confirm-check { width: 56px; height: 56px; border-radius: 999px; background: var(--primary); color: var(--btn-text); font-size: 28px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
-  footer { padding: 20px 0 28px; text-align: center; color: var(--muted); font-size: 12px; }
-  /* Per-style details */
-  body[data-style="suave"] .btn, body[data-style="suave"] .slot, body[data-style="suave"] .day { border-radius: 999px; }
-  body[data-style="suave"] .flow { box-shadow: 0 20px 50px -28px color-mix(in srgb, var(--primary) 45%, transparent); border-color: transparent; }
-  body[data-style="suave"] { background: radial-gradient(1200px 420px at 50% -120px, color-mix(in srgb, var(--primary) 14%, #fbfaf8), #fbfaf8 70%); }
-  body[data-style="editorial"] .shell { border-top: 4px solid var(--text); }
-  body[data-style="editorial"] .flow { border: 1px solid var(--text); box-shadow: none; }
-  body[data-style="editorial"] h1 { font-weight: 700; letter-spacing: -.01em; }
-  body[data-style="editorial"] .option, body[data-style="editorial"] .day, body[data-style="editorial"] .slot { border-color: color-mix(in srgb, var(--text) 25%, transparent); }
-  body[data-style="editorial"] .btn { text-transform: uppercase; letter-spacing: .08em; font-size: 13px; }
-  body[data-style="oscuro"] .btn { box-shadow: 0 8px 24px -10px var(--primary); }
-  body[data-style="compacto"] .shell { background: transparent; }
-  body[data-style="compacto"] .slots { grid-template-columns: 1fr 1fr; }
-  body[data-style="compacto"] .slot { text-align: left; padding: 12px 14px; }
-  body[data-style="compacto"] .days { grid-template-columns: 1fr 1fr; }
-  body[data-style="compacto"] .day { text-align: left; padding: 12px 14px; }
-  body[data-style="compacto"] .info { position: sticky; top: 24px; }
-  @media (max-width: 820px) { .shell { grid-template-columns: 1fr; padding: 24px 16px 48px; gap: 20px; } body[data-style="compacto"] .info { position: static; } .flow { padding: 18px; } }
+  .confirm { display: flex; flex-direction: column; gap: 10px; ${isSky ? "" : ""} }
+  .confirm p { margin: 0; }
+  .confirm-when { font-weight: 700; font-size: 17px; line-height: 1.35; }
+  .confirm-line { color: var(--muted); font-size: 14px; }
+  .confirm-line a { color: var(--primary); font-weight: 600; }
+  footer { padding: 14px 0 26px; text-align: center; color: ${isSky ? "color-mix(in srgb, var(--text) 60%, transparent)" : "var(--muted)"}; font-size: 12px; }
+  ${style === "editorial" ? ".card { border-width: 1.5px; } .pill, .d-on, .nav { border-radius: 2px; } .d-off, .d-on { border-radius: 2px; } .cal-title, .info h2 { font-weight: 700; } .btn { text-transform: uppercase; letter-spacing: .08em; font-size: 13px; }" : ""}
+  ${style === "suave" ? "body { background: radial-gradient(1100px 420px at 50% -120px, color-mix(in srgb, var(--primary) 14%, #fbfaf8), #fbfaf8 70%); } .card { border-color: transparent; }" : ""}
+  @media (max-width: 860px) {
+    .stage { justify-content: flex-start; padding: 24px 14px; }
+    .wrap-cal .info { width: 100%; margin: 0 0 14px; }
+    .card, .wrap-cal .card { padding: 22px 16px 24px; }
+    .split { grid-template-columns: 1fr; gap: 22px; }
+    .cal { padding-right: 0; }
+    .side { padding-left: 0; padding-top: 22px; border-left: 0; border-top: 1px solid var(--border); min-height: 0; }
+    .slots { max-height: none; display: grid; grid-template-columns: repeat(2, 1fr); }
+    .d { font-size: 15px; }
+  }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body data-style="${style}">
-  <main class="shell">
-    <section class="info">${infoHtml}</section>
-    <section class="flow" aria-live="polite">
-      ${params.confirmed ? "" : `<div class="step-head"><h2>${escapeHtml(heading)}</h2>${sub ? `<p>${escapeHtml(sub)}</p>` : ""}</div>`}
-      ${stepHtml}
-    </section>
+  <main class="stage">
+    ${logoUrl || params.businessName ? `<div class="brand">${logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="">` : ""}<span class="brand-name">${escapeHtml(params.businessName)}</span></div>` : ""}
+    <div class="wrap ${listStep ? "wrap-list" : "wrap-cal"}">
+      <aside class="info">${infoHtml}</aside>
+      ${cardHtml}
+    </div>
+    ${whatsapp ? `<p class="muted"><a href="https://wa.me/${whatsapp}" target="_blank" rel="noopener noreferrer">¿Dudas? Escríbenos por WhatsApp</a></p>` : ""}
   </main>
   <footer>Agenda creada con <a href="https://funnelslabs.app" target="_blank" rel="noopener noreferrer">Funnels Labs</a></footer>
 </body>
