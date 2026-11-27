@@ -83,6 +83,19 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
     item[parts[6]] = value;
     return finish(next);
   }
+  // sections.<i>.lines.<k>: a phrase of the moving text (the second one can be emptied: it just goes away; a new one is added at the end).
+  if (parts.length === 4 && section.type === "marquee" && parts[2] === "lines" && isIndex(parts[3])) {
+    const lines = [...(section.lines as string[])];
+    const at = Number(parts[3]);
+    const text = rawValue.replace(/\s+/g, " ").trim().slice(0, 60);
+    if (at > lines.length || at > 1) return bad();
+    if (!text) {
+      if (lines.filter(Boolean).length <= 1) return bad("Escribe al menos una frase.");
+      lines.splice(at, 1);
+    } else lines[at] = text;
+    section.lines = lines.filter((l) => l !== undefined);
+    return finish(next);
+  }
   // sections.<i>.nums.<key>: a number the block draws ("01", "02 / 06"); empty = back to the automatic one.
   if (parts.length === 4 && parts[2] === "nums" && /^[a-z0-9]{1,6}$/.test(parts[3])) {
     const text = rawValue.replace(/\s+/g, " ").trim().slice(0, 12);

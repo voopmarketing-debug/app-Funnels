@@ -96,6 +96,8 @@ export function TemplateBuilder({
     setHeaderColor: () => {},
     inspect: () => {},
     layoutStructure: () => {},
+    addContainer: () => {},
+    openLibrary: () => {},
     addToCell: () => {},
     removeFromCell: () => {},
   };

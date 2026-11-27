@@ -261,4 +261,20 @@ describe("Subir mi HTML", () => {
     const edited = more.ok ? setTextAtPath(more.content, "sections.1.cells.0.items.0.text", "Nuevo título") : null;
     expect(edited && edited.ok && (edited.content.sections[1] as unknown as { cells: { items: { text: string }[] }[] }).cells[0].items[0].text).toBe("Nuevo título");
   });
+  it("the moving text can be written, sped up and colored", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const page = { ...base, fullHtml: false, plain: false, sections: [base.sections[0], { type: "marquee", lines: ["Una", "Dos"] }] } as unknown as typeof base;
+    const one = setTextAtPath(page, "sections.1.lines.0", "Mi frase");
+    expect(one.ok).toBe(true);
+    const html = one.ok ? renderWebsiteHtmlV2(one.content, { ...ctx, preview: true, edit: true }) : "";
+    expect(html).toContain('<span data-edit="sections.1.lines.0">Mi frase</span>');
+    expect(html).toContain('data-edit="sections.1.lines.1"');
+    // The second phrase can go away, the first one cannot be the last to leave.
+    const solo = one.ok ? setTextAtPath(one.content, "sections.1.lines.1", "") : one;
+    expect(solo.ok && (solo.content.sections[1] as unknown as { lines: string[] }).lines).toEqual(["Mi frase"]);
+    expect(solo.ok && setTextAtPath(solo.content, "sections.1.lines.0", "").ok).toBe(false);
+    expect(lookParts({ speed: "fast" }).classes).toContain("lk-sp-fast");
+    expect(LookSchema.parse({ speed: "warp" })).toEqual({ speed: null });
+    expect(LOOK_CSS).toContain(".lk-sp-slow{--mq-d:92s}");
+  });
 });

@@ -129,7 +129,7 @@ const FX_CSS = `
 .fan-info .prow{justify-content:center}
 .mq{padding:28px 0;overflow:hidden;border-block:1px solid var(--line)}
 .mq-row{overflow:hidden;white-space:nowrap}
-.mq-track{display:inline-flex;animation:mq 46s linear infinite}
+.mq-track{display:inline-flex;animation:mq var(--mq-d,46s) linear infinite}
 .mq-row.rev .mq-track{animation-direction:reverse}
 .mq-track span{font-family:var(--hf);font-weight:700;font-size:calc(clamp(22px,3vw,40px) * var(--ts,1));line-height:1.2;letter-spacing:-.01em;padding-right:1.2em;color:color-mix(in srgb,var(--text) 38%,transparent)}
 .mq-row.rev .mq-track span{color:color-mix(in srgb,var(--text) 22%,transparent)}
@@ -772,10 +772,10 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       }
 
       case "marquee": {
-        const lines = s.lines.filter(Boolean).slice(0, 2);
+        const lines = s.lines.map((text, k) => ({ text, k })).filter((l) => l.text).slice(0, 2);
         if (lines.length === 0) return "";
-        const row = (text: string, rev: boolean) => `<div class="mq-row${rev ? " rev" : ""}" aria-hidden="true"><div class="mq-track">${Array.from({ length: 8 }, () => `<span>${esc(text)}</span>`).join("")}</div></div>`;
-        return `<section class="mq"><p class="sr-only">${esc(lines.join(". "))}</p>${lines.map((l, li) => row(l, li % 2 === 1)).join("")}</section>`;
+        const row = (l: { text: string; k: number }, rev: boolean) => `<div class="mq-row${rev ? " rev" : ""}" aria-hidden="true"><div class="mq-track">${Array.from({ length: 8 }, () => `<span${ed(fp(`lines.${l.k}`))}>${esc(l.text)}</span>`).join("")}</div></div>`;
+        return `<section class="mq"><p class="sr-only">${esc(lines.map((l) => l.text).join(". "))}</p>${lines.map((l, li) => row(l, li % 2 === 1)).join("")}</section>`;
       }
 
       case "event": {
@@ -1043,6 +1043,13 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,t
 .narrow{max-width:min(var(--max),860px)}.narrow-lg{max-width:min(var(--max),1120px)}
 .hero-centered .narrow{max-width:min(var(--max),1100px)}
 .center{text-align:center}.mt{margin-top:32px}
+.add-zone{display:flex;flex-direction:column;align-items:center;gap:10px;margin:28px auto;max-width:min(var(--max),980px);padding:26px 16px;border:2px dashed color-mix(in srgb,var(--text) 24%,transparent);border-radius:14px;position:relative}
+.add-zone p{margin:0;font:500 13px/1.3 system-ui,sans-serif;color:color-mix(in srgb,var(--text) 55%,transparent);text-align:center}
+.add-plus{all:unset;box-sizing:border-box;cursor:pointer;width:46px;height:46px;border-radius:50%;background:#e5e7eb;color:#111827;text-align:center;font:600 26px/46px system-ui,sans-serif}
+.add-plus:hover{background:#5b6cf0;color:#fff}
+.add-lib{all:unset;box-sizing:border-box;cursor:pointer;position:absolute;right:14px;top:12px;padding:6px 10px;border-radius:8px;background:#e5e7eb;color:#111827;font:600 12px/1 system-ui,sans-serif}
+.add-lib:hover{background:#5b6cf0;color:#fff}
+.fl-cell-over{outline:3px dashed #5b6cf0!important;outline-offset:2px;background:rgba(91,108,240,.08)!important}
 .lay-row{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:24px;margin-bottom:24px}
 .lay-cell{min-width:0;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
 .lay-item{position:relative;max-width:100%}
@@ -1384,6 +1391,7 @@ ${content.plain ? "" : `<header class="top${hdrVars ? " hc" : ""}"${hdrVars ? ` 
 </div></header>`}
 <main>
 ${body}
+${edit && !content.fullHtml ? `<div class="add-zone"><button type="button" class="add-plus" data-add-container title="Agregar un contenedor" aria-label="Agregar un contenedor">+</button><button type="button" class="add-lib" data-open-library>Bloques</button><p>Toca + para armar tu propio contenedor, o arrastra un bloque aquí.</p></div>` : ""}
 </main>
 ${content.plain ? "" : `<footer class="foot${ftrVars ? " fc" : ""}"${ftrVars ? ` style="${ftrVars}"` : ""}><div class="wrap"><span${ed("chrome.footerText")}>${esc(chrome.footerText || `© ${ctx.businessName}`)}</span><a href="${esc(href("footer"))}"${ed("chrome.footerLink")}>${esc(chrome.footerLink || "Escríbenos por WhatsApp")}</a></div></footer>`}
 ${content.sticky && firstHero && firstHero.type === "hero" ? `<div class="sticky-cta"><a class="btn" href="${esc(ctaHref("barra-fija"))}"${ed("sections.0.ctaLabel")}>${esc(firstHero.ctaLabel)}</a></div>` : ""}

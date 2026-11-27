@@ -30,6 +30,10 @@ export type EditorHandlers = {
   dropBlock(type: string, at: number): void;
   /** A text, button or photo from the library was dropped on a block of the page. */
   dropExtra(kind: string, index: number, cell?: number): void;
+  /** The "+" of the end of the page: an empty container (with its structure picker) is added there. */
+  addContainer(): void;
+  /** The list of ready-made blocks. */
+  openLibrary(): void;
   /** A structure was picked in an empty Contenedor (or changed): its elements are laid out again. */
   layoutStructure(index: number, structure: string): void;
   /** An element (title, text, button, photo) goes into a column of a Contenedor. */
@@ -565,6 +569,16 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     const t = asElement(e.target);
     if (!t) return;
     if (t.closest(".fl-tc")) return;
+    if (t.closest("[data-add-container]")) {
+      e.preventDefault();
+      getHandlers().addContainer();
+      return;
+    }
+    if (t.closest("[data-open-library]")) {
+      e.preventDefault();
+      getHandlers().openLibrary();
+      return;
+    }
     const struct = t.closest<HTMLElement>("[data-struct]");
     if (struct) {
       e.preventDefault();
@@ -724,6 +738,10 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
       const target = sectionAt(e);
       if (target && Number(target.dataset.sec) >= 0) setActive(target);
+      // The column under the pointer lights up: that is where the element lands.
+      const over = (doc.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-cell]") ?? null;
+      doc.querySelectorAll(".fl-cell-over").forEach((c) => c !== over && c.classList.remove("fl-cell-over"));
+      over?.classList.add("fl-cell-over");
       return;
     }
     if (!hasNewBlock(e)) return;
@@ -752,6 +770,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     doc.body.appendChild(marker);
   };
   const clearDrop = () => {
+    doc.querySelectorAll(".fl-cell-over").forEach((c) => c.classList.remove("fl-cell-over"));
     dropAt = null;
     marker.remove();
   };
@@ -762,6 +781,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     const extra = e.dataTransfer?.getData(NEW_EXTRA_TYPE);
     if (extra) {
       e.preventDefault();
+      doc.querySelectorAll(".fl-cell-over").forEach((c) => c.classList.remove("fl-cell-over"));
       const target = sectionAt(e);
       const cellEl = asElement(e.target)?.closest<HTMLElement>("[data-cell]");
       if (target) getHandlers().dropExtra(extra, Number(target.dataset.sec), cellEl?.dataset.cell ? Number(cellEl.dataset.cell.split(".")[1]) : undefined);

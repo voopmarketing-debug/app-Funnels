@@ -145,6 +145,42 @@ function LayoutStructurePicker({ value, onChange }: { value: string | null; onCh
   );
 }
 
+/** The moving text: its phrases (one or two) and how fast it moves. */
+function MarqueeFields({ lines, index, speed, disabled, onEditText, onSpeed }: { lines: string[]; index: number; speed: string | null; disabled: boolean; onEditText: (path: string, value: string) => void; onSpeed: (v: string | null) => void }) {
+  const [vals, setVals] = useState([lines[0] ?? "", lines[1] ?? ""]);
+  const field = "w-full rounded-md border border-border bg-surface px-2.5 py-2 text-sm outline-none focus:border-accent";
+  return (
+    <div className="space-y-3 rounded-xl border border-border p-3">
+      <p className="text-[13px] font-semibold text-ink">Frases</p>
+      {[0, 1].map((k) => (
+        <label key={k} className="block space-y-1">
+          <span className="text-[12px] text-ink-muted">{k === 0 ? "Primera frase" : "Segunda frase (opcional)"}</span>
+          <input
+            maxLength={60}
+            disabled={disabled}
+            value={vals[k]}
+            placeholder={k === 0 ? "Escribe una frase corta" : "Vacío = una sola frase"}
+            onChange={(e) => setVals((v) => v.map((x, i) => (i === k ? e.target.value : x)))}
+            onBlur={() => vals[k].trim() !== (lines[k] ?? "") && onEditText(`sections.${index}.lines.${k}`, vals[k].trim())}
+            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+            className={field}
+          />
+        </label>
+      ))}
+      <Segmented
+        label="Velocidad"
+        value={speed}
+        onChange={onSpeed}
+        options={[
+          { value: "slow", label: "Lenta" },
+          { value: null, label: "Normal" },
+          { value: "fast", label: "Rápida" },
+        ]}
+      />
+    </div>
+  );
+}
+
 /** A size as a percent: − and + buttons (easy on a phone), a slider, and "Normal" to go back. */
 function SizeControl({ label, value, onChange }: { label: string; value: string | null | undefined; onChange: (v: string | null) => void }) {
   const n = value ? Number(value) : 100;
@@ -304,6 +340,7 @@ export function StylePanel({
   onExtras,
   onPickExtraPhoto,
   onLayoutStructure,
+  onEditText,
 }: {
   section: Section;
   index: number;
@@ -316,6 +353,7 @@ export function StylePanel({
   onExtras: (list: ExtraElement[]) => void;
   onPickExtraPhoto: (at: number | null) => void;
   onLayoutStructure: (structure: string) => void;
+  onEditText: (path: string, value: string) => void;
 }) {
   const [look, setLook] = useState<Look>(section.look ?? {});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -358,6 +396,9 @@ export function StylePanel({
         <p className="text-[12px] text-ink-muted">Bloque {index + 1}. Cada cambio se ve al instante en la página.</p>
       </div>
 
+      {section.type === "marquee" && (
+        <MarqueeFields key={`mq:${(section.lines ?? []).join("|")}`} lines={section.lines ?? []} index={index} speed={(look.speed as string | null | undefined) ?? null} disabled={busy} onEditText={onEditText} onSpeed={(v) => change({ speed: v as Look["speed"] })} />
+      )}
       {section.type === "layout" ? (
         <LayoutStructurePicker value={section.structure ?? null} onChange={onLayoutStructure} />
       ) : (
@@ -452,7 +493,7 @@ export function StylePanel({
           { value: "right", label: "Derecha", icon: <AlignRightIcon className="h-[18px] w-[18px]" /> },
         ]}
       />
-      <SizeControl label="Tamaño de los títulos" value={look.titleScale} onChange={(v) => change({ titleScale: v, size: null })} />
+      <SizeControl label={section.type === "marquee" ? "Tamaño de las letras" : "Tamaño de los títulos"} value={look.titleScale} onChange={(v) => change({ titleScale: v, size: null })} />
       <SizeControl label="Tamaño del texto" value={look.textScale} onChange={(v) => change({ textScale: v })} />
       <FontPicker label="Tipografía de los títulos" value={look.headingFont} onChange={(v) => change({ headingFont: v })} />
       <FontPicker label="Tipografía del texto" value={look.bodyFont} onChange={(v) => change({ bodyFont: v })} />

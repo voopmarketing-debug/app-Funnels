@@ -349,6 +349,23 @@ export function WebsiteBuilder({
     runBlock({ kind: "extras", index, extras: list }, "Agregando el elemento…");
   }
 
+  // Writes one text (from a panel) and shows it in the page.
+  function saveTextRefresh(path: string, value: string) {
+    setBusy("Guardando…");
+    startTransition(async () => {
+      try {
+        const res = await updateWebsiteTextV2(businessId, websiteId, path, value);
+        if (!res.ok) showToast(res.error);
+        else {
+          adopt(res.content);
+          refreshPreview();
+        }
+      } finally {
+        setBusy(null);
+      }
+    });
+  }
+
   function runBlock(op: BlockOp, label = "Actualizando…") {
     setBusy(label);
     startTransition(async () => {
@@ -422,7 +439,7 @@ export function WebsiteBuilder({
       setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 2500);
       // Something appeared or disappeared (an emptied text, the highlighted words of the headline): redraw.
       const sectionIndex = Number(path.split(".")[1]);
-      const refresh = value === "" || (/^sections\.\d+\.heading$/.test(path) && res.content.sections[sectionIndex]?.type === "hero") || (/^sections\.\d+\.url$/.test(path) && res.content.sections[sectionIndex]?.type === "video");
+      const refresh = value === "" || /\.lines\.\d+$/.test(path) || (/^sections\.\d+\.heading$/.test(path) && res.content.sections[sectionIndex]?.type === "hero") || (/^sections\.\d+\.url$/.test(path) && res.content.sections[sectionIndex]?.type === "video");
       if (refresh) refreshPreview();
       return { ok: true, refresh };
     },
@@ -447,7 +464,10 @@ export function WebsiteBuilder({
       if (!sec || sec.type !== "layout" || !sec.cells[cell]) return;
       runBlock({ kind: "cellItems", index, cell, items: sec.cells[cell].items.filter((_, i) => i !== k) }, "Quitando…");
     },
-    add: (index) => setLibrary({ at: index + 1 }),
+    // The "+" of a block adds an empty container right below it: its structure is picked in the page itself.
+    add: (index) => runBlock({ kind: "add", type: "layout", at: index + 1 }, "Agregando el contenedor…"),
+    addContainer: () => runBlock({ kind: "add", type: "layout" }, "Agregando el contenedor…"),
+    openLibrary: () => setLibrary({ at: content.sections.length }),
     duplicate: (index) => runBlock({ kind: "duplicate", index }, "Duplicando…"),
     remove: (index) => runBlock({ kind: "remove", index }, "Eliminando…"),
     select: (index) => setSelected(index),
@@ -806,6 +826,7 @@ export function WebsiteBuilder({
                 onGalleryLayout={(layout) => runBlock({ kind: "galleryLayout", index: sel, layout }, "Cambiando el diseño…")}
                 onExtras={(extras) => runBlock({ kind: "extras", index: sel, extras }, "Guardando…")}
                 onPickExtraPhoto={(at) => setExtraPhoto({ index: sel, at })}
+                onEditText={saveTextRefresh}
                 onLayoutStructure={(structure) => runBlock({ kind: "layoutStructure", index: sel, structure }, "Aplicando la estructura…")}
               />
             ))}
