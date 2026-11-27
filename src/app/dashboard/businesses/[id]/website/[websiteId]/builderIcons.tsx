@@ -191,3 +191,7 @@ export const BagIcon = line(<><path d="M5 8h14l-1 12H6L5 8Z" /><path d="M9 11V7a
 export const CalendarIcon = line(<><rect x="3.500" y="5" width="17" height="15.500" rx="2.500" /><path d="M3.500 10h17M8 3v4M16 3v4" /></>);
 export const RefreshIcon = line(<><path d="M19.500 8A8 8 0 0 0 5 7.500M4.500 4v4h4" /><path d="M4.500 16a8 8 0 0 0 14.500.5M19.500 20v-4h-4" /></>);
 export const PaletteSmallIcon = PaletteIcon;
+export const AlignLeftIcon = line(<path d="M4 6.500h16M4 11h10M4 15.500h16M4 20h10" />);
+export const AlignCenterIcon = line(<path d="M4 6.500h16M7 11h10M4 15.500h16M7 20h10" />);
+export const AlignRightIcon = line(<path d="M4 6.500h16M10 11h10M4 15.500h16M10 20h10" />);
+export const DevicesIcon = line(<><rect x="2.500" y="5" width="13" height="9" rx="1.500" /><path d="M6 18h6M9 14v4" /><rect x="16.500" y="9" width="5" height="10" rx="1.200" /></>);

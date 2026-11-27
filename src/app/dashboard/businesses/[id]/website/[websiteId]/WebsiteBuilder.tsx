@@ -400,6 +400,22 @@ export function WebsiteBuilder({
       return { index, label: SECTION_LABELS[s.type], canMoveUp: index >= 2, canMoveDown: index >= 1 && index < content.sections.length - 1, canRemove: index >= 1, hasBg: !!s.bgImage };
     },
     notice: (message) => showToast(message),
+    palette: () => [content.theme.primaryColor, content.theme.textColor, content.theme.backgroundColor, content.theme.surfaceColor],
+    setTextColor: (path, color) => {
+      const m = /^sections\.(\d+)\.(.+)$/.exec(path);
+      if (!m) return;
+      setSaveState("saving");
+      void editWebsiteBlocksV2(businessId, websiteId, { kind: "fieldColor", index: Number(m[1]), key: m[2], color }).then((res) => {
+        if (!res.ok) {
+          setSaveState("error");
+          showToast(res.error);
+          return;
+        }
+        adopt(res.content);
+        setSaveState("saved");
+        setTimeout(() => setSaveState((v) => (v === "saved" ? "idle" : v)), 2500);
+      });
+    },
   };
   useEffect(() => {
     handlersRef.current = editorHandlers;

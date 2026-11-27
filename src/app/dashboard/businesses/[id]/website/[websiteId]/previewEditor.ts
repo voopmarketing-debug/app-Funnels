@@ -34,6 +34,10 @@ export type EditorHandlers = {
   redo(): void;
   section(index: number): SectionInfo | null;
   notice(message: string): void;
+  /** The page's own colors, offered as quick choices for one text. */
+  palette(): string[];
+  /** Saves the color of one text ("sections.2.heading"); null brings the automatic color back. */
+  setTextColor(path: string, color: string | null): void;
 };
 
 const ACCENT = "#5b6cf0";
@@ -76,6 +80,12 @@ section[data-sec].fl-hover{box-shadow:inset 0 0 0 2px ${ACCENT};background-image
 .fl-bar button:focus-visible{outline:2px solid #fff}
 .fl-bar button[disabled]{opacity:.3;cursor:default}
 .fl-bar button[disabled]:hover{background:none}
+.fl-tc{position:absolute;z-index:2147483300;display:flex;align-items:center;gap:6px;padding:6px 8px;background:#111827;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font:600 11px/1 system-ui,sans-serif;color:#9ca3af;white-space:nowrap}
+.fl-tc button.sw{all:unset;box-sizing:border-box;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.55);cursor:pointer}
+.fl-tc button.sw:hover{border-color:#fff}
+.fl-tc button.auto{all:unset;box-sizing:border-box;cursor:pointer;padding:5px 8px;border-radius:8px;color:#fff;font:600 11px/1 system-ui,sans-serif}
+.fl-tc button.auto:hover{background:#374151}
+.fl-tc input[type=color]{width:24px;height:24px;padding:0;border:0;background:none;cursor:pointer}
 @media (max-width:700px){.fl-label{display:none}}
 @media (pointer:coarse){.fl-bar button{min-height:44px;min-width:44px;padding:0 12px;font-size:14px;display:inline-flex;align-items:center;justify-content:center}.fl-bar button.fl-icon{padding:0 10px;font-size:17px}.fl-bar-wrap{right:6px}.fl-chip{display:none}}
 `;
@@ -201,6 +211,81 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     selection?.addRange(range);
   }
 
+  // Color of one text: a small bar next to the text being edited (the whole text, not the whole block).
+  let tc: HTMLElement | null = null;
+  let tcFor: HTMLElement | null = null;
+  function hideColors() {
+    tc?.remove();
+    tc = null;
+    tcFor = null;
+  }
+  function showColors(el: HTMLElement) {
+    hideColors();
+    const path = el.dataset.edit ?? "";
+    // Only the texts of a block (not the top announcement) can carry their own color.
+    if (!/^sections\.\d+\./.test(path)) return;
+    const h = getHandlers();
+    // Pages that cannot store a text color (Showroom / Scroll Story) offer no palette.
+    if (h.palette().length === 0) return;
+    const box = doc.createElement("div");
+    box.className = "fl-tc";
+    box.setAttribute("role", "toolbar");
+    box.setAttribute("aria-label", "Color de este texto");
+    const apply = (color: string | null) => {
+      if (color) {
+        el.setAttribute("data-fc", path);
+        el.style.setProperty("color", color, "important");
+      } else {
+        el.removeAttribute("data-fc");
+        el.style.removeProperty("color");
+      }
+      h.setTextColor(path, color);
+    };
+    const label = doc.createElement("span");
+    label.textContent = "Color";
+    box.appendChild(label);
+    const seen = new Set<string>();
+    for (const c of [...h.palette(), "#ffffff", "#111827"]) {
+      const hex = c.toLowerCase();
+      if (!/^#[0-9a-f]{6}$/.test(hex) || seen.has(hex)) continue;
+      seen.add(hex);
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.className = "sw";
+      b.style.background = hex;
+      b.title = hex;
+      b.setAttribute("aria-label", `Color ${hex}`);
+      b.addEventListener("click", () => apply(hex));
+      box.appendChild(b);
+    }
+    const pick = doc.createElement("input");
+    pick.type = "color";
+    pick.title = "Elegir otro color";
+    pick.setAttribute("aria-label", "Elegir otro color");
+    const current = win!.getComputedStyle(el).color.match(/\d+/g);
+    if (current && current.length >= 3) pick.value = "#" + current.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+    pick.addEventListener("input", () => apply(pick.value));
+    box.appendChild(pick);
+    const auto = doc.createElement("button");
+    auto.type = "button";
+    auto.className = "auto";
+    auto.textContent = "Auto";
+    auto.title = "Volver al color automático";
+    auto.addEventListener("click", () => apply(null));
+    box.appendChild(auto);
+    // The buttons must not take the focus away from the text being edited.
+    box.addEventListener("mousedown", (e) => {
+      if ((e.target as HTMLElement).tagName !== "INPUT") e.preventDefault();
+    });
+    doc.body.appendChild(box);
+    const r = el.getBoundingClientRect();
+    const top = r.top + (win!.scrollY || 0);
+    box.style.top = `${top > 56 ? top - 46 : r.bottom + (win!.scrollY || 0) + 8}px`;
+    box.style.left = `${Math.max(8, Math.min(r.left + (win!.scrollX || 0), doc.documentElement.clientWidth - box.offsetWidth - 8))}px`;
+    tc = box;
+    tcFor = el;
+  }
+
   function startEditing(el: HTMLElement) {
     editing = el;
     original = readValue(el);
@@ -209,11 +294,16 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     // Browsers without plaintext-only fall back to plain contenteditable (paste is cleaned below).
     if (el.contentEditable !== "plaintext-only") el.setAttribute("contenteditable", "true");
     el.focus();
+    showColors(el);
   }
 
   function stopEditing(el: HTMLElement) {
     el.removeAttribute("contenteditable");
     el.classList.remove("fl-editing");
+    // The color bar stays a moment (the color picker takes the focus) and goes away when nothing in it is in use.
+    win!.setTimeout(() => {
+      if (tcFor === el && !(tc && tc.contains(doc.activeElement))) hideColors();
+    }, 300);
   }
 
   async function commit(el: HTMLElement) {
@@ -250,8 +340,9 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
 
   const onMouseDown = (e: MouseEvent) => {
     const t = asElement(e.target);
-    if (!t || t.closest(".fl-bar-wrap")) return;
+    if (!t || t.closest(".fl-bar-wrap") || t.closest(".fl-tc")) return;
     const el = t.closest<HTMLElement>("[data-edit]");
+    if (!el) hideColors();
     if (!el || el === editing) return;
     if (editing) void commit(editing);
     // The browser's own click handling would move the focus away from an element that
@@ -264,6 +355,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   const onClick = (e: MouseEvent) => {
     const t = asElement(e.target);
     if (!t) return;
+    if (t.closest(".fl-tc")) return;
     const button = t.closest<HTMLElement>(".fl-bar-wrap button");
     if (button) {
       e.preventDefault();

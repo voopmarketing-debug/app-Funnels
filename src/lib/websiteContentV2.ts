@@ -105,7 +105,11 @@ export const ExtraSchema = z.union([
 ]);
 export type ExtraElement = z.infer<typeof ExtraSchema>;
 const ExtrasSchema = z.array(ExtraSchema).max(MAX_EXTRAS).optional().catch(undefined).describe("Elementos que agrega el dueño. NO lo escribas.");
-const media = { image: imageUrl, bgImage: imageUrl, look: LookSchema, extras: ExtrasSchema };
+// `fc`: a color of its own for one text of the block (key = the text's path inside the block, e.g. "heading" or "items.1.title").
+export const FIELD_COLOR_KEY = /^[A-Za-z0-9.]{1,40}$/;
+export const FIELD_COLOR_VALUE = /^#[0-9a-fA-F]{6}$/;
+const FieldColorsSchema = z.record(z.string().regex(FIELD_COLOR_KEY), z.string().regex(FIELD_COLOR_VALUE)).optional().catch(undefined).describe("Colores de textos sueltos. NO lo escribas.");
+const media = { image: imageUrl, bgImage: imageUrl, look: LookSchema, extras: ExtrasSchema, fc: FieldColorsSchema };
 
 const HeroSection = z.object({
   ...media,

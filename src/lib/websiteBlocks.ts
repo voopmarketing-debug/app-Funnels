@@ -1,4 +1,4 @@
-import { ExtraSchema, HTML_MAX_CHARS, MAX_EXTRAS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { ExtraSchema, FIELD_COLOR_KEY, FIELD_COLOR_VALUE, HTML_MAX_CHARS, MAX_EXTRAS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { mergeLook, type LookPatch } from "@/lib/websiteLook";
 
 // The builder's block operations: add a block from the library, duplicate,
@@ -127,6 +127,8 @@ export type BlockOp =
   | { kind: "remove"; index: number }
   | { kind: "move"; from: number; to: number }
   | { kind: "look"; index: number; patch: LookPatch }
+  /** The color of one text of a block (null: back to the automatic color). */
+  | { kind: "fieldColor"; index: number; key: string; color: string | null }
   | { kind: "html"; index: number; code: string; height: number }
   | { kind: "eventDate"; index: number; date: string }
   | { kind: "extras"; index: number; extras: unknown[] }
@@ -200,6 +202,18 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       const look = mergeLook(section.look, op.patch);
       if (look) section.look = look;
       else delete section.look;
+      focus = op.index;
+      break;
+    }
+    case "fieldColor": {
+      if (!isInt(op.index) || op.index < 0 || op.index >= n || typeof op.key !== "string" || !FIELD_COLOR_KEY.test(op.key)) return bad("No se pudo cambiar el color de ese texto.");
+      if (op.color !== null && !FIELD_COLOR_VALUE.test(op.color)) return bad("Ese color no es válido.");
+      const section = next.sections[op.index];
+      const fc = { ...(section.fc ?? {}) };
+      if (op.color === null) delete fc[op.key];
+      else if (Object.keys(fc).length < 40 || op.key in fc) fc[op.key] = op.color;
+      if (Object.keys(fc).length > 0) section.fc = fc;
+      else delete section.fc;
       focus = op.index;
       break;
     }

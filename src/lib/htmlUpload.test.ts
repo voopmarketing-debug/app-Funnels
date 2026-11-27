@@ -134,4 +134,19 @@ describe("Subir mi HTML", () => {
     const cleared = done.ok ? applyBlockOp(done.content, { kind: "extras", index: 1, extras: [] }) : done;
     expect(cleared.ok && "extras" in cleared.content.sections[1]).toBe(false);
   });
+  it("one text of a block can have its own color, without touching the rest", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const page = { ...base, fullHtml: false, sections: [base.sections[0], { type: "gallery", kicker: null, heading: "Mira" }] } as unknown as typeof base;
+    const done = applyBlockOp(page, { kind: "fieldColor", index: 1, key: "heading", color: "#e11d48" });
+    expect(done.ok).toBe(true);
+    const html = done.ok ? renderWebsiteHtmlV2(done.content, ctx) : "";
+    expect(html).toContain('data-fc="sections.1.heading"');
+    expect(html).toContain('[data-fc="sections.1.heading"]{color:#e11d48!important}');
+    // Only a real hex color and a plain key are accepted.
+    expect(applyBlockOp(page, { kind: "fieldColor", index: 1, key: "heading", color: "red;}</style>" }).ok).toBe(false);
+    expect(applyBlockOp(page, { kind: "fieldColor", index: 1, key: 'x"]{', color: "#ffffff" }).ok).toBe(false);
+    // null brings the automatic color back and leaves no trace.
+    const back = done.ok ? applyBlockOp(done.content, { kind: "fieldColor", index: 1, key: "heading", color: null }) : done;
+    expect(back.ok && "fc" in back.content.sections[1]).toBe(false);
+  });
 });

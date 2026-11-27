@@ -6,7 +6,7 @@ import { ColorSwatchButton } from "@/components/ColorSwatchButton";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { SECTION_LABELS, type ExtraElement, type Section, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { tidyLook, type Look } from "@/lib/websiteLook";
-import { ImageIcon, TrashIcon } from "./builderIcons";
+import { AlignCenterIcon, AlignLeftIcon, AlignRightIcon, DesktopIcon, DevicesIcon, ImageIcon, PhoneIcon, RefreshIcon, TrashIcon } from "./builderIcons";
 
 const SAVE_DELAY_MS = 500;
 
@@ -20,7 +20,7 @@ function Segmented<T extends string | null>({
   label: string;
   hint?: string;
   value: T;
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; icon?: React.ReactNode }[];
   onChange: (value: T) => void;
 }) {
   return (
@@ -35,9 +35,11 @@ function Segmented<T extends string | null>({
             role="radio"
             aria-checked={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${value === o.value ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-border-strong hover:text-ink"}`}
+            title={o.icon ? o.label : undefined}
+            aria-label={o.icon ? o.label : undefined}
+            className={`rounded-lg border text-xs font-semibold transition ${o.icon ? "flex h-9 min-w-9 items-center justify-center px-2" : "px-2.5 py-1.5"} ${value === o.value ? "border-accent bg-accent/15 text-ink" : "border-border text-ink-muted hover:border-border-strong hover:text-ink"}`}
           >
-            {o.label}
+            {o.icon ?? o.label}
           </button>
         ))}
       </div>
@@ -102,7 +104,7 @@ function ExtrasEditor({ extras, busy, onChange, onPickPhoto }: { extras: ExtraEl
     <div className="space-y-2 rounded-xl border border-border p-3">
       <div>
         <p className="text-[13px] font-semibold text-ink">Elementos dentro del bloque</p>
-        <p className="text-[12px] text-ink-muted">Agrega un texto, un botón o una foto dentro de este bloque, justo debajo de su título. También puedes escribir sobre ellos en la página.</p>
+        <p className="text-[12px] text-ink-muted">Se agregan debajo del título del bloque.</p>
       </div>
       {list.map((x, i) => (
         <div key={i} className="space-y-1.5 rounded-lg bg-surface-2/60 p-2">
@@ -295,17 +297,17 @@ export function StylePanel({
         </div>
       )}
 
-      <ColorRow label="Color de fondo" hint={hasPhoto ? "Este bloque tiene foto de fondo: la foto manda." : "Pinta todo el bloque."} value={look.bg} autoLabel="Quitar" swatches={swatches} onChange={(hex) => change({ bg: hex })} />
+      <ColorRow label="Color de fondo" hint={hasPhoto ? "La foto de fondo manda." : undefined} value={look.bg} autoLabel="Quitar" swatches={swatches} onChange={(hex) => change({ bg: hex })} />
 
       <button type="button" disabled={busy} onClick={onPickBgImage} className="flex w-full items-center justify-between rounded-lg border border-border px-3 py-2.5 text-left text-[13px] font-semibold text-ink transition hover:border-accent disabled:opacity-50">
         <span><ImageIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />{hasPhoto ? "Cambiar la foto de fondo" : "Poner una foto de fondo"}</span>
         <span className="text-xs font-normal text-ink-muted">{hasPhoto ? "Activa" : "Opcional"}</span>
       </button>
 
-      <ColorRow label="Color del texto" hint="Si no eliges uno, se ajusta solo para que se lea bien." value={look.color} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ color: hex })} />
+      <ColorRow label="Color del texto" value={look.color} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ color: hex })} />
 
       {section.type !== "gallery" && (
-        <ColorRow label="Color de los cuadros" hint="Las tarjetas y recuadros de este bloque (por ejemplo, el fondo detrás de cada foto). Si no eliges uno, se ajusta solo." value={look.surface} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ surface: hex })} />
+        <ColorRow label="Color de los cuadros" value={look.surface} autoLabel="Automático" swatches={swatches} onChange={(hex) => change({ surface: hex })} />
       )}
 
       <Segmented
@@ -337,9 +339,9 @@ export function StylePanel({
         onChange={(v) => change({ align: v })}
         options={[
           { value: null, label: "Automática" },
-          { value: "left", label: "Izquierda" },
-          { value: "center", label: "Centro" },
-          { value: "right", label: "Derecha" },
+          { value: "left", label: "Izquierda", icon: <AlignLeftIcon className="h-[18px] w-[18px]" /> },
+          { value: "center", label: "Centro", icon: <AlignCenterIcon className="h-[18px] w-[18px]" /> },
+          { value: "right", label: "Derecha", icon: <AlignRightIcon className="h-[18px] w-[18px]" /> },
         ]}
       />
       <SizeControl label="Tamaño de los títulos" value={look.titleScale} onChange={(v) => change({ titleScale: v, size: null })} />
@@ -347,14 +349,13 @@ export function StylePanel({
       <FontPicker label="Tipografía de los títulos" value={look.headingFont} onChange={(v) => change({ headingFont: v })} />
       <FontPicker label="Tipografía del texto" value={look.bodyFont} onChange={(v) => change({ bodyFont: v })} />
       <Segmented
-        label="Mostrar este bloque en"
-        hint="Útil para un bloque que solo tiene sentido en el celular o en el computador. Aquí lo ves siempre para poder editarlo."
+        label="Mostrar en"
         value={look.hideOn ?? null}
         onChange={(v) => change({ hideOn: v })}
         options={[
-          { value: null, label: "Todas las pantallas" },
-          { value: "mobile", label: "Solo computador" },
-          { value: "desktop", label: "Solo celular" },
+          { value: null, label: "Todas las pantallas", icon: <DevicesIcon className="h-[18px] w-[18px]" /> },
+          { value: "mobile", label: "Solo computador", icon: <DesktopIcon className="h-[18px] w-[18px]" /> },
+          { value: "desktop", label: "Solo celular", icon: <PhoneIcon className="h-[18px] w-[18px]" /> },
         ]}
       />
 
@@ -367,9 +368,9 @@ export function StylePanel({
           pending.current = undefined;
           flush();
         }}
-        className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold text-ink transition hover:border-error hover:text-error disabled:opacity-40"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold text-ink transition hover:border-error hover:text-error disabled:opacity-40"
       >
-        Quitar todos los cambios de este bloque
+        <RefreshIcon className="h-4 w-4" /> Restablecer bloque
       </button>
     </div>
   );

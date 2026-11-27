@@ -303,7 +303,15 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
 
   const edit = !!(ctx.preview && ctx.edit);
   // data-edit="sections.2.heading": the path of the text in the stored content.
-  const ed = (path: string) => (edit ? ` data-edit="${esc(path)}"` : "");
+  // data-fc="…": this text has a color of its own (set per text from the editor); the rule is added at the end of the styles.
+  const fcOf = (path: string) => {
+    const m = /^sections\.(\d+)\.(.+)$/.exec(path);
+    return m ? (content.sections[Number(m[1])]?.fc?.[m[2]] ?? null) : null;
+  };
+  const ed = (path: string) => (edit ? ` data-edit="${esc(path)}"` : "") + (fcOf(path) ? ` data-fc="${esc(path)}"` : "");
+  const fcCss = content.sections
+    .flatMap((sec, i) => Object.entries(sec.fc ?? {}).map(([k, c]) => `[data-fc="sections.${i}.${k}"]{color:${c}!important}`))
+    .join("");
   // Safe inside url('…'): only the characters that could end the url or the string are encoded.
   // (Then HTML-escaped, since it lands in a style="" attribute: an "&" stays an "&" for the browser.)
   const cssUrl = (u: string) => esc(u.replace(/['()\s"\\<>]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`));
@@ -951,7 +959,7 @@ ${fontLink(fonts)}
 :root{color-scheme:light;--primary:${primary};--primary-base:${primary};--primary-ink:${primaryInk};--primary-on-dark:color-mix(in srgb,${primary} 50%,#fff);--btn-text:${readableTextColor(primary)};--bg:${bg};--surface:${surface};--text:${textColor};
 --muted:color-mix(in srgb,var(--text) 64%,transparent);--line:color-mix(in srgb,var(--text) 12%,transparent);
 --hf:${fontStack(theme.headingFont)};--bf:${fontStack(theme.bodyFont)};
---r:${style.radius};--br:${style.btnRadius};--pad:${style.sectionPad};--max:${style.maxWidth}}
+--r:${style.radius};--br:${style.btnRadius};--pad:${style.sectionPad};--max:max(${style.maxWidth},min(88vw,1560px))}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--bf);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
@@ -964,7 +972,8 @@ p{margin:0 0 1em}
 a{color:inherit}
 a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
 .wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
-.narrow{max-width:760px}.narrow-lg{max-width:900px}
+.narrow{max-width:min(var(--max),860px)}.narrow-lg{max-width:min(var(--max),1120px)}
+.hero-centered .narrow{max-width:min(var(--max),1100px)}
 .center{text-align:center}.mt{margin-top:32px}
 .extras{margin:6px 0 20px;display:flex;flex-direction:column;align-items:flex-start;gap:12px}
 .extra-text{max-width:64ch;margin:0;font-size:1.08em;color:var(--muted,var(--text));white-space:pre-line}
@@ -1273,6 +1282,7 @@ footer.foot .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 ${FX_CSS}
 ${LOOK_CSS}
+${fcCss}
 </style>
 </head>
 <body class="st-${content.style} pt-${content.pageType}${content.sticky ? " has-sticky" : ""}">

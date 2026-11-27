@@ -89,6 +89,8 @@ export function TemplateBuilder({
       setToast(message);
       setTimeout(() => setToast(null), 3500);
     },
+    palette: () => [],
+    setTextColor: () => undefined,
   };
   const handlersRef = useRef(handlers);
   useEffect(() => {
