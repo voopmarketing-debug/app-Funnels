@@ -58,7 +58,34 @@ const STRUCTURES: { value: string | null; label: string; cells: number[] }[] = [
   { value: "3", label: "3 columnas", cells: [4, 4, 4] },
   { value: "4", label: "4 columnas", cells: [3, 3, 3, 3] },
 ];
-function StructurePicker({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+/** The structure a block comes with (what the template draws when nothing was chosen), so the picker can show it as marked. */
+function templateCols(section: { type: string; variant?: string; items?: unknown[] }): string | null {
+  const n = Array.isArray(section.items) ? section.items.length : 0;
+  const fit = (max: number) => String(Math.min(Math.max(n, 1), max));
+  switch (section.type) {
+    case "features":
+      return section.variant === "bento" ? null : section.variant === "numbered" || section.variant === "list" ? "1" : fit(4);
+    case "steps":
+      return section.variant === "timeline" ? "1" : fit(4);
+    case "testimonials":
+      return fit(3);
+    case "stats":
+      return fit(4);
+    case "trustBar":
+    case "productGrid":
+      return "4";
+    case "gallery":
+      return "3";
+    case "host":
+    case "productSpotlight":
+    case "promo":
+      return "2";
+    default:
+      return null;
+  }
+}
+
+function StructurePicker({ value, suggested, onChange }: { value: string | null; suggested: string | null; onChange: (v: string | null) => void }) {
   return (
     <div className="space-y-1.5">
       <p className="text-[13px] font-semibold text-ink">Estructura</p>
@@ -70,9 +97,9 @@ function StructurePicker({ value, onChange }: { value: string | null; onChange: 
             role="radio"
             aria-checked={value === o.value}
             aria-label={o.label}
-            title={o.label}
+            title={value === null && o.value === suggested ? `${o.label} · así viene tu plantilla` : o.label}
             onClick={() => onChange(o.value)}
-            className={`flex h-10 w-16 items-stretch gap-[2px] rounded-md border p-1 transition ${value === o.value ? "border-accent bg-accent/15" : "border-border hover:border-border-strong"}`}
+            className={`flex h-10 w-16 items-stretch gap-[2px] rounded-md border p-1 transition ${value === o.value ? "border-accent bg-accent/15" : value === null && o.value === suggested ? "border-dashed border-accent/70 bg-accent/5" : "border-border hover:border-border-strong"}`}
           >
             {o.cells.length === 0 ? (
               <span className="flex w-full items-center justify-center text-[10px] font-bold text-ink-muted">Auto</span>
@@ -297,7 +324,7 @@ export function StylePanel({
         <p className="text-[12px] text-ink-muted">Bloque {index + 1}. Cada cambio se ve al instante en la página.</p>
       </div>
 
-      <StructurePicker value={look.cols ?? null} onChange={(v) => change({ cols: v as Look["cols"] })} />
+      <StructurePicker value={look.cols ?? null} suggested={templateCols(section as unknown as { type: string; variant?: string; items?: unknown[] })} onChange={(v) => change({ cols: v as Look["cols"] })} />
       <ExtrasEditor extras={section.extras ?? []} busy={busy} onChange={onExtras} onPickPhoto={onPickExtraPhoto} />
 
       {section.type === "gallery" && (
