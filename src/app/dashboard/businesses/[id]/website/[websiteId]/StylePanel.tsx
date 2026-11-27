@@ -146,7 +146,7 @@ function ColorRow({
   onChange,
 }: {
   label: string;
-  hint: string;
+  hint?: string;
   value: string | null | undefined;
   autoLabel: string;
   swatches: string[];
@@ -157,7 +157,7 @@ function ColorRow({
     <div className="space-y-2">
       <div>
         <p className="text-[13px] font-semibold text-ink">{label}</p>
-        <p className="text-[12px] text-ink-muted">{hint}</p>
+        {hint && <p className="text-[12px] text-ink-muted">{hint}</p>}
       </div>
       <div className="flex items-center gap-2">
         <ColorSwatchButton
