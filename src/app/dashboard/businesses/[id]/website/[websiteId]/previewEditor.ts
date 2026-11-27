@@ -8,6 +8,8 @@
 // this module, running in the dashboard, listens to the iframe's document.
 // Nothing runs inside the public page itself (it ships with script-src 'none').
 
+import { joinMarks, parseMarks } from "@/lib/textMarks";
+
 export type SectionInfo = { index: number; label: string; canMoveUp: boolean; canMoveDown: boolean; canRemove: boolean; hasBg: boolean };
 
 export type EditorHandlers = {
@@ -38,6 +40,9 @@ export type EditorHandlers = {
   palette(): string[];
   /** Saves the color of one text ("sections.2.heading"); null brings the automatic color back. */
   setTextColor(path: string, color: string | null): void;
+  /** The page's logo: opens the photo window / takes it off (the top bar goes back to the name). */
+  pickLogo(): void;
+  removeLogo(): void;
 };
 
 const ACCENT = "#5b6cf0";
@@ -180,9 +185,43 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
 
   const sectionOf = (t: EventTarget | null) => asElement(t)?.closest<HTMLElement>("section[data-sec]") ?? null;
 
+  // A text may have colored parts (see lib/textMarks.ts): reading it gives the stored form (with the marks),
+  // writing it draws the colored parts as spans.
+  const toHex = (css: string): string | null => {
+    const m = css.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+    if (m) return "#" + [1, 2, 3].map((i) => Math.min(255, Number(m[i])).toString(16).padStart(2, "0")).join("");
+    return /^#[0-9a-fA-F]{6}$/.test(css.trim()) ? css.trim().toLowerCase() : null;
+  };
+  const collect = (node: Node, color: string | null, out: { text: string; color: string | null }[]) => {
+    if (node.nodeType === 3) {
+      out.push({ text: (node.textContent ?? "").replace(/\u00a0/g, " "), color });
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const e = node as HTMLElement;
+    if (e.tagName === "BR") {
+      out.push({ text: "\n", color: null });
+      return;
+    }
+    const own = e.style?.color ? (toHex(e.style.color) ?? color) : color;
+    if ((e.tagName === "DIV" || e.tagName === "P") && out.length) out.push({ text: "\n", color: null });
+    e.childNodes.forEach((child) => collect(child, own, out));
+  };
   const readValue = (el: HTMLElement) => {
-    const raw = MULTILINE.test(el.dataset.edit ?? "") ? el.innerText : (el.textContent ?? "");
-    return raw.replace(/ /g, " ");
+    const parts: { text: string; color: string | null }[] = [];
+    el.childNodes.forEach((child) => collect(child, null, parts));
+    return joinMarks(parts);
+  };
+  const setMarked = (el: HTMLElement, value: string) => {
+    el.textContent = "";
+    for (const part of parseMarks(value)) {
+      if (part.color) {
+        const span = doc.createElement("span");
+        span.style.color = part.color;
+        span.textContent = part.text;
+        el.appendChild(span);
+      } else el.appendChild(doc.createTextNode(part.text));
+    }
   };
 
   // Puts the caret where the person clicked (or at the end if that spot is outside the text).
@@ -214,7 +253,36 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   // Color of one text: a small bar next to the text being edited (the whole text, not the whole block).
   let tc: HTMLElement | null = null;
   let tcFor: HTMLElement | null = null;
+  // The words selected inside the text being edited (the color then goes to those words only).
+  let lastRange: Range | null = null;
+  const onSelectionChange = () => {
+    const target = editing ?? tcFor;
+    const sel = win.getSelection();
+    if (!target || !sel || sel.rangeCount === 0) return;
+    const r = sel.getRangeAt(0);
+    if (target.contains(r.commonAncestorContainer)) lastRange = r.collapsed ? null : r.cloneRange();
+  };
+  /** Colors only the selected words (or takes the color off them with null). Returns false when nothing is selected. */
+  function colorSelection(el: HTMLElement, path: string, color: string | null): boolean {
+    const range = lastRange;
+    if (!range || range.collapsed || !el.contains(range.commonAncestorContainer)) return false;
+    const sel = win!.getSelection();
+    if (!sel) return false;
+    el.setAttribute("contenteditable", "true");
+    sel.removeAllRanges();
+    sel.addRange(range);
+    doc.execCommand("styleWithCSS", false, "true");
+    if (color) doc.execCommand("foreColor", false, color);
+    else doc.execCommand("removeFormat");
+    const value = readValue(el);
+    original = value;
+    if (sel.rangeCount > 0) lastRange = sel.getRangeAt(0).cloneRange();
+    if (editing !== el) el.removeAttribute("contenteditable");
+    void getHandlers().saveText(path, value);
+    return true;
+  }
   function hideColors() {
+    lastRange = null;
     tc?.remove();
     tc = null;
     tcFor = null;
@@ -232,6 +300,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     box.setAttribute("role", "toolbar");
     box.setAttribute("aria-label", "Color de este texto");
     const apply = (color: string | null) => {
+      if (colorSelection(el, path, color)) return;
       if (color) {
         el.setAttribute("data-fc", path);
         el.style.setProperty("color", color, "important");
@@ -264,7 +333,10 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     pick.setAttribute("aria-label", "Elegir otro color");
     const current = win!.getComputedStyle(el).color.match(/\d+/g);
     if (current && current.length >= 3) pick.value = "#" + current.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
-    pick.addEventListener("input", () => apply(pick.value));
+    pick.addEventListener("input", () => {
+      if (!lastRange) apply(pick.value);
+    });
+    pick.addEventListener("change", () => apply(pick.value));
     box.appendChild(pick);
     const auto = doc.createElement("button");
     auto.type = "button";
@@ -286,7 +358,42 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     tcFor = el;
   }
 
+  // The top bar's name or logo: pick which one the page shows (write the name, or put / change / take off the logo).
+  function showBrandBar(el: HTMLElement) {
+    hideColors();
+    const h = getHandlers();
+    const hasLogo = !!el.querySelector("img[data-logo]");
+    const box = doc.createElement("div");
+    box.className = "fl-tc";
+    box.setAttribute("role", "toolbar");
+    box.setAttribute("aria-label", "Logo o nombre");
+    const add = (text: string, title: string, fn: () => void) => {
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.className = "auto";
+      b.textContent = text;
+      b.title = title;
+      b.addEventListener("click", fn);
+      box.appendChild(b);
+    };
+    add(hasLogo ? "Cambiar logo" : "Poner logo", "Subir o elegir tu logo", () => h.pickLogo());
+    if (hasLogo) add("Usar texto", "Quitar el logo y escribir el nombre", () => h.removeLogo());
+    else {
+      const hint = doc.createElement("span");
+      hint.textContent = "o escribe el nombre";
+      box.appendChild(hint);
+    }
+    box.addEventListener("mousedown", (e) => e.preventDefault());
+    doc.body.appendChild(box);
+    const r = el.getBoundingClientRect();
+    box.style.top = `${r.bottom + (win!.scrollY || 0) + 8}px`;
+    box.style.left = `${Math.max(8, r.left + (win!.scrollX || 0))}px`;
+    tc = box;
+    tcFor = el;
+  }
+
   function startEditing(el: HTMLElement) {
+    lastRange = null;
     editing = el;
     original = readValue(el);
     el.classList.add("fl-editing");
@@ -294,7 +401,8 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     // Browsers without plaintext-only fall back to plain contenteditable (paste is cleaned below).
     if (el.contentEditable !== "plaintext-only") el.setAttribute("contenteditable", "true");
     el.focus();
-    showColors(el);
+    if (el.dataset.edit === "chrome.brandName") showBrandBar(el);
+    else showColors(el);
   }
 
   function stopEditing(el: HTMLElement) {
@@ -313,14 +421,11 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     const path = el.dataset.edit ?? "";
     const before = original;
     const value = MULTILINE.test(path) ? readValue(el).trim() : readValue(el).replace(/\s+/g, " ").trim();
-    if (value === before.trim() || value === before) {
-      el.textContent = before;
-      return;
-    }
-    el.textContent = value;
+    if (value === before.trim() || value === before) return;
+    setMarked(el, value);
     const result = await getHandlers().saveText(path, value);
     if (!result.ok) {
-      el.textContent = before;
+      setMarked(el, before);
       getHandlers().notice(result.error ?? "No se pudo guardar el cambio");
     }
   }
@@ -329,7 +434,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     if (editing !== el) return;
     editing = null;
     stopEditing(el);
-    el.textContent = original;
+    setMarked(el, original);
     el.blur();
   }
 
@@ -341,6 +446,13 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   const onMouseDown = (e: MouseEvent) => {
     const t = asElement(e.target);
     if (!t || t.closest(".fl-bar-wrap") || t.closest(".fl-tc")) return;
+    const logo = t.closest<HTMLElement>("header.top .brand-logo");
+    if (logo) {
+      e.preventDefault();
+      if (editing) void commit(editing);
+      showBrandBar(logo);
+      return;
+    }
     const el = t.closest<HTMLElement>("[data-edit]");
     if (!el) hideColors();
     if (!el || el === editing) return;
@@ -560,6 +672,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   doc.addEventListener("keydown", onKeyDown, true);
   doc.addEventListener("keyup", onKeyUp, true);
   doc.addEventListener("paste", onPaste, true);
+  doc.addEventListener("selectionchange", onSelectionChange);
   doc.addEventListener("focusout", onFocusOut, true);
   doc.addEventListener("submit", onSubmit, true);
   win.addEventListener("scroll", onScroll, { passive: true });
@@ -580,6 +693,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     doc.removeEventListener("keydown", onKeyDown, true);
     doc.removeEventListener("keyup", onKeyUp, true);
     doc.removeEventListener("paste", onPaste, true);
+    doc.removeEventListener("selectionchange", onSelectionChange);
     doc.removeEventListener("focusout", onFocusOut, true);
     doc.removeEventListener("submit", onSubmit, true);
     win.removeEventListener("scroll", onScroll);

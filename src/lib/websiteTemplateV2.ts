@@ -1,5 +1,6 @@
 import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS } from "@/lib/websiteContent";
+import { renderMarks, stripMarks } from "@/lib/textMarks";
 import { readableTextColor, sanitizeHexColor, toEmbedUrl } from "@/lib/websiteTemplate";
 import { eventDateOk, toIsoWithZone } from "@/lib/websiteBlocks";
 import { LOOK_CSS, lookParts } from "@/lib/websiteLook";
@@ -954,14 +955,14 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       ? `<div class="annc"${ed("announcement")}>${esc(content.announcement)}</div>`
       : `<div class="annc annc-run" role="marquee" aria-label="${esc(phrases.join(". "))}"><div class="annc-track" aria-hidden="true">${Array.from({ length: 2 }, () => `<div class="annc-set">${Array.from({ length: Math.max(2, Math.ceil(6 / phrases.length)) }, () => phrases.map((t) => `<span>${esc(t)}</span><i>✦</i>`).join("")).join("")}</div>`).join("")}</div></div>`;
 
-  return `<!doctype html>
+  return renderMarks(`<!doctype html>
 <html lang="es"${edit ? ' data-fx="off"' : ""}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>${esc(ctx.businessName)}${firstHero && firstHero.type === "hero" ? ` · ${esc(firstHero.heading)}` : ""}</title>
-<meta name="description" content="${esc(firstHero && firstHero.type === "hero" ? firstHero.subheading : ctx.businessName)}">
+<title>${esc(ctx.businessName)}${firstHero && firstHero.type === "hero" ? ` · ${esc(stripMarks(firstHero.heading))}` : ""}</title>
+<meta name="description" content="${esc(firstHero && firstHero.type === "hero" ? stripMarks(firstHero.subheading) : ctx.businessName)}">
 ${fontLink(fonts)}
 <style>
 :root{color-scheme:light;--primary:${primary};--primary-base:${primary};--primary-ink:${primaryInk};--primary-on-dark:color-mix(in srgb,${primary} 50%,#fff);--btn-text:${readableTextColor(primary)};--bg:${bg};--surface:${surface};--text:${textColor};
@@ -1314,5 +1315,5 @@ ${content.sticky && firstHero && firstHero.type === "hero" ? `<div class="sticky
 ${isShop ? `<div class="mbar"><a class="btn" href="${esc(href("barra-movil"))}">Pedir por WhatsApp</a></div>` : ""}
 <script>${SITE_SCRIPT}</script>
 </body>
-</html>`;
+</html>`);
 }

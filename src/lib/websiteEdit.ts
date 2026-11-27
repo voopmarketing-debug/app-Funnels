@@ -1,5 +1,6 @@
 import { WebsiteContentV2Schema, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { toEmbedUrl } from "@/lib/websiteTemplate";
+import { stripMarks } from "@/lib/textMarks";
 
 // Click-to-edit in the builder's preview: every editable text carries the path
 // of its value in the stored content (data-edit="sections.2.items.1.title").
@@ -29,7 +30,9 @@ const isIndex = (s: string | undefined): s is string => !!s && /^\d{1,3}$/.test(
 function clean(key: string, raw: string): string {
   const multiline = MULTILINE_KEYS.has(key);
   const text = multiline ? raw.replace(/\r\n?/g, "\n").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n") : raw.replace(/\s+/g, " ");
-  return text.trim().slice(0, multiline ? MAX_LEN : MAX_SHORT);
+  // The color marks (see lib/textMarks.ts) do not count as text: leave room for a few.
+  const room = 10 * 12;
+  return text.trim().slice(0, (multiline ? MAX_LEN : MAX_SHORT) + room);
 }
 
 export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue: string): TextEditResult {
@@ -74,7 +77,7 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
     if (!text && !OPTIONAL_KEYS.has(key)) return bad("Este texto no puede quedar vacío.");
     section[key] = text || null;
     // The highlighted words must still be part of the headline.
-    if (key === "heading" && typeof section.highlight === "string" && !text.toLowerCase().includes(section.highlight.trim().toLowerCase())) {
+    if (key === "heading" && typeof section.highlight === "string" && !stripMarks(text).toLowerCase().includes(section.highlight.trim().toLowerCase())) {
       section.highlight = null;
     }
     return finish(next);

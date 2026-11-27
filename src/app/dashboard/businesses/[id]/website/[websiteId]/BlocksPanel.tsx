@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { SECTION_LABELS, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import type { BlockOp } from "@/lib/websiteBlocks";
+import { stripMarks } from "@/lib/textMarks";
 import { BlockGrid, ExtraGrid, NEW_BLOCK_MIME, TileLibrary } from "./BlockLibrary";
 import { EyeIcon, EyeOffIcon, ImageIcon, PaletteIcon, TrashIcon } from "./builderIcons";
 
 const MOVE_MIME = "application/x-fl-move-block";
 
 function sectionTitle(s: WebsiteContentV2["sections"][number]): string {
-  if ("heading" in s && typeof s.heading === "string") return s.heading;
+  if ("heading" in s && typeof s.heading === "string") return stripMarks(s.heading);
   if (s.type === "trustBar") return s.items.map((i) => i.title).join(" · ");
   if (s.type === "stats") return s.items.map((i) => i.value).join(" · ");
   return "";

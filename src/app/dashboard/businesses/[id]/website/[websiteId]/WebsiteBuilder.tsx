@@ -404,6 +404,8 @@ export function WebsiteBuilder({
     },
     notice: (message) => showToast(message),
     palette: () => [content.theme.primaryColor, content.theme.textColor, content.theme.backgroundColor, content.theme.surfaceColor],
+    pickLogo: () => setLogoPicker(true),
+    removeLogo: () => runDesign("Quitando el logo…", { chrome: { logo: null } }),
     setTextColor: (path, color) => {
       const m = /^sections\.(\d+)\.(.+)$/.exec(path);
       if (!m) return;
