@@ -3315,8 +3315,8 @@ export async function createWebsiteFromTemplate(
       ? buildFunnelContent(funnel, { businessName: ctx.businessName, brandColor: ctx.brandColors?.primary })
       : buildNicheContent(template!, { businessName: ctx.businessName, brandColor: ctx.brandColors?.primary });
     const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, existingCount === 0 && !funnel);
-    // A funnel needs the owner's own video, date or testimonials first: it starts as a draft.
-    const draft = !!funnel;
+    // Every template starts as a draft: the owner sees it, edits it and publishes it from the builder.
+    const draft = true;
     const created = await prisma.website.create({
       data: { businessId, name, purpose: null, designPrompt: null, slug, content, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: `template:${input.templateId}`, published: !draft },
     });

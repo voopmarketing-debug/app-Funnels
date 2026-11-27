@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { createBlankWebsite, createWebsiteFromTemplate } from "@/lib/actions";
 import type { TemplateCard } from "@/lib/websiteNicheTemplates";
 import { DevicePreviewFrame } from "@/components/DevicePreviewFrame";
-import { TemplateThumb } from "./TemplateThumb";
+import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { HtmlUploadDialog } from "./HtmlUploadDialog";
 
 const PAGE = 6;
@@ -70,8 +70,7 @@ export function TemplateLibrary({
   const previewSrc = (id: string) => `/dashboard/businesses/${businessId}/website/muestra?template=${id}`;
   const label = (c: TemplateCard) => `${c.number} · ${c.name}`;
   // Funnels are created as drafts (they need the owner's own video, date or testimonials first).
-  const isFunnel = (c: TemplateCard) => c.nicheId === "embudos";
-  const actionLabel = (c: TemplateCard) => (isFunnel(c) ? "Crear embudo" : "Publicar");
+  const actionLabel = () => "Editar";
 
   useEffect(() => {
     if (!big) return;
@@ -104,7 +103,7 @@ export function TemplateLibrary({
       } catch (err) {
         setBusy(null);
         setBig(null);
-        setError(err instanceof Error ? err.message : "No se pudo publicar la página");
+        setError(err instanceof Error ? err.message : "No se pudo crear la página");
       }
     });
   }
@@ -148,8 +147,8 @@ export function TemplateLibrary({
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
         <span className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-accent text-3xl text-accent-ink">{busy.emoji}</span>
         <div>
-          <h2 className="text-xl font-bold">{busy.nicheId === "embudos" ? "Creando tu embudo" : "Publicando tu página"}</h2>
-          <p className="mt-1 text-sm text-ink-muted">{busy.nicheId === "embudos" ? "Un momento: queda como borrador para que agregues tu video, fecha o testimonios y luego lo publiques." : "Un momento, ya casi: la abrimos para que la edites cuando quieras."}</p>
+          <h2 className="text-xl font-bold">Preparando tu página</h2>
+          <p className="mt-1 text-sm text-ink-muted">Un momento: la abrimos para que la edites y la publiques cuando quieras.</p>
         </div>
       </div>
     );
@@ -180,7 +179,7 @@ export function TemplateLibrary({
 
       {/* Toolbar: niches as tabs, search, background and the two ways to bring your own page. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <nav aria-label="Nichos" className="-mx-1 flex min-w-0 basis-full gap-1 overflow-x-auto px-1 pb-1">
+        <nav aria-label="Nichos" className="-mx-1 flex min-w-0 basis-full gap-2 overflow-x-auto px-1 py-2">
           {[{ id: "all", label: "Todos", emoji: "" }, ...niches.map((n) => ({ id: n.id, label: n.short, emoji: n.emoji }))].map((n) => (
             <button
               key={n.id}
@@ -190,7 +189,7 @@ export function TemplateLibrary({
                 setNiche(n.id);
                 setPage(0);
               }}
-              className={`flex-none whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] transition ${niche === n.id ? "bg-accent/15 font-semibold text-ink ring-1 ring-accent/50" : "text-ink-muted hover:bg-surface-2 hover:text-ink"}`}
+              className={`flex-none whitespace-nowrap rounded-full border px-4 py-2 text-sm transition ${niche === n.id ? "border-accent bg-accent font-bold text-accent-ink shadow-sm" : "border-border-strong font-medium text-ink hover:border-accent hover:bg-accent/10"}`}
             >
               {n.emoji && <span aria-hidden="true">{n.emoji} </span>}
               {n.label}
@@ -238,22 +237,24 @@ export function TemplateLibrary({
           {visible.map((card) => (
             <li key={card.id} className="group min-w-0">
               <div className="relative overflow-hidden rounded-xl border border-border bg-surface transition group-hover:border-accent/70 group-focus-within:border-accent/70">
-                <TemplateThumb card={card} />
+                <ScaledPagePreview src={previewSrc(card.id)} aspect={0.72} title={`Plantilla: ${card.nicheName}, ${label(card)}`} />
                 <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/55 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
                   <button type="button" onClick={() => setBig(card)} aria-label={`Ver página: ${card.nicheName}, ${label(card)}`} className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90">
                     Ver
                   </button>
                   <button type="button" onClick={() => publish(card)} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                    {actionLabel(card)}
+                    {actionLabel()}
                   </button>
                 </div>
               </div>
               <p title={card.strategy} className="mt-2 flex items-baseline gap-2 px-0.5">
                 <span className="min-w-0 truncate text-sm font-semibold text-ink">{label(card)}</span>
-                <span className="flex-none truncate text-xs text-ink-faint">
-                  <span aria-hidden="true">{card.emoji} </span>
-                  {card.nicheName}
-                </span>
+                {niche === "all" && (
+                  <span className="flex-none truncate text-xs text-ink-faint">
+                    <span aria-hidden="true">{card.emoji} </span>
+                    {card.nicheShort}
+                  </span>
+                )}
               </p>
             </li>
           ))}
@@ -301,7 +302,7 @@ export function TemplateLibrary({
                 Cerrar
               </button>
               <button type="button" onClick={() => publish(big)} className="rounded-lg bg-accent px-4 py-1.5 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                {actionLabel(big)}
+                {actionLabel()}
               </button>
             </div>
           </div>
