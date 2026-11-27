@@ -199,3 +199,4 @@ export const AlignRightIcon = line(<path d="M4 6.500h16M10 11h10M4 15.500h16M10 
 export const DevicesIcon = line(<><rect x="2.500" y="5" width="13" height="9" rx="1.500" /><path d="M6 18h6M9 14v4" /><rect x="16.500" y="9" width="5" height="10" rx="1.200" /></>);
 export const CursorIcon = line(<path d="m5 4 14 6.500-6 1.800L10.500 19 5 4Z" />);
 export const CloseIcon = line(<path d="M6 6l12 12M18 6 6 18" />);
+export const SaveIcon = line(<><path d="M5 4.500h11l3.500 3.500V19a1.500 1.500 0 0 1-1.500 1.500H5A1.500 1.500 0 0 1 3.500 19V6A1.500 1.500 0 0 1 5 4.500Z" /><path d="M8 4.500v5h7v-5M8 20.500v-6h8v6" /></>);

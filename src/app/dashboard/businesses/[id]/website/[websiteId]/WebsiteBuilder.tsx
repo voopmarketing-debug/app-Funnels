@@ -31,7 +31,7 @@ import { ButtonLinksPanel } from "./ButtonLinksPanel";
 import { ElementPanel, type Inspect } from "./ElementPanel";
 import { ButtonShapePicker } from "./ButtonShapePicker";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
-import { BagIcon, CursorIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
+import { SaveIcon, BagIcon, CursorIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
 import { PublishControl } from "./PublishControl";
 import { HtmlCodeDialog } from "./HtmlCodeDialog";
 
@@ -221,6 +221,43 @@ export function WebsiteBuilder({
         setBusy(null);
       }
     });
+  }
+
+  // "Guardar": every change is already saved as it is made; this button closes whatever is still being written
+  // (a text in the middle of typing, a field waiting to lose the focus), waits for the saving to finish and says so.
+  const liveRef = useRef({ busy: null as string | null, saveState: "idle" as SaveState });
+  useEffect(() => {
+    liveRef.current = { busy, saveState };
+  });
+  const [saveNowBusy, setSaveNowBusy] = useState(false);
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (liveRef.current.busy || liveRef.current.saveState === "saving") e.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+  async function saveNow() {
+    if (saveNowBusy) return;
+    setSaveNowBusy(true);
+    try {
+      try {
+        (iframeRef.current?.contentDocument?.activeElement as HTMLElement | null)?.blur();
+      } catch {
+        // The preview is not reachable: nothing to close there.
+      }
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      await new Promise((r) => setTimeout(r, 700));
+      for (let i = 0; i < 40 && (liveRef.current.busy || liveRef.current.saveState === "saving"); i++) await new Promise((r) => setTimeout(r, 200));
+      if (liveRef.current.saveState === "error") showToast("No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.");
+      else {
+        setSaveState("saved");
+        setTimeout(() => setSaveState((v) => (v === "saved" ? "idle" : v)), 2500);
+        showToast(published ? "Cambios guardados. Tu página publicada ya los muestra." : "Cambios guardados en el borrador.", true);
+      }
+    } finally {
+      setSaveNowBusy(false);
+    }
   }
 
   async function copyLink() {
@@ -641,6 +678,10 @@ export function WebsiteBuilder({
           <a href={fromPanelUrl(publicUrl)} target="_blank" rel="noopener noreferrer" title="Ver mi página en otra pestaña" aria-label="Ver mi página" className="flex h-9 w-9 flex-none items-center justify-center rounded-lg border border-border text-ink-muted transition hover:border-accent hover:text-ink">
             <ExternalIcon />
           </a>
+          <button type="button" onClick={() => void saveNow()} disabled={saveNowBusy || saveState === "saving"} title="Guardar los cambios" className="flex h-9 flex-none items-center gap-1.5 rounded-lg border border-border-strong px-3 text-[13px] font-semibold text-ink transition hover:border-accent disabled:opacity-60">
+            <SaveIcon className="h-4 w-4" />
+            {saveNowBusy || saveState === "saving" ? "Guardando…" : saveState === "saved" ? "Guardado" : "Guardar"}
+          </button>
           <PublishControl businessId={businessId} websiteId={websiteId} published={published} />
         </div>
       </header>
