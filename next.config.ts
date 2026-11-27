@@ -51,7 +51,8 @@ const nextConfig: NextConfig = {
         // example site pages whose own inline scripts need their hashes in the CSP.
         // /agenda-llamada (Funnels Labs' booking page) also sends its own,
         // since it talks to the booking Apps Script from the browser.
-        source: "/:path((?!sitio/|agenda-llamada$|dashboard/businesses/[^/]+/website/muestra$).*)",
+        // The frames of saved templates' HTML (.../muestra/saved/<id>/bloque/<n>) send their sandbox policy too.
+        source: "/:path((?!sitio/|agenda-llamada$|dashboard/businesses/[^/]+/website/muestra$|dashboard/businesses/[^/]+/website/muestra/saved/[^/]+/bloque/[^/]+$).*)",
         headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: APP_CSP }],
       },
       {

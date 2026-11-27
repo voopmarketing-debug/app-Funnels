@@ -85,6 +85,7 @@ model Business {
   broadcasts             Broadcast[]
   messageTemplates       MessageTemplate[]
   websites               Website[]
+  savedPageTemplates     SavedPageTemplate[]
   // Off by default: the owner turns on the automatic booking-link follow-up
   // (lib/bookingLinkFollowUp.ts) from the Plantillas page.
   autoBookingLinkEnabled Boolean                @default(false)
@@ -1215,4 +1216,18 @@ model AssistantAction {
   thread AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([threadId])
+}
+
+// A page the owner saved as a template ("Guardar como plantilla" in the builder, for pages with their own HTML).
+// It shows in the template library of that business only; the agency admin sees all of them.
+model SavedPageTemplate {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  // The page's content (WebsiteContentV2) as it was when saved.
+  content    Json
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
 }

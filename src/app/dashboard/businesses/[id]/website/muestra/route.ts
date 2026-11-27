@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { isAgencyAdmin } from "@/lib/authz";
+import { WebsiteContentV2Schema } from "@/lib/websiteContentV2";
 import { prisma } from "@/lib/prisma";
 import { getCatalogProducts, getShowcaseProducts } from "@/lib/websiteRender";
 import { templateForPageType } from "@/lib/templateSite/content";
@@ -31,6 +33,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const typeParam = req.nextUrl.searchParams.get("type");
   const style: StyleKey = STYLE_KEYS.includes(styleParam as StyleKey) ? (styleParam as StyleKey) : "editorial";
   const pageType: PageType = PAGE_TYPES.includes(typeParam as PageType) ? (typeParam as PageType) : "servicios";
+
+  // A page the owner saved as a template (or, for the agency admin, any account's).
+  const savedId = req.nextUrl.searchParams.get("saved");
+  if (savedId) {
+    const tpl = await prisma.savedPageTemplate.findUnique({ where: { id: savedId } });
+    if (!tpl || (tpl.businessId !== id && !(await isAgencyAdmin(session.user.id)))) return new NextResponse("No encontrada", { status: 404 });
+    const parsed = WebsiteContentV2Schema.safeParse(tpl.content);
+    if (!parsed.success) return new NextResponse("No encontrada", { status: 404 });
+    const html = renderWebsiteHtmlV2(parsed.data, { businessName: membership.business.name, trackingBasePath: `/dashboard/businesses/${id}/website/muestra/saved/${tpl.id}`, preview: true, edit: false, heroImageUrl: null, photos: [], products: [] });
+    return new NextResponse(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, max-age=300", ...siteSecurityHeaders() } });
+  }
 
   // A ready-made niche page (contadores, estéticas, odontólogos…): the real page, with this
   // business's name, brand color and photos.

@@ -28,6 +28,7 @@ import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { ChromePanel } from "./ChromePanel";
 import { ButtonLinksPanel } from "./ButtonLinksPanel";
+import { SaveAsTemplate } from "./SaveAsTemplate";
 import { ElementPanel, type Inspect } from "./ElementPanel";
 import { ButtonShapePicker } from "./ButtonShapePicker";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
@@ -923,6 +924,7 @@ export function WebsiteBuilder({
                 onSection={(index, key, url) => runBlock({ kind: "buttonLink", index, key, url }, "Guardando…")}
                 onHeader={(url) => runDesign("Guardando…", { chrome: { headerLink: url } })}
               />
+              {(content.fullHtml || content.sections.some((sec) => sec.type === "html")) && <SaveAsTemplate businessId={businessId} websiteId={websiteId} defaultName={name} />}
               <label className="flex cursor-pointer items-start gap-2 text-sm">
                 <input type="checkbox" className="mt-1" checked={!!content.plain} disabled={!!busy} onChange={(e) => runDesign("Guardando…", { plain: e.target.checked })} />
                 <span>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type ComponentProps } from "react";
 import type { TemplateCard } from "@/lib/websiteNicheTemplates";
-import { TemplateLibrary } from "./TemplateLibrary";
+import { TemplateLibrary, type SavedTemplateCard } from "./TemplateLibrary";
 import { WebsitePagesList } from "./WebsitePagesList";
 import type { CreationStudio } from "./crear/CreationStudio";
 import { DocIcon, GlobeIcon } from "./[websiteId]/builderIcons";
@@ -18,6 +18,8 @@ export function WebsiteHome({
   businessName,
   initialTab,
   cards,
+  savedTemplates,
+  isAdmin,
   pagesList,
   studio,
 }: {
@@ -25,6 +27,8 @@ export function WebsiteHome({
   businessName: string;
   initialTab: Tab;
   cards: TemplateCard[];
+  savedTemplates: SavedTemplateCard[];
+  isAdmin: boolean;
   pagesList: Omit<ComponentProps<typeof WebsitePagesList>, "onNewPage">;
   studio: ComponentProps<typeof CreationStudio>;
 }) {
@@ -62,7 +66,7 @@ export function WebsiteHome({
       {tab === "plantillas" && (
         <>
           <div className="max-md:hidden">
-            <TemplateLibrary businessId={businessId} cards={cards} needsWhatsapp={!!studio.needsWhatsapp} />
+            <TemplateLibrary businessId={businessId} cards={cards} savedTemplates={savedTemplates} isAdmin={isAdmin} needsWhatsapp={!!studio.needsWhatsapp} />
           </div>
           <div className="md:hidden">
             <WebsitePagesList {...pagesList} onNewPage={() => undefined} />

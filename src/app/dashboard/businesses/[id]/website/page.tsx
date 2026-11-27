@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isAgencyAdmin } from "@/lib/authz";
 import { WebsiteHome } from "./WebsiteHome";
 import { listFunnelCards, listTemplateCards } from "@/lib/websiteNicheTemplates";
 
@@ -58,6 +59,15 @@ export default async function WebsitePage({ params, searchParams }: { params: Pr
     // What this person was deciding with the AI the last time, so a reload or another device continues it.
     prisma.websiteCreationDraft.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: id } }, select: { data: true } }),
   ]);
+  // Pages saved as templates: this account's own, and (agency admin only) every other account's.
+  const admin = await isAgencyAdmin(session.user.id);
+  const savedRows = await prisma.savedPageTemplate.findMany({
+    where: admin ? {} : { businessId: id },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    select: { id: true, name: true, createdAt: true, businessId: true, business: { select: { name: true } } },
+  });
+  const savedTemplates = savedRows.map((t) => ({ id: t.id, name: t.name, createdAt: t.createdAt.toISOString(), own: t.businessId === id, owner: t.business.name }));
   // Funnels first, then the pages by kind of business.
   const cards = [...listFunnelCards(), ...listTemplateCards()];
   const cardById = new Map(cards.map((c) => [c.id, c]));
@@ -86,6 +96,8 @@ export default async function WebsitePage({ params, searchParams }: { params: Pr
       businessName={membership.business.name}
       initialTab={tab === "sitios" ? "sitios" : "plantillas"}
       cards={cards}
+      savedTemplates={savedTemplates}
+      isAdmin={admin}
       pagesList={{
         businessId: id,
         pages,

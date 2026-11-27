@@ -3359,6 +3359,101 @@ export async function createHtmlWebsite(businessId: string, input: { name?: stri
   }
 }
 
+// ---- Saved page templates ("Guardar como plantilla") ----
+
+const MAX_SAVED_TEMPLATES = 20;
+
+/** A page that is (or holds) the owner's own HTML. */
+function holdsOwnHtml(content: WebsiteContentV2): boolean {
+  return !!content.fullHtml || content.sections.some((s) => s.type === "html");
+}
+
+/** The page without the pictures of the business it came from (photos, logo): another account must not get them. */
+function withoutPrivateImages(content: WebsiteContentV2): WebsiteContentV2 {
+  const copy = structuredClone(content) as WebsiteContentV2;
+  for (const s of copy.sections) {
+    delete s.image;
+    delete s.bgImage;
+    if (s.extras) s.extras = s.extras.filter((x) => x.type !== "image");
+    if (s.type === "layout") for (const c of s.cells) c.items = c.items.filter((x) => x.type !== "image");
+  }
+  if (copy.chrome) delete copy.chrome.logo;
+  return copy;
+}
+
+/** Saves a page with the owner's own HTML as a template of their account. */
+export async function saveWebsiteAsTemplate(businessId: string, websiteId: string, name: string): Promise<BuilderResult<{ id: string }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    const title = (typeof name === "string" ? name : "").replace(/\s+/g, " ").trim().slice(0, 60);
+    if (!title) return { ok: false, error: "Ponle un nombre a la plantilla." };
+    const website = await prisma.website.findFirst({ where: { id: websiteId, businessId } });
+    if (!website) return { ok: false, error: "No encontramos esa página." };
+    const parsed = WebsiteContentV2Schema.safeParse(website.content);
+    if (!parsed.success || !holdsOwnHtml(parsed.data)) return { ok: false, error: "Solo se pueden guardar como plantilla las páginas con tu propio código HTML." };
+    if (JSON.stringify(parsed.data).length > 400_000) return { ok: false, error: "Esa página es muy pesada para guardarla como plantilla." };
+    if ((await prisma.savedPageTemplate.count({ where: { businessId } })) >= MAX_SAVED_TEMPLATES) return { ok: false, error: `Ya tienes ${MAX_SAVED_TEMPLATES} plantillas guardadas: quita alguna para guardar otra.` };
+    const created = await prisma.savedPageTemplate.create({ data: { businessId, name: title, content: parsed.data } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, id: created.id };
+  } catch (err) {
+    return builderError(`saveWebsiteAsTemplate(${businessId})`, err);
+  }
+}
+
+/** Takes a saved template out of the library (the account that saved it, or the agency admin). */
+export async function deleteSavedPageTemplate(businessId: string, templateId: string): Promise<BuilderResult<object>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    const admin = await isAgencyAdmin(session.user.id);
+    const tpl = await prisma.savedPageTemplate.findUnique({ where: { id: templateId }, select: { businessId: true } });
+    if (!tpl) return { ok: true };
+    if (tpl.businessId !== businessId && !admin) return { ok: false, error: "No puedes quitar esa plantilla." };
+    if (!admin) await requireBusinessMembership(session.user.id, tpl.businessId);
+    await prisma.savedPageTemplate.delete({ where: { id: templateId } });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true };
+  } catch (err) {
+    return builderError(`deleteSavedPageTemplate(${businessId})`, err);
+  }
+}
+
+/** A new page (draft) from a saved template: the account's own, or any of them when the agency admin asks. */
+export async function createWebsiteFromSavedTemplate(businessId: string, templateId: string, input: { whatsappNumber?: string } = {}): Promise<BuilderResult<{ id: string }>> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Tu sesión expiró, vuelve a iniciar sesión");
+    await requireBusinessMembership(session.user.id, businessId);
+    await requireActiveAccount(session.user.id, businessId);
+    const tpl = await prisma.savedPageTemplate.findUnique({ where: { id: templateId } });
+    if (!tpl) return { ok: false, error: "Esa plantilla ya no está disponible." };
+    if (tpl.businessId !== businessId && !(await isAgencyAdmin(session.user.id))) return { ok: false, error: "Esa plantilla no es de tu cuenta." };
+
+    const phoneError = await rememberWhatsappNumber(businessId, input.whatsappNumber);
+    if (phoneError) return { ok: false, error: phoneError };
+    const ctx = await buildWebsiteV2Context(businessId);
+    if (!ctx.displayNumber) {
+      return { ok: false, error: "Escribe tu WhatsApp con el indicativo del país, por ejemplo +57 300 123 4567: lo usamos para tus avisos y tus enlaces." };
+    }
+    const parsed = WebsiteContentV2Schema.safeParse(tpl.content);
+    if (!parsed.success) return { ok: false, error: "Esa plantilla ya no se puede abrir." };
+    const content = tpl.businessId === businessId ? parsed.data : withoutPrivateImages(parsed.data);
+    const name = tpl.name.slice(0, 80);
+    const slug = await generateUniqueWebsiteSlug(ctx.businessName, name, false);
+    const created = await prisma.website.create({
+      // A draft: the owner reviews it and publishes it from the builder.
+      data: { businessId, name, purpose: null, designPrompt: null, slug, content: { ...content, hidden: content.hidden ?? [] }, aiImageUrl: null, whatsappNumber: ctx.displayNumber, model: "template:saved", published: false },
+    });
+    revalidatePath(`/dashboard/businesses/${businessId}/website`);
+    return { ok: true, id: created.id };
+  } catch (err) {
+    return builderError(`createWebsiteFromSavedTemplate(${businessId})`, err);
+  }
+}
+
 /** A page with nothing on it, to build block by block or with the owner's own HTML. */
 export async function createBlankWebsite(businessId: string, input: { name?: string; whatsappNumber?: string } = {}): Promise<BuilderResult<{ id: string }>> {
   try {

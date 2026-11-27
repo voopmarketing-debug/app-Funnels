@@ -2,18 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { createBlankWebsite, createWebsiteFromTemplate } from "@/lib/actions";
+import { createBlankWebsite, createWebsiteFromSavedTemplate, createWebsiteFromTemplate, deleteSavedPageTemplate } from "@/lib/actions";
 import type { TemplateCard } from "@/lib/websiteNicheTemplates";
 import { DevicePreviewFrame } from "@/components/DevicePreviewFrame";
 import { NicheIcon } from "./nicheIcons";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { HtmlUploadDialog } from "./HtmlUploadDialog";
-import { UploadIcon } from "./[websiteId]/builderIcons";
+import { DocIcon, UploadIcon } from "./[websiteId]/builderIcons";
 
 const PAGE = 6;
 const plain = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 type Tone = "all" | "light" | "dark";
+
+/** A page saved as a template ("Mis plantillas"; for the agency admin also "De clientes"). */
+export type SavedTemplateCard = { id: string; name: string; createdAt: string; own: boolean; owner: string };
 
 /**
  * The first screen of "Sitio web": niches on the left, templates on the right (like the design
@@ -23,10 +26,14 @@ type Tone = "all" | "light" | "dark";
 export function TemplateLibrary({
   businessId,
   cards,
+  savedTemplates,
+  isAdmin,
   needsWhatsapp,
 }: {
   businessId: string;
   cards: TemplateCard[];
+  savedTemplates: SavedTemplateCard[];
+  isAdmin: boolean;
   needsWhatsapp: boolean;
 }) {
   const router = useRouter();
@@ -42,6 +49,9 @@ export function TemplateLibrary({
   const [blankBusy, setBlankBusy] = useState(false);
   const [htmlOpen, setHtmlOpen] = useState(false);
   const [, startTransition] = useTransition();
+  const [savedBusy, setSavedBusy] = useState<string | null>(null);
+  const mine = savedTemplates.filter((t) => t.own);
+  const others = savedTemplates.filter((t) => !t.own);
 
   const niches = useMemo(() => {
     const seen = new Map<string, { id: string; name: string; short: string; count: number }>();
@@ -107,6 +117,37 @@ export function TemplateLibrary({
         setBig(null);
         setError(err instanceof Error ? err.message : "No se pudo crear la página");
       }
+    });
+  }
+
+  function openSaved(t: SavedTemplateCard) {
+    if (busy || blankBusy || savedBusy) return;
+    if (whatsappMissing) {
+      setError("Escribe tu WhatsApp para que los botones de la página te lleven a él.");
+      document.getElementById("template-whatsapp")?.focus();
+      return;
+    }
+    setError(null);
+    setSavedBusy(t.id);
+    startTransition(async () => {
+      const result = await createWebsiteFromSavedTemplate(businessId, t.id, { whatsappNumber: needsWhatsapp ? whatsapp : undefined });
+      if (!result.ok) {
+        setSavedBusy(null);
+        setError(result.error);
+        return;
+      }
+      router.push(`/dashboard/businesses/${businessId}/website/${result.id}`);
+    });
+  }
+
+  function removeSaved(t: SavedTemplateCard) {
+    if (savedBusy || !window.confirm(`¿Quitar la plantilla "${t.name}"?`)) return;
+    setSavedBusy(t.id);
+    startTransition(async () => {
+      const result = await deleteSavedPageTemplate(businessId, t.id);
+      setSavedBusy(null);
+      if (!result.ok) setError(result.error);
+      else router.refresh();
     });
   }
 
@@ -182,7 +223,7 @@ export function TemplateLibrary({
       {/* Toolbar: niches as tabs, search, background and the two ways to bring your own page. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <nav aria-label="Nichos" className="-mx-1 flex min-w-0 basis-full gap-2 overflow-x-auto px-1 py-2">
-          {[{ id: "all", label: "Todos" }, ...niches.map((n) => ({ id: n.id, label: n.short }))].map((n) => (
+          {[{ id: "all", label: "Todos" }, ...niches.map((n) => ({ id: n.id, label: n.short })), { id: "mine", label: `Mis plantillas${mine.length ? ` (${mine.length})` : ""}` }, ...(isAdmin ? [{ id: "others", label: `De clientes${others.length ? ` (${others.length})` : ""}` }] : [])].map((n) => (
             <button
               key={n.id}
               type="button"
@@ -193,7 +234,7 @@ export function TemplateLibrary({
               }}
               className={`flex-none whitespace-nowrap rounded-full border px-4 py-2 text-sm transition ${niche === n.id ? "border-accent bg-accent font-bold text-accent-ink shadow-sm" : "border-border-strong font-medium text-ink hover:border-accent hover:bg-accent/10"}`}
             >
-              <NicheIcon id={n.id} className="mr-1.5 inline-block h-[17px] w-[17px] -translate-y-px" />
+              {n.id === "mine" || n.id === "others" ? <DocIcon className="mr-1.5 inline-block h-[17px] w-[17px] -translate-y-px" /> : <NicheIcon id={n.id} className="mr-1.5 inline-block h-[17px] w-[17px] -translate-y-px" />}
               {n.label}
             </button>
           ))}
@@ -229,7 +270,38 @@ export function TemplateLibrary({
         </div>
       </div>
 
-      {shown.length === 0 ? (
+      {niche === "mine" || niche === "others" ? (
+        (niche === "mine" ? mine : others).length === 0 ? (
+          <div className="fl-card p-8 text-center">
+            <p className="text-sm font-semibold text-ink">{niche === "mine" ? "Aún no tienes plantillas guardadas" : "Los clientes aún no guardan plantillas"}</p>
+            {niche === "mine" && <p className="mt-1 text-xs text-ink-muted">Abre una página con tu código HTML y usa Ajustes, Guardar como plantilla.</p>}
+          </div>
+        ) : (
+          <ul className="grid gap-x-5 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
+            {(niche === "mine" ? mine : others).map((t) => (
+              <li key={t.id} className="group min-w-0">
+                <div className="relative overflow-hidden rounded-xl border border-border bg-surface transition group-hover:border-accent/70 group-focus-within:border-accent/70">
+                  <ScaledPagePreview src={`/dashboard/businesses/${businessId}/website/muestra?saved=${t.id}`} aspect={0.72} title={`Plantilla guardada: ${t.name}`} />
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/55 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
+                    <button type="button" disabled={!!savedBusy} onClick={() => openSaved(t)} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-50">
+                      {savedBusy === t.id ? "Abriendo…" : "Usar"}
+                    </button>
+                    {(t.own || isAdmin) && (
+                      <button type="button" disabled={!!savedBusy} onClick={() => removeSaved(t)} className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-50">
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-2 flex items-baseline gap-2 px-0.5">
+                  <span className="min-w-0 truncate text-sm font-semibold text-ink">{t.name}</span>
+                  {niche === "others" && <span className="flex-none truncate text-xs text-ink-faint">{t.owner}</span>}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : shown.length === 0 ? (
         <div className="fl-card p-8 text-center">
           <p className="text-sm font-semibold text-ink">No encontramos plantillas con eso</p>
           <p className="mt-1 text-xs text-ink-muted">Prueba con otra palabra o cambia el filtro.</p>
@@ -262,7 +334,7 @@ export function TemplateLibrary({
         </ul>
       )}
 
-      {pages > 1 && (
+      {pages > 1 && niche !== "mine" && niche !== "others" && (
         <nav aria-label="Páginas de plantillas" className="flex items-center justify-center gap-3 pt-1">
           <button type="button" disabled={current === 0} aria-label="Anterior" onClick={() => { setPage(current - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 w-9 rounded-lg border border-border-strong text-lg hover:border-accent disabled:opacity-35">
             ‹
