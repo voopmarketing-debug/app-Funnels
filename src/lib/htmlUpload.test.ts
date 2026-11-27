@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkUploadedHtml, htmlBlockFromContent } from "./htmlBlock";
 import { SITE_SCRIPT } from "./siteScript";
 import { applyBlockOp } from "./websiteBlocks";
+import { setTextAtPath } from "./websiteEdit";
 import { LOOK_CSS, LookSchema, lookParts, mergeLook } from "./websiteLook";
 import { SAMPLE_HTML } from "./htmlSample";
 import { buildHtmlPageContent } from "./nicheTemplates";
@@ -180,5 +181,40 @@ describe("Subir mi HTML", () => {
     expect(lookParts({ btnShape: "soft" }).classes).toContain("lk-bsh-soft");
     expect(LookSchema.parse({ btnShape: "triangle" })).toEqual({ btnShape: null });
     expect(LOOK_CSS).toContain(".lk-bsh-square .btn{border-radius:0!important}");
+  });
+  it("each button can go to a link of its own", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const hero = { type: "hero", variant: "centered", heading: "Hola", subheading: "x", ctaLabel: "Quiero mi llamada", secondaryCtaLabel: "Ver más", eyebrow: null, badge: null, chips: [] };
+    const page = { ...base, fullHtml: false, plain: false, sections: [hero] } as unknown as typeof base;
+    const done = applyBlockOp(page, { kind: "buttonLink", index: 0, key: "ctaLabel", url: "https://landing.example.com/a" });
+    expect(done.ok).toBe(true);
+    const html = done.ok ? renderWebsiteHtmlV2(done.content, ctx) : "";
+    expect(html).toMatch(/<a href="https:\/\/landing\.example\.com\/a" target="_blank" rel="noopener" class="btn"[^>]*>Quiero mi llamada<\/a>/);
+    // The other button keeps the page's own link.
+    expect(html).toMatch(/<a class="btn btn-ghost" href="#[^"]+"[^>]*>Ver más<\/a>/);
+    // A script address is refused; null puts the button back.
+    expect(applyBlockOp(page, { kind: "buttonLink", index: 0, key: "ctaLabel", url: "javascript:alert(1)" }).ok).toBe(false);
+    const back = done.ok ? applyBlockOp(done.content, { kind: "buttonLink", index: 0, key: "ctaLabel", url: null }) : done;
+    expect(back.ok && "links" in back.content.sections[0]).toBe(false);
+    // The top bar's button too.
+    const head = renderWebsiteHtmlV2({ ...page, chrome: { headerLink: "https://agenda.example.com", headerLabel: "Agenda ya" } } as unknown as typeof base, ctx);
+    expect(head).toMatch(/<a href="https:\/\/agenda\.example\.com" target="_blank" rel="noopener" class="btn"[^>]*>Agenda ya<\/a>/);
+  });
+  it("the numbers, the menu names and the form button can be written by the owner", () => {
+    const base = buildHtmlPageContent({ businessName: "X", html: "<p>Hola</p>" });
+    const steps = { type: "steps", variant: "cards", kicker: null, heading: "Así", items: [{ title: "Uno", description: "a" }, { title: "Dos", description: "b" }] };
+    const page = { ...base, fullHtml: false, plain: false, sections: [base.sections[0], steps] } as unknown as typeof base;
+    const num = setTextAtPath(page, "sections.1.nums.i0", "A1");
+    expect(num.ok).toBe(true);
+    const nav = num.ok ? setTextAtPath(num.content, "sections.1.navLabel", "Mi proceso") : num;
+    expect(nav.ok).toBe(true);
+    const html = nav.ok ? renderWebsiteHtmlV2(nav.content, { ...ctx, preview: true, edit: true }) : "";
+    expect(html).toMatch(/<span class="step-n" data-edit="sections\.1\.nums\.i0">A1<\/span>/);
+    expect(html).toMatch(/<span class="step-n" data-edit="sections\.1\.nums\.i1">02<\/span>/);
+    expect(html).toMatch(/<a href="#como-funciona" data-edit="sections\.1\.navLabel">Mi proceso<\/a>/);
+    // Empty goes back to the automatic one.
+    const back = nav.ok ? setTextAtPath(nav.content, "sections.1.nums.i0", "") : nav;
+    expect(back.ok && "nums" in back.content.sections[1]).toBe(false);
+    expect(setTextAtPath(page, "sections.1.nums.<b>", "x").ok).toBe(false);
   });
 });

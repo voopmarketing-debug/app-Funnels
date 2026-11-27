@@ -309,7 +309,13 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     const m = /^sections\.(\d+)\.(.+)$/.exec(path);
     return m ? (content.sections[Number(m[1])]?.fc?.[m[2]] ?? null) : null;
   };
-  const ed = (path: string) => (edit ? ` data-edit="${esc(path)}"` : "") + (fcOf(path) ? ` data-fc="${esc(path)}"` : "");
+  // The address a button has of its own (set in "Ajustes" or on the page); the rest follow the page's main link.
+  const linkOf = (path: string): string | null => {
+    if (path === "chrome.headerLabel") return content.chrome?.headerLink ?? null;
+    const m = /^sections\.(\d+)\.(.+)$/.exec(path);
+    return m ? (content.sections[Number(m[1])]?.links?.[m[2]] ?? null) : null;
+  };
+  const ed = (path: string) => (edit ? ` data-edit="${esc(path)}"` : "") + (fcOf(path) ? ` data-fc="${esc(path)}"` : "") + (linkOf(path) ? ` data-bk="${esc(path)}"` : "");
   // The page's own top bar and footer (see "Encabezado y pie" in the builder).
   const chrome = content.chrome ?? {};
   const brandName = chrome.brandName || ctx.businessName;
@@ -394,11 +400,12 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   // "02 / 08": a small mono counter before the label of each section, when the template asks for it.
   const visibleOrder = new Map(sections.map(({ i }, n) => [i, n + 1]));
   let currentNo = 0;
+  let currentIdx = -1;
   const pad2 = (n: number) => String(n).padStart(2, "0");
   const kickerHtml = (k: string | null | undefined, path?: string) => {
     if (!k) return "";
     const p = `<p class="kicker"${path ? ed(path) : ""}>${rich(k)}</p>`;
-    return content.counters && currentNo > 0 ? `<div class="k-row"><span class="k-n" aria-hidden="true">${pad2(currentNo)} / ${pad2(sections.length)}</span>${p}</div>` : p;
+    return content.counters && currentNo > 0 ? `<div class="k-row"><span class="k-n"${ed(`sections.${currentIdx}.nums.c`)}>${esc(content.sections[currentIdx]?.nums?.c ?? `${pad2(currentNo)} / ${pad2(sections.length)}`)}</span>${p}</div>` : p;
   };
 
   // Paints the AI-chosen words of the headline in the accent color.
@@ -409,7 +416,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     return `${esc(heading.slice(0, at))}<span class="hl">${esc(heading.slice(at, at + h.length))}</span>${esc(heading.slice(at + h.length))}`;
   };
 
-  const leadFormHtml = (buttonLabel: string) =>
+  const leadFormHtml = (buttonLabel: string, labelPath?: string) =>
     ctx.leadSubmitted
       ? `<p class="lead-ok">¡Listo! Recibimos tus datos y te escribimos muy pronto.</p>`
       : `<form class="lead-form" method="POST" action="${esc(registroAction)}">${HONEYPOT_HTML}
@@ -417,11 +424,12 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           <input type="text" name="contact" placeholder="Tu WhatsApp o teléfono" maxlength="120" required>
           <textarea name="message" placeholder="Cuéntanos qué necesitas (opcional)" rows="2" maxlength="500"></textarea>
           <label class="consent"><input type="checkbox" name="consent" value="1" required><span>Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012.</span></label>
-          <button class="btn" type="submit">${esc(buttonLabel)}</button>
+          <button class="btn" type="submit"${labelPath ? ed(labelPath) : ""}>${esc(buttonLabel)}</button>
         </form>`;
 
   const renderSection = (s: Section, index: number): string => {
     currentNo = visibleOrder.get(index) ?? 0;
+    currentIdx = index;
     // Path of a field of this section, and the marker of its main picture.
     const fp = (field: string) => `sections.${index}.${field}`;
     const imgMark = edit ? ` data-img="${index}"` : "";
@@ -458,7 +466,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         if (s.showLeadForm) {
           return `<section class="hero hero-form" id="inicio"><div class="decor" aria-hidden="true"></div><div class="wrap hero-split-grid">
             <div>${eyebrow}${h1()}<p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}${badge}</div>
-            <div class="form-card">${mainImage ? `<img class="form-card-img" src="${esc(mainImage)}" alt=""${imgMark}>` : ""}<p class="form-card-title"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</p>${leadFormHtml(s.ctaLabel)}</div>
+            <div class="form-card">${mainImage ? `<img class="form-card-img" src="${esc(mainImage)}" alt=""${imgMark}>` : ""}<p class="form-card-title"${ed(fp("ctaLabel"))}>${esc(s.ctaLabel)}</p>${leadFormHtml(s.ctaLabel, fp("ctaLabel"))}</div>
           </div></section>`;
         }
 
@@ -542,7 +550,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
         const item = (it: (typeof list)[number], ii: number) => {
           const t = `<h3${ed(fp(`items.${ii}.title`))}>${esc(it.title)}</h3>`;
           const d = `<p${ed(fp(`items.${ii}.description`))}>${esc(it.description)}</p>`;
-          if (s.variant === "numbered") return `<div class="feat-item"><span class="feat-num" aria-hidden="true">${pad2(ii + 1)}</span>${t}${d}</div>`;
+          if (s.variant === "numbered") return `<div class="feat-item"><span class="feat-num"${ed(fp(`nums.i${ii}`))}>${esc(s.nums?.[`i${ii}`] ?? pad2(ii + 1))}</span>${t}${d}</div>`;
           return `<div class="feat-item">${s.variant !== "list" ? `<span class="feat-ico">${icon(it.icon)}</span>` : `<span class="feat-check">${icon("check")}</span>`}<div>${t}${d}</div></div>`;
         };
         return `<section class="sec" id="${index === 1 ? "detalles" : `s${index}`}"><div class="wrap">
@@ -556,7 +564,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
           ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2>
           <ol class="steps steps-${s.variant ?? "row"}">${s.items
             .slice(0, 4)
-            .map((it, i) => `<li><span class="step-n">${String(i + 1).padStart(2, "0")}</span><h3${ed(fp(`items.${i}.title`))}>${esc(it.title)}</h3><p${ed(fp(`items.${i}.description`))}>${esc(it.description)}</p></li>`)
+            .map((it, i) => `<li><span class="step-n"${ed(fp(`nums.i${i}`))}>${esc(s.nums?.[`i${i}`] ?? String(i + 1).padStart(2, "0"))}</span><h3${ed(fp(`items.${i}.title`))}>${esc(it.title)}</h3><p${ed(fp(`items.${i}.description`))}>${esc(it.description)}</p></li>`)
             .join("")}</ol>
         </div></section>`;
 
@@ -867,7 +875,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       case "leadForm":
         return `<section class="sec alt" id="registro"><div class="wrap narrow">
           ${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p class="intro"${ed(fp("body"))}>${esc(s.body)}</p>
-          ${leadFormHtml(s.buttonLabel)}
+          ${leadFormHtml(s.buttonLabel, fp("buttonLabel"))}
         </div></section>`;
 
       case "cta":
@@ -929,13 +937,17 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     .join("\n")
     // Blocks that rise into view as the page scrolls (what is on screen at load never starts hidden: see siteScript).
     .replace(/class="(feat-item|pcard[^"]*|ag-item|trust-item|stat-v|host-img)"/g, 'class="$1 rv"')
-    .replace(/<li><span class="step-n">/g, '<li class="rv"><span class="step-n">');
+    .replace(/<li><span class="step-n"/g, '<li class="rv"><span class="step-n"');
   const firstHero = content.sections.find((s) => s.type === "hero");
-  const navLinks: { href: string; label: string }[] = [];
-  if (sections.some(({ s }) => s.type === "productGrid") && products.length > 0) navLinks.push({ href: "#productos", label: "Productos" });
-  if (sections.some(({ s }) => s.type === "agenda")) navLinks.push({ href: "#agenda", label: "Agenda" });
-  if (sections.some(({ s }) => s.type === "steps")) navLinks.push({ href: "#como-funciona", label: "Cómo funciona" });
-  if (sections.some(({ s }) => s.type === "objections")) navLinks.push({ href: "#preguntas", label: "Preguntas" });
+  const navLinks: { href: string; label: string; path?: string }[] = [];
+  const navAdd = (type: string, href: string, label: string) => {
+    const found = sections.find(({ s }) => s.type === type);
+    if (found) navLinks.push({ href, label: found.s.navLabel || label, path: `sections.${found.i}.navLabel` });
+  };
+  if (products.length > 0) navAdd("productGrid", "#productos", "Productos");
+  navAdd("agenda", "#agenda", "Agenda");
+  navAdd("steps", "#como-funciona", "Cómo funciona");
+  navAdd("objections", "#preguntas", "Preguntas");
   const isShop = content.pageType === "producto" || content.pageType === "tienda";
 
   const decor =
@@ -955,7 +967,16 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
       ? `<div class="annc"${ed("announcement")}>${esc(content.announcement)}</div>`
       : `<div class="annc annc-run" role="marquee" aria-label="${esc(phrases.join(". "))}"><div class="annc-track" aria-hidden="true">${Array.from({ length: 2 }, () => `<div class="annc-set">${Array.from({ length: Math.max(2, Math.ceil(6 / phrases.length)) }, () => phrases.map((t) => `<span>${esc(t)}</span><i>✦</i>`).join("")).join("")}</div>`).join("")}</div></div>`;
 
-  return renderMarks(`<!doctype html>
+  // Buttons with an address of their own: the link replaces the page's main one (outside links open in a new tab).
+  const withLinks = (html: string): string =>
+    html.replace(/<a\b[^>]*\bdata-bk="([^"]+)"[^>]*>/g, (tag, path: string) => {
+      const url = linkOf(path.replace(/&amp;/g, "&"));
+      if (!url) return tag;
+      const external = /^https?:/i.test(url);
+      const rest = tag.replace(/\shref="[^"]*"/, "").replace(/\s(target|rel)="[^"]*"/g, "");
+      return rest.replace(/^<a\b/, `<a href="${esc(url)}"${external ? ' target="_blank" rel="noopener"' : ""}`);
+    });
+  return renderMarks(withLinks(`<!doctype html>
 <html lang="es"${edit ? ' data-fx="off"' : ""}>
 <head>
 <meta charset="utf-8">
@@ -1304,16 +1325,16 @@ ${fcCss}
 ${announcementHtml}
 ${content.plain ? "" : `<header class="top${hdrVars ? " hc" : ""}"${hdrVars ? ` style="${hdrVars}"` : ""}><div class="wrap">
   ${chrome.logo && safeUrl(chrome.logo) ? `<a class="brand brand-logo" href="#inicio"><img src="${esc(safeUrl(chrome.logo) ?? "")}" alt="${esc(brandName)}"${edit ? ` data-logo` : ""}></a>` : `<a class="brand" href="#inicio"${ed("chrome.brandName")}>${esc(brandName)}</a>`}
-  <nav class="nav" aria-label="Secciones">${navLinks.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("")}</nav>
-  <a class="btn" href="${esc(href("header"))}">${isShop ? "Pedir por WhatsApp" : "Escríbenos"}</a>
+  <nav class="nav" aria-label="Secciones">${navLinks.map((l) => `<a href="${l.href}"${l.path ? ed(l.path) : ""}>${esc(l.label)}</a>`).join("")}</nav>
+  <a class="btn" href="${esc(href("header"))}"${ed("chrome.headerLabel")}>${esc(chrome.headerLabel || (isShop ? "Pedir por WhatsApp" : "Escríbenos"))}</a>
 </div></header>`}
 <main>
 ${body}
 </main>
 ${content.plain ? "" : `<footer class="foot${ftrVars ? " fc" : ""}"${ftrVars ? ` style="${ftrVars}"` : ""}><div class="wrap"><span${ed("chrome.footerText")}>${esc(chrome.footerText || `© ${ctx.businessName}`)}</span><a href="${esc(href("footer"))}"${ed("chrome.footerLink")}>${esc(chrome.footerLink || "Escríbenos por WhatsApp")}</a></div></footer>`}
-${content.sticky && firstHero && firstHero.type === "hero" ? `<div class="sticky-cta"><a class="btn" href="${esc(ctaHref("barra-fija"))}">${esc(firstHero.ctaLabel)}</a></div>` : ""}
+${content.sticky && firstHero && firstHero.type === "hero" ? `<div class="sticky-cta"><a class="btn" href="${esc(ctaHref("barra-fija"))}"${ed("sections.0.ctaLabel")}>${esc(firstHero.ctaLabel)}</a></div>` : ""}
 ${isShop ? `<div class="mbar"><a class="btn" href="${esc(href("barra-movil"))}">Pedir por WhatsApp</a></div>` : ""}
 <script>${SITE_SCRIPT}</script>
 </body>
-</html>`);
+</html>`));
 }

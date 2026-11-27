@@ -49,6 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       businessName: membership.business.name,
       trackingBasePath: "#",
       preview: true,
+      edit: req.nextUrl.searchParams.get("edit") === "1",
       heroImageUrl: hero.heroImageUrl,
       photos: photos.map((p) => p.url),
       products: [],

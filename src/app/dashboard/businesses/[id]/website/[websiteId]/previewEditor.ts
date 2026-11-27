@@ -43,6 +43,8 @@ export type EditorHandlers = {
   /** The page's logo: opens the photo window / takes it off (the top bar goes back to the name). */
   pickLogo(): void;
   removeLogo(): void;
+  /** A color of the page's top bar: its background, its button or its text (null: automatic). */
+  setHeaderColor(key: "headerBg" | "headerBtn" | "headerColor", color: string | null): void;
 };
 
 const ACCENT = "#5b6cf0";
@@ -86,6 +88,9 @@ section[data-sec].fl-hover{box-shadow:inset 0 0 0 2px ${ACCENT};background-image
 .fl-bar button[disabled]{opacity:.3;cursor:default}
 .fl-bar button[disabled]:hover{background:none}
 .fl-tc{position:absolute;z-index:2147483300;display:flex;align-items:center;gap:6px;padding:6px 8px;background:#111827;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font:600 11px/1 system-ui,sans-serif;color:#9ca3af;white-space:nowrap}
+.fl-tc.col{flex-direction:column;align-items:stretch;gap:8px}
+.fl-tc .row{display:flex;align-items:center;gap:6px}
+.fl-tc .row>span.lab{min-width:46px}
 .fl-tc button.sw{all:unset;box-sizing:border-box;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.55);cursor:pointer}
 .fl-tc button.sw:hover{border-color:#fff}
 .fl-tc button.auto{all:unset;box-sizing:border-box;cursor:pointer;padding:5px 8px;border-radius:8px;color:#fff;font:600 11px/1 system-ui,sans-serif}
@@ -358,15 +363,18 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
     tcFor = el;
   }
 
-  // The top bar's name or logo: pick which one the page shows (write the name, or put / change / take off the logo).
+  // The top bar: the name or the logo (write the name, or put / change / take off the logo) and its colors.
   function showBrandBar(el: HTMLElement) {
     hideColors();
     const h = getHandlers();
-    const hasLogo = !!el.querySelector("img[data-logo]");
+    const header = el.closest<HTMLElement>("header.top") ?? el;
+    const hasLogo = !!header.querySelector("img[data-logo]");
     const box = doc.createElement("div");
-    box.className = "fl-tc";
+    box.className = "fl-tc col";
     box.setAttribute("role", "toolbar");
-    box.setAttribute("aria-label", "Logo o nombre");
+    box.setAttribute("aria-label", "Menú de la página");
+    const top = doc.createElement("div");
+    top.className = "row";
     const add = (text: string, title: string, fn: () => void) => {
       const b = doc.createElement("button");
       b.type = "button";
@@ -374,20 +382,73 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
       b.textContent = text;
       b.title = title;
       b.addEventListener("click", fn);
-      box.appendChild(b);
+      top.appendChild(b);
     };
     add(hasLogo ? "Cambiar logo" : "Poner logo", "Subir o elegir tu logo", () => h.pickLogo());
     if (hasLogo) add("Usar texto", "Quitar el logo y escribir el nombre", () => h.removeLogo());
     else {
       const hint = doc.createElement("span");
       hint.textContent = "o escribe el nombre";
-      box.appendChild(hint);
+      top.appendChild(hint);
     }
-    box.addEventListener("mousedown", (e) => e.preventDefault());
+    box.appendChild(top);
+    // One row per color: quick colors of the page, any other color, and back to automatic.
+    const colorRow = (label: string, key: "headerBg" | "headerBtn" | "headerColor", cssVar: string, property: string) => {
+      const row = doc.createElement("div");
+      row.className = "row";
+      const lab = doc.createElement("span");
+      lab.className = "lab";
+      lab.textContent = label;
+      row.appendChild(lab);
+      const live = (color: string | null) => {
+        if (color) {
+          header.classList.add("hc");
+          header.style.setProperty(cssVar, color);
+        } else header.style.removeProperty(cssVar);
+        h.setHeaderColor(key, color);
+      };
+      const seen = new Set<string>();
+      for (const c of [...h.palette(), "#ffffff", "#111827"]) {
+        const hex = c.toLowerCase();
+        if (!/^#[0-9a-f]{6}$/.test(hex) || seen.has(hex)) continue;
+        seen.add(hex);
+        const b = doc.createElement("button");
+        b.type = "button";
+        b.className = "sw";
+        b.style.background = hex;
+        b.title = hex;
+        b.setAttribute("aria-label", `${label}: ${hex}`);
+        b.addEventListener("click", () => live(hex));
+        row.appendChild(b);
+      }
+      const pick = doc.createElement("input");
+      pick.type = "color";
+      pick.title = "Elegir otro color";
+      pick.setAttribute("aria-label", `${label}: otro color`);
+      const target = property === "background" ? header : (header.querySelector<HTMLElement>(property === "color" ? ".brand" : ".btn") ?? header);
+      const current = win!.getComputedStyle(target)[property === "background" ? "backgroundColor" : "color"].match(/\d+/g);
+      if (current && current.length >= 3) pick.value = "#" + current.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+      pick.addEventListener("change", () => live(pick.value));
+      row.appendChild(pick);
+      const auto = doc.createElement("button");
+      auto.type = "button";
+      auto.className = "auto";
+      auto.textContent = "Auto";
+      auto.title = "Volver al color automático";
+      auto.addEventListener("click", () => live(null));
+      row.appendChild(auto);
+      box.appendChild(row);
+    };
+    colorRow("Fondo", "headerBg", "--hbg", "background");
+    colorRow("Botón", "headerBtn", "--hbtn", "backgroundColor");
+    colorRow("Texto", "headerColor", "--hc", "color");
+    box.addEventListener("mousedown", (e) => {
+      if ((e.target as HTMLElement).tagName !== "INPUT") e.preventDefault();
+    });
     doc.body.appendChild(box);
-    const r = el.getBoundingClientRect();
+    const r = header.getBoundingClientRect();
     box.style.top = `${r.bottom + (win!.scrollY || 0) + 8}px`;
-    box.style.left = `${Math.max(8, r.left + (win!.scrollX || 0))}px`;
+    box.style.left = `${Math.max(8, Math.min(r.left + (win!.scrollX || 0) + 8, doc.documentElement.clientWidth - box.offsetWidth - 8))}px`;
     tc = box;
     tcFor = el;
   }
@@ -446,11 +507,11 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   const onMouseDown = (e: MouseEvent) => {
     const t = asElement(e.target);
     if (!t || t.closest(".fl-bar-wrap") || t.closest(".fl-tc")) return;
-    const logo = t.closest<HTMLElement>("header.top .brand-logo");
-    if (logo) {
+    const hdr = t.closest<HTMLElement>("header.top");
+    if (hdr && !t.closest("[data-edit]")) {
       e.preventDefault();
       if (editing) void commit(editing);
-      showBrandBar(logo);
+      showBrandBar(hdr);
       return;
     }
     const el = t.closest<HTMLElement>("[data-edit]");

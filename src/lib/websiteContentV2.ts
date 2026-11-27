@@ -109,7 +109,14 @@ const ExtrasSchema = z.array(ExtraSchema).max(MAX_EXTRAS).optional().catch(undef
 export const FIELD_COLOR_KEY = /^[A-Za-z0-9.]{1,40}$/;
 export const FIELD_COLOR_VALUE = /^#[0-9a-fA-F]{6}$/;
 const FieldColorsSchema = z.record(z.string().regex(FIELD_COLOR_KEY), z.string().regex(FIELD_COLOR_VALUE)).optional().catch(undefined).describe("Colores de textos sueltos. NO lo escribas.");
-const media = { image: imageUrl, bgImage: imageUrl, look: LookSchema, extras: ExtrasSchema, fc: FieldColorsSchema };
+// `links`: the address of each button of the block that goes somewhere of its own (key = the button text's field, e.g. "ctaLabel").
+export const BUTTON_LINK = /^(https?:\/\/\S+|tel:\+?[0-9 ()-]{5,20}|mailto:\S+@\S+|#[A-Za-z0-9_-]+)$/;
+const ButtonLinksSchema = z.record(z.string().regex(FIELD_COLOR_KEY), z.string().regex(BUTTON_LINK).max(300)).optional().catch(undefined).describe("Enlaces propios de los botones. NO lo escribas.");
+// `nums`: the numbers drawn in a block ("01", "02 / 06") when the owner writes their own (keys: "i0", "i1"… for the items, "c" for the counter).
+const NumsSchema = z.record(z.string().regex(/^[a-z0-9]{1,6}$/), z.string().max(12)).optional().catch(undefined).describe("Números propios. NO lo escribas.");
+// `navLabel`: the name this block has in the top menu.
+const NavLabelSchema = z.string().max(24).optional().catch(undefined).describe("Nombre en el menú. NO lo escribas.");
+const media = { nums: NumsSchema, navLabel: NavLabelSchema, image: imageUrl, bgImage: imageUrl, look: LookSchema, extras: ExtrasSchema, fc: FieldColorsSchema, links: ButtonLinksSchema };
 
 const HeroSection = z.object({
   ...media,
@@ -457,6 +464,8 @@ export const ChromeSchema = z
   .object({
     logo: imageUrl,
     brandName: chromeText(60),
+    headerLabel: chromeText(30),
+    headerLink: z.string().regex(BUTTON_LINK).max(300).nullable().optional().catch(null),
     headerBg: chromeHex,
     headerColor: chromeHex,
     headerBtn: chromeHex,

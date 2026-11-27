@@ -1,4 +1,4 @@
-import { ExtraSchema, FIELD_COLOR_KEY, FIELD_COLOR_VALUE, HTML_MAX_CHARS, MAX_EXTRAS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
+import { BUTTON_LINK, ExtraSchema, FIELD_COLOR_KEY, FIELD_COLOR_VALUE, HTML_MAX_CHARS, MAX_EXTRAS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { mergeLook, type LookPatch } from "@/lib/websiteLook";
 
 // The builder's block operations: add a block from the library, duplicate,
@@ -128,6 +128,8 @@ export type BlockOp =
   | { kind: "move"; from: number; to: number }
   | { kind: "look"; index: number; patch: LookPatch }
   /** The color of one text of a block (null: back to the automatic color). */
+  /** Where one button of a block goes (null: back to the page's own link). */
+  | { kind: "buttonLink"; index: number; key: string; url: string | null }
   | { kind: "fieldColor"; index: number; key: string; color: string | null }
   | { kind: "html"; index: number; code: string; height: number }
   | { kind: "eventDate"; index: number; date: string }
@@ -202,6 +204,19 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       const look = mergeLook(section.look, op.patch);
       if (look) section.look = look;
       else delete section.look;
+      focus = op.index;
+      break;
+    }
+    case "buttonLink": {
+      if (!isInt(op.index) || op.index < 0 || op.index >= n || typeof op.key !== "string" || !FIELD_COLOR_KEY.test(op.key)) return bad("No se pudo cambiar el enlace de ese botón.");
+      const url = typeof op.url === "string" ? op.url.trim() : null;
+      if (url && !BUTTON_LINK.test(url)) return bad("Pon un enlace que empiece con https://, tel:, mailto: o #.");
+      const section = next.sections[op.index];
+      const links = { ...(section.links ?? {}) };
+      if (!url) delete links[op.key];
+      else links[op.key] = url;
+      if (Object.keys(links).length > 0) section.links = links;
+      else delete section.links;
       focus = op.index;
       break;
     }

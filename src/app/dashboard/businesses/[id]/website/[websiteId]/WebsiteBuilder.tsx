@@ -27,6 +27,7 @@ import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { ChromePanel } from "./ChromePanel";
+import { ButtonLinksPanel } from "./ButtonLinksPanel";
 import { ButtonShapePicker } from "./ButtonShapePicker";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
 import { BagIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
@@ -420,6 +421,20 @@ export function WebsiteBuilder({
     },
     notice: (message) => showToast(message),
     palette: () => [content.theme.primaryColor, content.theme.textColor, content.theme.backgroundColor, content.theme.surfaceColor],
+    setHeaderColor: (key, color) => {
+      setSaveState("saving");
+      void updateWebsiteDesignV2(businessId, websiteId, { chrome: { [key]: color } }).then(
+        (next) => {
+          adopt(next);
+          setSaveState("saved");
+          setTimeout(() => setSaveState((v) => (v === "saved" ? "idle" : v)), 2500);
+        },
+        () => {
+          setSaveState("error");
+          showToast("No se pudo guardar el color.");
+        },
+      );
+    },
     pickLogo: () => setLogoPicker(true),
     removeLogo: () => runDesign("Quitando el logo…", { chrome: { logo: null } }),
     setTextColor: (path, color) => {
@@ -720,6 +735,12 @@ export function WebsiteBuilder({
                 title="Página de gracias"
                 help="Después de enviar el formulario, la persona va a este link (por ejemplo, tu página de gracias o el enlace de tu regalo). Vacío = ve un mensaje de gracias en esta misma página."
                 onSave={(url) => runDesign("Guardando…", { thankYouUrl: url })}
+              />
+              <ButtonLinksPanel
+                content={content}
+                disabled={!!busy}
+                onSection={(index, key, url) => runBlock({ kind: "buttonLink", index, key, url }, "Guardando…")}
+                onHeader={(url) => runDesign("Guardando…", { chrome: { headerLink: url } })}
               />
               <label className="flex cursor-pointer items-start gap-2 text-sm">
                 <input type="checkbox" className="mt-1" checked={!!content.plain} disabled={!!busy} onChange={(e) => runDesign("Guardando…", { plain: e.target.checked })} />

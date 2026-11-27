@@ -48,8 +48,8 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
   }
 
   // The page's own top bar and footer: chrome.brandName, chrome.footerText, chrome.footerLink (empty = back to the automatic text).
-  if (parts.length === 2 && parts[0] === "chrome" && (parts[1] === "brandName" || parts[1] === "footerText" || parts[1] === "footerLink")) {
-    const text = clean("name", rawValue).slice(0, parts[1] === "footerText" ? 120 : 60);
+  if (parts.length === 2 && parts[0] === "chrome" && (parts[1] === "brandName" || parts[1] === "footerText" || parts[1] === "footerLink" || parts[1] === "headerLabel")) {
+    const text = clean("name", rawValue).slice(0, parts[1] === "footerText" ? 120 : parts[1] === "headerLabel" ? 30 : 60);
     const chrome = { ...(next.chrome ?? {}) } as Record<string, unknown>;
     if (text) chrome[parts[1]] = text;
     else delete chrome[parts[1]];
@@ -67,6 +67,24 @@ export function setTextAtPath(current: WebsiteContentV2, path: string, rawValue:
     const link = rawValue.trim();
     if (link && !toEmbedUrl(link)) return bad("Pega un enlace de YouTube, Vimeo, Wistia o Loom.");
     section.url = link.slice(0, 300);
+    return finish(next);
+  }
+
+  // sections.<i>.nums.<key>: a number the block draws ("01", "02 / 06"); empty = back to the automatic one.
+  if (parts.length === 4 && parts[2] === "nums" && /^[a-z0-9]{1,6}$/.test(parts[3])) {
+    const text = rawValue.replace(/\s+/g, " ").trim().slice(0, 12);
+    const nums = { ...((section.nums as Record<string, string> | undefined) ?? {}) };
+    if (text) nums[parts[3]] = text;
+    else delete nums[parts[3]];
+    if (Object.keys(nums).length) section.nums = nums;
+    else delete section.nums;
+    return finish(next);
+  }
+  // sections.<i>.navLabel: the name of this block in the top menu (empty = the automatic name).
+  if (parts.length === 3 && parts[2] === "navLabel") {
+    const text = rawValue.replace(/\s+/g, " ").trim().slice(0, 24);
+    if (text) section.navLabel = text;
+    else delete section.navLabel;
     return finish(next);
   }
 
