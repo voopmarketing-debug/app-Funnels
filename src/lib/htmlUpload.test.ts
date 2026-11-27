@@ -228,6 +228,15 @@ describe("Subir mi HTML", () => {
     expect(html).toMatch(/a\.btn\[data-bs="sections\.0\.ctaLabel"\]\[data-bs="sections\.0\.ctaLabel"\]\[data-bs="sections\.0\.ctaLabel"\]\{background:#112233!important;border-color:#112233!important;color:#[0-9a-f]{6}!important;border-radius:0px!important;\}/);
     expect(applyBlockOp(page, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { bg: "red;}" } }).ok).toBe(false);
     expect(applyBlockOp(page, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { shape: "star" } }).ok).toBe(false);
+    // Size: width in %, height of the padding in px, size of the letters in %.
+    const sized = applyBlockOp(page, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { w: "60", h: "24", fs: "120" } });
+    expect(sized.ok).toBe(true);
+    const sizedHtml = sized.ok ? renderWebsiteHtmlV2(sized.content, ctx) : "";
+    expect(sizedHtml).toContain("width:60%!important;");
+    expect(sizedHtml).toContain("padding-top:24px!important;padding-bottom:24px!important;");
+    expect(sizedHtml).toContain("font-size:120%!important;");
+    expect(applyBlockOp(page, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { w: "500" } }).ok).toBe(false);
+    expect(applyBlockOp(page, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { h: "1;}" } }).ok).toBe(false);
     const back = done.ok ? applyBlockOp(done.content, { kind: "buttonStyle", index: 0, key: "ctaLabel", patch: { bg: null, shape: null } }) : done;
     expect(back.ok && "bs" in back.content.sections[0]).toBe(false);
   });

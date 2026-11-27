@@ -122,6 +122,10 @@ export const ButtonStyleSchema = z.object({
   bg: z.string().regex(FIELD_COLOR_VALUE).nullable().optional().catch(null),
   color: z.string().regex(FIELD_COLOR_VALUE).nullable().optional().catch(null),
   shape: z.enum(["square", "soft", "round"]).nullable().optional().catch(null),
+  /** Width of the button in % of its space (20 to 100), height of its padding in px (6 to 50), size of its letters in % (50 to 200). */
+  w: z.string().regex(/^(?:[2-9]\d|100)$/).nullable().optional().catch(null),
+  h: z.string().regex(/^(?:[6-9]|[1-4]\d|50)$/).nullable().optional().catch(null),
+  fs: z.string().regex(/^(?:[5-9]\d|1\d\d|200)$/).nullable().optional().catch(null),
 });
 export type ButtonStyle = z.infer<typeof ButtonStyleSchema>;
 const ButtonStylesSchema = z.record(z.string().regex(FIELD_COLOR_KEY), ButtonStyleSchema).optional().catch(undefined).describe("Estilo propio de botones. NO lo escribas.");

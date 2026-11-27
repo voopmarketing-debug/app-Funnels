@@ -846,7 +846,12 @@ export function showSection(doc: Document, index: number, opts: { scroll?: boole
   const section = doc.querySelector<HTMLElement>(`section[data-sec="${index}"]`);
   if (!section) return;
   doc.querySelectorAll(".fl-picked").forEach((el) => el.classList.remove("fl-picked"));
-  if (opts.scroll !== false) section.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Scrolls only when the block is not already on screen, and then only as much as needed.
+  if (opts.scroll !== false) {
+    const r = section.getBoundingClientRect();
+    const h = doc.defaultView?.innerHeight ?? 800;
+    if (r.bottom < 0 || r.top > h * 0.85) section.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
   section.classList.add("fl-picked");
   setTimeout(() => section.classList.remove("fl-picked"), 1400);
 }

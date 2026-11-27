@@ -321,7 +321,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     .flatMap((sec, i) =>
       Object.entries(sec.bs ?? {}).map(([k, b]) => {
         const sel = `a.btn[data-bs="sections.${i}.${k}"][data-bs="sections.${i}.${k}"][data-bs="sections.${i}.${k}"]`;
-        const css = [b.bg && `background:${b.bg}!important;border-color:${b.bg}!important;${!b.color ? `color:${readableTextColor(b.bg)}!important;` : ""}`, b.color && `color:${b.color}!important;`, b.shape && SHAPE_PX[b.shape] && `border-radius:${SHAPE_PX[b.shape]}!important;`].filter(Boolean).join("");
+        const css = [b.bg && `background:${b.bg}!important;border-color:${b.bg}!important;${!b.color ? `color:${readableTextColor(b.bg)}!important;` : ""}`, b.color && `color:${b.color}!important;`, b.shape && SHAPE_PX[b.shape] && `border-radius:${SHAPE_PX[b.shape]}!important;`, b.w && `width:${b.w}%!important;max-width:100%;box-sizing:border-box;`, b.h && `padding-top:${b.h}px!important;padding-bottom:${b.h}px!important;`, b.fs && `font-size:${b.fs}%!important;`].filter(Boolean).join("");
         return css ? `${sel}{${css}}` : "";
       }),
     )

@@ -139,7 +139,7 @@ export type BlockOp =
   | { kind: "layoutStructure"; index: number; structure: string | null }
   /** The elements of one column of a Contenedor. */
   | { kind: "cellItems"; index: number; cell: number; items: unknown[] }
-  | { kind: "buttonStyle"; index: number; key: string; patch: { bg?: string | null; color?: string | null; shape?: string | null } }
+  | { kind: "buttonStyle"; index: number; key: string; patch: { bg?: string | null; color?: string | null; shape?: string | null; w?: string | null; h?: string | null; fs?: string | null } }
   | { kind: "buttonLink"; index: number; key: string; url: string | null }
   | { kind: "fieldColor"; index: number; key: string; color: string | null }
   | { kind: "html"; index: number; code: string; height: number }
@@ -243,11 +243,11 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
     case "buttonStyle": {
       if (!isInt(op.index) || op.index < 0 || op.index >= n || typeof op.key !== "string" || !FIELD_COLOR_KEY.test(op.key)) return bad("No se pudo cambiar ese botón.");
       const p = op.patch ?? {};
-      if ((p.bg && !FIELD_COLOR_VALUE.test(p.bg)) || (p.color && !FIELD_COLOR_VALUE.test(p.color)) || (p.shape && !["square", "soft", "round"].includes(p.shape))) return bad("Ese color o forma no es válido.");
+      if ((p.bg && !FIELD_COLOR_VALUE.test(p.bg)) || (p.color && !FIELD_COLOR_VALUE.test(p.color)) || (p.shape && !["square", "soft", "round"].includes(p.shape)) || (p.w && !/^(?:[2-9]\d|100)$/.test(p.w)) || (p.h && !/^(?:[6-9]|[1-4]\d|50)$/.test(p.h)) || (p.fs && !/^(?:[5-9]\d|1\d\d|200)$/.test(p.fs))) return bad("Ese color, forma o tamaño no es válido.");
       const section = next.sections[op.index];
       const all = { ...(section.bs ?? {}) } as Record<string, Record<string, unknown>>;
       const one = { ...(all[op.key] ?? {}) };
-      for (const k of ["bg", "color", "shape"] as const) {
+      for (const k of ["bg", "color", "shape", "w", "h", "fs"] as const) {
         if (!(k in p)) continue;
         if (p[k]) one[k] = p[k];
         else delete one[k];

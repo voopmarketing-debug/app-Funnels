@@ -154,7 +154,8 @@ export function WebsiteBuilder({
     const doc = frame?.contentDocument;
     if (!frame || !doc) return;
     try {
-      frame.contentWindow?.scrollTo(0, scrollRef.current);
+      // "instant": the page itself scrolls smoothly, and a smooth scroll here would slide the page up and down on every change.
+      frame.contentWindow?.scrollTo({ top: scrollRef.current, left: 0, behavior: "instant" });
     } catch {
       // Not scrollable yet: harmless.
     }
@@ -377,7 +378,8 @@ export function WebsiteBuilder({
         }
         adopt(res.content);
         setSelected(op.kind === "remove" ? null : res.focus);
-        focusAfterLoad.current = op.kind === "remove" ? null : res.focus;
+        // Only a block that just appeared (or was moved) is brought into view; changing a block's options leaves the page exactly where it is.
+        focusAfterLoad.current = op.kind === "add" || op.kind === "duplicate" || op.kind === "move" ? res.focus : null;
         if (op.kind === "remove") showToast("Bloque eliminado.", true);
         // A "Código HTML" block starts empty: open the window to paste the code right away.
         if (op.kind === "add" && res.content.sections[res.focus]?.type === "html") setHtmlDialog(res.focus);
@@ -778,6 +780,19 @@ export function WebsiteBuilder({
                 const m = /^sections\.(\d+)\.(.+)$/.exec(path);
                 if (path === "chrome.headerLabel") return runDesign("Guardando…", { chrome: { headerLink: url } });
                 if (!m) return;
+                const cell = /^cells\.(\d+)\.items\.(\d+)\.label$/.exec(m[2]);
+                if (cell) {
+                  const sec = content.sections[Number(m[1])];
+                  if (sec?.type === "layout" && sec.cells[Number(cell[1])]) {
+                    const items = [...sec.cells[Number(cell[1])].items];
+                    const item = items[Number(cell[2])];
+                    if (item && item.type === "button") {
+                      items[Number(cell[2])] = { ...item, url: url ?? "" };
+                      runBlock({ kind: "cellItems", index: Number(m[1]), cell: Number(cell[1]), items }, "Guardando…");
+                    }
+                  }
+                  return;
+                }
                 const extra = /^extras\.(\d+)\.label$/.exec(m[2]);
                 if (extra) {
                   const list = [...((content.sections[Number(m[1])]?.extras ?? []) as ExtraElement[])];

@@ -9,7 +9,7 @@ import { CloseIcon } from "./builderIcons";
 
 export type Inspect = { path: string; kind: "button" | "text" };
 
-type Style = { bg?: string | null; color?: string | null; shape?: string | null };
+type Style = { bg?: string | null; color?: string | null; shape?: string | null; w?: string | null; h?: string | null; fs?: string | null };
 
 /**
  * "Editar botón" / "Editar texto": the settings of the element chosen on the page, in the way of a widget
@@ -41,7 +41,9 @@ export function ElementPanel({
   const section = m ? content.sections[Number(m[1])] : null;
   const key = m?.[2] ?? "";
   const extra = /^extras\.(\d+)\.label$/.exec(key);
-  const extraItem = section && extra ? ((section.extras ?? [])[Number(extra[1])] as ExtraElement | undefined) : undefined;
+  const cellMatch = /^cells\.(\d+)\.items\.(\d+)\.(label|text)$/.exec(key);
+  const cellItem = section && section.type === "layout" && cellMatch ? (section.cells[Number(cellMatch[1])]?.items[Number(cellMatch[2])] as ExtraElement | undefined) : undefined;
+  const extraItem = (section && extra ? ((section.extras ?? [])[Number(extra[1])] as ExtraElement | undefined) : undefined) ?? (cellItem && cellItem.type === "button" ? cellItem : undefined);
   if (!header && !section) return null;
 
   const isButton = inspect.kind === "button";
@@ -49,7 +51,9 @@ export function ElementPanel({
     ? (content.chrome?.headerLabel ?? "Escríbenos")
     : extraItem && extraItem.type === "button"
       ? extraItem.label
-      : String((section as unknown as Record<string, unknown>)[key] ?? "");
+      : cellItem && (cellItem.type === "text" || cellItem.type === "heading")
+        ? cellItem.text
+        : String((section as unknown as Record<string, unknown>)[key] ?? "");
   const text = stripMarks(raw);
   const hasMarks = text !== raw;
   const link = header ? (content.chrome?.headerLink ?? "") : extraItem && extraItem.type === "button" ? extraItem.url : (section?.links?.[key] ?? "");
@@ -105,6 +109,13 @@ export function ElementPanel({
                   <ColorRow label="Color del botón" value={style.bg} autoLabel="Automático" swatches={swatches} onChange={(hex) => onStyle(path, { bg: hex })} />
                 </Fold>
                 {!header && (
+                  <Fold title="Tamaño">
+                    <RangeRow label="Ancho del botón" unit="%" min={20} max={100} step={5} auto="Automático" value={style.w} onChange={(v) => onStyle(path, { w: v })} />
+                    <RangeRow label="Grosor (alto)" unit="px" min={6} max={50} step={2} auto="Automático" value={style.h} onChange={(v) => onStyle(path, { h: v })} />
+                    <RangeRow label="Tamaño de las letras" unit="%" min={50} max={200} step={5} auto="Automático" value={style.fs} onChange={(v) => onStyle(path, { fs: v })} />
+                  </Fold>
+                )}
+                {!header && (
                   <Fold title="Forma">
                     <ButtonShapePicker label="Esquinas" value={style.shape} onChange={(v) => onStyle(path, { shape: v })} />
                   </Fold>
@@ -117,6 +128,35 @@ export function ElementPanel({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** A slider with its value; "Automático" puts the button's own size back. Saves when the pointer is released. */
+function RangeRow({ label, unit, min, max, step, auto, value, onChange }: { label: string; unit: string; min: number; max: number; step: number; auto: string; value: string | null | undefined; onChange: (v: string | null) => void }) {
+  const [v, setV] = useState(value ? Number(value) : null);
+  const shown = v ?? (unit === "%" && min === 50 ? 100 : max);
+  const commit = (n: number | null) => onChange(n === null ? null : String(n));
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-semibold text-ink">{label}</span>
+        <button type="button" disabled={v === null} onClick={() => { setV(null); commit(null); }} className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-ink-muted transition hover:text-ink disabled:opacity-40">
+          {v === null ? auto : `${v}${unit} · ${auto}`}
+        </button>
+      </div>
+      <input
+        type="range"
+        aria-label={label}
+        min={min}
+        max={max}
+        step={step}
+        value={shown}
+        onChange={(e) => setV(Number(e.target.value))}
+        onPointerUp={() => v !== null && commit(v)}
+        onKeyUp={() => v !== null && commit(v)}
+        className="w-full accent-[var(--accent,#7ac70c)]"
+      />
     </div>
   );
 }
