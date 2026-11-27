@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BLOCK_LIBRARY, GROUP_LABELS, type BlockEntry } from "@/lib/websiteBlocks";
+import { SearchIcon } from "./builderIcons";
 
 const GLYPH: Record<BlockEntry["type"], string> = {
   features: "▦",
@@ -144,6 +145,96 @@ export function ExtraGrid({ onPick, disabled }: { onPick: (kind: string) => void
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * Desktop library: a search box and two-column tiles (big symbol, short name), grouped.
+ * Tap a tile to add it, or drag it onto the page.
+ */
+export function TileLibrary({ onPick, onPickExtra, disabled, where }: { onPick: (type: BlockEntry["type"]) => void; onPickExtra: (kind: string) => void; disabled?: boolean; where: string }) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const match = (...texts: string[]) => !q || texts.some((t) => t.toLowerCase().includes(q));
+  const extras = EXTRA_CARDS.filter((c) => match(c.label, c.help, "dentro elemento"));
+  const groups = (Object.keys(GROUP_LABELS) as BlockEntry["group"][])
+    .map((g) => ({ key: g, blocks: BLOCK_LIBRARY.filter((b) => b.group === g && match(b.label, b.help, GROUP_LABELS[g])) }))
+    .filter((g) => g.blocks.length > 0);
+  const tile = "flex h-[5.25rem] w-full cursor-grab flex-col items-center justify-center gap-1.5 rounded-xl border border-border bg-background p-2 text-center transition hover:border-accent hover:bg-accent/5 active:cursor-grabbing disabled:opacity-50";
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <label className="relative block">
+        <span className="sr-only">Buscar elementos</span>
+        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+        <input
+          id="block-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar elementos…"
+          autoComplete="off"
+          className="h-10 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-sm outline-none transition focus:border-accent"
+        />
+      </label>
+      <p className="text-[12px] text-ink-muted">
+        <strong>Arrastra</strong> uno a la página o tócalo: se agrega {where}.
+      </p>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-2">
+        {extras.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">Dentro de un bloque</p>
+            <ul className="grid grid-cols-2 gap-2">
+              {extras.map((c) => (
+                <li key={c.kind}>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(NEW_EXTRA_MIME, c.kind);
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
+                    onClick={() => onPickExtra(c.kind)}
+                    title={c.help}
+                    className={tile}
+                  >
+                    <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/12 text-lg font-bold text-accent">{c.glyph}</span>
+                    <span className="text-[12px] font-semibold leading-tight text-ink">{c.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {groups.map((g) => (
+          <div key={g.key} className="space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">{GROUP_LABELS[g.key]}</p>
+            <ul className="grid grid-cols-2 gap-2">
+              {g.blocks.map((b) => (
+                <li key={b.type}>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(NEW_BLOCK_MIME, b.type);
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
+                    onClick={() => onPick(b.type)}
+                    title={b.help}
+                    className={tile}
+                  >
+                    <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/12 text-lg text-accent">{GLYPH[b.type]}</span>
+                    <span className="text-[12px] font-semibold leading-tight text-ink">{b.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {extras.length === 0 && groups.length === 0 && <p className="py-6 text-center text-sm text-ink-muted">Nada se llama «{query}». Prueba con otra palabra.</p>}
+      </div>
     </div>
   );
 }

@@ -27,6 +27,7 @@ import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
+import { BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
 import { PublishControl } from "./PublishControl";
 import { HtmlCodeDialog } from "./HtmlCodeDialog";
 
@@ -84,6 +85,8 @@ export function WebsiteBuilder({
   // The window where an HTML block's code is pasted (the block's number), or null.
   const [htmlDialog, setHtmlDialog] = useState<number | null>(null);
   const [device, setDevice] = useState<Device>("desktop");
+  // Canvas zoom (desktop toolbar): 50–150 %.
+  const [zoom, setZoom] = useState(100);
   const [previewVersion, setPreviewVersion] = useState(0);
   // Unsaved colors/fonts from the Diseño tab, shown live in the preview.
   const [draftTheme, setDraftTheme] = useState<WebsiteContentV2["theme"] | null>(null);
@@ -403,11 +406,11 @@ export function WebsiteBuilder({
   const sel = selected !== null && selected < content.sections.length ? selected : null;
   // Editing comes first (like a page builder); the AI chat is the second way to change the page.
   // "Estilo" only exists while a block is chosen (it is that block's style): with nothing chosen it was an empty twin of Elementos.
-  const TABS: { key: Tab; label: string }[] = [
-    { key: "bloques", label: "Elementos" },
-    ...(sel !== null ? [{ key: "estilo" as const, label: "Estilo" }] : []),
-    { key: "diseno", label: "Diseño" },
-    { key: "ajustes", label: "Ajustes" },
+  const TABS: { key: Tab; label: string; Icon: (p: { className?: string }) => React.JSX.Element; hint: string }[] = [
+    { key: "bloques", label: "Elementos", Icon: PlusSquareIcon, hint: "Agrega bloques y elementos a tu página" },
+    ...(sel !== null ? [{ key: "estilo" as const, label: "Estilo", Icon: EditIcon, hint: "Fondo, colores, espacios y tamaños del bloque elegido" }] : []),
+    { key: "diseno", label: "Diseño", Icon: PaletteIcon, hint: "Colores y estilo de toda la página" },
+    { key: "ajustes", label: "Ajustes", Icon: GearIcon, hint: "Link, formulario, pixel y estadísticas" },
   ];
   const activeTab: Tab = tab === "estilo" && sel === null ? "bloques" : tab;
 
@@ -453,57 +456,52 @@ export function WebsiteBuilder({
         </div>
       )}
 
-      {/* Top bar (tablet and desktop) */}
-      <header className="hidden flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2 md:flex md:px-4">
-        <Link href={`/dashboard/businesses/${businessId}/website`} className="rounded-md px-2 py-1 text-sm text-ink-muted hover:bg-surface-2 hover:text-ink">
-          ← Sitios
+      {/* Top bar (tablet and desktop): back + page name, the editor's sections as icons, and publishing on the right. */}
+      <header className="hidden items-center gap-2 border-b border-border bg-surface px-3 py-1.5 md:flex lg:gap-3 lg:px-4">
+        <Link href={`/dashboard/businesses/${businessId}/website`} title="Volver a mis sitios" aria-label="Volver a mis sitios" className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink">
+          <BackIcon />
         </Link>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold">{name}</p>
-          <p className="truncate text-[11px] text-ink-faint">
-            {PAGE_TYPE_LABELS[content.pageType]} · {STYLE_INFO[content.style].label}
-          </p>
+        <div className="min-w-0 flex-1 basis-0 lg:max-w-[16rem] lg:flex-none lg:basis-auto">
+          <p className="truncate text-sm font-bold leading-tight">{name}</p>
+          <p className="truncate text-[11px] leading-tight text-ink-faint">{publicUrl.replace(/^https?:\/\//, "")}</p>
         </div>
-        <div className="flex items-center gap-1" role="group" aria-label="Deshacer y rehacer">
-          <button type="button" onClick={() => travel("undo")} disabled={!!busy || history.undo === 0} title="Deshacer (Ctrl+Z)" aria-label="Deshacer" className="h-8 w-8 rounded-md border border-border text-base hover:border-accent disabled:opacity-35">
-            ↶
-          </button>
-          <button type="button" onClick={() => travel("redo")} disabled={!!busy || history.redo === 0} title="Rehacer (Ctrl+Mayús+Z)" aria-label="Rehacer" className="h-8 w-8 rounded-md border border-border text-base hover:border-accent disabled:opacity-35">
-            ↷
-          </button>
-        </div>
-        <div className="fl-seg mx-auto hidden md:inline-flex" role="radiogroup" aria-label="Vista">
-          {(["desktop", "tablet", "mobile"] as Device[]).map((d) => (
-            <button
-              key={d}
-              type="button"
-              role="radio"
-              aria-checked={device === d}
-              onClick={() => setDevice(d)}
-              className="fl-seg-item px-3 py-1.5 text-xs"
-            >
-              {d === "desktop" ? "🖥 Escritorio" : d === "tablet" ? "Tablet" : "📱 Celular"}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <span aria-live="polite" className={`hidden min-w-[5.5rem] text-right text-[11px] font-semibold sm:block ${saveState === "error" ? "text-error" : "text-ink-muted"}`}>
+        <nav aria-label="Secciones del editor" className="mx-auto flex items-center gap-0.5">
+          {TABS.map((t) => {
+            const on = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                title={t.hint}
+                aria-pressed={on}
+                onClick={() => setTab(t.key)}
+                className={`relative flex min-w-[4.25rem] flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition ${on ? "bg-accent/12 text-accent" : "text-ink-muted hover:bg-surface-2 hover:text-ink"}`}
+              >
+                <t.Icon />
+                {t.label}
+                {on && <span aria-hidden="true" className="absolute inset-x-3 -bottom-[7px] h-0.5 rounded-full bg-accent" />}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="flex flex-1 basis-0 items-center justify-end gap-1.5 lg:flex-none lg:basis-auto">
+          <span aria-live="polite" className={`hidden min-w-[5rem] text-right text-[11px] font-semibold xl:block ${saveState === "error" ? "text-error" : "text-ink-muted"}`}>
             {saveState === "saving" ? "Guardando…" : saveState === "saved" ? "✓ Guardado" : saveState === "error" ? "No se guardó" : ""}
           </span>
-          <PublishControl businessId={businessId} websiteId={websiteId} published={published} />
-          <button type="button" onClick={copyLink} className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold hover:border-accent">
-            {copied ? "¡Copiado!" : "Copiar link"}
+          <button type="button" onClick={copyLink} title="Copiar el link de la página" aria-label={copied ? "Link copiado" : "Copiar el link de la página"} className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg border transition ${copied ? "border-accent text-accent" : "border-border text-ink-muted hover:border-accent hover:text-ink"}`}>
+            <LinkIcon />
           </button>
-          <a href={fromPanelUrl(publicUrl)} target="_blank" rel="noopener noreferrer" className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink hover:bg-accent-hover">
-            Ver página ↗
+          <a href={fromPanelUrl(publicUrl)} target="_blank" rel="noopener noreferrer" title="Ver mi página en otra pestaña" aria-label="Ver mi página" className="flex h-9 w-9 flex-none items-center justify-center rounded-lg border border-border text-ink-muted transition hover:border-accent hover:text-ink">
+            <ExternalIcon />
           </a>
+          <PublishControl businessId={businessId} websiteId={websiteId} published={published} />
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
         {/* Side panel */}
         <aside className={`${mobilePanel === "panel" ? "flex" : "hidden"} w-full flex-col border-r border-border bg-surface md:flex md:w-[23rem] md:flex-none`}>
-          <nav className="flex gap-1 border-b border-border p-1.5">
+          <nav className="flex gap-1 border-b border-border p-1.5 md:hidden">
             {TABS.map((t) => (
               <button
                 key={t.key}
@@ -670,7 +668,7 @@ export function WebsiteBuilder({
         </aside>
 
         {/* Live preview */}
-        <div className={`${mobilePanel === "preview" ? "flex" : "hidden"} min-w-0 flex-1 flex-col md:flex`}>
+        <div className={`${mobilePanel === "preview" ? "flex" : "hidden"} min-w-0 flex-1 flex-col bg-surface-2 md:flex md:bg-[radial-gradient(var(--border-strong)_1px,transparent_1.2px)] md:bg-[length:18px_18px]`}>
         {/* Not on a page that is only the owner's own code: it is edited from the code, not on the page. */}
         {!hintDismissed && !content.fullHtml && (
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
@@ -694,10 +692,52 @@ export function WebsiteBuilder({
             </button>
           </div>
         )}
-        <main className="relative flex min-h-0 min-w-0 flex-1 justify-center overflow-auto bg-[repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2)_10px,var(--background)_10px,var(--background)_20px)] p-0 md:p-4">
+        {/* Floating canvas toolbar (tablet and desktop): undo/redo, zoom, fit and the device the page is shown on. */}
+        <div className="hidden flex-none justify-center px-3 pt-3 md:flex">
+          <div role="toolbar" aria-label="Herramientas del lienzo" className="flex items-center gap-1 rounded-xl border border-border bg-surface px-1.5 py-1 shadow-md">
+            <button type="button" onClick={() => travel("undo")} disabled={!!busy || history.undo === 0} title="Deshacer (Ctrl+Z)" aria-label="Deshacer" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-35">
+              <UndoIcon />
+            </button>
+            <button type="button" onClick={() => travel("redo")} disabled={!!busy || history.redo === 0} title="Rehacer (Ctrl+Mayús+Z)" aria-label="Rehacer" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-35">
+              <RedoIcon />
+            </button>
+            <span aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
+            <button type="button" onClick={() => setZoom((z) => Math.max(50, z - 10))} disabled={zoom <= 50} title="Alejar" aria-label="Alejar" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-35">
+              <MinusIcon />
+            </button>
+            <button type="button" onClick={() => setZoom(100)} title="Volver a 100 %" aria-label={`Zoom ${zoom} %, tocar para volver a 100 %`} className="h-8 min-w-[3.25rem] rounded-lg px-1 text-xs font-bold tabular-nums text-ink transition hover:bg-surface-2">
+              {zoom}%
+            </button>
+            <button type="button" onClick={() => setZoom((z) => Math.min(150, z + 10))} disabled={zoom >= 150} title="Acercar" aria-label="Acercar" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink disabled:opacity-35">
+              <PlusIcon />
+            </button>
+            <span aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
+            <div role="radiogroup" aria-label="Vista" className="flex items-center gap-0.5">
+              {([
+                ["desktop", "Computador", DesktopIcon],
+                ["tablet", "Tablet", TabletIcon],
+                ["mobile", "Celular", PhoneIcon],
+              ] as const).map(([d, label, Icon]) => (
+                <button
+                  key={d}
+                  type="button"
+                  role="radio"
+                  aria-checked={device === d}
+                  aria-label={label}
+                  title={label}
+                  onClick={() => setDevice(d)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${device === d ? "bg-accent/12 text-accent" : "text-ink-muted hover:bg-surface-2 hover:text-ink"}`}
+                >
+                  <Icon />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <main className="relative flex min-h-0 min-w-0 flex-1 justify-center overflow-auto p-0 md:p-4">
           <div
             className={`relative h-full overflow-hidden bg-white transition-[width] duration-300 md:rounded-xl md:border md:border-border md:shadow-2xl ${isPending ? "opacity-80" : ""}`}
-            style={{ width: DEVICE_WIDTH[device], maxWidth: "100%" }}
+            style={zoom === 100 ? { width: DEVICE_WIDTH[device], maxWidth: "100%" } : { zoom: zoom / 100, width: device === "desktop" ? `${10000 / zoom}%` : DEVICE_WIDTH[device], maxWidth: `${10000 / zoom}%`, height: "auto" }}
           >
             <iframe
               ref={iframeRef}

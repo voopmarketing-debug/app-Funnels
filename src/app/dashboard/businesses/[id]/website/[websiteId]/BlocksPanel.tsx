@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { SECTION_LABELS, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import type { BlockOp } from "@/lib/websiteBlocks";
-import { BlockGrid, ExtraGrid, NEW_BLOCK_MIME } from "./BlockLibrary";
+import { BlockGrid, ExtraGrid, NEW_BLOCK_MIME, TileLibrary } from "./BlockLibrary";
 
 const MOVE_MIME = "application/x-fl-move-block";
 
@@ -73,6 +73,9 @@ export function BlocksPanel({
 }) {
   // Open from the start: the elements are right there to drag onto the page.
   const [libraryOpen, setLibraryOpen] = useState(true);
+  // Desktop only: "Añadir" is the tile library, "Capas" the list of the page's blocks (the phone keeps one scrolling list).
+  const [deskView, setDeskView] = useState<"anadir" | "capas">("anadir");
+  const deskHide = deskView === "anadir" ? "md:hidden" : "";
   const [dropAt, setDropAt] = useState<number | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const hidden = new Set(content.hidden);
@@ -103,7 +106,24 @@ export function BlocksPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-      <div className="space-y-2 max-md:order-2">
+      <div role="tablist" aria-label="Elementos" className="fl-seg hidden w-full md:flex">
+        {([["anadir", "Añadir"], ["capas", `Capas (${count})`]] as const).map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={deskView === key} onClick={() => setDeskView(key)} className="fl-seg-item flex-1 px-3 py-1.5 text-xs">
+            {label}
+          </button>
+        ))}
+      </div>
+      {deskView === "anadir" && (
+        <div className="hidden min-h-0 flex-1 md:flex">
+          <TileLibrary
+            disabled={busy}
+            where={selected !== null && selected > 0 ? "debajo del bloque elegido" : "al final de la página"}
+            onPickExtra={onAddExtra}
+            onPick={(type) => onOp({ kind: "add", type, at: selected !== null && selected > 0 ? selected + 1 : undefined })}
+          />
+        </div>
+      )}
+      <div className="space-y-2 max-md:order-2 md:hidden">
         <button
           type="button"
           onClick={() => setLibraryOpen((v) => !v)}
@@ -126,6 +146,7 @@ export function BlocksPanel({
         )}
       </div>
 
+      <div className={`contents ${deskHide}`}>
       {selected !== null && content.sections[selected]?.type === "event" && (
         <EventDateEditor key={`ev${selected}`} date={(content.sections[selected] as { date: string }).date} busy={busy} onSave={(date) => onSaveEventDate(selected, date)} />
       )}
@@ -283,6 +304,7 @@ export function BlocksPanel({
           onDrop={(e) => drop(e, count)}
         />
       </ol>
+      </div>
       </div>
     </div>
   );
