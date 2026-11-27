@@ -2,35 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BLOCK_LIBRARY, GROUP_LABELS, type BlockEntry } from "@/lib/websiteBlocks";
-import { SearchIcon } from "./builderIcons";
+import { BLOCK_ICON, EXTRA_ICON, SearchIcon } from "./builderIcons";
 
-const GLYPH: Record<BlockEntry["type"], string> = {
-  features: "▦",
-  steps: "①",
-  host: "☺",
-  gallery: "▣",
-  productGrid: "🛍",
-  productSpotlight: "★",
-  promo: "▬",
-  showroom: "◐",
-  quoter: "⇋",
-  fan: "◠",
-  traveler: "⇅",
-  marquee: "≋",
-  video: "▶",
-  html: "</>",
-  event: "📅",
-  offer: "🏷",
-  guarantee: "🛡",
-  testimonials: "❝",
-  comparison: "⇄",
-  trustBar: "✓",
-  stats: "#",
-  objections: "?",
-  agenda: "▤",
-  leadForm: "✉",
-  cta: "➜",
-};
 
 /** Drag payload of a library block dropped onto the block list. */
 export const NEW_BLOCK_MIME = "application/x-fl-new-block";
@@ -59,7 +32,7 @@ export function BlockGrid({ onPick, disabled, compact = false }: { onPick: (type
                   className="flex w-full cursor-grab items-center gap-2.5 rounded-lg border border-border bg-background p-2 text-left transition hover:border-accent hover:bg-accent/5 active:cursor-grabbing disabled:opacity-50"
                 >
                   <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-md bg-accent/12 text-base text-accent">
-                    {GLYPH[b.type]}
+                    {(() => { const I = BLOCK_ICON[b.type]; return <I className="h-[18px] w-[18px]" />; })()}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-semibold text-ink">{b.label}</span>
@@ -114,9 +87,9 @@ export function BlockLibraryDialog({ onPick, onClose, where }: { onPick: (type: 
 export const NEW_EXTRA_MIME = "application/x-fl-new-extra";
 
 const EXTRA_CARDS = [
-  { kind: "text", label: "Texto", glyph: "T", help: "Un párrafo debajo del título" },
-  { kind: "button", label: "Botón", glyph: "▭", help: "Un botón con tu enlace" },
-  { kind: "image", label: "Foto", glyph: "▣", help: "Una foto que se acomoda sola" },
+  { kind: "text", label: "Texto", help: "Un párrafo debajo del título" },
+  { kind: "button", label: "Botón", help: "Un botón con tu enlace" },
+  { kind: "image", label: "Foto", help: "Una foto que se acomoda sola" },
 ] as const;
 
 /** Elements that go INSIDE a block: tap to put one in the chosen block, or drag it onto a block of the page. */
@@ -139,7 +112,7 @@ export function ExtraGrid({ onPick, disabled }: { onPick: (kind: string) => void
               title={c.help}
               className="flex w-full cursor-grab flex-col items-center gap-1 rounded-lg border border-border bg-background p-2 text-center transition hover:border-accent hover:bg-accent/5 active:cursor-grabbing disabled:opacity-50"
             >
-              <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/12 text-base font-bold text-accent">{c.glyph}</span>
+              <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/12 text-accent">{(() => { const I = EXTRA_ICON[c.kind]; return <I className="h-[18px] w-[18px]" />; })()}</span>
               <span className="text-[12px] font-semibold text-ink">{c.label}</span>
             </button>
           </li>
@@ -161,7 +134,7 @@ export function TileLibrary({ onPick, onPickExtra, disabled, where }: { onPick: 
   const groups = (Object.keys(GROUP_LABELS) as BlockEntry["group"][])
     .map((g) => ({ key: g, blocks: BLOCK_LIBRARY.filter((b) => b.group === g && match(b.label, b.help, GROUP_LABELS[g])) }))
     .filter((g) => g.blocks.length > 0);
-  const tile = "flex h-[5.25rem] w-full cursor-grab flex-col items-center justify-center gap-1.5 rounded-xl border border-border bg-background p-2 text-center transition hover:border-accent hover:bg-accent/5 active:cursor-grabbing disabled:opacity-50";
+  const tile = "group flex h-[5.25rem] w-full cursor-grab flex-col items-center justify-center gap-1.5 rounded-xl border border-border bg-background p-2 text-center text-ink-muted transition hover:border-accent hover:bg-accent/5 hover:text-accent active:cursor-grabbing disabled:opacity-50";
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <label className="relative block">
@@ -199,8 +172,8 @@ export function TileLibrary({ onPick, onPickExtra, disabled, where }: { onPick: 
                     title={c.help}
                     className={tile}
                   >
-                    <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/12 text-lg font-bold text-accent">{c.glyph}</span>
-                    <span className="text-[12px] font-semibold leading-tight text-ink">{c.label}</span>
+                    {(() => { const I = EXTRA_ICON[c.kind]; return <I className="h-7 w-7" />; })()}
+                    <span className="text-[12px] font-medium leading-tight text-ink">{c.label}</span>
                   </button>
                 </li>
               ))}
@@ -225,8 +198,8 @@ export function TileLibrary({ onPick, onPickExtra, disabled, where }: { onPick: 
                     title={b.help}
                     className={tile}
                   >
-                    <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/12 text-lg text-accent">{GLYPH[b.type]}</span>
-                    <span className="text-[12px] font-semibold leading-tight text-ink">{b.label}</span>
+                    {(() => { const I = BLOCK_ICON[b.type]; return <I className="h-7 w-7" />; })()}
+                    <span className="text-[12px] font-medium leading-tight text-ink">{b.label}</span>
                   </button>
                 </li>
               ))}

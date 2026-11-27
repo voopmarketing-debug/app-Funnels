@@ -27,7 +27,7 @@ import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
-import { BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
+import { ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
 import { PublishControl } from "./PublishControl";
 import { HtmlCodeDialog } from "./HtmlCodeDialog";
 
@@ -87,6 +87,8 @@ export function WebsiteBuilder({
   const [device, setDevice] = useState<Device>("desktop");
   // Canvas zoom (desktop toolbar): 50–150 %.
   const [zoom, setZoom] = useState(100);
+  // Desktop: the left panel folds away to give the page the whole width.
+  const [panelOpen, setPanelOpen] = useState(true);
   const [previewVersion, setPreviewVersion] = useState(0);
   // Unsaved colors/fonts from the Diseño tab, shown live in the preview.
   const [draftTheme, setDraftTheme] = useState<WebsiteContentV2["theme"] | null>(null);
@@ -474,7 +476,10 @@ export function WebsiteBuilder({
                 type="button"
                 title={t.hint}
                 aria-pressed={on}
-                onClick={() => setTab(t.key)}
+                onClick={() => {
+                  setTab(t.key);
+                  setPanelOpen(true);
+                }}
                 className={`relative flex min-w-[4.25rem] flex-col items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition ${on ? "bg-accent/12 text-accent" : "text-ink-muted hover:bg-surface-2 hover:text-ink"}`}
               >
                 <t.Icon />
@@ -500,7 +505,7 @@ export function WebsiteBuilder({
 
       <div className="flex min-h-0 flex-1">
         {/* Side panel */}
-        <aside className={`${mobilePanel === "panel" ? "flex" : "hidden"} w-full flex-col border-r border-border bg-surface md:flex md:w-[23rem] md:flex-none`}>
+        <aside className={`${mobilePanel === "panel" ? "flex" : "hidden"} w-full flex-col border-r border-border bg-surface ${panelOpen ? "md:flex" : "md:hidden"} md:w-[23rem] md:flex-none`}>
           <nav className="flex gap-1 border-b border-border p-1.5 md:hidden">
             {TABS.map((t) => (
               <button
@@ -668,7 +673,10 @@ export function WebsiteBuilder({
         </aside>
 
         {/* Live preview */}
-        <div className={`${mobilePanel === "preview" ? "flex" : "hidden"} min-w-0 flex-1 flex-col bg-surface-2 md:flex md:bg-[radial-gradient(var(--border-strong)_1px,transparent_1.2px)] md:bg-[length:18px_18px]`}>
+        <div className={`${mobilePanel === "preview" ? "flex" : "hidden"} min-w-0 flex-1 flex-col bg-surface-2 md:relative md:flex md:bg-[radial-gradient(var(--border-strong)_1px,transparent_1.2px)] md:bg-[length:18px_18px]`}>
+        <button type="button" onClick={() => setPanelOpen((v) => !v)} aria-label={panelOpen ? "Esconder el panel" : "Mostrar el panel"} title={panelOpen ? "Esconder el panel" : "Mostrar el panel"} className="absolute left-0 top-1/2 z-20 hidden h-12 w-4 -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-border bg-surface text-ink-muted shadow transition hover:text-accent md:flex">
+          {panelOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+        </button>
         {/* Not on a page that is only the owner's own code: it is edited from the code, not on the page. */}
         {!hintDismissed && !content.fullHtml && (
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
