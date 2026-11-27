@@ -155,8 +155,6 @@ export function TemplateLibrary({
     );
   }
 
-  const sidebarItem = (active: boolean) =>
-    `flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition ${active ? "bg-accent/15 font-semibold text-ink" : "text-ink-muted hover:bg-surface-2 hover:text-ink"}`;
   const bigIndex = big ? shown.findIndex((c) => c.id === big.id) : -1;
 
   return (
@@ -180,213 +178,101 @@ export function TemplateLibrary({
 
       {error && <p className="rounded-lg border border-error/40 bg-error/10 p-3 text-sm text-error">{error}</p>}
 
-      {/* Phones: the blank page is built on a computer only; here, the one way to bring your own page. */}
-      <div className="sm:hidden">
-        <button type="button" onClick={() => setHtmlOpen(true)} className="flex min-h-[4.5rem] w-full flex-col items-center justify-center gap-0.5 rounded-xl border border-border-strong px-3 py-3 text-sm font-bold text-ink hover:border-accent">
-          <span aria-hidden="true" className="text-xl leading-none">⬆</span>
-          Subir mi HTML
-        </button>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        {/* Niches */}
-        <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
-          <div className="relative">
-            <label htmlFor="template-search" className="sr-only">
-              Buscar plantillas
-            </label>
-            <input
-              id="template-search"
-              type="search"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(0);
-              }}
-              placeholder="Buscar: contadores, citas, formulario…"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-ink outline-none focus:border-accent md:text-sm"
-            />
-          </div>
-
-          {/* Phones: dropdowns. Wider screens: the list. */}
-          <div className="grid grid-cols-2 gap-2 lg:hidden">
-            <select
-              aria-label="Nicho"
-              value={niche}
-              onChange={(e) => {
-                setNiche(e.target.value);
-                setPage(0);
-              }}
-              className="rounded-lg border border-border bg-background px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
-            >
-              <option value="all">Todos ({cards.length})</option>
-              {niches.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.emoji} {n.short}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Estilo de color" value={tone} onChange={(e) => setTone(e.target.value as Tone)} className="rounded-lg border border-border bg-background px-3 py-2.5 text-base text-ink outline-none focus:border-accent">
-              <option value="all">Cualquier fondo</option>
-              <option value="light">Fondo claro</option>
-              <option value="dark">Fondo oscuro</option>
-            </select>
-          </div>
-
-          <nav aria-label="Nichos" className="hidden space-y-0.5 lg:block">
-            <p className="px-3 pb-1 text-xs font-bold uppercase tracking-wide text-ink-faint">Nichos</p>
+      {/* Toolbar: niches as tabs, search, background and the two ways to bring your own page. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <nav aria-label="Nichos" className="-mx-1 flex min-w-0 basis-full gap-1 overflow-x-auto px-1 pb-1">
+          {[{ id: "all", label: "Todos", emoji: "" }, ...niches.map((n) => ({ id: n.id, label: n.short, emoji: n.emoji }))].map((n) => (
             <button
+              key={n.id}
               type="button"
+              aria-current={niche === n.id}
               onClick={() => {
-                setNiche("all");
+                setNiche(n.id);
                 setPage(0);
               }}
-              aria-current={niche === "all"}
-              className={sidebarItem(niche === "all")}
+              className={`flex-none whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] transition ${niche === n.id ? "bg-accent/15 font-semibold text-ink ring-1 ring-accent/50" : "text-ink-muted hover:bg-surface-2 hover:text-ink"}`}
             >
-              <span>Todos</span>
-              <span className="text-xs text-ink-faint">{cards.length}</span>
+              {n.emoji && <span aria-hidden="true">{n.emoji} </span>}
+              {n.label}
             </button>
-            {niches.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => {
-                  setNiche(n.id);
-                  setPage(0);
-                }}
-                aria-current={niche === n.id}
-                className={sidebarItem(niche === n.id)}
-              >
-                <span className="min-w-0 truncate">
-                  <span aria-hidden="true">{n.emoji} </span>
-                  {n.short}
-                </span>
-                <span className="text-xs text-ink-faint">{n.count}</span>
-              </button>
-            ))}
-          </nav>
-
-          <div className="hidden space-y-1.5 lg:block">
-            <p className="px-3 text-xs font-bold uppercase tracking-wide text-ink-faint">Color de fondo</p>
-            <div className="fl-seg flex" role="radiogroup" aria-label="Color de fondo">
-              {(
-                [
-                  ["all", "Todos"],
-                  ["light", "Claro"],
-                  ["dark", "Oscuro"],
-                ] as const
-              ).map(([key, text]) => (
-                <button key={key} type="button" role="radio" aria-checked={tone === key} onClick={() => setTone(key)} className="fl-seg-item flex-1 px-2 py-1.5 text-xs">
-                  {text}
-                </button>
-              ))}
-            </div>
-          </div>
-
-        </aside>
-
-        {/* Templates */}
-        <section className="min-w-0 space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-bold text-ink">{niche === "all" ? "Todas las plantillas" : niches.find((n) => n.id === niche)?.name}</h2>
-              <p className="text-xs text-ink-muted">
-                {shown.length} {shown.length === 1 ? "plantilla" : "plantillas"} · cada una con una estructura distinta pensada para que te escriban.
-              </p>
-            </div>
-          </div>
-
-          {shown.length === 0 ? (
-            <div className="fl-card p-8 text-center">
-              <p className="text-sm font-semibold text-ink">No encontramos plantillas con eso</p>
-              <p className="mt-1 text-xs text-ink-muted">Prueba con otra palabra o cambia el filtro.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <article className="fl-card flex flex-col overflow-hidden border-dashed max-sm:hidden">
-                <button type="button" onClick={createBlank} className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-surface-2/50 text-ink-muted transition hover:text-ink max-sm:hidden" aria-label="Empezar con una página en blanco">
-                  <span aria-hidden="true" className="font-mono text-4xl">{"</>"}</span>
-                  <span className="text-xs">Sin nada: tú pones los bloques</span>
-                </button>
-                <div className="flex flex-1 flex-col gap-1.5 p-3.5">
-                  <p className="text-sm font-bold text-ink"><span aria-hidden="true" className="mr-1.5 font-mono sm:hidden">{"</>"}</span>Página en blanco</p>
-                  <p className="line-clamp-2 text-xs text-ink-muted">Arrastra bloques o pega tu propio código HTML, como en Elementor.</p>
-                  <button type="button" onClick={createBlank} className="mt-auto rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                    Empezar en blanco
-                  </button>
-                </div>
-              </article>
-              <article className="fl-card flex flex-col overflow-hidden border-dashed max-sm:hidden">
-                <button type="button" onClick={() => setHtmlOpen(true)} className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 bg-surface-2/50 text-ink-muted transition hover:text-ink max-sm:hidden" aria-label="Subir mi propio HTML">
-                  <span aria-hidden="true" className="text-4xl">⬆</span>
-                  <span className="text-xs">Tu archivo .html o tu código</span>
-                </button>
-                <div className="flex flex-1 flex-col gap-1.5 p-3.5">
-                  <p className="text-sm font-bold text-ink"><span aria-hidden="true" className="mr-1.5 sm:hidden">⬆</span>Subir mi HTML</p>
-                  <p className="line-clamp-2 text-xs text-ink-muted">Elige un archivo .html desde tu celular o computador, o pega tu código: queda como una página tuya.</p>
-                  <button type="button" onClick={() => setHtmlOpen(true)} className="mt-auto rounded-lg border border-border-strong px-3 py-2 text-sm font-bold text-ink hover:border-accent">
-                    Subir mi HTML
-                  </button>
-                </div>
-              </article>
-              {visible.map((card) => (
-                <article key={card.id} className="fl-card flex flex-col overflow-hidden">
-                  <button type="button" onClick={() => setBig(card)} className="block overflow-hidden text-left" aria-label={`Ver página: ${card.nicheName}, ${label(card)}`}>
-                    <TemplateThumb card={card} />
-                  </button>
-                  <div className="flex flex-1 flex-col gap-1.5 p-3.5">
-                    <p className="text-sm font-bold text-ink">{label(card)}</p>
-                    <p className="text-xs text-ink-faint">
-                      <span aria-hidden="true">{card.emoji} </span>
-                      {card.nicheName}
-                    </p>
-                    <p className="line-clamp-2 text-xs text-ink-muted">{card.strategy}</p>
-                    <div className="mt-auto grid grid-cols-2 gap-2 pt-2.5">
-                      <button type="button" onClick={() => setBig(card)} className="rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold hover:border-accent">
-                        Ver página
-                      </button>
-                      <button type="button" onClick={() => publish(card)} className="rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
-                        {actionLabel(card)}
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-
-          {pages > 1 && (
-            <nav aria-label="Páginas de plantillas" className="flex items-center justify-between gap-2 pt-2">
-              <button
-                type="button"
-                disabled={current === 0}
-                onClick={() => {
-                  setPage(current - 1);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="h-11 flex-1 rounded-lg border border-border-strong px-4 text-sm font-semibold hover:border-accent disabled:opacity-40 sm:flex-none"
-              >
-                ‹ Anterior
-              </button>
-              <p className="flex-none text-center text-sm text-ink-muted">
-                Página <strong className="text-ink">{current + 1}</strong> de {pages}
-              </p>
-              <button
-                type="button"
-                disabled={current >= pages - 1}
-                onClick={() => {
-                  setPage(current + 1);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="h-11 flex-1 rounded-lg bg-accent px-4 text-sm font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-40 sm:flex-none"
-              >
-                Siguiente ›
-              </button>
-            </nav>
-          )}
-        </section>
+          ))}
+        </nav>
+        <label htmlFor="template-search" className="sr-only">
+          Buscar plantillas
+        </label>
+        <input
+          id="template-search"
+          type="search"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
+          placeholder="Buscar…"
+          className="mr-auto h-9 w-52 rounded-lg border border-border bg-background px-3 text-sm text-ink outline-none focus:border-accent"
+        />
+        <div className="fl-seg flex" role="radiogroup" aria-label="Color de fondo">
+          {([["all", "Todos"], ["light", "Claro"], ["dark", "Oscuro"]] as const).map(([key, text]) => (
+            <button key={key} type="button" role="radio" aria-checked={tone === key} onClick={() => { setTone(key); setPage(0); }} className="fl-seg-item px-3 py-1.5 text-xs">
+              {text}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={createBlank} className="h-9 rounded-lg border border-border-strong px-3 text-[13px] font-semibold text-ink transition hover:border-accent">
+            <span aria-hidden="true" className="mr-1 font-mono">{"</>"}</span>En blanco
+          </button>
+          <button type="button" onClick={() => setHtmlOpen(true)} className="h-9 rounded-lg border border-border-strong px-3 text-[13px] font-semibold text-ink transition hover:border-accent">
+            <span aria-hidden="true" className="mr-1">⬆</span>Subir HTML
+          </button>
+        </div>
       </div>
+
+      {shown.length === 0 ? (
+        <div className="fl-card p-8 text-center">
+          <p className="text-sm font-semibold text-ink">No encontramos plantillas con eso</p>
+          <p className="mt-1 text-xs text-ink-muted">Prueba con otra palabra o cambia el filtro.</p>
+        </div>
+      ) : (
+        <ul className="grid gap-x-5 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
+          {visible.map((card) => (
+            <li key={card.id} className="group min-w-0">
+              <div className="relative overflow-hidden rounded-xl border border-border bg-surface transition group-hover:border-accent/70 group-focus-within:border-accent/70">
+                <TemplateThumb card={card} />
+                <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/55 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
+                  <button type="button" onClick={() => setBig(card)} aria-label={`Ver página: ${card.nicheName}, ${label(card)}`} className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90">
+                    Ver
+                  </button>
+                  <button type="button" onClick={() => publish(card)} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
+                    {actionLabel(card)}
+                  </button>
+                </div>
+              </div>
+              <p title={card.strategy} className="mt-2 flex items-baseline gap-2 px-0.5">
+                <span className="min-w-0 truncate text-sm font-semibold text-ink">{label(card)}</span>
+                <span className="flex-none truncate text-xs text-ink-faint">
+                  <span aria-hidden="true">{card.emoji} </span>
+                  {card.nicheName}
+                </span>
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {pages > 1 && (
+        <nav aria-label="Páginas de plantillas" className="flex items-center justify-center gap-3 pt-1">
+          <button type="button" disabled={current === 0} aria-label="Anterior" onClick={() => { setPage(current - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 w-9 rounded-lg border border-border-strong text-lg hover:border-accent disabled:opacity-35">
+            ‹
+          </button>
+          <p className="text-sm tabular-nums text-ink-muted">
+            <strong className="text-ink">{current + 1}</strong> / {pages}
+          </p>
+          <button type="button" disabled={current >= pages - 1} aria-label="Siguiente" onClick={() => { setPage(current + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="h-9 w-9 rounded-lg bg-accent text-lg font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-35">
+            ›
+          </button>
+        </nav>
+      )}
 
       {htmlOpen && <HtmlUploadDialog businessId={businessId} needsWhatsapp={needsWhatsapp} onClose={() => setHtmlOpen(false)} />}
       {big && (
