@@ -424,7 +424,7 @@ export function WebsiteBuilder({
   function selectBlock(index: number) {
     setSelected(index);
     const doc = iframeRef.current?.contentDocument;
-    if (doc) showSection(doc, index);
+    if (doc) showSection(doc, index, { scroll: false });
   }
 
   // What the preview's own editor can do: save a text, open the image window, move or hide a block.
