@@ -103,7 +103,7 @@ export function WebsiteBuilder({
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"panel" | "preview">("panel");
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   // Click-to-edit on the preview itself (see previewEditor.ts).
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -144,10 +144,9 @@ export function WebsiteBuilder({
     setPreviewVersion((v) => v + 1);
   };
 
-  function onPreviewLoad() {
+  function attachTo(frame: HTMLIFrameElement | null) {
     detachRef.current?.();
     detachRef.current = null;
-    const frame = iframeRef.current;
     const doc = frame?.contentDocument;
     if (!frame || !doc) return;
     try {
@@ -160,6 +159,23 @@ export function WebsiteBuilder({
       showSection(doc, focusAfterLoad.current);
       focusAfterLoad.current = null;
     }
+  }
+
+  function onPreviewLoad() {
+    attachTo(iframeRef.current);
+  }
+
+  // A new version of the page loads behind the one on screen and takes its place when it is ready:
+  // no white flash, no jump (it opens at the same scroll).
+  const targetKey = `${previewVersion}-${previewTheme ? themeQuery(previewTheme) : ""}`;
+  const targetSrc = `/sitio/${slug}?preview=1&edit=1&v=${previewVersion}${previewTheme ? `&${themeQuery(previewTheme)}` : ""}`;
+  const [shown, setShown] = useState({ key: targetKey, src: targetSrc });
+  const nextRef = useRef<HTMLIFrameElement>(null);
+  function onNextLoad() {
+    const next = nextRef.current;
+    if (!next) return;
+    attachTo(next);
+    setShown({ key: targetKey, src: targetSrc });
   }
 
   // The first preview can finish loading before React hydrates this page, and then its
@@ -809,20 +825,30 @@ export function WebsiteBuilder({
         </div>
         <main className="relative flex min-h-0 min-w-0 flex-1 justify-center overflow-auto p-0 md:p-4">
           <div
-            className={`relative h-full overflow-hidden bg-white transition-[width] duration-300 md:rounded-xl md:border md:border-border md:shadow-2xl ${isPending ? "opacity-80" : ""}`}
+            className={`relative h-full overflow-hidden bg-white transition-[width] duration-300 md:rounded-xl md:border md:border-border md:shadow-2xl `}
             style={zoom === 100 ? { width: DEVICE_WIDTH[device], maxWidth: "100%" } : { zoom: zoom / 100, width: device === "desktop" ? `${10000 / zoom}%` : DEVICE_WIDTH[device], maxWidth: `${10000 / zoom}%`, height: "auto" }}
           >
-            <iframe
-              ref={iframeRef}
-              key={`${previewVersion}-${previewTheme ? themeQuery(previewTheme) : ""}`}
-              src={`/sitio/${slug}?preview=1&edit=1&v=${previewVersion}${previewTheme ? `&${themeQuery(previewTheme)}` : ""}`}
-              title="Vista previa de la página, editable: toca un texto o una imagen para cambiarlos"
-              onLoad={onPreviewLoad}
-              className="h-full w-full border-0"
-            />
+            {(shown.key === targetKey ? [{ key: shown.key, src: shown.src }] : [{ key: shown.key, src: shown.src }, { key: targetKey, src: targetSrc }]).map((fr) => {
+              const isShown = fr.key === shown.key;
+              return (
+                <iframe
+                  key={fr.key}
+                  ref={(el) => {
+                    if (isShown) iframeRef.current = el;
+                    else nextRef.current = el;
+                  }}
+                  src={fr.src}
+                  title={isShown ? "Vista previa de la página, editable: toca un texto o una imagen para cambiarlos" : "Nueva versión de la página (cargando)"}
+                  aria-hidden={isShown ? undefined : true}
+                  tabIndex={isShown ? undefined : -1}
+                  onLoad={isShown ? onPreviewLoad : onNextLoad}
+                  className={isShown ? "h-full w-full border-0" : "pointer-events-none absolute inset-0 h-full w-full border-0 opacity-0"}
+                />
+              );
+            })}
             {busy && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
-                <span className="rounded-full bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-lg">✦ {busy}</span>
+              <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2">
+                <span className="rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-lg ring-1 ring-border">{busy}</span>
               </div>
             )}
           </div>
