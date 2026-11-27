@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { listWebsiteImagesV2, uploadWebsiteImageV2 } from "@/lib/actions";
+import { UploadIcon } from "./builderIcons";
 
 type Photo = { url: string; label: string; source: "subida" | "catalogo" };
 
@@ -112,7 +113,7 @@ export function ImagePicker({
             onClick={() => fileRef.current?.click()}
             className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-strong px-4 py-5 text-sm font-semibold text-ink transition hover:border-accent hover:bg-accent/5 disabled:opacity-60"
           >
-            {uploading ? "Subiendo tu foto…" : "⬆ Subir una foto nueva"}
+            {uploading ? "Subiendo tu foto…" : <><UploadIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Subir una foto nueva</>}
             <span className="font-normal text-ink-muted">JPG, PNG o WebP</span>
           </button>
 

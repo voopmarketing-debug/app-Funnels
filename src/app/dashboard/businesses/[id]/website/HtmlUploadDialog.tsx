@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createHtmlWebsite } from "@/lib/actions";
 import { SAMPLE_HTML } from "@/lib/htmlSample";
+import { SparklesIcon, UploadIcon } from "./[websiteId]/builderIcons";
 
 const MAX = 100_000;
 
@@ -96,7 +97,7 @@ export function HtmlUploadDialog({ businessId, needsWhatsapp, onClose }: { busin
         />
         <div className="grid gap-2 sm:grid-cols-2">
           <button type="button" onClick={() => fileRef.current?.click()} className="flex h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-strong px-3 text-sm font-semibold transition hover:border-accent hover:text-accent">
-            <span aria-hidden="true">⬆</span> {fileName ? "Cambiar archivo" : "Elegir un archivo .html"}
+            <UploadIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" /> {fileName ? "Cambiar archivo" : "Elegir un archivo .html"}
           </button>
           <button
             type="button"
@@ -108,7 +109,7 @@ export function HtmlUploadDialog({ businessId, needsWhatsapp, onClose }: { busin
             }}
             className="flex h-14 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold transition hover:border-accent hover:text-accent"
           >
-            <span aria-hidden="true">✨</span> Probar con un ejemplo
+            <SparklesIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" /> Probar con un ejemplo
           </button>
         </div>
         {fileName && <p className="text-[12px] text-ink-muted">Archivo: <strong className="text-ink">{fileName}</strong></p>}

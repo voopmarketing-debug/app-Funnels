@@ -410,6 +410,9 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     const imgMark = edit ? ` data-img="${index}"` : "";
     // The owner's own photo wins over the automatic one.
     const mainImage = safeUrl(s.image) ?? heroImage;
+    // A fine frame where a photo goes, only while the owner is looking at the page in the library or the editor:
+    // the published page never shows an empty frame (it simply lays out without the photo).
+    const photoSlot = (cls: string) => `<div class="ph-photo ${cls}"${imgMark} role="img" aria-label="Aquí va tu foto"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.500A2.500 2.500 0 0 1 6.500 6h1.300l1.100-1.600A1.500 1.500 0 0 1 10.100 3.700h3.800a1.500 1.500 0 0 1 1.200.700L16.200 6h1.300A2.500 2.500 0 0 1 20 8.500v8A2.500 2.500 0 0 1 17.500 19h-11A2.500 2.500 0 0 1 4 16.500v-8Z"/><circle cx="12" cy="12.500" r="3.200"/></svg><span>Tu foto aquí</span></div>`;
     switch (s.type) {
       case "html": {
         if (!s.code.trim()) return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerá tu código HTML. Elige este bloque en <strong>Bloques</strong> y pégalo.</div></div></section>` : "";
@@ -493,15 +496,15 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
             <div class="hero-stage"><img src="${esc(safeUrl(heroProduct.imageUrl) ?? "")}" alt="${esc(heroProduct.name)}"${note("La foto de la portada es la de tu primer producto. Cámbiala en Productos.")}><p class="hero-stage-cap"><b>${esc(heroProduct.name)}</b>${heroProduct.price !== null ? `<span>${esc(formatMoney(heroProduct.price, heroProduct.currency))}</span>` : ""}</p></div>
           </div></section>`;
         }
-        if (s.variant === "split" && mainImage) {
+        if (s.variant === "split" && (mainImage || ctx.preview)) {
           return `<section class="hero hero-split" id="inicio"><div class="decor" aria-hidden="true"></div><div class="wrap hero-split-grid">
             <div>${eyebrow}${h1()}<p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions">${primaryBtn}${secondaryBtn}</div>${badge}</div>
-            <div class="hero-media"><img src="${esc(mainImage)}" alt=""${imgMark}></div>
+            <div class="hero-media">${mainImage ? `<img src="${esc(mainImage)}" alt=""${imgMark}>` : photoSlot("ph-4x3")}</div>
           </div></section>`;
         }
         return `<section class="hero hero-centered" id="inicio"><div class="decor" aria-hidden="true"></div><div class="wrap narrow">
           ${eyebrow}${h1()}<p class="lead"${ed(fp("subheading"))}>${esc(s.subheading)}</p>${chipsHtml}<div class="hero-actions center">${primaryBtn}${secondaryBtn}</div>${badge}
-          ${mainImage && s.variant === "centered" ? `<img class="hero-wide" src="${esc(mainImage)}" alt=""${imgMark}>` : ""}
+          ${s.variant === "centered" ? (mainImage ? `<img class="hero-wide" src="${esc(mainImage)}" alt=""${imgMark}>` : ctx.preview ? photoSlot("ph-wide") : "") : ""}
         </div></section>`;
       }
 
@@ -802,8 +805,9 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
 
       case "host": {
         const hostImage = safeUrl(s.image) ?? (heroImage ? (photos[1] ?? heroImage) : null);
-        return `<section class="sec" id="nosotros"><div class="wrap host${hostImage ? "" : " host-noimg"}">
-          ${hostImage ? `<img class="host-img" src="${esc(hostImage)}" alt=""${imgMark}>` : ""}
+        const hostSlot = !hostImage && ctx.preview;
+        return `<section class="sec" id="nosotros"><div class="wrap host${hostImage || hostSlot ? "" : " host-noimg"}">
+          ${hostImage ? `<img class="host-img" src="${esc(hostImage)}" alt=""${imgMark}>` : hostSlot ? photoSlot("ph-4x3") : ""}
           <div>${kickerHtml(s.kicker, fp("kicker"))}<h2${ed(fp("heading"))}>${esc(s.heading)}</h2><p class="host-name"><span class="host-n"${ed(fp("name"))}>${esc(s.name)}</span>${s.role ? ` <span>· <span${ed(fp("role"))}>${esc(s.role)}</span></span>` : ""}</p><p class="host-body"${ed(fp("body"))}>${esc(s.body)}</p></div>
         </div></section>`;
       }
@@ -1200,6 +1204,9 @@ section{position:relative}
 .ag-item p{color:var(--muted);margin:0}
 .host{display:grid;grid-template-columns:.9fr 1.1fr;gap:56px;align-items:center}
 .host-noimg{grid-template-columns:1fr}
+.ph-photo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;border:1px solid color-mix(in srgb,var(--text) 16%,transparent);border-radius:var(--r);background:linear-gradient(145deg,color-mix(in srgb,var(--text) 4%,transparent),color-mix(in srgb,var(--primary) 7%,transparent));color:color-mix(in srgb,var(--text) 38%,transparent);font-size:12px;letter-spacing:.04em}
+.ph-4x3{aspect-ratio:4/3}
+.ph-wide{aspect-ratio:16/6;margin-top:56px}
 .host-img{width:100%;height:auto;max-height:72vh;object-fit:contain;background:var(--surface);border-radius:var(--r)}
 .host-name{font-weight:700;font-size:18px}
 .host-name span{font-weight:400;color:var(--muted)}

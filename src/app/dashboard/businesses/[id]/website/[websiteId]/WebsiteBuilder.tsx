@@ -27,7 +27,7 @@ import { BlocksPanel } from "./BlocksPanel";
 import { BlockLibraryDialog } from "./BlockLibrary";
 import { StylePanel } from "./StylePanel";
 import { attachPreviewEditor, hoverSection, showSection, type EditorHandlers } from "./previewEditor";
-import { ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
+import { BagIcon, EyeIcon, ChevronLeftIcon, ChevronRightIcon, BackIcon, DesktopIcon, EditIcon, ExternalIcon, GearIcon, LinkIcon, MinusIcon, PaletteIcon, PhoneIcon, PlusIcon, PlusSquareIcon, RedoIcon, TabletIcon, UndoIcon } from "./builderIcons";
 import { PublishControl } from "./PublishControl";
 import { HtmlCodeDialog } from "./HtmlCodeDialog";
 
@@ -468,7 +468,7 @@ export function WebsiteBuilder({
               <span aria-hidden="true">↗</span> Ver mi página
             </a>
             <button type="button" onClick={() => { void copyLink(); setPhoneMenu(false); }} className="flex h-12 w-full items-center gap-3 rounded-xl border border-border px-4 text-left text-sm font-semibold">
-              <span aria-hidden="true">🔗</span> {copied ? "¡Link copiado!" : "Copiar el link"}
+              <LinkIcon className="h-4 w-4" /> {copied ? "¡Link copiado!" : "Copiar el link"}
             </button>
             <button type="button" onClick={() => { travel("redo"); setPhoneMenu(false); }} disabled={!!busy || history.redo === 0} className="flex h-12 w-full items-center gap-3 rounded-xl border border-border px-4 text-left text-sm font-semibold disabled:opacity-40">
               <span aria-hidden="true">↷</span> Rehacer
@@ -698,7 +698,7 @@ export function WebsiteBuilder({
               </label>
               <TrackingSettings businessId={businessId} websiteId={websiteId} metaPixelId={tracking.metaPixelId} googleTagId={tracking.googleTagId} />
               <Link href={`/dashboard/businesses/${businessId}/productos`} className="block rounded-lg border border-border bg-background p-3 text-sm hover:border-accent">
-                🛍️ <strong>Productos</strong>
+                <BagIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" /><strong>Productos</strong>
                 <span className="block text-xs text-ink-muted">Agrega o edita los productos que aparecen en tu tienda.</span>
               </Link>
             </div>
@@ -714,8 +714,8 @@ export function WebsiteBuilder({
         {!hintDismissed && !content.fullHtml && (
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
             <p className="min-w-0 flex-1">
-              <span className="md:hidden"><strong>✏️ Toca un texto</strong> para escribir sobre él, o una imagen para cambiarla. Los botones sobre cada bloque lo mueven, lo duplican o lo borran.</span>
-              <span className="hidden md:inline"><strong>✏️ Edita en la página:</strong> toca un texto o una imagen. Arrastra elementos desde la izquierda.</span>
+              <span className="md:hidden"><strong>Toca un texto</strong> para escribir sobre él, o una imagen para cambiarla. Los botones sobre cada bloque lo mueven, lo duplican o lo borran.</span>
+              <span className="hidden md:inline"><strong>Edita en la página:</strong> toca un texto o una imagen. Arrastra elementos desde la izquierda.</span>
             </p>
             <button
               type="button"
@@ -894,7 +894,7 @@ export function WebsiteBuilder({
             aria-pressed={mobilePanel === p}
             className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-bold transition ${mobilePanel === p ? "bg-accent text-accent-ink" : "bg-surface-2 text-ink-muted"}`}
           >
-            <span aria-hidden="true">{p === "panel" ? "＋" : "👁"}</span>
+            {p === "panel" ? <PlusSquareIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
             {p === "panel" ? "Elementos y ajustes" : "Mi página"}
           </button>
         ))}

@@ -7,6 +7,7 @@ import { attachPreviewEditor, type EditorHandlers } from "./previewEditor";
 import { fromPanelUrl } from "@/lib/panelBackLink";
 import { TrackingSettings } from "./TrackingSettings";
 import { PublishControl } from "./PublishControl";
+import { BagIcon, DesktopIcon, LinkIcon, PhoneIcon } from "./builderIcons";
 
 type Device = "desktop" | "mobile";
 const DEVICE_WIDTH: Record<Device, string> = { desktop: "100%", mobile: "390px" };
@@ -145,7 +146,7 @@ export function TemplateBuilder({
               <span aria-hidden="true">↗</span> Ver mi página
             </a>
             <button type="button" onClick={() => { void copyLink(); setPhoneMenu(false); }} className="flex h-12 w-full items-center gap-3 rounded-xl border border-border px-4 text-left text-sm font-semibold">
-              <span aria-hidden="true">🔗</span> {copied ? "¡Link copiado!" : "Copiar el link"}
+              <LinkIcon className="h-4 w-4" /> {copied ? "¡Link copiado!" : "Copiar el link"}
             </button>
             <button type="button" onClick={() => setPhoneMenu(false)} className="h-12 w-full rounded-xl text-sm font-semibold text-ink-muted">
               Cerrar
@@ -166,7 +167,7 @@ export function TemplateBuilder({
         <div className="fl-seg mx-auto hidden md:inline-flex" role="radiogroup" aria-label="Vista">
           {(["desktop", "mobile"] as Device[]).map((d) => (
             <button key={d} type="button" role="radio" aria-checked={device === d} onClick={() => setDevice(d)} className="fl-seg-item px-3 py-1.5 text-xs">
-              {d === "desktop" ? "🖥 Escritorio" : "📱 Celular"}
+              {d === "desktop" ? <><DesktopIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Escritorio</> : <><PhoneIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Celular</>}
             </button>
           ))}
         </div>
@@ -202,7 +203,7 @@ export function TemplateBuilder({
                 <p className="break-all rounded-md border border-border bg-background px-2.5 py-2 text-xs">{publicUrl}</p>
               </div>
               <Link href={`/dashboard/businesses/${businessId}/productos`} className="block rounded-lg border border-border bg-background p-3 text-sm hover:border-accent">
-                🛍️ <strong>Productos y fotos</strong>
+                <BagIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" /><strong>Productos y fotos</strong>
                 <span className="block text-xs text-ink-muted">Cambia productos, precios y fotos (incluidas las de otros ángulos para el giro 360°). Se actualizan solos en la página.</span>
               </Link>
               <TrackingSettings businessId={businessId} websiteId={websiteId} metaPixelId={tracking.metaPixelId} googleTagId={tracking.googleTagId} />
@@ -214,7 +215,7 @@ export function TemplateBuilder({
         {!hintDismissed && (
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
             <p className="min-w-0 flex-1">
-              <strong>✏️ Toca un texto</strong> de la página para escribir sobre él. Los productos, precios y fotos se cambian en <strong>Productos</strong>; lo demás, con el chat de IA.
+              <strong>Toca un texto</strong> de la página para escribir sobre él. Los productos, precios y fotos se cambian en <strong>Productos</strong>; lo demás, con el chat de IA.
             </p>
             <button type="button" onClick={() => { setHintDismissed(true); try { localStorage.setItem("fl-template-edit-hint", "1"); } catch { /* shows again next time */ } }} className="flex-none rounded-md border border-border-strong px-2.5 py-1 text-xs font-semibold hover:border-accent">
               Entendido

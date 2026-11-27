@@ -41,13 +41,22 @@ const ACCENT = "#5b6cf0";
 const NEW_BLOCK_TYPE = "application/x-fl-new-block";
 const NEW_EXTRA_TYPE = "application/x-fl-new-extra";
 
+const svgIcon = (d: string) => `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px">${d}</svg>`;
+// Static icons for the block bar (the bar lives inside the page's own frame, so they are plain strings).
+const ICO = {
+  palette: svgIcon('<path d="M12 3.500a8.500 8.500 0 1 0 0 17c1.400 0 2-.9 2-1.800 0-1.300-1.100-1.500-1.100-2.700 0-1 .8-1.700 1.900-1.700H17a3.500 3.500 0 0 0 3.500-3.500C20.500 6.800 16.700 3.500 12 3.500Z"/><circle cx="8" cy="11" r="1"/><circle cx="11" cy="7.500" r="1"/><circle cx="15.500" cy="8.500" r="1"/>'),
+  image: svgIcon('<rect x="3" y="4" width="18" height="16" rx="2.500"/><circle cx="9" cy="10" r="1.600"/><path d="m3.500 17 5-4.500 4 3.500 3-2.500 5 4"/>'),
+  eyeOff: svgIcon('<path d="M3 3l18 18"/><path d="M10.200 6a9.800 9.800 0 0 1 1.800-.5c6 0 9.500 6.500 9.500 6.500a15 15 0 0 1-2.800 3.500M6.700 7.300A15 15 0 0 0 2.500 12S6 18.500 12 18.500c1.500 0 2.800-.4 4-1"/><path d="M9.900 9.900a3 3 0 0 0 4.200 4.200"/>'),
+  trash: svgIcon('<path d="M4 7h16M9.500 7V4.500h5V7M6.500 7l.8 12.500h9.400L17.500 7"/><path d="M10 11v5.500M14 11v5.500"/>'),
+};
+
 const CSS = `
 [data-edit]{cursor:text;border-radius:4px;transition:outline-color .12s,background-color .12s}
 [data-edit]:hover{outline:2px dashed ${ACCENT};outline-offset:3px}
 [data-edit].fl-editing{outline:2px solid ${ACCENT}!important;outline-offset:3px;background:rgba(91,108,240,.1);-webkit-user-select:text;user-select:text}
 [data-note]{cursor:help}
-img[data-img]{cursor:pointer;transition:filter .12s}
-img[data-img]:hover{outline:3px solid ${ACCENT};outline-offset:-3px;filter:brightness(.9)}
+[data-img]{cursor:pointer;transition:filter .12s}
+[data-img]:hover{outline:3px solid ${ACCENT};outline-offset:-3px;filter:brightness(.9)}
 section[data-sec].fl-active{box-shadow:inset 0 0 0 2px rgba(91,108,240,.55)}
 section[data-sec].fl-picked{box-shadow:inset 0 0 0 3px ${ACCENT}}
 section[data-sec].fl-hover{box-shadow:inset 0 0 0 2px ${ACCENT};background-image:linear-gradient(rgba(91,108,240,.06),rgba(91,108,240,.06))}
@@ -87,7 +96,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
   style.textContent = CSS;
   doc.head.appendChild(style);
 
-  doc.querySelectorAll<HTMLElement>("img[data-img]").forEach((img) => {
+  doc.querySelectorAll<HTMLElement>("[data-img]").forEach((img) => {
     img.title = "Toca para cambiar la imagen";
   });
   // Every answer of the FAQ open, so each one can be edited.
@@ -128,20 +137,20 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
       b.type = "button";
       b.className = `${icon ? "fl-icon" : ""} ${extra}`.trim();
       b.dataset.act = act;
-      b.textContent = text;
+      b.innerHTML = text;
       b.title = title;
       b.setAttribute("aria-label", title);
       b.disabled = disabled;
       bar.appendChild(b);
     };
-    add("style", "🎨 Estilo", "Colores, espacios y tamaños de este bloque");
-    add("bg", info.hasBg ? "🖼 Fondo" : "🖼 Fondo", info.hasBg ? "Cambiar la foto de fondo de este bloque" : "Pon una foto detrás de este bloque");
+    add("style", `${ICO.palette} Estilo`, "Colores, espacios y tamaños de este bloque");
+    add("bg", `${ICO.image} Fondo`, info.hasBg ? "Cambiar la foto de fondo de este bloque" : "Pon una foto detrás de este bloque");
     add("up", "↑", "Subir este bloque", !info.canMoveUp, true);
     add("down", "↓", "Bajar este bloque", !info.canMoveDown, true);
     add("add", "＋", "Agregar un bloque debajo de este", false, true);
     add("dup", "⧉", "Duplicar este bloque", !info.canRemove, true);
-    add("hide", "🚫 Ocultar", "Ocultar este bloque de la página (no se borra)", index === 0);
-    add("del", "🗑 Quitar", "Quitar este bloque de la página", !info.canRemove, false, "fl-danger");
+    add("hide", `${ICO.eyeOff} Ocultar`, "Ocultar este bloque de la página (no se borra)", index === 0);
+    add("del", `${ICO.trash} Quitar`, "Quitar este bloque de la página", !info.canRemove, false, "fl-danger");
     return true;
   }
 
@@ -292,7 +301,7 @@ export function attachPreviewEditor(doc: Document, getHandlers: () => EditorHand
       getHandlers().code(Number(codeBtn.dataset.codeEdit));
       return;
     }
-    const img = t.closest<HTMLElement>("img[data-img]");
+    const img = t.closest<HTMLElement>("[data-img]");
     if (img) {
       e.preventDefault();
       getHandlers().pickImage(Number(img.dataset.img), "image");

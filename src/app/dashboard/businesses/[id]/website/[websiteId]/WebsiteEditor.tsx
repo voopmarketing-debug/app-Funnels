@@ -7,6 +7,7 @@ import { FONT_OPTIONS, type WebsiteContent } from "@/lib/websiteContent";
 import { DownloadCsvButton } from "@/components/DownloadCsvButton";
 import { ClientDate } from "@/components/ClientDate";
 import { fromPanelUrl } from "@/lib/panelBackLink";
+import { WarnIcon } from "./builderIcons";
 
 export function WebsiteEditor({
   businessId,
@@ -146,7 +147,7 @@ export function WebsiteEditor({
                 <option value="">Elegir página...</option>
                 {otherPages.map((p) => (
                   <option key={p.publicUrl} value={p.publicUrl}>
-                    {p.pageType === "agenda" ? "📅 " : ""}
+                    {p.pageType === "agenda" ? "Agenda · " : ""}
                     {p.name}
                   </option>
                 ))}
@@ -760,7 +761,7 @@ export function DomainSection({
           {isPending ? "Guardando..." : "Solicitar"}
         </button>
       </form>
-      {error && <p className="text-xs font-medium text-error">⚠ {error}</p>}
+      {error && <p className="text-xs font-medium text-error"><WarnIcon className="mr-1 inline h-3.5 w-3.5 -translate-y-px" />{error}</p>}
       {!error && savedDomain && (
         <div className="space-y-2 rounded-md border border-accent/30 bg-accent/5 p-3">
           <p className="text-xs font-semibold text-ink">

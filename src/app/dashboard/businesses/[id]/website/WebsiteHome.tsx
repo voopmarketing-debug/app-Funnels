@@ -6,6 +6,7 @@ import type { TemplateCard } from "@/lib/websiteNicheTemplates";
 import { TemplateLibrary } from "./TemplateLibrary";
 import { WebsitePagesList } from "./WebsitePagesList";
 import type { CreationStudio } from "./crear/CreationStudio";
+import { DocIcon, GlobeIcon } from "./[websiteId]/builderIcons";
 
 type Tab = "plantillas" | "sitios";
 
@@ -29,9 +30,9 @@ export function WebsiteHome({
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const count = pagesList.pages.length;
-  const tabs: [Tab, string, string, string][] = [
-    ["plantillas", "📄", "Plantillas", "Plantillas"],
-    ["sitios", "🌐", count > 0 ? `Mis sitios (${count})` : "Mis sitios", count > 0 ? `Sitios (${count})` : "Sitios"],
+  const tabs: [Tab, (p: { className?: string }) => React.JSX.Element, string, string][] = [
+    ["plantillas", DocIcon, "Plantillas", "Plantillas"],
+    ["sitios", GlobeIcon, count > 0 ? `Mis sitios (${count})` : "Mis sitios", count > 0 ? `Sitios (${count})` : "Sitios"],
   ];
   return (
     <div className="space-y-4">
@@ -46,9 +47,9 @@ export function WebsiteHome({
             <p className="mt-1 max-w-2xl text-sm text-ink-muted md:hidden">Para crear o editar, entra desde un computador.</p>
           </div>
           <div className="fl-seg flex w-full max-md:hidden sm:inline-flex sm:w-auto" role="radiogroup" aria-label="Sección">
-            {tabs.map(([key, icon, label, short]) => (
+            {tabs.map(([key, Icon, label, short]) => (
               <button key={key} type="button" role="radio" aria-checked={tab === key} onClick={() => setTab(key)} className="fl-seg-item flex-1 whitespace-nowrap px-2 py-2 text-sm sm:flex-none sm:px-4">
-                <span className="hidden sm:inline">{icon} </span>
+                <Icon className="mr-1.5 hidden h-4 w-4 -translate-y-px sm:inline" />
                 <span className="sm:hidden">{short}</span>
                 <span className="hidden sm:inline">{label}</span>
               </button>

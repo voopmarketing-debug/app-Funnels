@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateWebsiteTracking } from "@/lib/actions";
+import { TrendIcon, WarnIcon } from "./builderIcons";
 
 /** "Píxel y medición": Meta Pixel + Google tag ids for running ads to this page. */
 export function TrackingSettings({
@@ -40,7 +41,7 @@ export function TrackingSettings({
     <section id="pixel" className="scroll-mt-20 space-y-3 rounded-lg border border-border bg-background p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-ink">📈 Píxel y medición para anuncios</p>
+          <p className="text-sm font-semibold text-ink"><TrendIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Píxel y medición para anuncios</p>
           <p className="text-xs text-ink-muted">
             Pega tus IDs para medir las campañas de Meta y Google que lleven a esta página.
           </p>
@@ -79,7 +80,7 @@ export function TrackingSettings({
           />
           <p className="text-[11px] text-ink-faint">Google Analytics → Flujos de datos (G-…) o Google Ads → Etiqueta de Google (AW-…).</p>
         </div>
-        {error && <p className="text-xs font-medium text-error">⚠ {error}</p>}
+        {error && <p className="text-xs font-medium text-error"><WarnIcon className="mr-1 inline h-3.5 w-3.5 -translate-y-px" />{error}</p>}
         <div className="flex items-center gap-3">
           <button
             type="submit"

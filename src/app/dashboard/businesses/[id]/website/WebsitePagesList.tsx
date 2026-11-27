@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { createWebsitePageV2, createAgendaPage, deleteWebsitePage, renameWebsitePage } from "@/lib/actions";
 import { ClientDate } from "@/components/ClientDate";
 import { askConfirm } from "@/components/ConfirmHost";
+import { DocIcon, SparklesIcon, TrendIcon } from "./[websiteId]/builderIcons";
 
 type Page = {
   id: string;
@@ -301,7 +302,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
             )}
             {renameError && <p className="mt-0.5 text-xs text-error">{renameError}</p>}
             {page.purpose && <p className="mt-0.5 truncate text-xs text-ink-muted">{page.purpose}</p>}
-            {page.templateLabel && <p className="mt-0.5 truncate text-xs text-ink-faint">📄 Plantilla: {page.templateLabel}</p>}
+            {page.templateLabel && <p className="mt-0.5 truncate text-xs text-ink-faint"><DocIcon className="mr-1 inline h-3.5 w-3.5 -translate-y-px" />Plantilla: {page.templateLabel}</p>}
           </div>
           <button
             type="button"
@@ -352,7 +353,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
                 : "border border-border-strong text-ink-muted hover:border-accent hover:text-accent"
             }`}
           >
-            {page.hasTracking ? "● Píxel activo" : "📈 Agregar píxel"}
+            {page.hasTracking ? "● Píxel activo" : <><TrendIcon className="mr-1 inline h-3.5 w-3.5 -translate-y-px" />Agregar píxel</>}
           </Link>
         </div>
       </div>
@@ -515,7 +516,7 @@ function NewPageForm({
           disabled={isPending}
           className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
         >
-          {isPending ? "Generando... (puede tardar un minuto)" : "✨ Generar página"}
+          {isPending ? "Generando... (puede tardar un minuto)" : <><SparklesIcon className="mr-1 inline h-4 w-4" />Generar página</>}
         </button>
       </div>
     </form>

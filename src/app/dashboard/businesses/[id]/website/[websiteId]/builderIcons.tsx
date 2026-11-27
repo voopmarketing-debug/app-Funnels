@@ -166,3 +166,28 @@ export const ChevronRightIcon = ({ className }: IconProps) => (
     <path d="m9.500 6 6 6-6 6" />
   </svg>
 );
+
+const line = (children: ReactNode) => {
+  const Icon = ({ className }: IconProps) => (
+    <svg {...base} strokeWidth={1.7} className={className}>
+      {children}
+    </svg>
+  );
+  return Icon;
+};
+
+export const DocIcon = line(<><path d="M7 3.500h7l4 4V19a1.500 1.500 0 0 1-1.500 1.500h-9.500A1.500 1.500 0 0 1 5.500 19V5A1.500 1.500 0 0 1 7 3.500Z" /><path d="M14 3.500V8h4M8.500 12.500h7M8.500 16h5" /></>);
+export const GlobeIcon = line(<><circle cx="12" cy="12" r="8.500" /><path d="M3.500 12h17M12 3.500c2.500 2.400 3.500 5.300 3.500 8.500s-1 6.100-3.500 8.500c-2.500-2.400-3.500-5.300-3.500-8.500s1-6.100 3.500-8.500Z" /></>);
+export const UploadIcon = line(<><path d="M12 15.500V4.500M7.500 9 12 4.500 16.500 9" /><path d="M4.500 15v3.500a1.500 1.500 0 0 0 1.500 1.500h12a1.500 1.500 0 0 0 1.500-1.500V15" /></>);
+export const SparklesIcon = line(<><path d="m11 4 1.700 4.300L17 10l-4.300 1.700L11 16l-1.700-4.300L5 10l4.300-1.700L11 4Z" /><path d="m18 14.500.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z" /></>);
+export const TrendIcon = line(<><path d="M4 19.500V4.500M4 19.500h16" /><path d="m7.500 15 3.500-4 3 2.500 4-6" /></>);
+export const EyeIcon = line(<><path d="M2.500 12S6 5.500 12 5.500 21.500 12 21.500 12 18 18.500 12 18.500 2.500 12 2.500 12Z" /><circle cx="12" cy="12" r="2.800" /></>);
+export const EyeOffIcon = line(<><path d="M3 3l18 18" /><path d="M10.200 6a9.800 9.800 0 0 1 1.800-.5c6 0 9.500 6.500 9.500 6.500a15 15 0 0 1-2.800 3.500M6.700 7.300A15 15 0 0 0 2.500 12S6 18.500 12 18.500c1.500 0 2.800-.4 4-1" /><path d="M9.900 9.900a3 3 0 0 0 4.200 4.200" /></>);
+export const TrashIcon = line(<><path d="M4 7h16M9.500 7V4.500h5V7M6.500 7l.8 12.500h9.400L17.500 7" /><path d="M10 11v5.500M14 11v5.500" /></>);
+export const ImageIcon = line(<><rect x="3" y="4" width="18" height="16" rx="2.500" /><circle cx="9" cy="10" r="1.600" /><path d="m3.500 17 5-4.500 4 3.500 3-2.500 5 4" /></>);
+export const WarnIcon = line(<><path d="M12 4 2.800 19.500h18.400L12 4Z" /><path d="M12 10v4.500M12 17.200h.01" /></>);
+export const ChatIcon = line(<path d="M4 5.500h16v10.500H11l-4.500 3.500V16H4V5.500Z" />);
+export const BagIcon = line(<><path d="M5 8h14l-1 12H6L5 8Z" /><path d="M9 11V7a3 3 0 0 1 6 0v4" /></>);
+export const CalendarIcon = line(<><rect x="3.500" y="5" width="17" height="15.500" rx="2.500" /><path d="M3.500 10h17M8 3v4M16 3v4" /></>);
+export const RefreshIcon = line(<><path d="M19.500 8A8 8 0 0 0 5 7.500M4.500 4v4h4" /><path d="M4.500 16a8 8 0 0 0 14.500.5M19.500 20v-4h-4" /></>);
+export const PaletteSmallIcon = PaletteIcon;

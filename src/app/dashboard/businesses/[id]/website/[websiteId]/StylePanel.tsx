@@ -6,6 +6,7 @@ import { ColorSwatchButton } from "@/components/ColorSwatchButton";
 import { FONT_OPTIONS } from "@/lib/websiteContent";
 import { SECTION_LABELS, type ExtraElement, type Section, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { tidyLook, type Look } from "@/lib/websiteLook";
+import { ImageIcon, TrashIcon } from "./builderIcons";
 
 const SAVE_DELAY_MS = 500;
 
@@ -107,7 +108,7 @@ function ExtrasEditor({ extras, busy, onChange, onPickPhoto }: { extras: ExtraEl
         <div key={i} className="space-y-1.5 rounded-lg bg-surface-2/60 p-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[12px] font-bold text-ink-muted">{x.type === "text" ? "Texto" : x.type === "image" ? "Foto" : "Botón"} {i + 1}</span>
-            <button type="button" disabled={busy} onClick={() => commit(list.filter((_, k) => k !== i))} className="rounded-md border border-error/50 bg-error/10 px-2 py-1 text-[12px] font-bold text-error disabled:opacity-40">🗑 Quitar</button>
+            <button type="button" disabled={busy} onClick={() => commit(list.filter((_, k) => k !== i))} className="rounded-md border border-error/50 bg-error/10 px-2 py-1 text-[12px] font-bold text-error disabled:opacity-40"><TrashIcon className="mr-1 inline h-3.5 w-3.5 -translate-y-px" />Quitar</button>
           </div>
           {x.type === "image" ? (
             <div className="flex items-center gap-2">
@@ -297,7 +298,7 @@ export function StylePanel({
       <ColorRow label="Color de fondo" hint={hasPhoto ? "Este bloque tiene foto de fondo: la foto manda." : "Pinta todo el bloque."} value={look.bg} autoLabel="Quitar" swatches={swatches} onChange={(hex) => change({ bg: hex })} />
 
       <button type="button" disabled={busy} onClick={onPickBgImage} className="flex w-full items-center justify-between rounded-lg border border-border px-3 py-2.5 text-left text-[13px] font-semibold text-ink transition hover:border-accent disabled:opacity-50">
-        <span>🖼 {hasPhoto ? "Cambiar la foto de fondo" : "Poner una foto de fondo"}</span>
+        <span><ImageIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />{hasPhoto ? "Cambiar la foto de fondo" : "Poner una foto de fondo"}</span>
         <span className="text-xs font-normal text-ink-muted">{hasPhoto ? "Activa" : "Opcional"}</span>
       </button>
 

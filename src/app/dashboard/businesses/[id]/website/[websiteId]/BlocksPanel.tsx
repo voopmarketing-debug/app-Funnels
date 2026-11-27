@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SECTION_LABELS, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import type { BlockOp } from "@/lib/websiteBlocks";
 import { BlockGrid, ExtraGrid, NEW_BLOCK_MIME, TileLibrary } from "./BlockLibrary";
+import { EyeIcon, EyeOffIcon, ImageIcon, PaletteIcon, TrashIcon } from "./builderIcons";
 
 const MOVE_MIME = "application/x-fl-move-block";
 
@@ -241,7 +242,7 @@ export function BlocksPanel({
                       }}
                       className={`flex h-9 flex-none items-center gap-1 rounded-lg border px-2.5 text-xs font-bold transition disabled:opacity-40 ${content.plain ? "border-accent/60 bg-accent/10 text-accent hover:bg-accent/20" : "border-error/50 bg-error/10 text-error hover:bg-error/20"}`}
                     >
-                      {content.plain ? "↺ Poner barra" : <><span aria-hidden="true">🗑</span> Quitar barra</>}
+                      {content.plain ? "↺ Poner barra" : <><TrashIcon className="h-4 w-4" /> Quitar barra</>}
                     </button>
                   ) : (
                     <span title="La portada va siempre primero y no se puede quitar" className="flex-none rounded bg-surface-2 px-1.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink-muted">Fija</span>
@@ -258,7 +259,7 @@ export function BlocksPanel({
                       }}
                       className={`flex h-9 flex-none items-center gap-1 rounded-lg border px-2.5 text-xs font-bold transition disabled:opacity-40 ${hidden.has(i) ? "border-accent/60 bg-accent/15 text-accent hover:bg-accent/25" : "border-border-strong bg-surface text-ink hover:border-accent"}`}
                     >
-                      <span aria-hidden="true">{hidden.has(i) ? "👁" : "🚫"}</span> {hidden.has(i) ? "Mostrar" : "Ocultar"}
+                      {hidden.has(i) ? <EyeIcon className="h-4 w-4" /> : <EyeOffIcon className="h-4 w-4" />} {hidden.has(i) ? "Mostrar" : "Ocultar"}
                     </button>
                     <button
                       type="button"
@@ -270,13 +271,13 @@ export function BlocksPanel({
                       }}
                       className="flex h-9 flex-none items-center gap-1 rounded-lg border border-error/50 bg-error/10 px-2.5 text-xs font-bold text-error transition hover:bg-error/20 disabled:opacity-40"
                     >
-                      <span aria-hidden="true">🗑</span> Quitar
+                      <TrashIcon className="h-4 w-4" /> Quitar
                     </button>
                   </div>
                 )}
                 <div className={on ? "flex w-full flex-wrap items-center justify-end gap-1.5 pt-1" : "hidden items-center gap-1 sm:group-hover:flex sm:group-focus-within:flex"}>
                   <IconButton label="Estilo del bloque" onClick={() => onStyle(i)}>
-                    🎨
+                    <PaletteIcon className="h-4 w-4" />
                   </IconButton>
                   {!fixed && (
                     <>
@@ -394,8 +395,8 @@ function PhotosCard({ content, selected, busy, onPick }: { content: WebsiteConte
   }
   return (
     <div className="space-y-2 rounded-xl border border-border bg-background p-3">
-      <p className="text-sm font-bold">🖼 Fotos de tu página</p>
-      <p className="text-[12px] text-ink-muted">Sube tus fotos o elige las de tu catálogo y las que ya subiste. También puedes tocar cualquier imagen en la página para cambiarla.</p>
+      <p className="text-sm font-bold"><ImageIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Fotos de tu página</p>
+      <p className="text-[12px] text-ink-muted">Sube o elige tus fotos.</p>
       <ul className="space-y-1.5">
         {slots.map((slot) => (
           <li key={slot.key}>

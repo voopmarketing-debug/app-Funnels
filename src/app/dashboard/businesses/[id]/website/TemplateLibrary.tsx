@@ -5,8 +5,10 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { createBlankWebsite, createWebsiteFromTemplate } from "@/lib/actions";
 import type { TemplateCard } from "@/lib/websiteNicheTemplates";
 import { DevicePreviewFrame } from "@/components/DevicePreviewFrame";
+import { NicheIcon } from "./nicheIcons";
 import { ScaledPagePreview } from "@/components/ScaledPagePreview";
 import { HtmlUploadDialog } from "./HtmlUploadDialog";
+import { UploadIcon } from "./[websiteId]/builderIcons";
 
 const PAGE = 6;
 const plain = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -42,9 +44,9 @@ export function TemplateLibrary({
   const [, startTransition] = useTransition();
 
   const niches = useMemo(() => {
-    const seen = new Map<string, { id: string; name: string; short: string; emoji: string; count: number }>();
+    const seen = new Map<string, { id: string; name: string; short: string; count: number }>();
     for (const c of cards) {
-      const n = seen.get(c.nicheId) ?? { id: c.nicheId, name: c.nicheName, short: c.nicheShort, emoji: c.emoji, count: 0 };
+      const n = seen.get(c.nicheId) ?? { id: c.nicheId, name: c.nicheName, short: c.nicheShort, count: 0 };
       n.count++;
       seen.set(c.nicheId, n);
     }
@@ -145,7 +147,7 @@ export function TemplateLibrary({
   if (busy) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
-        <span className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-accent text-3xl text-accent-ink">{busy.emoji}</span>
+        <span className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-accent text-3xl text-accent-ink"><NicheIcon id={busy.nicheId} className="h-8 w-8" /></span>
         <div>
           <h2 className="text-xl font-bold">Preparando tu página</h2>
           <p className="mt-1 text-sm text-ink-muted">Un momento: la abrimos para que la edites y la publiques cuando quieras.</p>
@@ -180,7 +182,7 @@ export function TemplateLibrary({
       {/* Toolbar: niches as tabs, search, background and the two ways to bring your own page. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <nav aria-label="Nichos" className="-mx-1 flex min-w-0 basis-full gap-2 overflow-x-auto px-1 py-2">
-          {[{ id: "all", label: "Todos", emoji: "" }, ...niches.map((n) => ({ id: n.id, label: n.short, emoji: n.emoji }))].map((n) => (
+          {[{ id: "all", label: "Todos" }, ...niches.map((n) => ({ id: n.id, label: n.short }))].map((n) => (
             <button
               key={n.id}
               type="button"
@@ -191,7 +193,7 @@ export function TemplateLibrary({
               }}
               className={`flex-none whitespace-nowrap rounded-full border px-4 py-2 text-sm transition ${niche === n.id ? "border-accent bg-accent font-bold text-accent-ink shadow-sm" : "border-border-strong font-medium text-ink hover:border-accent hover:bg-accent/10"}`}
             >
-              {n.emoji && <span aria-hidden="true">{n.emoji} </span>}
+              <NicheIcon id={n.id} className="mr-1.5 inline-block h-[17px] w-[17px] -translate-y-px" />
               {n.label}
             </button>
           ))}
@@ -222,7 +224,7 @@ export function TemplateLibrary({
             <span aria-hidden="true" className="mr-1 font-mono">{"</>"}</span>En blanco
           </button>
           <button type="button" onClick={() => setHtmlOpen(true)} className="h-9 rounded-lg border border-border-strong px-3 text-[13px] font-semibold text-ink transition hover:border-accent">
-            <span aria-hidden="true" className="mr-1">⬆</span>Subir HTML
+            <UploadIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Subir HTML
           </button>
         </div>
       </div>
@@ -251,7 +253,6 @@ export function TemplateLibrary({
                 <span className="min-w-0 truncate text-sm font-semibold text-ink">{label(card)}</span>
                 {niche === "all" && (
                   <span className="flex-none truncate text-xs text-ink-faint">
-                    <span aria-hidden="true">{card.emoji} </span>
                     {card.nicheShort}
                   </span>
                 )}

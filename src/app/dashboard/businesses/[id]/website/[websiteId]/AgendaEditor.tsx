@@ -12,6 +12,7 @@ import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
 import { DomainSection } from "./WebsiteEditor";
 import { ClientDate } from "@/components/ClientDate";
 import { askConfirm } from "@/components/ConfirmHost";
+import { ChatIcon } from "./builderIcons";
 
 /** `#RRGGBB` + a 2-digit hex alpha (e.g. "26" ≈ 15%) — used to tint the calendar with the clinic's own primary color without a CSS color-mix dependency. */
 function withAlpha(hex: string, alpha: string): string {
@@ -292,7 +293,7 @@ export function AgendaEditor({
                               title="Escribir por WhatsApp"
                               className="flex-none rounded-full border border-border p-1.5 text-ink-muted transition hover:border-accent hover:text-accent"
                             >
-                              💬
+                              <ChatIcon className="h-4 w-4" />
                             </a>
                           )}
                         </div>
@@ -428,7 +429,7 @@ export function AgendaEditor({
                         title="Escribir por WhatsApp"
                         className="flex-none rounded-full border border-border p-1.5 text-ink-muted transition hover:border-accent hover:text-accent"
                       >
-                        💬
+                        <ChatIcon className="h-4 w-4" />
                       </a>
                     )}
                   </div>

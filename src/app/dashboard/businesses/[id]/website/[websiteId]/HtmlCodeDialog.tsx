@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SAMPLE_HTML } from "@/lib/htmlSample";
+import { SparklesIcon, UploadIcon } from "./builderIcons";
 
 /**
  * Where the owner pastes their own HTML: a big window that opens by itself when the "Código HTML"
@@ -80,10 +81,10 @@ export function HtmlCodeDialog({
         />
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => fileRef.current?.click()} className="h-10 rounded-lg border border-border px-3 text-sm font-semibold hover:border-accent hover:text-accent">
-            ⬆ Elegir un archivo .html
+            <UploadIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Elegir un archivo .html
           </button>
           <button type="button" onClick={() => setCode(SAMPLE_HTML)} className="h-10 rounded-lg border border-border px-3 text-sm font-semibold hover:border-accent hover:text-accent">
-            ✨ Probar con un ejemplo
+            <SparklesIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Probar con un ejemplo
           </button>
         </div>
         {fileError && <p role="alert" className="text-sm text-error">{fileError}</p>}
