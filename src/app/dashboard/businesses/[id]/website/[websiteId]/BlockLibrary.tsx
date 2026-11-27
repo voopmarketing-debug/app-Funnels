@@ -151,7 +151,7 @@ export function TileLibrary({ onPick, onPickExtra, disabled, where }: { onPick: 
         />
       </label>
       <p className="text-[12px] text-ink-muted">
-        <strong>Arrastra</strong> uno a la página o tócalo: se agrega {where}.
+        Arrastra a la página o toca: se agrega {where}.
       </p>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-2">
         {extras.length > 0 && (

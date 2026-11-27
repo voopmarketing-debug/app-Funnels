@@ -93,7 +93,7 @@ export function WebsitePagesList({
             <button
               type="button"
               onClick={onNewPage}
-              className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
+              className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover max-md:hidden"
             >
               + Nueva página
             </button>
@@ -140,7 +140,7 @@ export function WebsitePagesList({
           <button
             type="button"
             onClick={onNewPage}
-            className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover"
+            className="rounded-md bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[0_8px_20px_-8px_rgba(181,255,43,0.6)] transition hover:bg-accent-hover max-md:hidden"
           >
             Elegir una plantilla
           </button>

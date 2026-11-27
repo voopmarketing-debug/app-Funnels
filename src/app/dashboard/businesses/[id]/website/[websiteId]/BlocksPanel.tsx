@@ -50,6 +50,7 @@ export function BlocksPanel({
   onEditHtml,
   onPickPhoto,
   onSaveEventDate,
+  onSaveVideoUrl,
   onHover,
 }: {
   content: WebsiteContentV2;
@@ -68,6 +69,8 @@ export function BlocksPanel({
   /** Opens the photo window (upload or pick from the catalog) for a picture slot of a block. */
   onPickPhoto: (index: number, field: "image" | "bgImage") => void;
   onSaveEventDate: (index: number, date: string) => Promise<boolean>;
+  /** Saves the link of a video block (empty clears it). */
+  onSaveVideoUrl: (index: number, url: string) => Promise<boolean>;
   /** The pointer is on the row of a block (null: left the list): the page outlines that block. */
   onHover: (index: number | null) => void;
 }) {
@@ -106,7 +109,7 @@ export function BlocksPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-      <div role="tablist" aria-label="Elementos" className="fl-seg hidden w-full md:flex">
+      <div role="tablist" aria-label="Elementos" className="fl-seg hidden w-full md:sticky md:top-0 md:z-10 md:-mt-3 md:flex md:shrink-0">
         {([["anadir", "Añadir"], ["capas", `Capas (${count})`]] as const).map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={deskView === key} onClick={() => setDeskView(key)} className="fl-seg-item flex-1 px-3 py-1.5 text-xs">
             {label}
@@ -146,11 +149,15 @@ export function BlocksPanel({
         )}
       </div>
 
-      <div className={`contents ${deskHide}`}>
       {selected !== null && content.sections[selected]?.type === "event" && (
         <EventDateEditor key={`ev${selected}`} date={(content.sections[selected] as { date: string }).date} busy={busy} onSave={(date) => onSaveEventDate(selected, date)} />
       )}
 
+      {selected !== null && content.sections[selected]?.type === "video" && (
+        <VideoLinkEditor key={`vd${selected}:${(content.sections[selected] as { url: string }).url}`} url={(content.sections[selected] as { url: string }).url} busy={busy} onSave={(url) => onSaveVideoUrl(selected, url)} />
+      )}
+
+      <div className={`contents ${deskHide}`}>
       {codeIndex >= 0 && (
         <button
           type="button"
@@ -167,15 +174,13 @@ export function BlocksPanel({
 
       {hidden.size > 0 && (
         <p className="rounded-lg border border-border bg-background p-2.5 text-[12px] text-ink-muted">
-          Hay {hidden.size} {hidden.size === 1 ? "bloque oculto" : "bloques ocultos"} (marcados «Oculto»): no se ven en tu página. Toca «Mostrar» en ese bloque cuando quieras que se vea (por ejemplo, cuando tengas tus testimonios, precio o garantía reales).
-        </p>
+          {hidden.size} {hidden.size === 1 ? "bloque oculto" : "bloques ocultos"}: no se ven en tu página.</p>
       )}
 
       <div className="max-md:order-3"><PhotosCard content={content} selected={selected} busy={busy} onPick={onPickPhoto} /></div>
 
       <div className="space-y-2 max-md:order-1">
       <p className="text-sm font-bold text-ink">Bloques de tu página <span className="font-normal text-ink-muted">({count})</span></p>
-      <p className="text-[12px] text-ink-faint">Toca <strong>🗑 Quitar</strong> para borrar un bloque. Si te equivocas, usa ↶ Deshacer arriba. Toca un bloque para ver más opciones.</p>
 
       <ol
         className="space-y-1.5"
@@ -305,6 +310,38 @@ export function BlocksPanel({
         />
       </ol>
       </div>
+      </div>
+    </div>
+  );
+}
+
+/** The link of a video block: paste it here (or on the page itself). */
+function VideoLinkEditor({ url, busy, onSave }: { url: string; busy: boolean; onSave: (url: string) => Promise<boolean> }) {
+  const [value, setValue] = useState(url);
+  const [saving, setSaving] = useState(false);
+  const dirty = value.trim() !== url;
+  return (
+    <div className="space-y-2 rounded-xl border border-accent/60 bg-accent/5 p-3">
+      <p className="text-sm font-bold">Enlace del video</p>
+      <p className="text-[12px] text-ink-muted">YouTube, Vimeo, Wistia o Loom.</p>
+      <div className="flex gap-2">
+        <label htmlFor="video-url" className="sr-only">Enlace del video</label>
+        <input id="video-url" type="url" inputMode="url" value={value} placeholder="https://youtube.com/watch?v=…" onChange={(e) => setValue(e.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 py-2 text-sm outline-none focus:border-accent" />
+        <button
+          type="button"
+          disabled={busy || saving || !dirty}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await onSave(value.trim());
+            } finally {
+              setSaving(false);
+            }
+          }}
+          className="rounded-lg bg-accent px-3 py-2 text-sm font-bold text-accent-ink transition hover:bg-accent-hover disabled:opacity-40"
+        >
+          {saving ? "Guardando…" : "Guardar"}
+        </button>
       </div>
     </div>
   );

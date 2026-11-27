@@ -370,7 +370,7 @@ export function WebsiteBuilder({
       setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 2500);
       // Something appeared or disappeared (an emptied text, the highlighted words of the headline): redraw.
       const sectionIndex = Number(path.split(".")[1]);
-      const refresh = value === "" || (/^sections\.\d+\.heading$/.test(path) && res.content.sections[sectionIndex]?.type === "hero");
+      const refresh = value === "" || (/^sections\.\d+\.heading$/.test(path) && res.content.sections[sectionIndex]?.type === "hero") || (/^sections\.\d+\.url$/.test(path) && res.content.sections[sectionIndex]?.type === "video");
       if (refresh) refreshPreview();
       return { ok: true, refresh };
     },
@@ -417,7 +417,29 @@ export function WebsiteBuilder({
   const activeTab: Tab = tab === "estilo" && sel === null ? "bloques" : tab;
 
   return (
-    <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col md:-m-6">
+    <>
+    {/* Phones do not build: the page is built from a computer or tablet. Here they only see it, copy its link and go back. */}
+    <div className="mx-auto flex max-w-sm flex-col items-center gap-4 py-10 text-center md:hidden">
+      <span aria-hidden="true" className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/12 text-accent">
+        <DesktopIcon className="h-8 w-8" />
+      </span>
+      <div className="space-y-1.5">
+        <h1 className="text-lg font-bold">Esta página se edita desde un computador</h1>
+        <p className="text-sm text-ink-muted">«{name}» se construye en la versión de escritorio de la plataforma. Desde el celular puedes verla y compartir su link.</p>
+      </div>
+      <div className="flex w-full flex-col gap-2">
+        <a href={fromPanelUrl(publicUrl)} target="_blank" rel="noopener noreferrer" className="flex h-12 items-center justify-center rounded-xl bg-accent px-4 text-sm font-bold text-accent-ink">
+          Ver mi página
+        </a>
+        <button type="button" onClick={() => void copyLink()} className="h-12 rounded-xl border border-border px-4 text-sm font-semibold">
+          {copied ? "¡Link copiado!" : "Copiar el link"}
+        </button>
+        <Link href={`/dashboard/businesses/${businessId}/website`} className="flex h-12 items-center justify-center rounded-xl text-sm font-semibold text-ink-muted">
+          ← Volver a mis sitios
+        </Link>
+      </div>
+    </div>
+    <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col max-md:hidden md:-m-6">
       {/* Phone top bar: one row. Back, name, publish chip, undo/redo and a menu. */}
       <header className="flex items-center gap-1.5 border-b border-border bg-surface px-2 py-1.5 md:hidden">
         <Link href={`/dashboard/businesses/${businessId}/website`} aria-label="Volver a mis sitios" className="flex h-11 w-11 flex-none items-center justify-center rounded-lg text-xl text-ink-muted active:bg-surface-2">
@@ -580,6 +602,17 @@ export function WebsiteBuilder({
                 showToast("Fecha guardada.", true);
                 return true;
               }}
+              onSaveVideoUrl={async (index, url) => {
+                const res = await updateWebsiteTextV2(businessId, websiteId, `sections.${index}.url`, url);
+                if (!res.ok) {
+                  showToast(res.error);
+                  return false;
+                }
+                adopt(res.content);
+                refreshPreview();
+                showToast(url ? "Video guardado." : "Video quitado.", true);
+                return true;
+              }}
               onEditHtml={(index) => {
                 setSelected(index);
                 setHtmlDialog(index);
@@ -682,7 +715,7 @@ export function WebsiteBuilder({
           <div className="flex items-center gap-3 border-b border-border bg-accent/10 px-3 py-2 text-[12.5px] leading-snug text-ink">
             <p className="min-w-0 flex-1">
               <span className="md:hidden"><strong>✏️ Toca un texto</strong> para escribir sobre él, o una imagen para cambiarla. Los botones sobre cada bloque lo mueven, lo duplican o lo borran.</span>
-              <span className="hidden md:inline"><strong>✏️ Edita directo en la página:</strong> toca un texto para escribir sobre él o una imagen para cambiarla. Arrastra elementos desde la izquierda y suéltalos donde quieras. La barra sobre cada bloque te deja cambiar su estilo, moverlo, duplicarlo, agregar otro o eliminarlo. Si te equivocas, usa ↶ Deshacer.</span>
+              <span className="hidden md:inline"><strong>✏️ Edita en la página:</strong> toca un texto o una imagen. Arrastra elementos desde la izquierda.</span>
             </p>
             <button
               type="button"
@@ -867,6 +900,7 @@ export function WebsiteBuilder({
         ))}
       </nav>
     </div>
+    </>
   );
 }
 

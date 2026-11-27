@@ -42,9 +42,10 @@ export function WebsiteHome({
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold">Sitio web</h1>
-            <p className="mt-1 max-w-2xl text-sm text-ink-muted">Elige una plantilla lista para tu tipo de negocio, mírala y publícala. Después la editas como quieras.</p>
+            <p className="mt-1 max-w-2xl text-sm text-ink-muted max-md:hidden">Elige una plantilla, edítala y publícala.</p>
+            <p className="mt-1 max-w-2xl text-sm text-ink-muted md:hidden">Para crear o editar, entra desde un computador.</p>
           </div>
-          <div className="fl-seg flex w-full sm:inline-flex sm:w-auto" role="radiogroup" aria-label="Sección">
+          <div className="fl-seg flex w-full max-md:hidden sm:inline-flex sm:w-auto" role="radiogroup" aria-label="Sección">
             {tabs.map(([key, icon, label, short]) => (
               <button key={key} type="button" role="radio" aria-checked={tab === key} onClick={() => setTab(key)} className="fl-seg-item flex-1 whitespace-nowrap px-2 py-2 text-sm sm:flex-none sm:px-4">
                 <span className="hidden sm:inline">{icon} </span>
@@ -56,7 +57,17 @@ export function WebsiteHome({
         </div>
       </div>
 
-      {tab === "plantillas" && <TemplateLibrary businessId={businessId} cards={cards} needsWhatsapp={!!studio.needsWhatsapp} />}
+      {/* Phones only see their pages (the builder and the templates are for the computer). */}
+      {tab === "plantillas" && (
+        <>
+          <div className="max-md:hidden">
+            <TemplateLibrary businessId={businessId} cards={cards} needsWhatsapp={!!studio.needsWhatsapp} />
+          </div>
+          <div className="md:hidden">
+            <WebsitePagesList {...pagesList} onNewPage={() => undefined} />
+          </div>
+        </>
+      )}
       {tab === "sitios" && <WebsitePagesList {...pagesList} onNewPage={() => setTab("plantillas")} />}
     </div>
   );
