@@ -611,6 +611,20 @@ model AgendaConfig {
   // used everywhere else a page has no chosen accent yet.
   primaryColor String @default("#1f6feb")
 
+  // Look of the public page: "clasico" | "oscuro" | "suave" | "editorial" | "compacto" (lib/agendaStyles.ts).
+  style    String  @default("clasico")
+  // Texts and data shown on the public page (all optional; the page falls back to sensible defaults).
+  title    String?
+  subtitle String?
+  address  String?
+  mapUrl   String?
+  logoUrl  String?
+  // Whether the booking form has a free "reason / note" field.
+  askNote  Boolean @default(true)
+  // What the visitor can book: [{ id, name, minutes, price?, description? }] (lib/agendaServices.ts).
+  // Empty = a single kind of appointment of `slotMinutes`.
+  services Json    @default("[]")
+
   website       Website        @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   professionals Professional[]
 }
@@ -628,6 +642,7 @@ model Professional {
   agendaConfigId String
   name           String
   title          String? // optional role/specialty shown to visitors, e.g. "Ortodoncista"
+  photoUrl       String? // optional photo shown in the picker
   email          String? // gets their own notification email when someone books with them
   availability   Json
   active         Boolean @default(true) // soft-hide from the picker without losing their appointment history
@@ -667,6 +682,11 @@ model Appointment {
   contact        String // phone/WhatsApp, shown to the business
   email          String? // optional — only present when given, used for the visitor's own confirmation email
   startsAt       DateTime
+  // What was booked (a snapshot of the service's name), the visitor's note and how long it lasts.
+  // Null duration = the agenda's slot length (bookings made before services existed).
+  service         String?
+  note            String?
+  durationMinutes Int?
   status         String   @default("confirmed") // "confirmed" | "cancelled"
   createdAt      DateTime @default(now())
 

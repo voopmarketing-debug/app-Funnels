@@ -13,6 +13,9 @@ import { DomainSection } from "./WebsiteEditor";
 import { ClientDate } from "@/components/ClientDate";
 import { askConfirm } from "@/components/ConfirmHost";
 import { ChatIcon } from "./builderIcons";
+import { ImagePicker } from "./ImagePicker";
+import { AGENDA_STYLES, AGENDA_STYLE_DEFS, type AgendaStyle } from "@/lib/agendaStyles";
+import { durationLabel, MAX_AGENDA_SERVICES, type AgendaService } from "@/lib/agendaServices";
 
 /** `#RRGGBB` + a 2-digit hex alpha (e.g. "26" ≈ 15%) — used to tint the calendar with the clinic's own primary color without a CSS color-mix dependency. */
 function withAlpha(hex: string, alpha: string): string {
@@ -24,13 +27,14 @@ function waLink(contact: string): string | null {
   return digits.length >= 8 ? `https://wa.me/${digits}` : null;
 }
 
-type Appointment = { id: string; name: string; contact: string; startsAt: Date; professional?: { name: string } | null };
+type Appointment = { id: string; name: string; contact: string; startsAt: Date; service?: string | null; note?: string | null; professional?: { name: string } | null };
 
 type ProfessionalData = {
   id: string;
   name: string;
   title: string | null;
   email: string | null;
+  photoUrl: string | null;
   active: boolean;
   availability: Availability;
   pipelineId: string | null;
@@ -101,7 +105,21 @@ export function AgendaEditor({
 }: {
   businessId: string;
   websiteId: string;
-  initialConfig: { notificationEmail: string; timezone: string; slotMinutes: number; availability: Availability; primaryColor: string };
+  initialConfig: {
+    notificationEmail: string;
+    timezone: string;
+    slotMinutes: number;
+    availability: Availability;
+    primaryColor: string;
+    style: AgendaStyle;
+    title: string;
+    subtitle: string;
+    address: string;
+    mapUrl: string;
+    logoUrl: string;
+    askNote: boolean;
+    services: AgendaService[];
+  };
   publicUrl: string;
   generatedAt: Date;
   customDomain: string | null;
@@ -120,6 +138,7 @@ export function AgendaEditor({
   const [previewKey, setPreviewKey] = useState(0);
   const [copied, setCopied] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [logoOpen, setLogoOpen] = useState(false);
 
   const gridDates = useMemo(() => getMonthGridDates(monthStr), [monthStr]);
   const appointmentsByDate = useMemo(() => {
@@ -283,7 +302,9 @@ export function AgendaEditor({
                             </p>
                             <p className="truncate text-sm font-medium text-ink">{a.name}</p>
                             <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
+                            {a.service && <p className="truncate text-[13px] text-ink">{a.service}</p>}
                             {a.professional && <p className="truncate text-[13px] text-ink-faint">{a.professional.name}</p>}
+                            {a.note && <p className="text-[12px] text-ink-muted">“{a.note}”</p>}
                           </div>
                           {wa && (
                             <a
@@ -306,7 +327,73 @@ export function AgendaEditor({
           </div>
         </div>
 
-        <Section title="Notificaciones y zona horaria" defaultOpen>
+        <Section title="Apariencia" defaultOpen>
+          <div className="space-y-1.5">
+            <p className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Estilo de la página</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {AGENDA_STYLES.map((id) => (
+                <StyleCard key={id} id={id} accent={accent} selected={config.style === id} onSelect={() => setConfig((c) => ({ ...c, style: id }))} />
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Color principal</label>
+            <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
+              <input type="color" value={config.primaryColor} onChange={(e) => setConfig((c) => ({ ...c, primaryColor: e.target.value }))} className="h-6 w-8 flex-none cursor-pointer bg-transparent" />
+              <input value={config.primaryColor} onChange={(e) => setConfig((c) => ({ ...c, primaryColor: e.target.value }))} maxLength={9} className="fl-mono min-w-0 flex-1 bg-transparent text-xs text-ink outline-none" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {config.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={config.logoUrl} alt="Logo" className="h-12 max-w-[120px] rounded-md border border-border bg-background object-contain p-1" />
+            ) : (
+              <span className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-border-strong text-xs text-ink-faint">Logo</span>
+            )}
+            <button type="button" onClick={() => setLogoOpen(true)} className="rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent">
+              {config.logoUrl ? "Cambiar logo" : "Poner logo"}
+            </button>
+            {config.logoUrl && (
+              <button type="button" onClick={() => setConfig((c) => ({ ...c, logoUrl: "" }))} className="text-xs font-medium text-error hover:underline">
+                Quitar
+              </button>
+            )}
+          </div>
+          <TextField label="Título" value={config.title} max={80} placeholder="Agenda tu cita" onChange={(v) => setConfig((c) => ({ ...c, title: v }))} />
+          <TextField label="Frase de apoyo (opcional)" value={config.subtitle} max={200} placeholder="Ej: Atención personalizada, con cita previa" onChange={(v) => setConfig((c) => ({ ...c, subtitle: v }))} />
+        </Section>
+
+        <Section title="Dónde y cómo" defaultOpen>
+          <TextField label="Dirección o sede" value={config.address} max={200} placeholder="Ej: Cra 15 # 93-20, consultorio 402, Bogotá" onChange={(v) => setConfig((c) => ({ ...c, address: v }))} />
+          <TextField label="Link del mapa (opcional)" value={config.mapUrl} max={500} placeholder="https://maps.google.com/..." onChange={(v) => setConfig((c) => ({ ...c, mapUrl: v }))} />
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+            <input type="checkbox" checked={config.askNote} onChange={(e) => setConfig((c) => ({ ...c, askNote: e.target.checked }))} className="h-4 w-4 cursor-pointer accent-accent" />
+            Preguntar el motivo de la cita
+          </label>
+        </Section>
+
+        <Section title={`Servicios (${config.services.length})`} defaultOpen={config.services.length > 0}>
+          <p className="text-xs text-ink-muted">Si agregas servicios, el cliente elige uno y el calendario bloquea el tiempo que dura. Sin servicios, todas las citas duran un horario.</p>
+          {config.services.map((svc, i) => (
+            <ServiceRow
+              key={svc.id}
+              service={svc}
+              onChange={(next) => setConfig((c) => ({ ...c, services: c.services.map((x, j) => (j === i ? next : x)) }))}
+              onRemove={() => setConfig((c) => ({ ...c, services: c.services.filter((_, j) => j !== i) }))}
+            />
+          ))}
+          {config.services.length < MAX_AGENDA_SERVICES && (
+            <button
+              type="button"
+              onClick={() => setConfig((c) => ({ ...c, services: [...c.services, { id: Math.random().toString(36).slice(2, 10), name: "", minutes: c.slotMinutes }] }))}
+              className="rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent"
+            >
+              + Agregar servicio
+            </button>
+          )}
+        </Section>
+
+        <Section title="Avisos y zona horaria">
           <div className="space-y-1">
             <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">
               Correo para avisos de nuevas citas
@@ -339,7 +426,7 @@ export function AgendaEditor({
               </select>
             </div>
             <div className="space-y-1">
-              <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Duración de la cita</label>
+              <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Cada cuánto hay horario</label>
               <select
                 value={config.slotMinutes}
                 onChange={(e) => setConfig((c) => ({ ...c, slotMinutes: Number(e.target.value) }))}
@@ -351,23 +438,6 @@ export function AgendaEditor({
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">Color principal</label>
-            <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
-              <input
-                type="color"
-                value={config.primaryColor}
-                onChange={(e) => setConfig((c) => ({ ...c, primaryColor: e.target.value }))}
-                className="h-6 w-8 flex-none cursor-pointer bg-transparent"
-              />
-              <input
-                value={config.primaryColor}
-                onChange={(e) => setConfig((c) => ({ ...c, primaryColor: e.target.value }))}
-                maxLength={9}
-                className="fl-mono min-w-0 flex-1 bg-transparent text-xs text-ink outline-none"
-              />
             </div>
           </div>
         </Section>
@@ -419,6 +489,7 @@ export function AgendaEditor({
                       </p>
                       <p className="truncate text-sm font-medium text-ink">{a.name}</p>
                       <p className="fl-mono truncate text-xs text-ink-muted">{a.contact}</p>
+                      {a.service && <p className="truncate text-[13px] text-ink">{a.service}</p>}
                       {a.professional && <p className="truncate text-[13px] text-ink-faint">{a.professional.name}</p>}
                     </div>
                     {wa && (
@@ -476,6 +547,79 @@ export function AgendaEditor({
           <iframe key={previewKey} src={`${publicUrl}?preview=1`} className="h-[70vh] w-full" title="Vista previa de la agenda" />
         </div>
       </div>
+      {logoOpen && (
+        <ImagePicker
+          businessId={businessId}
+          title="Logo de tu negocio"
+          help="Sube tu logo o elige una foto de tu biblioteca."
+          current={config.logoUrl || null}
+          removeLabel="Quitar el logo"
+          onPick={(url) => {
+            setConfig((c) => ({ ...c, logoUrl: url }));
+            setLogoOpen(false);
+          }}
+          onRemove={config.logoUrl ? () => { setConfig((c) => ({ ...c, logoUrl: "" })); setLogoOpen(false); } : null}
+          onClose={() => setLogoOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function TextField({ label, value, max, placeholder, onChange }: { label: string; value: string; max: number; placeholder: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1">
+      <label className="fl-mono text-[12px] tracking-wide text-ink-muted uppercase">{label}</label>
+      <input value={value} maxLength={max} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent" />
+    </div>
+  );
+}
+
+/** One look of the public page, drawn small with its own colors so the owner picks by sight. */
+export function StyleCard({ id, accent, selected, onSelect }: { id: AgendaStyle; accent: string; selected: boolean; onSelect: () => void }) {
+  const d = AGENDA_STYLE_DEFS[id];
+  const r = Math.min(d.radius, 10);
+  return (
+    <button type="button" onClick={onSelect} aria-pressed={selected} className={`rounded-lg border p-1.5 text-left transition ${selected ? "border-accent ring-2 ring-accent/40" : "border-border hover:border-accent"}`}>
+      <span className="block overflow-hidden" style={{ background: d.bg, borderRadius: r, padding: 8, border: `1px solid ${d.border}` }}>
+        <span className="flex gap-1.5" style={{ flexDirection: d.split ? "row" : "column" }}>
+          <span className="flex flex-col gap-1" style={{ flex: d.split ? "0 0 38%" : undefined }}>
+            <span style={{ height: 5, width: "70%", background: d.text, borderRadius: 2, opacity: 0.85 }} />
+            <span style={{ height: 3, width: "50%", background: d.text, borderRadius: 2, opacity: 0.3 }} />
+          </span>
+          <span className="flex flex-1 flex-col gap-1" style={{ background: d.surface, border: `1px solid ${d.border}`, borderRadius: r, padding: 5 }}>
+            <span className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <span key={i} style={{ height: 9, flex: 1, border: `1px solid ${i === 1 ? accent : d.border}`, background: i === 1 ? `${accent}22` : "transparent", borderRadius: id === "suave" ? 9 : Math.min(d.radius, 4) }} />
+              ))}
+            </span>
+            <span style={{ height: 8, background: accent, borderRadius: id === "suave" ? 9 : Math.min(d.radius, 4) }} />
+          </span>
+        </span>
+      </span>
+      <span className="mt-1.5 block px-0.5 text-xs font-semibold text-ink">{d.label}</span>
+      <span className="block px-0.5 text-[11px] text-ink-faint">{d.hint}</span>
+    </button>
+  );
+}
+
+const SERVICE_MINUTES = [15, 20, 30, 40, 45, 60, 75, 90, 120, 150, 180, 240];
+
+function ServiceRow({ service, onChange, onRemove }: { service: AgendaService; onChange: (next: AgendaService) => void; onRemove: () => void }) {
+  const options = SERVICE_MINUTES.includes(service.minutes) ? SERVICE_MINUTES : [...SERVICE_MINUTES, service.minutes].sort((a, b) => a - b);
+  return (
+    <div className="space-y-2 rounded-md border border-border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input value={service.name} maxLength={80} onChange={(e) => onChange({ ...service, name: e.target.value })} placeholder="Nombre del servicio" className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-accent" />
+        <select value={service.minutes} onChange={(e) => onChange({ ...service, minutes: Number(e.target.value) })} aria-label="Duración" className="rounded-md border border-border bg-background px-2 py-2 text-sm text-ink outline-none focus:border-accent">
+          {options.map((m) => (
+            <option key={m} value={m}>{durationLabel(m)}</option>
+          ))}
+        </select>
+        <input value={service.price ?? ""} maxLength={40} onChange={(e) => onChange({ ...service, price: e.target.value })} placeholder="Precio (opcional)" className="w-36 rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent" />
+      </div>
+      <input value={service.description ?? ""} maxLength={200} onChange={(e) => onChange({ ...service, description: e.target.value })} placeholder="Descripción corta (opcional)" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-ink outline-none focus:border-accent" />
+      <button type="button" onClick={onRemove} className="text-xs font-medium text-error hover:underline">Quitar servicio</button>
     </div>
   );
 }
@@ -544,6 +688,7 @@ function ProfessionalRow({
     name: professional.name,
     title: professional.title ?? "",
     email: professional.email ?? "",
+    photoUrl: professional.photoUrl ?? "",
     active: professional.active,
     availability: professional.availability,
     pipelineId: professional.pipelineId,
@@ -553,6 +698,7 @@ function ProfessionalRow({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   function setDay(day: DayKey, patch: Partial<Availability[DayKey]>) {
     setForm((f) => ({ ...f, availability: { ...f.availability, [day]: { ...f.availability[day], ...patch } } }));
@@ -582,6 +728,22 @@ function ProfessionalRow({
 
   return (
     <div className="space-y-3 rounded-md border border-border p-3">
+      <div className="flex items-center gap-3">
+        {form.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={form.photoUrl} alt="" className="h-11 w-11 rounded-full border border-border object-cover" />
+        ) : (
+          <span className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-border-strong text-[11px] text-ink-faint">Foto</span>
+        )}
+        <button type="button" onClick={() => setPhotoOpen(true)} className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent">
+          {form.photoUrl ? "Cambiar foto" : "Poner foto"}
+        </button>
+        {form.photoUrl && (
+          <button type="button" onClick={() => setForm((f) => ({ ...f, photoUrl: "" }))} className="text-xs font-medium text-error hover:underline">
+            Quitar
+          </button>
+        )}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={form.name}
@@ -661,6 +823,21 @@ function ProfessionalRow({
         {saved && <span className="fl-mono text-xs text-accent">✓ Guardado</span>}
         {error && <span className="text-xs font-medium text-error">{error}</span>}
       </div>
+      {photoOpen && (
+        <ImagePicker
+          businessId={businessId}
+          title={`Foto de ${form.name || "este profesional"}`}
+          help="Sube una foto o elige una de tu biblioteca."
+          current={form.photoUrl || null}
+          removeLabel="Quitar la foto"
+          onPick={(url) => {
+            setForm((f) => ({ ...f, photoUrl: url }));
+            setPhotoOpen(false);
+          }}
+          onRemove={form.photoUrl ? () => { setForm((f) => ({ ...f, photoUrl: "" })); setPhotoOpen(false); } : null}
+          onClose={() => setPhotoOpen(false)}
+        />
+      )}
     </div>
   );
 }

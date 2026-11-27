@@ -2,16 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withSiteTracking } from "@/lib/siteTracking";
 import { renderStoredWebsite, resolveClickTarget } from "@/lib/websiteRender";
-import { renderAgendaHtml } from "@/lib/agendaTemplate";
-import {
-  AvailabilitySchema,
-  DEFAULT_AVAILABILITY,
-  ANY_PROFESSIONAL_ID,
-  mergeAvailabilities,
-  getUpcomingAvailableDates,
-  getAvailableSlotsForDate,
-  getAvailableSlotsForAnyProfessional,
-} from "@/lib/agenda";
+import { AGENDA_CONFIG_SELECT, renderAgendaPage } from "@/lib/agendaPage";
 import { submitAgendaBooking, previewAgendaBookingOutcome } from "@/lib/agendaBooking";
 import { captureWebsiteLead } from "@/lib/websiteLeads";
 import { blockedBookingOutcome, publicFormBlock } from "@/lib/abuseGuard";
@@ -82,20 +73,7 @@ export async function proxy(request: NextRequest) {
       businessId: true,
       aiImageUrl: true,
       business: { select: { name: true, industry: true } },
-      agendaConfig: {
-        select: {
-          notificationEmail: true,
-          timezone: true,
-          slotMinutes: true,
-          availability: true,
-          primaryColor: true,
-          professionals: {
-            where: { active: true },
-            orderBy: { position: "asc" },
-            select: { id: true, name: true, title: true, email: true, availability: true, pipelineId: true },
-          },
-        },
-      },
+      agendaConfig: { select: AGENDA_CONFIG_SELECT },
     },
   });
 
@@ -143,6 +121,8 @@ export async function proxy(request: NextRequest) {
               notificationEmail: website.agendaConfig.notificationEmail,
               formData,
               slotMinutes: website.agendaConfig.slotMinutes,
+              address: website.agendaConfig.address,
+              mapUrl: website.agendaConfig.mapUrl,
               professionals: website.agendaConfig.professionals,
             });
 
@@ -167,57 +147,13 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    const professionals = website.agendaConfig.professionals;
-    const professionalParam = request.nextUrl.searchParams.get("professional");
-    const selectedProfessional = professionals.find((p) => p.id === professionalParam) ?? null;
-    const isAnyProfessional = professionalParam === ANY_PROFESSIONAL_ID;
-    const needsProfessionalPick = professionals.length > 0 && !selectedProfessional && !isAnyProfessional;
-    const parsedProfessionalAvailabilities = professionals.map((p) => AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(p.availability));
-    const availability = selectedProfessional
-      ? AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(selectedProfessional.availability)
-      : isAnyProfessional
-        ? mergeAvailabilities(parsedProfessionalAvailabilities)
-        : AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(website.agendaConfig.availability);
-    const dateStr = request.nextUrl.searchParams.get("date");
-    const timeStr = request.nextUrl.searchParams.get("time");
-    const confirmedDate = request.nextUrl.searchParams.get("reservado_fecha");
-    const confirmedTime = request.nextUrl.searchParams.get("reservado_hora");
-    const bookingError = request.nextUrl.searchParams.get("error");
-
-    const upcomingDates =
-      needsProfessionalPick || dateStr ? [] : getUpcomingAvailableDates(availability, website.agendaConfig.timezone, 10);
-    const availableSlots =
-      needsProfessionalPick || !dateStr || timeStr
-        ? []
-        : isAnyProfessional
-          ? await getAvailableSlotsForAnyProfessional({
-              websiteId: website.id,
-              dateStr,
-              professionals: professionals.map((p) => ({ id: p.id, availability: p.availability })),
-              slotMinutes: website.agendaConfig.slotMinutes,
-              timezone: website.agendaConfig.timezone,
-            })
-          : await getAvailableSlotsForDate({
-              websiteId: website.id,
-              dateStr,
-              availability,
-              slotMinutes: website.agendaConfig.slotMinutes,
-              timezone: website.agendaConfig.timezone,
-              professionalId: selectedProfessional?.id ?? null,
-            });
-
-    const html = renderAgendaHtml({
+    const { html, booked } = await renderAgendaPage({
+      websiteId: website.id,
       businessName: website.business.name,
-      primaryColor: website.agendaConfig.primaryColor,
+      whatsappNumber: website.whatsappNumber,
+      config: website.agendaConfig,
+      query: request.nextUrl.searchParams,
       trackingBasePath: "",
-      professionals: professionals.map((p) => ({ id: p.id, name: p.name, title: p.title })),
-      professionalId: professionalParam,
-      upcomingDates,
-      dateStr,
-      availableSlots,
-      timeStr,
-      confirmed: confirmedDate && confirmedTime ? { dateStr: confirmedDate, timeStr: confirmedTime } : null,
-      bookingError,
       preview,
     });
 
@@ -225,7 +161,7 @@ export async function proxy(request: NextRequest) {
       html,
       { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", ...customDomainSecurityHeaders() },
       { metaPixelId: website.metaPixelId, googleTagId: website.googleTagId },
-      { preview, events: { schedule: !!(confirmedDate && confirmedTime) } },
+      { preview, events: { schedule: booked } },
     );
     return new NextResponse(tracked.html, { headers: tracked.headers });
   }

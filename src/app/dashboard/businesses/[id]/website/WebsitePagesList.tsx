@@ -4,10 +4,12 @@ import { fromPanelUrl } from "@/lib/panelBackLink";
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createWebsitePageV2, createAgendaPage, deleteWebsitePage, renameWebsitePage } from "@/lib/actions";
+import { createAgendaPage, deleteWebsitePage, renameWebsitePage } from "@/lib/actions";
+import { AGENDA_STYLES, type AgendaStyle } from "@/lib/agendaStyles";
+import { StyleCard } from "./[websiteId]/AgendaEditor";
 import { ClientDate } from "@/components/ClientDate";
 import { askConfirm } from "@/components/ConfirmHost";
-import { DocIcon, SparklesIcon, TrendIcon } from "./[websiteId]/builderIcons";
+import { DocIcon, TrendIcon } from "./[websiteId]/builderIcons";
 
 type Page = {
   id: string;
@@ -103,13 +105,13 @@ export function WebsitePagesList({
               onClick={openNewPageDialog}
               className="rounded-md border border-border-strong px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-accent"
             >
-              + Página rápida o agenda
+              + Agenda
             </button>
           </div>
         </div>
       )}
 
-      <dialog ref={dialogRef} className="fl-card-hero w-full max-w-md p-0">
+      <dialog ref={dialogRef} className="fl-card-hero w-full max-w-lg p-0">
         <NewPageDialog
           key={formKey}
           businessId={businessId}
@@ -364,172 +366,22 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
 type FormState = { error: string | null };
 const INITIAL_STATE: FormState = { error: null };
 
-// Lets the client choose between a content page (AI-written copy, the
-// default) and an agenda page (a real booking calendar — see
-// lib/agendaTemplate.ts) before showing the matching form. An agenda page
-// only makes sense once there's already a first, general-purpose page to
-// send people to it from, so the choice only shows up for additional
-// pages — the very first page is always content.
+// A new page is always an agenda (a real booking calendar, see lib/agendaTemplate.ts): pages with
+// content come from the template library, not from here. It asks for a name and a look; hours,
+// services, address and the rest are set afterwards in the agenda's own editor.
 function NewPageDialog({
   businessId,
   pageNumber,
-  isFirstPage,
   onClose,
 }: {
   businessId: string;
   pageNumber: number;
-  isFirstPage: boolean;
-  onClose: () => void;
-}) {
-  const [kind, setKind] = useState<"landing" | "agenda">("landing");
-
-  if (!isFirstPage) {
-    return (
-      <div>
-        <div className="mx-6 mt-6 flex gap-1 rounded-md bg-background p-1">
-          <button
-            type="button"
-            onClick={() => setKind("landing")}
-            className={`flex-1 rounded px-3 py-1.5 text-xs font-semibold transition ${kind === "landing" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"}`}
-          >
-            Página de contenido
-          </button>
-          <button
-            type="button"
-            onClick={() => setKind("agenda")}
-            className={`flex-1 rounded px-3 py-1.5 text-xs font-semibold transition ${kind === "agenda" ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink"}`}
-          >
-            Página de agenda
-          </button>
-        </div>
-        {kind === "landing" ? (
-          <NewPageForm businessId={businessId} pageNumber={pageNumber} isFirstPage={false} onClose={onClose} />
-        ) : (
-          <NewAgendaForm businessId={businessId} pageNumber={pageNumber} onClose={onClose} />
-        )}
-      </div>
-    );
-  }
-
-  return <NewPageForm businessId={businessId} pageNumber={pageNumber} isFirstPage onClose={onClose} />;
-}
-
-// Only asks for what actually changes the generated copy (the client's own
-// design brief, and — for additional pages — the page's purpose) — no name
-// field here (auto-numbered at creation so there's nothing to invent up
-// front; renaming it to something like "Paso 2 — Agendar demo" happens
-// afterward, straight from the card — see PageCard's inline rename) and no
-// link field (that's editable afterward, in the page's own editor,
-// alongside everything else).
-function NewPageForm({
-  businessId,
-  pageNumber,
-  isFirstPage,
-  onClose,
-}: {
-  businessId: string;
-  pageNumber: number;
-  isFirstPage: boolean;
+  isFirstPage?: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
   const [state, setState] = useState<FormState>(INITIAL_STATE);
-  const [isPending, startTransition] = useTransition();
-
-  function handleSubmit(formData: FormData) {
-    const purpose = String(formData.get("purpose") ?? "").trim();
-    const designPrompt = String(formData.get("designPrompt") ?? "").trim();
-
-    startTransition(async () => {
-      try {
-        // Quick path from this dialog also uses the new builder (v2).
-        const result = await createWebsitePageV2(businessId, {
-          purpose: purpose || undefined,
-          brief: designPrompt || undefined,
-        });
-        if (!result.ok) throw new Error(result.error);
-        onClose();
-        router.push(`/dashboard/businesses/${businessId}/website/${result.id}`);
-      } catch (err) {
-        setState({ error: err instanceof Error ? err.message : "No se pudo crear la página" });
-      }
-    });
-  }
-
-  return (
-    <form action={handleSubmit} className="space-y-4 p-6">
-      <div className="space-y-1">
-        <h2 className="text-lg font-bold text-ink">
-          {isFirstPage ? "Crea tu primera página" : `Nueva página (Página ${pageNumber})`}
-        </h2>
-        <p className="text-sm text-ink-muted">
-          {isFirstPage
-            ? "Cuéntale a la IA cómo quieres tu página abajo — si la dejas en blanco, la armamos igual con la información de tu perfil de negocio, pero mientras más detalles le des, mejor queda."
-            : "Para qué es esta página además de la principal — por ejemplo, que el visitante agende una demo, o una oferta puntual. La IA ajusta el texto y el botón a eso."}
-        </p>
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="designPrompt" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          ✍️ Pega aquí el prompt de cómo quieres tu página web
-        </label>
-        <textarea
-          id="designPrompt"
-          name="designPrompt"
-          rows={4}
-          placeholder={'Ej: "Estilo minimalista en tonos verdes, que resalte que somos los únicos con entrega el mismo día, tono profesional pero cercano"'}
-          className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-        />
-        <p className="text-xs text-ink-faint">
-          Describe estilo, colores, qué debe destacar o cualquier dato que no pueda faltar — la IA lo prioriza al
-          diseñar tu página. Es opcional, pero recomendado.
-        </p>
-      </div>
-
-      {!isFirstPage && (
-        <div className="space-y-1">
-          <label htmlFor="purpose" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-            Objetivo de esta página (opcional)
-          </label>
-          <textarea
-            id="purpose"
-            name="purpose"
-            rows={2}
-            placeholder="Ej: que el visitante agende una demo con nosotros"
-            className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
-          />
-        </div>
-      )}
-
-      {state.error && <p className="text-sm text-error">{state.error}</p>}
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-ink transition hover:border-accent"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={isPending}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink transition hover:bg-accent-hover disabled:opacity-50"
-        >
-          {isPending ? "Generando... (puede tardar un minuto)" : <><SparklesIcon className="mr-1 inline h-4 w-4" />Generar página</>}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-// No AI content to write here — an agenda page needs only a name up
-// front; hours, slot length, notification email and accent color all get
-// sensible defaults (Lun-Vie 9am-5pm, cada 30 min, tu propio correo) and
-// are editable right after creation from the agenda's own settings panel.
-function NewAgendaForm({ businessId, pageNumber, onClose }: { businessId: string; pageNumber: number; onClose: () => void }) {
-  const router = useRouter();
-  const [state, setState] = useState<FormState>(INITIAL_STATE);
+  const [style, setStyle] = useState<AgendaStyle>("clasico");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
@@ -537,7 +389,7 @@ function NewAgendaForm({ businessId, pageNumber, onClose }: { businessId: string
 
     startTransition(async () => {
       try {
-        const { id } = await createAgendaPage(businessId, { name: name || undefined });
+        const { id } = await createAgendaPage(businessId, { name: name || undefined, style });
         onClose();
         router.push(`/dashboard/businesses/${businessId}/website/${id}`);
       } catch (err) {
@@ -550,16 +402,12 @@ function NewAgendaForm({ businessId, pageNumber, onClose }: { businessId: string
     <form action={handleSubmit} className="space-y-4 p-6">
       <div className="space-y-1">
         <h2 className="text-lg font-bold text-ink">Nueva agenda (Página {pageNumber})</h2>
-        <p className="text-sm text-ink-muted">
-          Una página real donde tus visitantes eligen día y hora y quedan agendados — sin depender de Calendly ni
-          otra herramienta externa. Te llega un correo cada vez que alguien reserva, y también le llega confirmación
-          a esa persona. Configuras los horarios después de crearla.
-        </p>
+        <p className="text-sm text-ink-muted">Tus clientes eligen día y hora y quedan agendados.</p>
       </div>
 
       <div className="space-y-1">
         <label htmlFor="name" className="fl-mono text-xs tracking-wide text-ink-muted uppercase">
-          Nombre de esta página (opcional)
+          Nombre (opcional)
         </label>
         <input
           id="name"
@@ -567,6 +415,15 @@ function NewAgendaForm({ businessId, pageNumber, onClose }: { businessId: string
           placeholder="Ej: Agenda tu cita"
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-ink outline-none focus:border-accent"
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="fl-mono text-xs tracking-wide text-ink-muted uppercase">Estilo</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {AGENDA_STYLES.map((id) => (
+            <StyleCard key={id} id={id} accent="#1f6feb" selected={style === id} onSelect={() => setStyle(id)} />
+          ))}
+        </div>
       </div>
 
       {state.error && <p className="text-sm text-error">{state.error}</p>}

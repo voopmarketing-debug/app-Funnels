@@ -23,6 +23,7 @@ export function buildIcsEvent(params: {
   uid: string;
   summary: string;
   description?: string;
+  location?: string;
   startsAt: Date;
   endsAt: Date;
 }): string {
@@ -40,6 +41,7 @@ export function buildIcsEvent(params: {
     `DTEND:${formatIcsDate(params.endsAt)}`,
     `SUMMARY:${escapeIcsText(params.summary)}`,
     ...(params.description ? [`DESCRIPTION:${escapeIcsText(params.description)}`] : []),
+    ...(params.location ? [`LOCATION:${escapeIcsText(params.location)}`] : []),
     "END:VEVENT",
     "END:VCALENDAR",
   ];

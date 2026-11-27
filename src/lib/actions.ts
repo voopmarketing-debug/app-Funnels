@@ -79,6 +79,9 @@ import { convertToOggOpus } from "@/lib/audioConvert";
 import { isRateLimited, recordRateLimitEvent } from "@/lib/rateLimit";
 import { clientIpFrom, isHoneypotFilled, overLimit } from "@/lib/abuseGuard";
 import { headers } from "next/headers";
+import { isAgendaStyle } from "@/lib/agendaStyles";
+import { parseServices } from "@/lib/agendaServices";
+import { safeHttpUrl } from "@/lib/agendaTemplate";
 import { isAgencyAdmin, requireActiveAccount, requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
 import { DEFAULT_PIPELINE_STAGE_NAMES } from "@/lib/crmStages";
@@ -2748,7 +2751,7 @@ export async function renameWebsitePage(businessId: string, websiteId: string, n
  * are never silently unreachable; editable afterward from the agenda's own
  * settings panel (see updateAgendaConfig below).
  */
-export async function createAgendaPage(businessId: string, input: { name?: string }): Promise<{ id: string }> {
+export async function createAgendaPage(businessId: string, input: { name?: string; style?: string }): Promise<{ id: string }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
   await requireBusinessMembership(session.user.id, businessId);
@@ -2778,6 +2781,7 @@ export async function createAgendaPage(businessId: string, input: { name?: strin
             timezone: "America/Bogota",
             slotMinutes: 30,
             availability: DEFAULT_AVAILABILITY,
+            style: isAgendaStyle(input.style) ? input.style : "clasico",
           },
         },
       },
@@ -2795,7 +2799,21 @@ export async function createAgendaPage(businessId: string, input: { name?: strin
 export async function updateAgendaConfig(
   businessId: string,
   websiteId: string,
-  input: { notificationEmail: string; timezone: string; slotMinutes: number; availability: Availability; primaryColor: string },
+  input: {
+    notificationEmail: string;
+    timezone: string;
+    slotMinutes: number;
+    availability: Availability;
+    primaryColor: string;
+    style: string;
+    title: string;
+    subtitle: string;
+    address: string;
+    mapUrl: string;
+    logoUrl: string;
+    askNote: boolean;
+    services: unknown;
+  },
 ): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
@@ -2817,10 +2835,22 @@ export async function updateAgendaConfig(
   const slotMinutes = Math.max(5, Math.min(240, Math.round(input.slotMinutes) || 30));
   const primaryColor = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3}){0,2}$/.test(input.primaryColor) ? input.primaryColor : "#1f6feb";
 
+  const style = isAgendaStyle(input.style) ? input.style : "clasico";
+  const title = input.title.trim().slice(0, 80) || null;
+  const subtitle = input.subtitle.trim().slice(0, 200) || null;
+  const address = input.address.trim().slice(0, 200) || null;
+  const mapUrl = safeHttpUrl(input.mapUrl);
+  if (input.mapUrl.trim() && !mapUrl) throw new Error("El link del mapa no es válido (debe empezar por https://)");
+  const logoUrl = safeHttpUrl(input.logoUrl);
+  if (input.logoUrl.trim() && !logoUrl) throw new Error("El logo no es válido");
+  const askNote = !!input.askNote;
+  const services = parseServices(input.services);
+
+  const fields = { notificationEmail, timezone, slotMinutes, availability, primaryColor, style, title, subtitle, address, mapUrl, logoUrl, askNote, services };
   await prisma.agendaConfig.upsert({
     where: { websiteId },
-    create: { websiteId, notificationEmail, timezone, slotMinutes, availability, primaryColor },
-    update: { notificationEmail, timezone, slotMinutes, availability, primaryColor },
+    create: { websiteId, ...fields },
+    update: fields,
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website/${websiteId}`);
@@ -2861,7 +2891,7 @@ export async function createProfessional(
 export async function updateProfessional(
   businessId: string,
   professionalId: string,
-  input: { name: string; title: string; email: string; availability: Availability; active: boolean; pipelineId: string | null },
+  input: { name: string; title: string; email: string; photoUrl: string; availability: Availability; active: boolean; pipelineId: string | null },
 ): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Not authenticated");
@@ -2876,6 +2906,7 @@ export async function updateProfessional(
   if (!name) throw new Error("Falta el nombre");
   const title = input.title.trim().slice(0, 80);
   const email = input.email.trim().slice(0, 180);
+  const photoUrl = safeHttpUrl(input.photoUrl);
   const availability = AvailabilitySchema.parse(input.availability);
   // Trust the FK, not the input — a stale/forged pipelineId from a different
   // business would otherwise silently succeed (Prisma only checks the FK
@@ -2886,7 +2917,7 @@ export async function updateProfessional(
 
   await prisma.professional.update({
     where: { id: professionalId },
-    data: { name, title: title || null, email: email || null, availability, active: input.active, pipelineId },
+    data: { name, title: title || null, email: email || null, photoUrl, availability, active: input.active, pipelineId },
   });
 
   revalidatePath(`/dashboard/businesses/${businessId}/website/${professional.agendaConfig.websiteId}`);

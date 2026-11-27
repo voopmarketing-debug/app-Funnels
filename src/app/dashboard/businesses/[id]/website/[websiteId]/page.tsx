@@ -8,6 +8,8 @@ import { WebsiteEditor } from "./WebsiteEditor";
 import { WebsiteBuilder } from "./WebsiteBuilder";
 import { WebsiteContentV2Schema, isV2Content } from "@/lib/websiteContentV2";
 import { AgendaEditor } from "./AgendaEditor";
+import { parseServices } from "@/lib/agendaServices";
+import { isAgendaStyle } from "@/lib/agendaStyles";
 import { TemplateBuilder } from "./TemplateBuilder";
 import { isTemplateContent } from "@/lib/templateSite/content";
 import { parseTemplateSite } from "@/lib/templateSite/render";
@@ -53,12 +55,12 @@ export default async function WebsiteEditorPage({
         where: { websiteId, status: "confirmed" },
         orderBy: { startsAt: "asc" },
         take: 20,
-        select: { id: true, name: true, contact: true, startsAt: true, professional: { select: { name: true } } },
+        select: { id: true, name: true, contact: true, startsAt: true, service: true, note: true, professional: { select: { name: true } } },
       }),
       prisma.appointment.findMany({
         where: { websiteId, status: "confirmed", startsAt: { gte: monthQueryStart, lt: monthQueryEnd } },
         orderBy: { startsAt: "asc" },
-        select: { id: true, name: true, contact: true, startsAt: true, professional: { select: { name: true } } },
+        select: { id: true, name: true, contact: true, startsAt: true, service: true, note: true, professional: { select: { name: true } } },
       }),
       website.agendaConfig
         ? prisma.professional.findMany({ where: { agendaConfigId: website.agendaConfig.id }, orderBy: { position: "asc" } })
@@ -87,6 +89,14 @@ export default async function WebsiteEditorPage({
             slotMinutes: website.agendaConfig?.slotMinutes ?? 30,
             availability,
             primaryColor: website.agendaConfig?.primaryColor ?? "#1f6feb",
+            style: isAgendaStyle(website.agendaConfig?.style) ? website.agendaConfig.style : "clasico",
+            title: website.agendaConfig?.title ?? "",
+            subtitle: website.agendaConfig?.subtitle ?? "",
+            address: website.agendaConfig?.address ?? "",
+            mapUrl: website.agendaConfig?.mapUrl ?? "",
+            logoUrl: website.agendaConfig?.logoUrl ?? "",
+            askNote: website.agendaConfig?.askNote ?? true,
+            services: parseServices(website.agendaConfig?.services),
           }}
           customDomain={website.customDomain}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
@@ -101,6 +111,7 @@ export default async function WebsiteEditorPage({
             name: p.name,
             title: p.title,
             email: p.email,
+            photoUrl: p.photoUrl,
             active: p.active,
             availability: AvailabilitySchema.catch(DEFAULT_AVAILABILITY).parse(p.availability),
             pipelineId: p.pipelineId,

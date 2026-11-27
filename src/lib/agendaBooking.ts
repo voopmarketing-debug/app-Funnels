@@ -1,5 +1,5 @@
 import { bookAppointment } from "@/lib/agenda";
-import { formatDateLabel } from "@/lib/agendaTemplate";
+import { formatDateLabel, safeHttpUrl } from "@/lib/agendaTemplate";
 import { sendEmail } from "@/lib/email";
 import { buildIcsEvent } from "@/lib/ics";
 import { upsertLeadConversation } from "@/lib/crmIntake";
@@ -32,6 +32,9 @@ export async function submitAgendaBooking(params: {
   // invite's DTEND (see lib/ics.ts); the caller already has this from
   // AgendaConfig.slotMinutes for the slot-picking step, no extra query.
   slotMinutes: number;
+  // Shown in the visitor's confirmation (optional).
+  address?: string | null;
+  mapUrl?: string | null;
   // Every professional on this agenda (id/name/email/pipelineId) — passed
   // in by the caller (route.ts/proxy.ts, which already fetched this for the
   // picker), so this function doesn't need its own extra query. Which one
@@ -48,6 +51,8 @@ export async function submitAgendaBooking(params: {
   const contact = String(params.formData.get("contact") ?? "").trim().slice(0, 120);
   const email = String(params.formData.get("email") ?? "").trim().slice(0, 180);
   const requestedProfessionalId = String(params.formData.get("professional") ?? "").trim() || null;
+  const serviceId = String(params.formData.get("service") ?? "").trim().slice(0, 40) || null;
+  const note = String(params.formData.get("note") ?? "").trim().slice(0, 500);
 
   if (!dateStr || !timeStr || !name || !contact) {
     return { ok: false, dateStr, error: "Faltan datos — completa nombre y contacto." };
@@ -61,6 +66,8 @@ export async function submitAgendaBooking(params: {
     contact,
     email: email || null,
     professionalId: requestedProfessionalId,
+    serviceId,
+    note: note || null,
   });
   if (!result.ok) {
     return { ok: false, dateStr, error: result.error };
@@ -69,6 +76,8 @@ export async function submitAgendaBooking(params: {
     ? (params.professionals.find((p) => p.id === result.professionalId) ?? null)
     : null;
 
+  const address = (params.address ?? "").trim();
+  const mapUrl = safeHttpUrl(params.mapUrl);
   const dateLabel = formatDateLabel(dateStr);
   const withProfessional = assignedProfessional ? ` con ${escapeHtml(assignedProfessional.name)}` : "";
 
@@ -83,12 +92,13 @@ export async function submitAgendaBooking(params: {
   // plain text (not the HTML-escaped withProfessional above), so the
   // business sees the real date/time/professional without re-typing it.
   const professionalNote = assignedProfessional ? ` con ${assignedProfessional.name}` : "";
+  const serviceNote = result.service ? ` — ${result.service}` : "";
   await upsertLeadConversation({
     websiteId: params.websiteId,
     name,
     contact,
     appointmentAt: result.startsAt,
-    appointmentNote: `Agendó desde la página — ${dateLabel} a las ${timeStr}${professionalNote}`,
+    appointmentNote: `Agendó desde la página${serviceNote} — ${dateLabel} a las ${timeStr}${professionalNote}${note ? `. Nota: ${note}` : ""}`,
     pipelineId: assignedProfessional?.pipelineId ?? undefined,
   });
 
@@ -101,11 +111,12 @@ export async function submitAgendaBooking(params: {
   // Attached to every notification below so the appointment lands straight
   // on the recipient's own calendar app (Google Calendar, Outlook, Apple
   // Calendar) without anyone opening Funnels Labs — see lib/ics.ts.
-  const endsAt = new Date(result.startsAt.getTime() + params.slotMinutes * 60 * 1000);
+  const endsAt = new Date(result.startsAt.getTime() + result.durationMinutes * 60 * 1000);
   const icsContent = buildIcsEvent({
     uid: `${result.appointmentId}@funnelslabs.app`,
-    summary: `Cita: ${name}${withProfessional} — ${params.businessName}`,
-    description: `Nombre: ${name}\nContacto: ${contact}${email ? `\nCorreo: ${email}` : ""}`,
+    summary: `${result.service ?? "Cita"}: ${name}${withProfessional} — ${params.businessName}`,
+    description: `Nombre: ${name}\nContacto: ${contact}${email ? `\nCorreo: ${email}` : ""}${result.service ? `\nServicio: ${result.service}` : ""}${note ? `\nNota: ${note}` : ""}`,
+    location: address || undefined,
     startsAt: result.startsAt,
     endsAt,
   });
@@ -117,7 +128,7 @@ export async function submitAgendaBooking(params: {
     html: `
       <p>Tienes una nueva cita agendada${withProfessional} desde tu página web.</p>
       <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
-      <p>Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}</p>
+      <p>${result.service ? `Servicio: ${escapeHtml(result.service)} (${result.durationMinutes} min)<br>` : ""}Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}${note ? `<br>Nota: ${escapeHtml(note)}` : ""}</p>
     `,
     icsContent,
     icsFilename,
@@ -129,6 +140,8 @@ export async function submitAgendaBooking(params: {
       html: `
         <p>¡Listo! Tu cita con <strong>${escapeHtml(params.businessName)}</strong>${withProfessional} quedó confirmada.</p>
         <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
+        ${result.service ? `<p>Servicio: ${escapeHtml(result.service)}</p>` : ""}
+        ${address ? `<p>Dónde: ${escapeHtml(address)}${mapUrl ? ` — <a href="${escapeHtml(mapUrl)}">Cómo llegar</a>` : ""}</p>` : ""}
         <p>Si necesitas cambiarla, contáctanos directamente.</p>
       `,
       icsContent,
@@ -146,7 +159,7 @@ export async function submitAgendaBooking(params: {
       html: `
         <p>Te agendaron una cita en ${escapeHtml(params.businessName)}.</p>
         <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
-        <p>Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}</p>
+        <p>${result.service ? `Servicio: ${escapeHtml(result.service)}<br>` : ""}Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}${note ? `<br>Nota: ${escapeHtml(note)}` : ""}</p>
       `,
       icsContent,
       icsFilename,
