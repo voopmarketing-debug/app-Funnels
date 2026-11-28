@@ -532,6 +532,8 @@ export const WebsiteContentV2Schema = AiWebsiteV2Schema.extend({
   hidden: z.array(z.number().int()).catch([]),
   /** Small mono counters ("02 / 08") before each section's label. A look the template sets; the AI never decides it. */
   counters: z.boolean().optional().catch(undefined),
+  /** The kind of business (a niche id) whose drawing fills the empty photo spaces in the editor and the previews. */
+  art: z.string().max(24).optional().catch(undefined),
   /** Addresses of the pictures the platform created with AI on this page (so they can be counted, replaced or removed). */
   /** The public page shows only the owner's HTML block, with no header, footer or sections of ours ("Subir mi HTML"). */
   fullHtml: z.boolean().optional().catch(undefined),

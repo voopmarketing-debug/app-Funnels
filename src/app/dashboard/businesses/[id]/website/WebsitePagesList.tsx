@@ -239,7 +239,7 @@ function PageCard({ businessId, page, publicUrl }: { businessId: string; page: P
   }
 
   return (
-    <div className="fl-card fl-card-hover group overflow-hidden">
+    <div className="fl-card fl-card-hover group overflow-hidden !rounded-[20px]">
       <Link href={editHref} className="block">
         {/* Live scaled-down render of the real page — no screenshot service
             needed: the iframe renders at 4x the box size then is scaled to

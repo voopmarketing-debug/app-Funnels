@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Montserrat, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -21,8 +21,9 @@ const THEME_INIT_SCRIPT = `
   } catch (e) {}
 `;
 
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
+// The platform's typeface: Inter (the closest open face to the one used by the reference dashboards).
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
 });
@@ -71,7 +72,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${montserrat.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
       // The inline theme script (in <head>) sets data-theme on this
       // element before React hydrates, based on localStorage — which the
       // server can't know at render time. That's an intentional mismatch on

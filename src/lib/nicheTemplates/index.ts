@@ -1,6 +1,7 @@
 import { STYLE_THEME } from "@/lib/websiteStylePreview";
 import type { Section, StyleKey, WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { BLUEPRINTS } from "./blueprints";
+import { SKINS, nicheTheme } from "./skins";
 import type { Niche } from "./types";
 import { FUNNELS, FUNNEL_NICHE, buildFunnelContent, getFunnelTemplate } from "./funnels";
 import { abogados } from "./niches/abogados";
@@ -65,7 +66,7 @@ export function listTemplateCards(): TemplateCard[] {
   for (const niche of NICHES) {
     BLUEPRINTS.forEach((bp, i) => {
       const style = niche.styleOrder[i];
-      const theme = STYLE_THEME[style];
+      const theme = nicheTheme(style, niche.id);
       const angle = niche.angles[i];
       const built = bp.build(niche, angle, "Tu negocio");
       const hero = built[0];
@@ -116,16 +117,19 @@ export function buildNicheContent(
   const { niche, index } = template;
   const style = niche.styleOrder[index];
   const sections = BLUEPRINTS[index].build(niche, niche.angles[index], opts.businessName);
-  const accent = opts.brandColor && /^#[0-9a-fA-F]{6}$/.test(opts.brandColor) ? opts.brandColor : STYLE_THEME[style].primaryColor;
+  const nt = nicheTheme(style, niche.id);
+  const accent = opts.brandColor && /^#[0-9a-fA-F]{6}$/.test(opts.brandColor) ? opts.brandColor : nt.primaryColor;
   return {
     version: 2,
     pageType: "captacion",
     style,
     announcement: null,
-    theme: { ...STYLE_THEME[style], primaryColor: accent } as WebsiteContentV2["theme"],
+    theme: { ...nt, primaryColor: accent } as WebsiteContentV2["theme"],
     sections,
     hidden: [],
     ...(BLUEPRINTS[index].counters ? { counters: true } : {}),
+    ...(SKINS[niche.id] ? { btnShape: SKINS[niche.id].shape } : {}),
+    art: niche.id,
     heroCtaUrl: null,
   };
 }

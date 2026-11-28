@@ -1,5 +1,10 @@
 import type { Section } from "@/lib/websiteContentV2";
 import type { Angle, Niche } from "./types";
+import { SKINS, rotate } from "./skins";
+
+const shiftOf = (n: Niche) => SKINS[n.id]?.shift ?? 0;
+const FEATURES = ["cards", "icons", "list", "bento", "numbered"] as const;
+const STEPS = ["row", "timeline", "big"] as const;
 
 export type Blueprint = {
   key: string;
@@ -14,9 +19,9 @@ export type Blueprint = {
 
 const fill = (text: string, business: string) => text.replaceAll("{negocio}", business);
 
-const hero = (a: Angle, business: string, variant: "split" | "centered" | "giant" | "wordmark", showLeadForm = false): Section => ({
+const hero = (a: Angle, business: string, variant: "split" | "centered" | "giant" | "wordmark", showLeadForm = false, shift = 0): Section => ({
   type: "hero",
-  variant,
+  variant: shift % 2 === 1 && (variant === "split" || variant === "centered") && !showLeadForm ? (variant === "split" ? "centered" : "split") : variant,
   eyebrow: fill(a.eyebrow, business),
   heading: a.heading,
   highlight: a.highlight,
@@ -29,17 +34,17 @@ const hero = (a: Angle, business: string, variant: "split" | "centered" | "giant
   productId: null,
 });
 
-const trust = (n: Niche, count = 3, variant: "row" | "ticker" = "row"): Section => ({ type: "trustBar", variant, items: n.trust.slice(0, count) });
+const trust = (n: Niche, count = 3, variant: "row" | "ticker" = "row"): Section => ({ type: "trustBar", variant: rotate(["row", "ticker"] as const, variant, shiftOf(n)), items: n.trust.slice(0, count) });
 const features = (n: Niche, variant: "cards" | "icons" | "list" | "bento" | "numbered", count = 6): Section => ({
   type: "features",
-  variant,
+  variant: rotate(FEATURES, variant, shiftOf(n)),
   kicker: n.servicesKicker,
   heading: n.servicesHeading,
   intro: null,
   items: n.services.slice(0, count),
 });
-const steps = (n: Niche, variant: "row" | "timeline" | "big" = "row"): Section => ({ type: "steps", variant, kicker: n.stepsKicker, heading: n.stepsHeading, items: n.steps });
-const faq = (n: Niche, count = 4, variant: "list" | "split" = "list"): Section => ({ type: "objections", variant, kicker: "Preguntas frecuentes", heading: n.faqHeading, items: n.faq.slice(0, count) });
+const steps = (n: Niche, variant: "row" | "timeline" | "big" = "row"): Section => ({ type: "steps", variant: rotate(STEPS, variant, shiftOf(n)), kicker: n.stepsKicker, heading: n.stepsHeading, items: n.steps });
+const faq = (n: Niche, count = 4, variant: "list" | "split" = "list"): Section => ({ type: "objections", variant: rotate(["list", "split"] as const, variant, shiftOf(n)), kicker: "Preguntas frecuentes", heading: n.faqHeading, items: n.faq.slice(0, count) });
 const host = (n: Niche, business: string): Section => ({
   type: "host",
   kicker: n.host.kicker,
@@ -75,77 +80,77 @@ export const BLUEPRINTS: Blueprint[] = [
     key: "cita-directa",
     name: "Cita directa",
     strategy: "Promesa clara, servicios y formulario: para quien ya sabe lo que busca.",
-    build: (n, a, b) => [hero(a, b, "split"), trust(n), features(n, "cards"), steps(n), host(n, b), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "split", false, shiftOf(n)), trust(n), features(n, "cards"), steps(n), host(n, b), faq(n), form(n)],
   },
   {
     key: "formulario-en-portada",
     name: "Formulario en portada",
     strategy: "El formulario está desde el primer vistazo: menos pasos para escribirte.",
-    build: (n, a, b) => [hero(a, b, "split", true), trust(n, 4, "ticker"), features(n, "bento", 5), steps(n, "timeline"), faq(n, 4, "split"), cta(n)],
+    build: (n, a, b) => [hero(a, b, "split", true, shiftOf(n)), trust(n, 4, "ticker"), features(n, "bento", 5), steps(n, "timeline"), faq(n, 4, "split"), cta(n)],
   },
   {
     key: "problema-y-solucion",
     name: "Problema y solución",
     strategy: "Empieza por lo que le duele al cliente y lo compara con hacerlo por su cuenta.",
-    build: (n, a, b) => [hero(a, b, "centered"), comparison(n, b), features(n, "numbered", 5), steps(n, "big"), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "centered", false, shiftOf(n)), comparison(n, b), features(n, "numbered", 5), steps(n, "big"), faq(n), form(n)],
   },
   {
     key: "confianza-primero",
     name: "Confianza primero",
     strategy: "Presenta a quien atiende y las garantías antes de pedir el contacto.",
-    build: (n, a, b) => [hero(a, b, "split"), host(n, b), trust(n, 4), features(n, "icons"), faq(n, 5, "split"), cta(n)],
+    build: (n, a, b) => [hero(a, b, "split", false, shiftOf(n)), host(n, b), trust(n, 4), features(n, "icons"), faq(n, 5, "split"), cta(n)],
   },
   {
     key: "titular-gigante",
     name: "Titular gigante",
     strategy: "Un mensaje que se lee de lejos y un solo camino: escribirte.",
-    build: (n, a, b) => [hero(a, b, "giant"), marquee(n), features(n, "list"), steps(n, "timeline"), cta(n, "giant"), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "giant", false, shiftOf(n)), marquee(n), features(n, "list"), steps(n, "timeline"), cta(n, "giant"), faq(n), form(n)],
   },
   {
     key: "paso-a-paso",
     counters: true,
     name: "Paso a paso",
     strategy: "Quita el miedo a empezar mostrando exactamente qué pasa después de escribir.",
-    build: (n, a, b) => [hero(a, b, "centered"), steps(n, "big"), features(n, "bento", 6), comparison(n, b), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "centered", false, shiftOf(n)), steps(n, "big"), features(n, "bento", 6), comparison(n, b), faq(n), form(n)],
   },
   {
     key: "primer-paso",
     counters: true,
     name: "Primer paso sin compromiso",
     strategy: "Una franja que invita a una primera conversación, sin descuentos inventados.",
-    build: (n, a, b) => [hero(a, b, "wordmark"), trust(n), promo(n, "accent"), features(n, "cards"), steps(n), faq(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "wordmark", false, shiftOf(n)), trust(n), promo(n, "accent"), features(n, "cards"), steps(n), faq(n), form(n)],
   },
   {
     key: "servicios-primero",
     counters: true,
     name: "Servicios primero",
     strategy: "Muestra todo lo que haces enseguida: para quien compara opciones.",
-    build: (n, a, b) => [hero(a, b, "centered"), features(n, "bento", 6), promo(n, "dark"), steps(n, "timeline"), host(n, b), form(n)],
+    build: (n, a, b) => [hero(a, b, "centered", false, shiftOf(n)), features(n, "bento", 6), promo(n, "dark"), steps(n, "timeline"), host(n, b), form(n)],
   },
   {
     key: "preguntas-primero",
     name: "Preguntas primero",
     strategy: "Responde las dudas antes que nada: ideal cuando el cliente duda de contratar.",
-    build: (n, a, b) => [hero(a, b, "split"), faq(n, 6, "split"), features(n, "numbered", 5), steps(n), trust(n, 3, "ticker"), cta(n, "giant")],
+    build: (n, a, b) => [hero(a, b, "split", false, shiftOf(n)), faq(n, 6, "split"), features(n, "numbered", 5), steps(n), trust(n, 3, "ticker"), cta(n, "giant")],
   },
   {
     key: "minimal",
     counters: true,
     name: "Minimal y directo",
     strategy: "Pocas secciones y mucho aire: carga rápido y va al grano.",
-    build: (n, a, b) => [hero(a, b, "wordmark"), features(n, "list", 4), steps(n, "big"), form(n)],
+    build: (n, a, b) => [hero(a, b, "wordmark", false, shiftOf(n)), features(n, "list", 4), steps(n, "big"), form(n)],
   },
   {
     key: "doble-llamado",
     name: "Doble llamado a la acción",
     strategy: "Un botón a mitad de la página y otro al final: para quien se decide leyendo.",
-    build: (n, a, b) => [hero(a, b, "split"), features(n, "icons"), promo(n, "soft"), comparison(n, b), steps(n, "big"), faq(n), cta(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "split", false, shiftOf(n)), features(n, "icons"), promo(n, "soft"), comparison(n, b), steps(n, "big"), faq(n), cta(n), form(n)],
   },
   {
     key: "garantias-y-proceso",
     counters: true,
     name: "Garantías y proceso",
     strategy: "Pone el proceso y las garantías al frente para bajar la sensación de riesgo.",
-    build: (n, a, b) => [hero(a, b, "centered"), trust(n, 4), steps(n, "timeline"), features(n, "numbered", 5), host(n, b), faq(n, 5, "split"), cta(n), form(n)],
+    build: (n, a, b) => [hero(a, b, "centered", false, shiftOf(n)), trust(n, 4), steps(n, "timeline"), features(n, "numbered", 5), host(n, b), faq(n, 5, "split"), cta(n), form(n)],
   },
 ];

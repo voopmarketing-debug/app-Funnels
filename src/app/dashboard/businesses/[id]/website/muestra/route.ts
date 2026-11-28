@@ -56,15 +56,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       getWebsiteHeroContext(id, membership.business.industry, null),
       prisma.business.findUnique({ where: { id }, select: { brandPrimaryColor: true } }),
     ]);
-    const color = req.nextUrl.searchParams.get("color") ?? brand?.brandPrimaryColor;
+    // Funnels take the business's brand color; a niche template previews in its own colors (what makes it look like its niche).
+    const color = req.nextUrl.searchParams.get("color") ?? (funnel ? brand?.brandPrimaryColor : null);
     const content = funnel ? buildFunnelContent(funnel, { businessName: membership.business.name, brandColor: color }) : buildNicheContent(niche!, { businessName: membership.business.name, brandColor: color });
     const html = renderWebsiteHtmlV2(content, {
       businessName: membership.business.name,
       trackingBasePath: "#",
       preview: true,
       edit: req.nextUrl.searchParams.get("edit") === "1",
-      heroImageUrl: hero.heroImageUrl,
-      photos: photos.map((p) => p.url),
+      // A template preview shows the template (its own drawing), not whatever photo the business uploaded last.
+      heroImageUrl: funnel ? hero.heroImageUrl : null,
+      photos: funnel ? photos.map((p) => p.url) : [],
       products: [],
     });
     return new NextResponse(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, max-age=300", ...siteSecurityHeaders() } });

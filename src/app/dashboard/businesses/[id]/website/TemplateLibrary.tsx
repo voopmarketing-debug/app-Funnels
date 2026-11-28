@@ -232,7 +232,7 @@ export function TemplateLibrary({
                 setNiche(n.id);
                 setPage(0);
               }}
-              className={`flex-none whitespace-nowrap rounded-full border px-4 py-2 text-sm transition ${niche === n.id ? "border-accent bg-accent font-bold text-accent-ink shadow-sm" : "border-border-strong font-medium text-ink hover:border-accent hover:bg-accent/10"}`}
+              className={`flex-none whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition ${niche === n.id ? "border-transparent bg-ink text-background" : "border-border bg-surface text-ink hover:border-border-strong hover:bg-surface-2"}`}
             >
               {n.id === "mine" || n.id === "others" ? <DocIcon className="mr-1.5 inline-block h-[17px] w-[17px] -translate-y-px" /> : <NicheIcon id={n.id} className="mr-1.5 inline-block h-[17px] w-[17px] -translate-y-px" />}
               {n.label}
@@ -242,17 +242,23 @@ export function TemplateLibrary({
         <label htmlFor="template-search" className="sr-only">
           Buscar plantillas
         </label>
-        <input
-          id="template-search"
-          type="search"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(0);
-          }}
-          placeholder="Buscar…"
-          className="mr-auto h-9 w-52 rounded-lg border border-border bg-background px-3 text-sm text-ink outline-none focus:border-accent"
-        />
+        <div className="relative mr-auto w-full max-w-md">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-faint" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            id="template-search"
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(0);
+            }}
+            placeholder="Buscar plantillas…"
+            className="h-11 w-full rounded-full border border-border bg-surface pr-4 pl-11 text-sm text-ink outline-none transition focus:border-border-strong"
+          />
+        </div>
         <div className="fl-seg flex" role="radiogroup" aria-label="Color de fondo">
           {([["all", "Todos"], ["light", "Claro"], ["dark", "Oscuro"]] as const).map(([key, text]) => (
             <button key={key} type="button" role="radio" aria-checked={tone === key} onClick={() => { setTone(key); setPage(0); }} className="fl-seg-item px-3 py-1.5 text-xs">
@@ -261,10 +267,10 @@ export function TemplateLibrary({
           ))}
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={createBlank} className="h-9 rounded-lg border border-border-strong px-3 text-[13px] font-semibold text-ink transition hover:border-accent">
+          <button type="button" onClick={createBlank} className="h-11 rounded-full border border-border bg-surface px-4 text-[13px] font-semibold text-ink transition hover:border-border-strong hover:bg-surface-2">
             <span aria-hidden="true" className="mr-1 font-mono">{"</>"}</span>En blanco
           </button>
-          <button type="button" onClick={() => setHtmlOpen(true)} className="h-9 rounded-lg border border-border-strong px-3 text-[13px] font-semibold text-ink transition hover:border-accent">
+          <button type="button" onClick={() => setHtmlOpen(true)} className="h-11 rounded-full border border-border bg-surface px-4 text-[13px] font-semibold text-ink transition hover:border-border-strong hover:bg-surface-2">
             <UploadIcon className="mr-1.5 inline h-4 w-4 -translate-y-px" />Subir HTML
           </button>
         </div>
@@ -277,11 +283,11 @@ export function TemplateLibrary({
             {niche === "mine" && <p className="mt-1 text-xs text-ink-muted">Abre una página con tu código HTML y usa Ajustes, Guardar como plantilla.</p>}
           </div>
         ) : (
-          <ul className="grid gap-x-5 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid gap-x-6 gap-y-9 sm:grid-cols-2 xl:grid-cols-3">
             {(niche === "mine" ? mine : others).map((t) => (
               <li key={t.id} className="group min-w-0">
-                <div className="relative overflow-hidden rounded-xl border border-border bg-surface transition group-hover:border-accent/70 group-focus-within:border-accent/70">
-                  <ScaledPagePreview src={`/dashboard/businesses/${businessId}/website/muestra?saved=${t.id}`} aspect={0.72} title={`Plantilla guardada: ${t.name}`} />
+                <div className="relative overflow-hidden rounded-[20px] border border-border bg-surface transition group-hover:border-border-strong group-hover:shadow-lg group-focus-within:border-border-strong">
+                  <ScaledPagePreview src={`/dashboard/businesses/${businessId}/website/muestra?saved=${t.id}`} aspect={0.64} title={`Plantilla guardada: ${t.name}`} />
                   <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/55 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
                     <button type="button" disabled={!!savedBusy} onClick={() => openSaved(t)} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover disabled:opacity-50">
                       {savedBusy === t.id ? "Abriendo…" : "Usar"}
@@ -307,28 +313,30 @@ export function TemplateLibrary({
           <p className="mt-1 text-xs text-ink-muted">Prueba con otra palabra o cambia el filtro.</p>
         </div>
       ) : (
-        <ul className="grid gap-x-5 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid gap-x-6 gap-y-9 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((card) => (
             <li key={card.id} className="group min-w-0">
-              <div className="relative overflow-hidden rounded-xl border border-border bg-surface transition group-hover:border-accent/70 group-focus-within:border-accent/70">
-                <ScaledPagePreview src={previewSrc(card.id)} aspect={0.72} title={`Plantilla: ${card.nicheName}, ${label(card)}`} />
-                <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/55 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
-                  <button type="button" onClick={() => setBig(card)} aria-label={`Ver página: ${card.nicheName}, ${label(card)}`} className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90">
+              <div className="relative overflow-hidden rounded-[20px] border border-border bg-surface transition group-hover:border-border-strong group-hover:shadow-lg group-focus-within:border-border-strong">
+                <ScaledPagePreview src={previewSrc(card.id)} aspect={0.64} title={`Plantilla: ${card.nicheName}, ${label(card)}`} />
+                <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">{card.dark ? "Oscuro" : "Claro"}</span>
+                <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/45 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100">
+                  <button type="button" onClick={() => setBig(card)} aria-label={`Ver página: ${card.nicheName}, ${label(card)}`} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-white/90">
                     Ver
                   </button>
-                  <button type="button" onClick={() => publish(card)} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
+                  <button type="button" onClick={() => publish(card)} className="rounded-full bg-accent px-5 py-2 text-sm font-bold text-accent-ink hover:bg-accent-hover">
                     {actionLabel()}
                   </button>
                 </div>
               </div>
-              <p title={card.strategy} className="mt-2 flex items-baseline gap-2 px-0.5">
-                <span className="min-w-0 truncate text-sm font-semibold text-ink">{label(card)}</span>
-                {niche === "all" && (
-                  <span className="flex-none truncate text-xs text-ink-faint">
-                    {card.nicheShort}
-                  </span>
-                )}
-              </p>
+              <div title={card.strategy} className="mt-3 flex items-center gap-3 px-0.5">
+                <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full text-white" style={{ backgroundColor: card.colors.primary }} aria-hidden="true">
+                  <NicheIcon id={card.nicheId} className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-semibold text-ink">{label(card)}</p>
+                  <p className="truncate text-[13px] text-ink-muted">{card.nicheName}</p>
+                </div>
+              </div>
             </li>
           ))}
         </ul>

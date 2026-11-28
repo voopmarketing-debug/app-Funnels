@@ -96,7 +96,7 @@
   --color-accent-secondary: var(--accent-secondary);
   --color-error: var(--error);
 
-  --font-sans: var(--font-montserrat);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains-mono);
 }
 
@@ -121,17 +121,22 @@ html {
 body {
   background: var(--background);
   color: var(--ink);
-  font-family: var(--font-montserrat), -apple-system, "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-inter), -apple-system, "Segoe UI", Arial, sans-serif;
+  letter-spacing: -0.006em;
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.02em;
 }
 
 /* .fl-mono used to switch to JetBrains Mono (a genuinely different
  * typeface) for labels, IDs and small caps text — mixing two typefaces
  * across the platform read as inconsistent. It now just aliases to the
- * same font as everything else (Montserrat); the class stays in markup
+ * same font as everything else (Inter); the class stays in markup
  * purely so callers don't need touching, and tabular-nums keeps any
  * digit-heavy text (IDs, scores) aligned without a real monospace font. */
 .fl-mono {
-  font-family: var(--font-montserrat), -apple-system, "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-inter), -apple-system, "Segoe UI", Arial, sans-serif;
   font-variant-numeric: tabular-nums;
 }
 

@@ -1,3 +1,4 @@
+import { nicheArt } from "@/lib/nicheArt";
 import { HONEYPOT_HTML } from "@/lib/honeypot";
 import { SERIF_FONTS } from "@/lib/websiteContent";
 import type { ExtraElement } from "@/lib/websiteContentV2";
@@ -438,7 +439,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     const mainImage = safeUrl(s.image) ?? heroImage;
     // A fine frame where a photo goes, only while the owner is looking at the page in the library or the editor:
     // the published page never shows an empty frame (it simply lays out without the photo).
-    const photoSlot = (cls: string) => `<div class="ph-photo ${cls}"${imgMark} role="img" aria-label="Aquí va tu foto"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.500A2.500 2.500 0 0 1 6.500 6h1.300l1.100-1.600A1.500 1.500 0 0 1 10.100 3.700h3.800a1.500 1.500 0 0 1 1.200.700L16.200 6h1.300A2.500 2.500 0 0 1 20 8.500v8A2.500 2.500 0 0 1 17.500 19h-11A2.500 2.500 0 0 1 4 16.500v-8Z"/><circle cx="12" cy="12.500" r="3.200"/></svg><span>Tu foto aquí</span></div>`;
+    const photoSlot = (cls: string) => `<div class="ph-photo ${cls}"${imgMark} role="img" aria-label="Aquí va tu foto">${nicheArt(content.art)}<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.500A2.500 2.500 0 0 1 6.500 6h1.300l1.100-1.600A1.500 1.500 0 0 1 10.100 3.700h3.800a1.500 1.500 0 0 1 1.200.700L16.200 6h1.300A2.500 2.500 0 0 1 20 8.500v8A2.500 2.500 0 0 1 17.500 19h-11A2.500 2.500 0 0 1 4 16.500v-8Z"/><circle cx="12" cy="12.500" r="3.200"/></svg><span>Tu foto aquí</span></div>`;
     switch (s.type) {
       case "html": {
         if (!s.code.trim()) return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerá tu código HTML. Elige este bloque en <strong>Bloques</strong> y pégalo.</div></div></section>` : "";
@@ -1297,7 +1298,9 @@ section{position:relative}
 .ag-item p{color:var(--muted);margin:0}
 .host{display:grid;grid-template-columns:.9fr 1.1fr;gap:56px;align-items:center}
 .host-noimg{grid-template-columns:1fr}
-.ph-photo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;border:1px solid color-mix(in srgb,var(--text) 16%,transparent);border-radius:var(--r);background:linear-gradient(145deg,color-mix(in srgb,var(--text) 4%,transparent),color-mix(in srgb,var(--primary) 7%,transparent));color:color-mix(in srgb,var(--text) 38%,transparent);font-size:12px;letter-spacing:.04em}
+.ph-photo{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;border:1px solid color-mix(in srgb,var(--text) 16%,transparent);border-radius:var(--r);background:linear-gradient(145deg,color-mix(in srgb,var(--text) 4%,transparent),color-mix(in srgb,var(--primary) 7%,transparent));color:color-mix(in srgb,var(--text) 38%,transparent);font-size:12px;letter-spacing:.04em}
+.ph-art{position:absolute;inset:0;width:100%;height:100%;color:var(--primary);opacity:.55;pointer-events:none}
+.ph-photo>svg:not(.ph-art),.ph-photo>span{position:relative;z-index:1}
 .ph-4x3{aspect-ratio:4/3}
 .ph-wide{aspect-ratio:16/6;margin-top:56px}
 .host-img{width:100%;height:auto;max-height:72vh;object-fit:contain;background:var(--surface);border-radius:var(--r)}
