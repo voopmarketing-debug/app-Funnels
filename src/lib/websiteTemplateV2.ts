@@ -257,7 +257,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
   if (content.fullHtml) {
     const at = content.sections.findIndex((s, i) => s.type === "html" && s.code.trim() !== "" && !(content.hidden ?? []).includes(i));
     if (at >= 0) {
-      const src = `${ctx.trackingBasePath}/bloque/${at}${ctx.preview ? "?preview=1" : ""}`;
+      const src = `${ctx.trackingBasePath}/bloque/${at}${ctx.preview ? "?preview=1" : ""}${ctx.preview && ctx.edit ? "&edit=1" : ""}`;
       const first = content.sections[0];
       const title = esc(first && first.type === "hero" && first.heading ? first.heading : ctx.businessName);
       const editBtn = ctx.edit
@@ -442,7 +442,7 @@ export function renderWebsiteHtmlV2(content: WebsiteContentV2, ctx: RenderV2Cont
     switch (s.type) {
       case "html": {
         if (!s.code.trim()) return ctx.preview ? `<section class="sec"><div class="wrap"><div class="empty-note">Aquí aparecerá tu código HTML. Elige este bloque en <strong>Bloques</strong> y pégalo.</div></div></section>` : "";
-        const src = `${ctx.trackingBasePath}/bloque/${index}${ctx.preview ? "?preview=1" : ""}`;
+        const src = `${ctx.trackingBasePath}/bloque/${index}${ctx.preview ? "?preview=1" : ""}${ctx.preview && edit ? "&edit=1" : ""}`;
         const h = s.height > 0 ? `${s.height}px` : "320px";
         const editBtn = edit ? `<button type="button" data-code-edit="${index}" style="all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:8px 12px;background:#111827;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center">&lt;/&gt; Editar código de este bloque</button>` : "";
         return `<section class="htmlw">${editBtn}<iframe class="htmlw-frame" src="${esc(src)}" title="Contenido" loading="lazy" data-htmlframe sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals" referrerpolicy="no-referrer"${s.height > 0 ? "" : " data-autoheight"} style="height:${h}"></iframe></section>`;

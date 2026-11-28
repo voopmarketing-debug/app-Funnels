@@ -565,6 +565,37 @@ export function WebsiteBuilder({
     handlersRef.current = editorHandlers;
   });
 
+  // A text of the owner's own HTML was changed by clicking it on the page (the editing frame sends it here).
+  const htmlTextRef = useRef<(section: number, textIndex: number, text: string) => void>(() => undefined);
+  useEffect(() => {
+    htmlTextRef.current = (section, textIndex, text) => runBlock({ kind: "htmlText", index: section, textIndex, text }, "Guardando…");
+  });
+  const showAllStepsRef = useRef(false);
+  useEffect(() => {
+    function fromFrame(w: unknown): boolean {
+      // Only a frame inside the preview we show (the page, or a frame of the page).
+      try {
+        const src = w as Window;
+        return Array.from(document.querySelectorAll("iframe")).some((f) => f.contentWindow === src.parent);
+      } catch {
+        return false;
+      }
+    }
+    function onMessage(e: MessageEvent) {
+      const d = e.data as { flHtmlText?: boolean; section?: unknown; index?: unknown; text?: unknown; flHtmlAll?: unknown; flHtmlReady?: unknown } | null;
+      if (!d || typeof d !== "object" || !fromFrame(e.source)) return;
+      if (d.flHtmlText === true && typeof d.section === "number" && typeof d.index === "number" && typeof d.text === "string") {
+        htmlTextRef.current(d.section, d.index, d.text.slice(0, 2000));
+      } else if (typeof d.flHtmlAll === "boolean") {
+        showAllStepsRef.current = d.flHtmlAll;
+      } else if (d.flHtmlReady === true && showAllStepsRef.current) {
+        (e.source as Window).postMessage({ flShowAll: true }, "*");
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   const sel = selected !== null && selected < content.sections.length ? selected : null;
   // Editing comes first (like a page builder); the AI chat is the second way to change the page.
   // "Estilo" only exists while a block is chosen (it is that block's style): with nothing chosen it was an empty twin of Elementos.

@@ -3891,6 +3891,7 @@ const BlockOpSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("extras"), index: z.number().int(), extras: z.array(z.record(z.string(), z.string().max(600))).max(6) }),
   z.object({ kind: z.literal("galleryLayout"), index: z.number().int(), layout: z.enum(["grid", "mosaic", "carousel"]) }),
   z.object({ kind: z.literal("html"), index: z.number().int(), code: z.string().max(100_000), height: z.number().int().min(0).max(3000) }),
+  z.object({ kind: z.literal("htmlText"), index: z.number().int(), textIndex: z.number().int().min(0).max(5000), text: z.string().max(2000) }),
   z.object({ kind: z.literal("videoOpts"), index: z.number().int(), opts: z.record(z.string().max(12), z.union([z.number(), z.boolean(), z.null()])) }),
   z.object({ kind: z.literal("layoutStructure"), index: z.number().int(), structure: z.string().max(8).nullable() }),
   z.object({ kind: z.literal("cellItems"), index: z.number().int(), cell: z.number().int(), items: z.array(z.unknown()).max(8) }),

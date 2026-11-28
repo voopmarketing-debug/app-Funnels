@@ -16,15 +16,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const website = await prisma.website.findUnique({ where: { slug }, select: { published: true, content: true, businessId: true } });
   if (!website) return NOT_FOUND();
 
-  if (!website.published) {
+  // The builder asks for the editing frame (?edit=1): only a member of the business gets it, published or not.
+  const wantsEdit = req.nextUrl.searchParams.get("edit") === "1";
+  let isMember = false;
+  if (!website.published || wantsEdit) {
     const session = await auth();
-    const member = session?.user?.id
-      ? await prisma.membership.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: website.businessId } }, select: { id: true } })
-      : null;
-    if (!member) return NOT_FOUND();
+    isMember = session?.user?.id
+      ? !!(await prisma.membership.findUnique({ where: { userId_businessId: { userId: session.user.id, businessId: website.businessId } }, select: { id: true } }))
+      : false;
+    if (!website.published && !isMember) return NOT_FOUND();
   }
 
-  const doc = htmlBlockFromContent(website.content, index);
+  const doc = htmlBlockFromContent(website.content, index, wantsEdit && isMember);
   if (!doc) return NOT_FOUND();
   return new NextResponse(doc, { headers: HTML_BLOCK_HEADERS });
 }

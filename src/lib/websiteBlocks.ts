@@ -1,6 +1,7 @@
 import { BUTTON_LINK, ExtraSchema, FIELD_COLOR_KEY, FIELD_COLOR_VALUE, HTML_MAX_CHARS, MAX_EXTRAS, incompleteHtmlReason, SECTION_LABELS, WebsiteContentV2Schema, type Section, type SectionType, type WebsiteContentV2 } from "@/lib/websiteContentV2";
 import { mergeLook, type LookPatch } from "@/lib/websiteLook";
 import { cellsFor } from "@/lib/websiteStructures";
+import { replaceEditableText } from "@/lib/htmlText";
 import { z } from "zod";
 
 // The builder's block operations: add a block from the library, duplicate,
@@ -145,6 +146,8 @@ export type BlockOp =
   | { kind: "buttonLink"; index: number; key: string; url: string | null }
   | { kind: "fieldColor"; index: number; key: string; color: string | null }
   | { kind: "html"; index: number; code: string; height: number }
+  /** One text of a "Código HTML" block, changed by clicking it on the page (textIndex = its number among the code's texts). */
+  | { kind: "htmlText"; index: number; textIndex: number; text: string }
   | { kind: "eventDate"; index: number; date: string }
   | { kind: "extras"; index: number; extras: unknown[] }
   | { kind: "galleryLayout"; index: number; layout: "grid" | "mosaic" | "carousel" };
@@ -306,6 +309,16 @@ export function applyBlockOp(current: WebsiteContentV2, op: BlockOp, ctx: { firs
       else if (Object.keys(fc).length < 40 || op.key in fc) fc[op.key] = op.color;
       if (Object.keys(fc).length > 0) section.fc = fc;
       else delete section.fc;
+      focus = op.index;
+      break;
+    }
+    case "htmlText": {
+      const section = isInt(op.index) ? next.sections[op.index] : undefined;
+      if (!section || section.type !== "html" || !isInt(op.textIndex) || typeof op.text !== "string") return bad("No se pudo cambiar el texto.");
+      const code = replaceEditableText(section.code, op.textIndex, op.text);
+      if (code === null) return bad("Ese texto no se puede dejar vacío. Si quieres quitarlo, edita el código.");
+      if (code.length > HTML_MAX_CHARS) return bad("El código es demasiado largo (máximo 100.000 caracteres).");
+      section.code = code;
       focus = op.index;
       break;
     }
