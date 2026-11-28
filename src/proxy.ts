@@ -23,9 +23,23 @@ import { STORE_APP_COOKIE, STORE_APP_COOKIE_MAX_AGE, STORE_APP_HIDDEN_PATHS, sto
 // that rewrites its /agenda page to /agenda-llamada.
 const APP_HOSTS = new Set(["agente.funnelslabs.app", "agenda.funnelslabs.app", "localhost:3000", "localhost"]);
 
+// The main domain shows only the offer page (the platform itself lives on agente.funnelslabs.app, which keeps
+// working as it is): "/" is the offer, its files load, and any other page goes to the platform's address.
+const OFFER_HOST = "funnelslabs.app";
+const PLATFORM_ORIGIN = "https://agente.funnelslabs.app";
+
 export async function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const hostname = host.split(":")[0].toLowerCase();
+
+  if (hostname === OFFER_HOST || hostname === `www.${OFFER_HOST}`) {
+    const { pathname, search } = request.nextUrl;
+    if (hostname.startsWith("www.")) return NextResponse.redirect(`https://${OFFER_HOST}${pathname}${search}`, 308);
+    if (pathname === "/" || pathname === "/oferta") return NextResponse.rewrite(new URL("/oferta", request.url));
+    // Files of the page (images, videos, fonts) have an extension.
+    if (/\.[a-z0-9]{2,5}$/i.test(pathname)) return NextResponse.next();
+    return NextResponse.redirect(`${PLATFORM_ORIGIN}${pathname}${search}`, 308);
+  }
 
   if (APP_HOSTS.has(host) || APP_HOSTS.has(hostname) || hostname.endsWith(".vercel.app")) {
     // Inside the Android / iPhone app from the stores (it opens ?app=android|ios): no purchase

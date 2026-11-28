@@ -32,12 +32,13 @@ import { LANDING_VIDEOS } from "@/lib/landingVideos";
 import { TRIAL_DAYS } from "@/lib/plans";
 import "./landing.css";
 
-// Draft of the new offer landing. Not linked from anywhere and kept out of the
-// search engines until it replaces the one at "/".
+// The offer landing: it is what funnelslabs.app shows (see proxy.ts). The canonical address is the main domain,
+// so the same page under the platform's address does not compete with it.
 export const metadata: Metadata = {
   title: "Funnels Labs · Que ningún cliente se quede sin respuesta en tu WhatsApp",
   description: "Un asistente que contesta tu WhatsApp, agenda tus citas y te deja el negocio ordenado. Pruébalo 7 días gratis.",
-  robots: { index: false, follow: false },
+  alternates: { canonical: "https://funnelslabs.app" },
+  robots: { index: true, follow: true },
 };
 
 const CTA_PRIMARY = `Probar ${TRIAL_DAYS} días gratis`;
