@@ -18,6 +18,7 @@ import { AgendaWeek, mondayOf, type WeekAppointment } from "./AgendaWeek";
 import { draftToParam } from "@/lib/agendaDraft";
 import { AGENDA_STYLES, AGENDA_STYLE_DEFS, type AgendaStyle } from "@/lib/agendaStyles";
 import { durationLabel, MAX_AGENDA_SERVICES, type AgendaService } from "@/lib/agendaServices";
+import { FIELD_TYPES, FIELD_TYPE_LABELS, MAX_AGENDA_FIELDS, type AgendaField, type FieldType } from "@/lib/agendaFields";
 
 /** `#RRGGBB` + a 2-digit hex alpha (e.g. "26" ≈ 15%) — used to tint the calendar with the clinic's own primary color without a CSS color-mix dependency. */
 function withAlpha(hex: string, alpha: string): string {
@@ -122,6 +123,7 @@ export function AgendaEditor({
     logoUrl: string;
     askNote: boolean;
     services: AgendaService[];
+    fields: AgendaField[];
   };
   publicUrl: string;
   generatedAt: Date;
@@ -208,7 +210,7 @@ export function AgendaEditor({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       <div className="fl-card overflow-hidden p-0">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
           <h2 className="text-sm font-semibold text-ink">Calendario de citas</h2>
@@ -232,8 +234,8 @@ export function AgendaEditor({
             onWeekChange={changeWeek}
           />
         ) : (
-                <div className="grid md:grid-cols-[minmax(0,1fr)_240px]">
-          <div className="space-y-3 p-4">
+                <div className="grid md:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="mx-auto w-full max-w-lg space-y-3 p-5">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">{formatMonthLabel(monthStr)}</h2>
               <div className="flex items-center gap-1">
@@ -260,7 +262,7 @@ export function AgendaEditor({
               </div>
             </div>
 
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 justify-items-center gap-1.5">
               {MONTH_DAY_LABELS.map((d) => (
                 <div key={d} className="fl-mono py-1 text-center text-[12px] uppercase tracking-wide text-ink-faint">
                   {d}
@@ -276,7 +278,7 @@ export function AgendaEditor({
                     key={date}
                     type="button"
                     onClick={() => setSelectedDate(date)}
-                    className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-full text-sm transition ${
+                    className={`flex h-11 w-11 flex-col items-center justify-center gap-0.5 rounded-full text-sm transition ${
                       !inMonth ? "opacity-30" : ""
                     } ${isSelected ? "" : "hover:bg-surface-2"}`}
                     style={
@@ -417,10 +419,30 @@ export function AgendaEditor({
         <Section title="Dónde y cómo" defaultOpen>
           <TextField label="Dirección o sede" value={config.address} max={200} placeholder="Ej: Cra 15 # 93-20, consultorio 402, Bogotá" onChange={(v) => setConfig((c) => ({ ...c, address: v }))} />
           <TextField label="Link del mapa (opcional)" value={config.mapUrl} max={500} placeholder="https://maps.google.com/..." onChange={(v) => setConfig((c) => ({ ...c, mapUrl: v }))} />
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
-            <input type="checkbox" checked={config.askNote} onChange={(e) => setConfig((c) => ({ ...c, askNote: e.target.checked }))} className="h-4 w-4 cursor-pointer accent-accent" />
-            Preguntar el motivo de la cita
-          </label>
+        </Section>
+
+        <Section title={`Formulario de la cita (${config.fields.length} campos)`} defaultOpen>
+          <p className="text-xs text-ink-muted">Esto es lo que llena tu cliente al agendar. Cambia los textos, el orden y agrega los campos que necesites.</p>
+          {config.fields.map((f, i) => (
+            <FieldRow
+              key={f.id}
+              field={f}
+              first={i === 0}
+              last={i === config.fields.length - 1}
+              onChange={(next) => setConfig((c) => ({ ...c, fields: c.fields.map((x, j) => (j === i ? next : x)) }))}
+              onMove={(dir) =>
+                setConfig((c) => {
+                  const to = i + dir;
+                  if (to < 0 || to >= c.fields.length) return c;
+                  const copy = [...c.fields];
+                  [copy[i], copy[to]] = [copy[to], copy[i]];
+                  return { ...c, fields: copy };
+                })
+              }
+              onRemove={() => setConfig((c) => ({ ...c, fields: c.fields.filter((_, j) => j !== i) }))}
+            />
+          ))}
+          {config.fields.length < MAX_AGENDA_FIELDS && <AddFieldBar onAdd={(f) => setConfig((c) => ({ ...c, fields: [...c.fields, f] }))} />}
         </Section>
 
         <Section title={`Servicios (${config.services.length})`} defaultOpen={config.services.length > 0}>
@@ -652,6 +674,97 @@ export function StyleCard({ id, accent, selected, onSelect }: { id: AgendaStyle;
       <span className="mt-1.5 block px-0.5 text-xs font-semibold text-ink">{d.label}</span>
       <span className="block px-0.5 text-[11px] text-ink-faint">{d.hint}</span>
     </button>
+  );
+}
+
+const FIXED_KEYS = ["name", "contact"];
+
+function FieldRow({ field, first, last, onChange, onMove, onRemove }: { field: AgendaField; first: boolean; last: boolean; onChange: (next: AgendaField) => void; onMove: (dir: -1 | 1) => void; onRemove: () => void }) {
+  const fixed = !!field.key && FIXED_KEYS.includes(field.key);
+  const [optionsText, setOptionsText] = useState((field.options ?? []).join("\n"));
+  return (
+    <div className="space-y-2 rounded-md border border-border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-none flex-col">
+          <button type="button" disabled={first} onClick={() => onMove(-1)} aria-label="Subir campo" className="rounded px-1.5 text-xs leading-4 text-ink-muted hover:text-ink disabled:opacity-30">▲</button>
+          <button type="button" disabled={last} onClick={() => onMove(1)} aria-label="Bajar campo" className="rounded px-1.5 text-xs leading-4 text-ink-muted hover:text-ink disabled:opacity-30">▼</button>
+        </div>
+        <input value={field.label} maxLength={80} onChange={(e) => onChange({ ...field, label: e.target.value })} aria-label="Texto del campo" className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-accent" />
+        <select
+          value={field.type}
+          disabled={fixed || field.key === "email"}
+          onChange={(e) => {
+            const type = e.target.value as FieldType;
+            const options = type === "select" ? (field.options && field.options.length > 0 ? field.options : ["Opción 1", "Opción 2"]) : undefined;
+            if (type === "select") setOptionsText((options ?? []).join("\n"));
+            onChange({ ...field, type, options });
+          }}
+          aria-label="Tipo de campo"
+          className="rounded-md border border-border bg-background px-2 py-2 text-sm text-ink outline-none focus:border-accent disabled:opacity-60"
+        >
+          {FIELD_TYPES.map((t) => (
+            <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-7">
+        <label className={`flex items-center gap-1.5 text-xs ${fixed ? "text-ink-faint" : "text-ink-muted"}`}>
+          <input type="checkbox" checked={field.required} disabled={fixed} onChange={(e) => onChange({ ...field, required: e.target.checked })} className="h-4 w-4 cursor-pointer accent-accent" />
+          Obligatorio
+        </label>
+        {field.type !== "checkbox" && field.type !== "select" && field.type !== "date" && (
+          <input value={field.placeholder ?? ""} maxLength={80} onChange={(e) => onChange({ ...field, placeholder: e.target.value })} placeholder="Texto de ayuda (opcional)" aria-label="Texto de ayuda" className="min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent" />
+        )}
+        {fixed ? (
+          <span className="ml-auto text-[11px] text-ink-faint">Siempre se pide</span>
+        ) : (
+          <button type="button" onClick={onRemove} className="ml-auto text-xs font-medium text-error hover:underline">Quitar</button>
+        )}
+      </div>
+      {field.type === "select" && (
+        <div className="space-y-1 pl-7">
+          <label className="fl-mono text-[11px] tracking-wide text-ink-muted uppercase">Opciones (una por línea)</label>
+          <textarea
+            value={optionsText}
+            rows={3}
+            aria-label="Opciones (una por línea)"
+            onChange={(e) => {
+              setOptionsText(e.target.value);
+              onChange({ ...field, options: e.target.value.split("\n").map((o) => o.trim()).filter(Boolean).slice(0, 20) });
+            }}
+            className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm text-ink outline-none focus:border-accent"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddFieldBar({ onAdd }: { onAdd: (f: AgendaField) => void }) {
+  const [type, setType] = useState<FieldType>("text");
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+      <select value={type} onChange={(e) => setType(e.target.value as FieldType)} aria-label="Tipo del campo nuevo" className="rounded-md border border-border bg-background px-2 py-2 text-sm text-ink outline-none focus:border-accent">
+        {FIELD_TYPES.map((t) => (
+          <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={() =>
+          onAdd({
+            id: Math.random().toString(36).slice(2, 10),
+            type,
+            label: FIELD_TYPE_LABELS[type],
+            required: false,
+            ...(type === "select" ? { options: ["Opción 1", "Opción 2"] } : {}),
+          })
+        }
+        className="rounded-md border border-border-strong px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent"
+      >
+        + Agregar campo
+      </button>
+    </div>
   );
 }
 

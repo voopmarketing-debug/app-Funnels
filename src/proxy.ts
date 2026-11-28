@@ -123,6 +123,8 @@ export async function proxy(request: NextRequest) {
               slotMinutes: website.agendaConfig.slotMinutes,
               address: website.agendaConfig.address,
               mapUrl: website.agendaConfig.mapUrl,
+              fields: website.agendaConfig.fields,
+              askNote: website.agendaConfig.askNote,
               professionals: website.agendaConfig.professionals,
             });
 

@@ -81,6 +81,7 @@ import { clientIpFrom, isHoneypotFilled, overLimit } from "@/lib/abuseGuard";
 import { headers } from "next/headers";
 import { agendaStyleOrDefault } from "@/lib/agendaStyles";
 import { parseServices } from "@/lib/agendaServices";
+import { parseFields } from "@/lib/agendaFields";
 import { safeHttpUrl } from "@/lib/agendaTemplate";
 import { isAgencyAdmin, requireActiveAccount, requireBusinessMembership, requireBusinessOwnerOrAdmin } from "@/lib/authz";
 import { INDUSTRY_OPTIONS } from "@/lib/agentOptions";
@@ -2813,6 +2814,7 @@ export async function updateAgendaConfig(
     logoUrl: string;
     askNote: boolean;
     services: unknown;
+    fields: unknown;
   },
 ): Promise<void> {
   const session = await auth();
@@ -2845,8 +2847,9 @@ export async function updateAgendaConfig(
   if (input.logoUrl.trim() && !logoUrl) throw new Error("El logo no es válido");
   const askNote = !!input.askNote;
   const services = parseServices(input.services);
+  const formFields = parseFields(input.fields);
 
-  const fields = { notificationEmail, timezone, slotMinutes, availability, primaryColor, style, title, subtitle, address, mapUrl, logoUrl, askNote, services };
+  const fields = { notificationEmail, timezone, slotMinutes, availability, primaryColor, style, title, subtitle, address, mapUrl, logoUrl, askNote, services, fields: formFields };
   await prisma.agendaConfig.upsert({
     where: { websiteId },
     create: { websiteId, ...fields },

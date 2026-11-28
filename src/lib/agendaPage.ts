@@ -12,6 +12,7 @@ import {
 import { parseServices } from "@/lib/agendaServices";
 import { formatDateInZone } from "@/lib/timezone";
 import { parseAgendaDraft } from "@/lib/agendaDraft";
+import { effectiveFields } from "@/lib/agendaFields";
 import { renderAgendaHtml } from "@/lib/agendaTemplate";
 
 /** What the public pages (the /sitio/<slug> route and custom domains) load for an agenda. */
@@ -29,6 +30,7 @@ export const AGENDA_CONFIG_SELECT = {
   logoUrl: true,
   askNote: true,
   services: true,
+  fields: true,
   professionals: {
     where: { active: true },
     orderBy: { position: "asc" },
@@ -156,6 +158,7 @@ export async function renderAgendaPage(params: {
     logoUrl: config.logoUrl,
     whatsapp: params.whatsappNumber,
     askNote: config.askNote,
+    fields: draft?.fields ?? effectiveFields(config.fields, config.askNote),
     services,
     serviceId: service?.id ?? null,
     professionals: professionals.map((p) => ({ id: p.id, name: p.name, title: p.title, photoUrl: p.photoUrl })),

@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/email";
 import { buildIcsEvent } from "@/lib/ics";
 import { upsertLeadConversation } from "@/lib/crmIntake";
 import { sendBookingConfirmation } from "@/lib/appointmentConfirmation";
+import { collectSubmission, effectiveFields } from "@/lib/agendaFields";
 
 // The name/contact/email fields below come straight from a public,
 // unauthenticated form — interpolated raw into an HTML email body, they'd
@@ -35,6 +36,9 @@ export async function submitAgendaBooking(params: {
   // Shown in the visitor's confirmation (optional).
   address?: string | null;
   mapUrl?: string | null;
+  // The booking form (the owner's fields) and the old "ask the reason" switch.
+  fields?: unknown;
+  askNote?: boolean;
   // Every professional on this agenda (id/name/email/pipelineId) — passed
   // in by the caller (route.ts/proxy.ts, which already fetched this for the
   // picker), so this function doesn't need its own extra query. Which one
@@ -47,15 +51,14 @@ export async function submitAgendaBooking(params: {
 }): Promise<AgendaBookingOutcome> {
   const dateStr = String(params.formData.get("date") ?? "");
   const timeStr = String(params.formData.get("time") ?? "");
-  const name = String(params.formData.get("name") ?? "").trim().slice(0, 120);
-  const contact = String(params.formData.get("contact") ?? "").trim().slice(0, 120);
-  const email = String(params.formData.get("email") ?? "").trim().slice(0, 180);
+  const submitted = collectSubmission(effectiveFields(params.fields, params.askNote ?? true), (n) => String(params.formData.get(n) ?? ""));
+  if (!submitted.ok) return { ok: false, dateStr, error: submitted.error };
+  const { name, contact, email, note, answers } = submitted;
   const requestedProfessionalId = String(params.formData.get("professional") ?? "").trim() || null;
   const serviceId = String(params.formData.get("service") ?? "").trim().slice(0, 40) || null;
-  const note = String(params.formData.get("note") ?? "").trim().slice(0, 500);
 
-  if (!dateStr || !timeStr || !name || !contact) {
-    return { ok: false, dateStr, error: "Faltan datos — completa nombre y contacto." };
+  if (!dateStr || !timeStr) {
+    return { ok: false, dateStr, error: "Faltan datos: elige el día y la hora." };
   }
 
   const result = await bookAppointment({
@@ -68,6 +71,7 @@ export async function submitAgendaBooking(params: {
     professionalId: requestedProfessionalId,
     serviceId,
     note: note || null,
+    answers,
   });
   if (!result.ok) {
     return { ok: false, dateStr, error: result.error };
@@ -93,12 +97,14 @@ export async function submitAgendaBooking(params: {
   // business sees the real date/time/professional without re-typing it.
   const professionalNote = assignedProfessional ? ` con ${assignedProfessional.name}` : "";
   const serviceNote = result.service ? ` — ${result.service}` : "";
+  const answersText = answers.map((a) => `${a.label}: ${a.value}`).join("; ");
+  const answersHtml = answers.map((a) => `<br>${escapeHtml(a.label)}: ${escapeHtml(a.value)}`).join("");
   await upsertLeadConversation({
     websiteId: params.websiteId,
     name,
     contact,
     appointmentAt: result.startsAt,
-    appointmentNote: `Agendó desde la página${serviceNote} — ${dateLabel} a las ${timeStr}${professionalNote}${note ? `. Nota: ${note}` : ""}`,
+    appointmentNote: `Agendó desde la página${serviceNote} — ${dateLabel} a las ${timeStr}${professionalNote}${note ? `. Nota: ${note}` : ""}${answersText ? `. ${answersText}` : ""}`,
     pipelineId: assignedProfessional?.pipelineId ?? undefined,
   });
 
@@ -115,7 +121,7 @@ export async function submitAgendaBooking(params: {
   const icsContent = buildIcsEvent({
     uid: `${result.appointmentId}@funnelslabs.app`,
     summary: `${result.service ?? "Cita"}: ${name}${withProfessional} — ${params.businessName}`,
-    description: `Nombre: ${name}\nContacto: ${contact}${email ? `\nCorreo: ${email}` : ""}${result.service ? `\nServicio: ${result.service}` : ""}${note ? `\nNota: ${note}` : ""}`,
+    description: `Nombre: ${name}\nContacto: ${contact}${email ? `\nCorreo: ${email}` : ""}${result.service ? `\nServicio: ${result.service}` : ""}${note ? `\nNota: ${note}` : ""}${answers.map((a) => `\n${a.label}: ${a.value}`).join("")}`,
     location: address || undefined,
     startsAt: result.startsAt,
     endsAt,
@@ -128,7 +134,7 @@ export async function submitAgendaBooking(params: {
     html: `
       <p>Tienes una nueva cita agendada${withProfessional} desde tu página web.</p>
       <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
-      <p>${result.service ? `Servicio: ${escapeHtml(result.service)} (${result.durationMinutes} min)<br>` : ""}Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}${note ? `<br>Nota: ${escapeHtml(note)}` : ""}</p>
+      <p>${result.service ? `Servicio: ${escapeHtml(result.service)} (${result.durationMinutes} min)<br>` : ""}Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}${note ? `<br>Nota: ${escapeHtml(note)}` : ""}${answersHtml}</p>
     `,
     icsContent,
     icsFilename,
@@ -159,7 +165,7 @@ export async function submitAgendaBooking(params: {
       html: `
         <p>Te agendaron una cita en ${escapeHtml(params.businessName)}.</p>
         <p><strong>${escapeHtml(dateLabel)} a las ${escapeHtml(timeStr)}</strong></p>
-        <p>${result.service ? `Servicio: ${escapeHtml(result.service)}<br>` : ""}Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}${note ? `<br>Nota: ${escapeHtml(note)}` : ""}</p>
+        <p>${result.service ? `Servicio: ${escapeHtml(result.service)}<br>` : ""}Nombre: ${escapeHtml(name)}<br>Contacto: ${escapeHtml(contact)}${email ? `<br>Correo: ${escapeHtml(email)}` : ""}${note ? `<br>Nota: ${escapeHtml(note)}` : ""}${answersHtml}</p>
       `,
       icsContent,
       icsFilename,

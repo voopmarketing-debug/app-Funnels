@@ -624,6 +624,9 @@ model AgendaConfig {
   // What the visitor can book: [{ id, name, minutes, price?, description? }] (lib/agendaServices.ts).
   // Empty = a single kind of appointment of `slotMinutes`.
   services Json    @default("[]")
+  // The booking form's fields the owner edits: [{ id, key?, type, label, required, options? }] (lib/agendaFields.ts).
+  // Empty = the default four (name, contact, email, reason).
+  fields   Json    @default("[]")
 
   website       Website        @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   professionals Professional[]
@@ -686,6 +689,8 @@ model Appointment {
   // Null duration = the agenda's slot length (bookings made before services existed).
   service         String?
   note            String?
+  // Answers to the owner's own form fields: [{ label, value }].
+  answers         Json?
   durationMinutes Int?
   status         String   @default("confirmed") // "confirmed" | "cancelled"
   createdAt      DateTime @default(now())

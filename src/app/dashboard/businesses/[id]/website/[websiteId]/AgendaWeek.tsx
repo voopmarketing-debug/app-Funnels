@@ -13,6 +13,7 @@ export type WeekAppointment = {
   durationMinutes?: number | null;
   service?: string | null;
   note?: string | null;
+  answers?: { label: string; value: string }[] | null;
   professionalId?: string | null;
   professional?: { name: string } | null;
 };
@@ -201,6 +202,11 @@ export function AgendaWeek({
             {picked.service && <p className="text-ink">{picked.service}</p>}
             {picked.professional && <p className="text-xs text-ink-faint">{picked.professional.name}</p>}
             {picked.note && <p className="text-xs text-ink-muted">“{picked.note}”</p>}
+            {(picked.answers ?? []).map((a) => (
+              <p key={a.label} className="text-xs text-ink-muted">
+                <span className="text-ink-faint">{a.label}:</span> {a.value}
+              </p>
+            ))}
           </div>
           <div className="flex flex-none items-center gap-2">
             {pickedWa && (

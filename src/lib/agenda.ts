@@ -180,6 +180,8 @@ export async function bookAppointment(params: {
   professionalId?: string | null;
   serviceId?: string | null;
   note?: string | null;
+  // Answers to the owner's own form fields.
+  answers?: { label: string; value: string }[];
 }): Promise<BookAppointmentResult> {
   const config = await prisma.agendaConfig.findUnique({
     where: { websiteId: params.websiteId },
@@ -240,7 +242,8 @@ export async function bookAppointment(params: {
           email: params.email || null,
           startsAt,
           service: service?.name ?? null,
-          note: config.askNote ? params.note?.trim().slice(0, 500) || null : null,
+          note: params.note?.trim().slice(0, 500) || null,
+          answers: params.answers && params.answers.length > 0 ? params.answers : undefined,
           durationMinutes: duration,
         },
       });

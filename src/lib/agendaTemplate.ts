@@ -3,6 +3,7 @@ import { sanitizeHexColor, readableTextColor } from "@/lib/websiteTemplate";
 import { ANY_PROFESSIONAL_ID } from "@/lib/agendaAvailability";
 import { AGENDA_STYLE_DEFS, agendaStyleOrDefault, type AgendaStyle } from "@/lib/agendaStyles";
 import { durationLabel, type AgendaService } from "@/lib/agendaServices";
+import { DEFAULT_FIELDS, inputName, type AgendaField } from "@/lib/agendaFields";
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -68,6 +69,8 @@ export type AgendaPageParams = {
   logoUrl?: string | null;
   whatsapp?: string | null; // digits, to link "Escríbenos por WhatsApp"
   askNote?: boolean;
+  // The booking form's fields (the owner edits them); the default four when not given.
+  fields?: AgendaField[];
   // What can be booked — empty on an agenda with one kind of appointment (that step is skipped).
   services?: AgendaService[];
   serviceId?: string | null;
@@ -208,6 +211,33 @@ export function renderAgendaHtml(params: AgendaPageParams): string {
       <div class="cal-grid">${WEEKDAYS.map((w) => `<span class="wd">${w}</span>`).join("")}${cells.join("")}</div>
     </div>`;
 
+  // ---- The booking form's fields ----
+  const fieldHtml = (f: AgendaField) => {
+    const name = escapeHtml(inputName(f));
+    const label = `<span>${escapeHtml(f.label)}${f.required ? "" : " <em>(opcional)</em>"}</span>`;
+    const req = f.required ? " required" : "";
+    const ph = f.placeholder ? ` placeholder="${escapeHtml(f.placeholder)}"` : "";
+    switch (f.type) {
+      case "textarea":
+        return `<label class="field">${label}<textarea name="${name}" rows="2" maxlength="500"${ph}${req}></textarea></label>`;
+      case "select":
+        return `<label class="field">${label}<select name="${name}"${req}><option value="">Elige una opción</option>${(f.options ?? []).map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("")}</select></label>`;
+      case "checkbox":
+        return `<label class="check"><input type="checkbox" name="${name}" value="Sí"${req}><span>${escapeHtml(f.label)}${f.required ? "" : " <em>(opcional)</em>"}</span></label>`;
+      case "email":
+        return `<label class="field">${label}<input type="email" name="${name}" maxlength="180" autocomplete="${f.key === "email" ? "email" : "off"}"${ph}${req}></label>`;
+      case "phone":
+        return `<label class="field">${label}<input type="text" name="${name}" maxlength="120" inputmode="tel" autocomplete="${f.key === "contact" ? "tel" : "off"}"${ph}${req}></label>`;
+      case "number":
+        return `<label class="field">${label}<input type="text" name="${name}" maxlength="40" inputmode="decimal"${ph}${req}></label>`;
+      case "date":
+        return `<label class="field">${label}<input type="date" name="${name}"${req}></label>`;
+      default:
+        return `<label class="field">${label}<input type="text" name="${name}" maxlength="200" autocomplete="${f.key === "name" ? "name" : "off"}"${ph}${req}></label>`;
+    }
+  };
+  const formFields = (params.fields && params.fields.length > 0 ? params.fields : DEFAULT_FIELDS.filter((f) => f.key !== "note" || params.askNote !== false)).map(fieldHtml).join("\n        ");
+
   // ---- Right column: times / form / confirmation ----
   let sideHtml: string;
   if (params.confirmed) {
@@ -229,10 +259,7 @@ export function renderAgendaHtml(params: AgendaPageParams): string {
         <input type="hidden" name="time" value="${escapeHtml(params.timeStr)}">
         ${effectiveProfessionalId ? `<input type="hidden" name="professional" value="${escapeHtml(effectiveProfessionalId)}">` : ""}
         ${serviceId ? `<input type="hidden" name="service" value="${escapeHtml(serviceId)}">` : ""}
-        <label class="field"><span>Tu nombre</span><input type="text" name="name" maxlength="120" required autocomplete="name"></label>
-        <label class="field"><span>Tu WhatsApp o teléfono</span><input type="text" name="contact" maxlength="120" required autocomplete="tel" inputmode="tel"></label>
-        <label class="field"><span>Tu correo <em>(opcional)</em></span><input type="email" name="email" maxlength="180" autocomplete="email"></label>
-        ${params.askNote !== false ? `<label class="field"><span>Motivo de la cita <em>(opcional)</em></span><textarea name="note" rows="2" maxlength="500"></textarea></label>` : ""}
+        ${formFields}
         <button class="btn" type="submit">Confirmar cita</button>
       </form>`;
   } else {
@@ -362,7 +389,11 @@ ${fontLink(def)}
   .field { display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 600; }
   .field em { font-style: normal; font-weight: 400; color: var(--muted); }
   .field input, .field textarea { font: inherit; font-size: 15px; font-weight: 400; padding: 10px 12px; border-radius: calc(var(--radius) * .4); border: 1px solid color-mix(in srgb, var(--text) 20%, transparent); background: var(--surface); color: var(--text); resize: vertical; }
-  .field input:focus, .field textarea:focus, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .field select { font: inherit; font-size: 15px; font-weight: 400; padding: 10px 12px; border-radius: calc(var(--radius) * .4); border: 1px solid color-mix(in srgb, var(--text) 20%, transparent); background: var(--surface); color: var(--text); }
+  .check { display: flex; gap: 9px; align-items: flex-start; font-size: 14px; font-weight: 600; }
+  .check input { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--primary); }
+  .check em { font-style: normal; font-weight: 400; color: var(--muted); }
+  .field input:focus, .field textarea:focus, .field select:focus, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   .booking-error { color: #d92d20; font-size: 13px; font-weight: 600; margin: 0; }
   .back { display: inline-block; font-size: 13px; color: var(--muted); text-decoration: none; }
   .back:hover { text-decoration: underline; }

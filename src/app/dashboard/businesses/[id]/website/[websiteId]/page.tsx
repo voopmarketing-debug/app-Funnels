@@ -9,6 +9,7 @@ import { WebsiteBuilder } from "./WebsiteBuilder";
 import { WebsiteContentV2Schema, isV2Content } from "@/lib/websiteContentV2";
 import { AgendaEditor } from "./AgendaEditor";
 import { parseServices } from "@/lib/agendaServices";
+import { effectiveFields, parseAnswers } from "@/lib/agendaFields";
 import { agendaStyleOrDefault } from "@/lib/agendaStyles";
 import { TemplateBuilder } from "./TemplateBuilder";
 import { isTemplateContent } from "@/lib/templateSite/content";
@@ -56,12 +57,12 @@ export default async function WebsiteEditorPage({
         where: { websiteId, status: "confirmed" },
         orderBy: { startsAt: "asc" },
         take: 20,
-        select: { id: true, name: true, contact: true, startsAt: true, service: true, note: true, professional: { select: { name: true } } },
+        select: { id: true, name: true, contact: true, startsAt: true, service: true, note: true, answers: true, professional: { select: { name: true } } },
       }),
       prisma.appointment.findMany({
         where: { websiteId, status: "confirmed", startsAt: { gte: monthQueryStart, lt: monthQueryEnd } },
         orderBy: { startsAt: "asc" },
-        select: { id: true, name: true, contact: true, startsAt: true, durationMinutes: true, service: true, note: true, professionalId: true, professional: { select: { name: true } } },
+        select: { id: true, name: true, contact: true, startsAt: true, durationMinutes: true, service: true, note: true, answers: true, professionalId: true, professional: { select: { name: true } } },
       }),
       website.agendaConfig
         ? prisma.professional.findMany({ where: { agendaConfigId: website.agendaConfig.id }, orderBy: { position: "asc" } })
@@ -98,16 +99,17 @@ export default async function WebsiteEditorPage({
             logoUrl: website.agendaConfig?.logoUrl ?? "",
             askNote: website.agendaConfig?.askNote ?? true,
             services: parseServices(website.agendaConfig?.services),
+            fields: effectiveFields(website.agendaConfig?.fields, website.agendaConfig?.askNote ?? true),
           }}
           customDomain={website.customDomain}
           tracking={{ metaPixelId: website.metaPixelId, googleTagId: website.googleTagId }}
           generatedAt={website.updatedAt}
           publicUrl={`https://${appHost}/sitio/${website.slug}`}
           totalAppointments={totalAppointments}
-          upcomingAppointments={upcomingAppointments}
+          upcomingAppointments={upcomingAppointments.map((a) => ({ ...a, answers: parseAnswers(a.answers) }))}
           monthStr={monthStr}
           initialWeek={weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? weekParam : null}
-          monthAppointments={monthAppointments}
+          monthAppointments={monthAppointments.map((a) => ({ ...a, answers: parseAnswers(a.answers) }))}
           professionals={professionals.map((p) => ({
             id: p.id,
             name: p.name,
