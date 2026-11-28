@@ -50,9 +50,16 @@ export function WebsiteHome({
             <p className="mt-1 max-w-2xl text-sm text-ink-muted max-md:hidden">Elige una plantilla, edítala y publícala.</p>
             <p className="mt-1 max-w-2xl text-sm text-ink-muted md:hidden">Para crear o editar, entra desde un computador.</p>
           </div>
-          <div className="fl-seg flex w-full max-md:hidden sm:inline-flex sm:w-auto" role="radiogroup" aria-label="Sección">
+          <div className="flex w-full gap-1 rounded-full border border-border bg-surface p-1 max-md:hidden sm:inline-flex sm:w-auto" role="radiogroup" aria-label="Sección">
             {tabs.map(([key, Icon, label, short]) => (
-              <button key={key} type="button" role="radio" aria-checked={tab === key} onClick={() => setTab(key)} className="fl-seg-item flex-1 whitespace-nowrap px-2 py-2 text-sm sm:flex-none sm:px-4">
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={tab === key}
+                onClick={() => setTab(key)}
+                className={`flex-1 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition sm:flex-none ${tab === key ? "bg-ink text-background" : "text-ink-muted hover:text-ink"}`}
+              >
                 <Icon className="mr-1.5 hidden h-4 w-4 -translate-y-px sm:inline" />
                 <span className="sm:hidden">{short}</span>
                 <span className="hidden sm:inline">{label}</span>
